@@ -1594,6 +1594,8 @@ function renderRecipeSelectionGrid() {
     const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
     const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
     
+    console.log('Creating recipe card for:', recipe.name, 'with id:', recipe.id);
+    
     return `
       <div class="recipe-selection-card" onclick="selectRecipeForPlanning(${recipe.id})">
         <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
@@ -1626,13 +1628,20 @@ function getCategoryIcon(category) {
 }
 
 function selectRecipeForPlanning(recipeId) {
+  console.log('selectRecipeForPlanning called with recipeId:', recipeId);
+  console.log('AppState.selectedMealSlot:', AppState.selectedMealSlot);
+  
   if (!AppState.selectedMealSlot) {
+    console.log('No meal slot selected');
     showSuccessMessage('Please select a meal slot first.');
     return;
   }
   
   const { day, meal } = AppState.selectedMealSlot;
   const recipe = AppState.recipes.find(r => r.id === recipeId);
+  
+  console.log('Selected day:', day, 'meal:', meal);
+  console.log('Found recipe:', recipe);
   
   if (meal === 'snacks') {
     // For snacks, allow multiple recipes
@@ -1643,6 +1652,8 @@ function selectRecipeForPlanning(recipeId) {
     // For other meals, replace with new recipe
     AppState.weeklyPlan[day][meal] = recipeId;
   }
+  
+  console.log('Updated weekly plan:', AppState.weeklyPlan);
   
   // Close modal and update UI
   document.getElementById('recipe-selection-modal').classList.add('hidden');
