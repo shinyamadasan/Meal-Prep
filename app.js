@@ -1597,7 +1597,7 @@ function renderRecipeSelectionGrid() {
     console.log('Creating recipe card for:', recipe.name, 'with id:', recipe.id);
     
     return `
-      <div class="recipe-selection-card" onclick="selectRecipeForPlanning(${recipe.id})">
+      <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${recipe.id}')">
         <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
         <div class="recipe-title">${recipe.name}</div>
         <div class="recipe-meta">${recipe.category}</div>
@@ -2394,7 +2394,7 @@ function filterRecipesByNutrition() {
             <span class="nutrition-item-label">carbs</span>
           </div>
         </div>
-        <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning(${recipe.id})">Add to Plan</button>
+        <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning('${recipe.id}')">Add to Plan</button>
       </div>
     `;
   }).join('');
