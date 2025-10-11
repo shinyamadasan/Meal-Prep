@@ -1570,7 +1570,6 @@ function showSuccessMessage(message) {
 }
 
 function openRecipeSelectionModal(day, meal) {
-  console.log('openRecipeSelectionModal called with day:', day, 'meal:', meal);
   AppState.selectedMealSlot = { day, meal };
   
   const modal = document.getElementById('recipe-selection-modal');
@@ -1578,7 +1577,6 @@ function openRecipeSelectionModal(day, meal) {
   
   title.textContent = `Select a Recipe for ${day} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
   
-  console.log('AppState.selectedMealSlot set to:', AppState.selectedMealSlot);
   renderRecipeSelectionGrid();
   modal.classList.remove('hidden');
 }
@@ -1587,15 +1585,10 @@ function renderRecipeSelectionGrid() {
   const grid = document.getElementById('recipe-selection-grid');
   const searchTerm = document.getElementById('recipe-modal-search').value.toLowerCase();
   
-  console.log('renderRecipeSelectionGrid called, AppState.recipes:', AppState.recipes);
-  console.log('searchTerm:', searchTerm);
-  
   let filteredRecipes = AppState.recipes.filter(recipe => 
     recipe.name.toLowerCase().includes(searchTerm) || 
     recipe.category.toLowerCase().includes(searchTerm)
   );
-  
-  console.log('filteredRecipes:', filteredRecipes);
   
   grid.innerHTML = filteredRecipes.map(recipe => {
     const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
@@ -1633,21 +1626,13 @@ function getCategoryIcon(category) {
 }
 
 function selectRecipeForPlanning(recipeId) {
-  console.log('selectRecipeForPlanning called with recipeId:', recipeId);
-  console.log('AppState.selectedMealSlot:', AppState.selectedMealSlot);
-  console.log('AppState.recipes:', AppState.recipes);
-  
   if (!AppState.selectedMealSlot) {
-    console.log('No meal slot selected');
     showSuccessMessage('Please select a meal slot first.');
     return;
   }
   
   const { day, meal } = AppState.selectedMealSlot;
   const recipe = AppState.recipes.find(r => r.id === recipeId);
-  
-  console.log('Selected day:', day, 'meal:', meal);
-  console.log('Found recipe:', recipe);
   
   if (meal === 'snacks') {
     // For snacks, allow multiple recipes
@@ -1659,13 +1644,11 @@ function selectRecipeForPlanning(recipeId) {
     AppState.weeklyPlan[day][meal] = recipeId;
   }
   
-  console.log('Updated weekly plan:', AppState.weeklyPlan);
-  
   // Close modal and update UI
   document.getElementById('recipe-selection-modal').classList.add('hidden');
   renderWeeklyPlanner();
   updateWeeklyStats();
-  saveToLocalStorage();
+  saveData();
   
   // Show success message
   showSuccessMessage(`${recipe?.name || 'Recipe'} added to ${day} ${meal}!`);
