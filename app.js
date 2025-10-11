@@ -1,0 +1,3506 @@
+// Global state management
+const AppState = {
+  recipes: [],
+  weeklyPlan: {
+    Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+  },
+  groceryList: [],
+  currentEditingRecipe: null,
+  selectedRecipeForPlanning: null,
+  nutritionGoals: {
+    calories: 2000,
+    protein: 150,
+    carbs: 250,
+    fat: 67,
+    fiber: 25,
+    sodium: 2300
+  },
+  currentEditingIngredient: null,
+  currentEditingHack: null,
+  customIngredients: [],
+  customHacks: [],
+  currentUser: null,
+  isOnline: navigator.onLine
+};
+
+// Local Storage Management
+const STORAGE_KEY = 'mealPrepAppData';
+
+function saveToLocalStorage() {
+  try {
+    const dataToSave = {
+      recipes: AppState.recipes,
+      weeklyPlan: AppState.weeklyPlan,
+      groceryList: AppState.groceryList,
+      nutritionGoals: AppState.nutritionGoals,
+      customIngredients: AppState.customIngredients,
+      customHacks: AppState.customHacks,
+      lastSaved: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    console.log('Data saved to local storage');
+  } catch (error) {
+    console.error('Error saving to local storage:', error);
+    showErrorMessage('Failed to save data. Please check your browser storage settings.');
+  }
+}
+
+function loadFromLocalStorage() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      AppState.recipes = data.recipes || [];
+      AppState.weeklyPlan = data.weeklyPlan || {
+        Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+      };
+      AppState.groceryList = data.groceryList || [];
+      AppState.nutritionGoals = data.nutritionGoals || {
+        calories: 2000,
+        protein: 150,
+        carbs: 250,
+        fat: 67,
+        fiber: 25,
+        sodium: 2300
+      };
+      AppState.customIngredients = data.customIngredients || [];
+      AppState.customHacks = data.customHacks || [];
+      
+      console.log('Data loaded from local storage');
+      if (data.lastSaved) {
+        showSuccessMessage(`Data loaded (last saved: ${new Date(data.lastSaved).toLocaleString()})`);
+      }
+      return true;
+    }
+  } catch (error) {
+    console.error('Error loading from local storage:', error);
+    showErrorMessage('Failed to load saved data. Starting with fresh data.');
+  }
+  return false;
+}
+
+function clearLocalStorage() {
+  if (confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {
+    localStorage.removeItem(STORAGE_KEY);
+    showSuccessMessage('All saved data has been cleared.');
+    // Reload the page to reset to default state
+    location.reload();
+  }
+}
+
+function showErrorMessage(message) {
+  const existingMessage = document.querySelector('.error-message');
+  if (existingMessage) {
+    existingMessage.remove();
+  }
+  
+  const messageEl = document.createElement('div');
+  messageEl.className = 'error-message';
+  messageEl.textContent = message;
+  document.body.appendChild(messageEl);
+  
+  setTimeout(() => messageEl.classList.add('show'), 100);
+  setTimeout(() => {
+    messageEl.classList.remove('show');
+    setTimeout(() => messageEl.remove(), 300);
+  }, 5000);
+}
+
+// Updated cooking hacks data with realistic Philippine context
+const defaultCookingHacks = [
+  {
+    id: 1,
+    category: "Batch Cooking",
+    title: "Rice and Kamote Prep",
+    description: "Cook brown rice + kamote in bulk → refrigerate. Reheat portions throughout the week.",
+    timeSaved: "15-20 minutes per meal",
+    costSavings: ""
+  },
+  {
+    id: 2,
+    category: "Storage",
+    title: "Egg Prep Strategy",
+    description: "Hard-boil a dozen eggs at once. They last 7 days refrigerated and make instant protein.",
+    timeSaved: "10 minutes daily",
+    costSavings: ""
+  },
+  {
+    id: 3,
+    category: "Equipment",
+    title: "One-Pan Veggie Method",
+    description: "Use 1 pan for sautéing all veggie dishes. Clean once, cook multiple vegetables.",
+    timeSaved: "10-15 minutes cleanup",
+    costSavings: ""
+  },
+  {
+    id: 4,
+    category: "Budget",
+    title: "Bone-In Cuts",
+    description: "Chicken thighs and legs are cheaper than breast and more flavorful for stews.",
+    timeSaved: "",
+    costSavings: "₱50-100 per kilo"
+  },
+  {
+    id: 5,
+    category: "Storage",
+    title: "2-Hour Safety Rule", 
+    description: "Refrigerate cooked food within 2 hours (1 hour if very hot) to prevent spoilage.",
+    timeSaved: "",
+    costSavings: ""
+  },
+  {
+    id: 6,
+    category: "Budget",
+    title: "Seasonal Vegetables",
+    description: "Buy whatever vegetables are in season and abundant at the market.",
+    timeSaved: "",
+    costSavings: "₱200-300 per week"
+  }
+];
+
+// Enhanced storage guide data with corrected Philippine pricing and nutrition
+const defaultStorageData = [
+  {
+    id: 1,
+    name: "Chicken thighs",
+    category: "Protein",
+    fridgeLife: 2,
+    freezerLife: 270,
+    pricePerUnit: 190,
+    unit: "per kg",
+    storageMethod: "Refrigerate in original packaging or airtight container",
+    storageTips: "Store on bottom shelf. Use within 2 days or freeze immediately.",
+    calories: 209,
+    protein: 26,
+    carbs: 0,
+    fat: 11,
+    fiber: 0,
+    sodium: 82
+  },
+  {
+    name: "Salmon fillet", 
+    category: "Protein",
+    fridgeLife: 2,
+    freezerLife: 180,
+    storageMethod: "Wrap in plastic wrap, store in coldest part of fridge",
+    storageTips: "Best used within 24 hours. Pat dry before cooking."
+  },
+  {
+    id: 3,
+    name: "Eggs",
+    category: "Protein",
+    fridgeLife: 35,
+    freezerLife: 365,
+    pricePerUnit: 7,
+    unit: "per piece",
+    storageMethod: "Keep in original carton in main body of fridge",
+    storageTips: "Don't store in door. Can freeze beaten eggs in ice cube trays.",
+    calories: 70,
+    protein: 6,
+    carbs: 0.6,
+    fat: 5,
+    fiber: 0,
+    sodium: 70
+  },
+  {
+    name: "Greek yogurt",
+    category: "Dairy",
+    fridgeLife: 14,
+    freezerLife: 60,
+    storageMethod: "Keep sealed, store in main body of fridge",
+    storageTips: "Stir if separated. Freezing changes texture but good for smoothies."
+  },
+  {
+    name: "Tofu",
+    category: "Protein",
+    fridgeLife: 7,
+    freezerLife: 180,
+    storageMethod: "Keep in water, change water daily if opened",
+    storageTips: "Freeze to change texture for better absorption of flavors."
+  },
+  {
+    name: "Red lentils",
+    category: "Protein",
+    fridgeLife: 1825,
+    freezerLife: 1825,
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Can last years if stored properly. Check for bugs before use."
+  },
+  {
+    name: "Broccoli",
+    category: "Vegetable",
+    fridgeLife: 7,
+    freezerLife: 365,
+    storageMethod: "Store unwashed in perforated plastic bag",
+    storageTips: "Blanch 3 minutes before freezing. Don't wash until ready to use."
+  },
+  {
+    name: "Carrots",
+    category: "Vegetable",
+    fridgeLife: 21,
+    freezerLife: 365,
+    storageMethod: "Remove green tops, store in crisper drawer",
+    storageTips: "Keep away from apples. Can freeze without blanching if sliced."
+  },
+  {
+    name: "Onion",
+    category: "Vegetable",
+    fridgeLife: 60,
+    freezerLife: 365,
+    storageMethod: "Store whole in cool, dry, well-ventilated area",
+    storageTips: "Don't refrigerate whole onions. Can freeze chopped onions for cooking."
+  },
+  {
+    name: "Garlic cloves",
+    category: "Vegetable",
+    fridgeLife: 90,
+    freezerLife: 365,
+    storageMethod: "Store whole bulbs in cool, dry place with good air circulation",
+    storageTips: "Don't refrigerate whole bulbs. Can freeze peeled cloves in oil."
+  },
+  {
+    name: "Fresh ginger",
+    category: "Vegetable",
+    fridgeLife: 21,
+    freezerLife: 180,
+    storageMethod: "Store unpeeled in crisper drawer",
+    storageTips: "Can grate frozen ginger directly into dishes. Peel with spoon edge."
+  },
+  {
+    name: "Scallions",
+    category: "Vegetable",
+    fridgeLife: 7,
+    freezerLife: 365,
+    storageMethod: "Wrap in damp paper towel, store in plastic bag",
+    storageTips: "Can regrow in water. Freeze chopped for cooking use only."
+  },
+  {
+    name: "Soy sauce",
+    category: "Pantry",
+    fridgeLife: 1095,
+    freezerLife: 1095,
+    storageMethod: "Store in cool, dark place or refrigerate after opening",
+    storageTips: "Quality best for 3 years. Won't spoil but may lose flavor over time."
+  },
+  {
+    name: "White vinegar",
+    category: "Pantry",
+    fridgeLife: 1825,
+    freezerLife: 1825,
+    storageMethod: "Store in cool, dark place",
+    storageTips: "Never spoils due to acidity. May develop sediment but still safe."
+  },
+  {
+    name: "Sesame oil",
+    category: "Pantry",
+    fridgeLife: 730,
+    freezerLife: 730,
+    storageMethod: "Refrigerate after opening",
+    storageTips: "Goes rancid quickly. Buy small bottles and refrigerate."
+  },
+  {
+    name: "Bay leaves",
+    category: "Pantry",
+    fridgeLife: 1095,
+    freezerLife: 1095,
+    storageMethod: "Store in airtight container in cool, dark place",
+    storageTips: "Whole leaves last longer than crushed. Replace yearly for best flavor."
+  },
+  {
+    name: "Mixed berries",
+    category: "Fruit",
+    fridgeLife: 5,
+    freezerLife: 365,
+    storageMethod: "Don't wash until ready to eat, store in breathable container",
+    storageTips: "Remove any moldy berries immediately. Freeze on tray first, then bag."
+  },
+  {
+    name: "Granola",
+    category: "Pantry",
+    fridgeLife: 180,
+    freezerLife: 365,
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Refrigerate in humid climates. Can freeze to extend life."
+  },
+  {
+    name: "Honey",
+    category: "Pantry",
+    fridgeLife: 1825,
+    freezerLife: 1825,
+    storageMethod: "Store at room temperature in tightly sealed container",
+    storageTips: "Never spoils. Crystallization is normal - warm to reliquefy."
+  },
+  {
+    name: "Rolled oats",
+    category: "Grain",
+    fridgeLife: 730,
+    freezerLife: 730,
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Can refrigerate or freeze to extend life. Check for rancid smell."
+  },
+  {
+    name: "Milk",
+    category: "Dairy",
+    fridgeLife: 7,
+    freezerLife: 90,
+    storageMethod: "Keep in main body of fridge at 40°F or below",
+    storageTips: "Don't store in door. Freezing changes texture but good for cooking."
+  },
+  {
+    name: "Chia seeds",
+    category: "Pantry",
+    fridgeLife: 1460,
+    freezerLife: 1460,
+    pricePerUnit: 80,
+    unit: "per 100g",
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Can refrigerate to extend life. High in omega-3s, keep sealed."
+  },
+  {
+    name: "Sayote",
+    category: "Vegetable",
+    fridgeLife: 14,
+    freezerLife: 365,
+    pricePerUnit: 25,
+    unit: "per kilo",
+    storageMethod: "Store in cool, dry place or crisper drawer",
+    storageTips: "Can be stored at room temperature for a week. Refrigerate for longer storage."
+  },
+  {
+    name: "Pechay",
+    category: "Vegetable",
+    fridgeLife: 5,
+    freezerLife: 365,
+    pricePerUnit: 15,
+    unit: "per bundle",
+    storageMethod: "Wrap in damp paper towel, store in plastic bag",
+    storageTips: "Very perishable. Use within 3-5 days. Blanch before freezing."
+  },
+  {
+    name: "Malunggay",
+    category: "Vegetable",
+    fridgeLife: 3,
+    freezerLife: 365,
+    pricePerUnit: 10,
+    unit: "per bundle",
+    storageMethod: "Store like herbs - in water or wrapped in damp paper towel",
+    storageTips: "Extremely perishable. Freeze leaves for longer storage."
+  },
+  {
+    name: "Kangkong",
+    category: "Vegetable",
+    fridgeLife: 3,
+    freezerLife: 365,
+    pricePerUnit: 12,
+    unit: "per bundle",
+    storageMethod: "Store cut stems in water, refrigerate leaves",
+    storageTips: "Use quickly. Can regrow stems in water."
+  },
+  {
+    name: "Kalabasa",
+    category: "Vegetable",
+    fridgeLife: 30,
+    freezerLife: 365,
+    pricePerUnit: 40,
+    unit: "per kilo",
+    storageMethod: "Store whole in cool, dry place. Cut pieces in fridge.",
+    storageTips: "Whole squash lasts weeks. Once cut, use within a week."
+  },
+  {
+    name: "Fish sauce",
+    category: "Pantry",
+    fridgeLife: 1095,
+    freezerLife: 1095,
+    pricePerUnit: 25,
+    unit: "per 200ml bottle",
+    storageMethod: "Store in cool, dark place or refrigerate",
+    storageTips: "Very long shelf life. Quality best for 2-3 years."
+  },
+  {
+    name: "Coconut milk",
+    category: "Pantry",
+    fridgeLife: 5,
+    freezerLife: 180,
+    pricePerUnit: 45,
+    unit: "per 400ml can",
+    storageMethod: "Refrigerate after opening, freeze in ice cube trays",
+    storageTips: "Separation is normal - stir before use."
+  },
+  {
+    name: "Calamansi",
+    category: "Fruit",
+    fridgeLife: 14,
+    freezerLife: 180,
+    pricePerUnit: 20,
+    unit: "per kilo",
+    storageMethod: "Store in crisper drawer",
+    storageTips: "Juice and freeze in ice trays for longer use."
+  },
+  {
+    name: "Gochujang",
+    category: "Pantry",
+    fridgeLife: 365,
+    freezerLife: 365,
+    pricePerUnit: 120,
+    unit: "per 500g container",
+    storageMethod: "Refrigerate after opening",
+    storageTips: "Long shelf life. A little goes a long way for flavor."
+  },
+  {
+    name: "Kimchi",
+    category: "Vegetable",
+    fridgeLife: 30,
+    freezerLife: 180,
+    pricePerUnit: 180,
+    unit: "per 500g jar",
+    storageMethod: "Keep refrigerated in original brine",
+    storageTips: "Gets more sour over time. Use older kimchi for cooking."
+  },
+  {
+    name: "Curry powder",
+    category: "Pantry",
+    fridgeLife: 1095,
+    freezerLife: 1095,
+    pricePerUnit: 35,
+    unit: "per 50g packet",
+    storageMethod: "Store in airtight container in cool, dark place",
+    storageTips: "Whole spices last longer than ground. Toast before using for better flavor."
+  },
+  {
+    name: "Garam masala",
+    category: "Pantry",
+    fridgeLife: 730,
+    freezerLife: 730,
+    pricePerUnit: 45,
+    unit: "per 50g packet",
+    storageMethod: "Store in airtight container away from light",
+    storageTips: "Loses potency over time. Buy in small quantities."
+  },
+  {
+    name: "Tomato puree",
+    category: "Pantry",
+    fridgeLife: 5,
+    freezerLife: 180,
+    pricePerUnit: 25,
+    unit: "per 200g can",
+    storageMethod: "Refrigerate after opening",
+    storageTips: "Freeze leftover portions in ice cube trays for easy use."
+  },
+  {
+    name: "Greek yogurt",
+    category: "Dairy",
+    fridgeLife: 14,
+    freezerLife: 60,
+    pricePerUnit: 35,
+    unit: "per 200g container",
+    storageMethod: "Keep sealed, store in main body of fridge",
+    storageTips: "Stir if separated. Freezing changes texture but good for smoothies."
+  },
+  {
+    name: "Banana",
+    category: "Fruit",
+    fridgeLife: 7,
+    freezerLife: 180,
+    storageMethod: "Store at room temperature, refrigerate when ripe",
+    storageTips: "Peel darkens in fridge but fruit is fine. Freeze peeled for smoothies."
+  },
+  {
+    name: "Peanut butter",
+    category: "Pantry",
+    fridgeLife: 270,
+    freezerLife: 365,
+    storageMethod: "Store in cool, dry place or refrigerate after opening",
+    storageTips: "Natural PB should be refrigerated. Stir before use if separated."
+  },
+  {
+    name: "Vegetable broth",
+    category: "Pantry",
+    fridgeLife: 5,
+    freezerLife: 180,
+    storageMethod: "Refrigerate opened cartons, freeze in ice cube trays",
+    storageTips: "Use within 5 days of opening. Freeze portions for easy use."
+  },
+  {
+    id: 2,
+    name: "White fish fillet",
+    category: "Protein", 
+    fridgeLife: 1,
+    freezerLife: 180,
+    pricePerUnit: 300,
+    unit: "per kg",
+    storageMethod: "Store on ice in coldest part of fridge",
+    storageTips: "Use within 24 hours for best quality. Should smell like ocean, not fishy.",
+    calories: 128,
+    protein: 26,
+    carbs: 0,
+    fat: 3,
+    fiber: 0,
+    sodium: 78
+  },
+  {
+    id: 15,
+    name: "Brown rice", 
+    category: "Grain",
+    fridgeLife: 180,
+    freezerLife: 365,
+    pricePerUnit: 60,
+    unit: "per kg",
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Shorter shelf life than white rice due to oils. Can refrigerate or freeze.",
+    calories: 123,
+    protein: 2.6,
+    carbs: 23,
+    fat: 1,
+    fiber: 2,
+    sodium: 5
+  },
+  {
+    name: "Quinoa",
+    category: "Grain",
+    fridgeLife: 730,
+    freezerLife: 1095,
+    storageMethod: "Store in airtight container in cool, dry place",
+    storageTips: "Rinse before cooking to remove bitter coating. Very long shelf life."
+  }
+];
+
+// Sample recipe data with corrected pricing and nutrition data
+const sampleRecipes = [
+  {
+    id: 1,
+    name: "Instant Pot Chicken Adobo",
+    basePrepTime: 10,
+    baseCookTime: 20,
+    baseServings: 4,
+    currentServings: 4,
+    category: "Main Dish",
+    fridgeLife: 4,
+    freezerLife: 90,
+    storageNotes: "Store in shallow containers. Reheat thoroughly.",
+    baseIngredients: [
+      { name: "Chicken thighs", baseQuantity: 2, unit: "lbs", category: "Protein" },
+      { name: "Soy sauce", baseQuantity: 0.5, unit: "cup", category: "Pantry" },
+      { name: "White vinegar", baseQuantity: 0.25, unit: "cup", category: "Pantry" },
+      { name: "Garlic cloves", baseQuantity: 6, unit: "pieces", category: "Vegetable" },
+      { name: "Bay leaves", baseQuantity: 3, unit: "pieces", category: "Pantry" }
+    ],
+    instructions: "Add all ingredients to Instant Pot. Pressure cook high 8 minutes, quick release. Remove chicken, reduce sauce on sauté mode. Serve over rice."
+  },
+  {
+    id: 2,
+    name: "Greek Yogurt Parfait",
+    basePrepTime: 5,
+    baseCookTime: 0,
+    baseServings: 1,
+    currentServings: 1,
+    category: "Breakfast",
+    fridgeLife: 2,
+    freezerLife: 30,
+    storageNotes: "Best fresh. Granola gets soggy if stored assembled.",
+    baseIngredients: [
+      { name: "Greek yogurt", baseQuantity: 1, unit: "cup", category: "Dairy" },
+      { name: "Mixed berries", baseQuantity: 0.5, unit: "cup", category: "Fruit" },
+      { name: "Granola", baseQuantity: 0.25, unit: "cup", category: "Pantry" },
+      { name: "Honey", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
+    ],
+    instructions: "Layer yogurt, berries, and granola in a jar. Drizzle with honey. Add granola just before eating to maintain crunch."
+  },
+  {
+    id: 3,
+    name: "Steamed Fish with Ginger",
+    basePrepTime: 15,
+    baseCookTime: 8,
+    baseServings: 2,
+    currentServings: 2,
+    category: "Main Dish",
+    fridgeLife: 2,
+    freezerLife: 60,
+    storageNotes: "Best consumed fresh. Do not reheat in microwave.",
+    baseIngredients: [
+      { name: "White fish fillet", baseQuantity: 1, unit: "lb", category: "Protein" },
+      { name: "Fresh ginger", baseQuantity: 2, unit: "inches", category: "Vegetable" },
+      { name: "Scallions", baseQuantity: 3, unit: "stalks", category: "Vegetable" },
+      { name: "Soy sauce", baseQuantity: 2, unit: "tbsp", category: "Pantry" },
+      { name: "Sesame oil", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "Slice ginger and place under fish. Steam 8 minutes. Top with scallions, soy sauce, and hot sesame oil."
+  },
+  {
+    id: 4,
+    name: "Overnight Oats",
+    basePrepTime: 5,
+    baseCookTime: 0,
+    baseServings: 1,
+    currentServings: 1,
+    category: "Breakfast",
+    fridgeLife: 4,
+    freezerLife: 30,
+    storageNotes: "Perfect make-ahead meal. Gets better after overnight rest.",
+    baseIngredients: [
+      { name: "Rolled oats", baseQuantity: 0.5, unit: "cup", category: "Grain" },
+      { name: "Milk", baseQuantity: 0.5, unit: "cup", category: "Dairy" },
+      { name: "Chia seeds", baseQuantity: 1, unit: "tbsp", category: "Pantry" },
+      { name: "Banana", baseQuantity: 0.5, unit: "piece", category: "Fruit" },
+      { name: "Peanut butter", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
+    ],
+    instructions: "Mix oats, milk, and chia seeds in jar. Add sliced banana and peanut butter. Refrigerate overnight. Stir before eating."
+  },
+  {
+    id: 5,
+    name: "Lentil Vegetable Soup",
+    basePrepTime: 15,
+    baseCookTime: 25,
+    baseServings: 6,
+    currentServings: 6,
+    category: "Main Dish",
+    fridgeLife: 5,
+    freezerLife: 120,
+    storageNotes: "Freezes excellently. May need extra liquid when reheating.",
+    baseIngredients: [
+      { name: "Red lentils", baseQuantity: 1, unit: "cup", category: "Protein" },
+      { name: "Vegetable broth", baseQuantity: 4, unit: "cups", category: "Pantry" },
+      { name: "Carrots", baseQuantity: 2, unit: "pieces", category: "Vegetable" },
+      { name: "Celery stalks", baseQuantity: 2, unit: "pieces", category: "Vegetable" },
+      { name: "Onion", baseQuantity: 1, unit: "piece", category: "Vegetable" },
+      { name: "Garlic cloves", baseQuantity: 3, unit: "pieces", category: "Vegetable" }
+    ],
+    instructions: "Sauté vegetables until soft. Add lentils and broth. Simmer 20 minutes until lentils are tender. Season to taste."
+  },
+  {
+    id: 6,
+    name: "Chicken Tinola (Instant Pot)",
+    basePrepTime: 10,
+    baseCookTime: 10,
+    baseServings: 3,
+    currentServings: 3,
+    category: "Main Dish",
+    cookingMethod: ["Instant Pot", "Slow Cook"],
+    fridgeLife: 4,
+    freezerLife: 90,
+    estimatedCost: 180,
+    costPerServing: 60,
+    storageNotes: "Great leftover dish. Flavors improve overnight.",
+    highlights: ["Comforting", "Light and gingery", "Budget-friendly", "Healing"],
+    baseIngredients: [
+      { name: "Chicken (bone-in pieces)", baseQuantity: 500, unit: "g", category: "Protein", pricePerUnit: 160 },
+      { name: "Fresh ginger", baseQuantity: 1, unit: "thumb-sized piece", category: "Vegetable", pricePerUnit: 5 },
+      { name: "Onion", baseQuantity: 1, unit: "small", category: "Vegetable", pricePerUnit: 8 },
+      { name: "Sayote", baseQuantity: 2, unit: "cups sliced", category: "Vegetable", pricePerUnit: 15 },
+      { name: "Water or chicken broth", baseQuantity: 2, unit: "cups", category: "Pantry", pricePerUnit: 5 },
+      { name: "Fish sauce", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 2 },
+      { name: "Pechay or malunggay", baseQuantity: 1, unit: "handful", category: "Vegetable", pricePerUnit: 10 }
+    ],
+    instructions: "Pressure Cook Method: 1. Add chicken, ginger, onion, sayote, water, fish sauce, salt/pepper 2. Set Pressure Cook: 10 minutes 3. Quick release 4. Stir in pechay or malunggay (let sit 2 mins to soften). Slow Cook Method: 1. Dump all ingredients except greens 2. Set Slow Cook: 6 hours (LOW) 3. Add greens in last 30 minutes"
+  },
+  {
+    id: 7,
+    name: "Garlic Herb Chicken",
+    basePrepTime: 5,
+    baseCookTime: 12,
+    baseServings: 3,
+    currentServings: 3,
+    category: "Main Dish",
+    cookingMethod: ["Instant Pot", "Slow Cook"],
+    fridgeLife: 4,
+    freezerLife: 120,
+    estimatedCost: 220,
+    costPerServing: 73,
+    storageNotes: "Reheat in pan for crispy skin.",
+    highlights: ["Versatile", "Bold flavor", "Great with rice/kamote", "No sauce needed"],
+    baseIngredients: [
+      { name: "Chicken thighs", baseQuantity: 500, unit: "g", category: "Protein", pricePerUnit: 180 },
+      { name: "Garlic cloves", baseQuantity: 6, unit: "pieces", category: "Vegetable", pricePerUnit: 10 },
+      { name: "Dried herbs", baseQuantity: 1, unit: "tsp", category: "Pantry", pricePerUnit: 5 },
+      { name: "Salt", baseQuantity: 1, unit: "tsp", category: "Pantry", pricePerUnit: 1 },
+      { name: "Black pepper", baseQuantity: 0.5, unit: "tsp", category: "Pantry", pricePerUnit: 2 },
+      { name: "Olive oil", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 8 },
+      { name: "Water or broth", baseQuantity: 2, unit: "tbsp", category: "Pantry", pricePerUnit: 2 }
+    ],
+    instructions: "Pressure Cook Method: 1. Dump all ingredients in pot 2. Set Pressure Cook: 12 minutes 3. Natural or quick release 4. Optional: Air-fry or pan-sear after for crispy skin. Slow Cook Method: 1. Dump everything in 2. Set Slow Cook: 4-5 hours (LOW)"
+  },
+  {
+    id: 8,
+    name: "Pork/Chicken Ginataan",
+    basePrepTime: 10,
+    baseCookTime: 12,
+    baseServings: 4,
+    currentServings: 4,
+    category: "Main Dish",
+    cookingMethod: ["Instant Pot", "Slow Cook"],
+    fridgeLife: 4,
+    freezerLife: 60,
+    estimatedCost: 280,
+    costPerServing: 70,
+    storageNotes: "Thaw gently due to coconut milk. May separate when reheated.",
+    highlights: ["Creamy and rich", "Comforting", "Amazing with rice"],
+    baseIngredients: [
+      { name: "Pork cubes or chicken", baseQuantity: 500, unit: "g", category: "Protein", pricePerUnit: 200 },
+      { name: "Kalabasa", baseQuantity: 1, unit: "cup cubed", category: "Vegetable", pricePerUnit: 20 },
+      { name: "Sitaw", baseQuantity: 1, unit: "cup cut", category: "Vegetable", pricePerUnit: 15 },
+      { name: "Onion", baseQuantity: 1, unit: "small sliced", category: "Vegetable", pricePerUnit: 8 },
+      { name: "Fresh ginger", baseQuantity: 1, unit: "thumb-sized", category: "Vegetable", pricePerUnit: 5 },
+      { name: "Coconut milk", baseQuantity: 400, unit: "ml can", category: "Pantry", pricePerUnit: 45 },
+      { name: "Fish sauce", baseQuantity: 2, unit: "tbsp", category: "Pantry", pricePerUnit: 4 }
+    ],
+    instructions: "Pressure Cook Method: 1. Add meat, onion, ginger, kalabasa, coconut milk, fish sauce 2. Set Pressure Cook: 10-12 minutes 3. Quick release 4. Stir in sitaw → cover 2-3 minutes to soften. Slow Cook Method: 1. Add everything except sitaw 2. Set Slow Cook: 6 hours (LOW) 3. Add sitaw during last 30-45 mins"
+  },
+  {
+    id: 9,
+    name: "Kimchi-jjigae",
+    basePrepTime: 5,
+    baseCookTime: 15,
+    baseServings: 2,
+    currentServings: 2,
+    category: "Main Dish",
+    cookingMethod: ["Instant Pot", "Slow Cook"],
+    fridgeLife: 5,
+    freezerLife: 90,
+    estimatedCost: 180,
+    costPerServing: 90,
+    storageNotes: "Flavors improve over time. Great leftover dish.",
+    highlights: ["Korean comfort food", "Spicy and tangy", "Probiotic benefits"],
+    baseIngredients: [
+      { name: "Pork cubes", baseQuantity: 0.5, unit: "cup", category: "Protein", pricePerUnit: 80 },
+      { name: "Onion", baseQuantity: 0.5, unit: "cup", category: "Vegetable", pricePerUnit: 8 },
+      { name: "Green onion", baseQuantity: 0.25, unit: "cup", category: "Vegetable", pricePerUnit: 10 },
+      { name: "Aged kimchi", baseQuantity: 0.5, unit: "cup", category: "Vegetable", pricePerUnit: 40 },
+      { name: "Water", baseQuantity: 2, unit: "cups", category: "Pantry", pricePerUnit: 2 },
+      { name: "Tofu", baseQuantity: 0.5, unit: "cup", category: "Protein", pricePerUnit: 25 },
+      { name: "Gochujang", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 15 },
+      { name: "Fish sauce", baseQuantity: 1, unit: "tsp", category: "Pantry", pricePerUnit: 2 }
+    ],
+    instructions: "Add all ingredients to pot. Pressure cook 15 minutes or slow cook 3-4 hours."
+  },
+  {
+    id: 10,
+    name: "Masala Butter Chicken",
+    basePrepTime: 10,
+    baseCookTime: 240,
+    baseServings: 4,
+    currentServings: 4,
+    category: "Main Dish",
+    cookingMethod: ["Slow Cook"],
+    fridgeLife: 5,
+    freezerLife: 120,
+    estimatedCost: 350,
+    costPerServing: 88,
+    storageNotes: "Freezes excellently. Rich and creamy sauce.",
+    highlights: ["Rich Indian curry", "Set and forget", "Restaurant quality"],
+    baseIngredients: [
+      { name: "Chicken breast cubes", baseQuantity: 2, unit: "pieces", category: "Protein", pricePerUnit: 200 },
+      { name: "Curry powder", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 8 },
+      { name: "Garam masala", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 10 },
+      { name: "Chili powder", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 5 },
+      { name: "Onion", baseQuantity: 1, unit: "piece", category: "Vegetable", pricePerUnit: 8 },
+      { name: "Garlic cloves", baseQuantity: 4, unit: "pieces", category: "Vegetable", pricePerUnit: 5 },
+      { name: "Tomato puree", baseQuantity: 100, unit: "g", category: "Pantry", pricePerUnit: 25 },
+      { name: "Greek yogurt", baseQuantity: 200, unit: "g", category: "Dairy", pricePerUnit: 35 },
+      { name: "Coconut milk", baseQuantity: 400, unit: "ml", category: "Pantry", pricePerUnit: 45 },
+      { name: "Butter", baseQuantity: 100, unit: "g", category: "Dairy", pricePerUnit: 25 }
+    ],
+    instructions: "Mix everything and slow cook for 4 hours. Season with salt and pepper before serving."
+  },
+  {
+    id: 11,
+    name: "Slow Cooker Beef and Broccoli",
+    basePrepTime: 15,
+    baseCookTime: 270,
+    baseServings: 6,
+    currentServings: 6,
+    category: "Main Dish",
+    cookingMethod: ["Slow Cook"],
+    fridgeLife: 4,
+    freezerLife: 90,
+    estimatedCost: 420,
+    costPerServing: 70,
+    storageNotes: "Beef stays tender. Add fresh broccoli when reheating.",
+    highlights: ["American-Chinese favorite", "Tender beef", "Family-sized portions"],
+    baseIngredients: [
+      { name: "Sirloin steak", baseQuantity: 905, unit: "g", category: "Protein", pricePerUnit: 250 },
+      { name: "Beef broth", baseQuantity: 240, unit: "ml", category: "Pantry", pricePerUnit: 25 },
+      { name: "Low sodium soy sauce", baseQuantity: 120, unit: "ml", category: "Pantry", pricePerUnit: 30 },
+      { name: "Brown sugar", baseQuantity: 55, unit: "g", category: "Pantry", pricePerUnit: 15 },
+      { name: "Sesame oil", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 20 },
+      { name: "Garlic cloves", baseQuantity: 4, unit: "pieces", category: "Vegetable", pricePerUnit: 5 },
+      { name: "Cornstarch", baseQuantity: 4, unit: "tbsp", category: "Pantry", pricePerUnit: 10 },
+      { name: "Broccoli", baseQuantity: 1, unit: "head", category: "Vegetable", pricePerUnit: 50 },
+      { name: "White rice", baseQuantity: 2, unit: "cups", category: "Grain", pricePerUnit: 15 }
+    ],
+    instructions: "1. In crockpot, whisk together beef broth, soy sauce, sesame oil, minced garlic, and brown sugar. 2. Place slices of beef in liquid and toss to coat. 3. Cook on low heat for 4 hours. 4. After 4 hours, whisk together cornstarch and water. Pour into crock pot, add broccoli and stir. 5. Cook 30 minutes to cook broccoli and thicken sauce. 6. Serve with warm white rice."
+  }
+];
+
+// Utility functions for serving size calculations
+function formatQuantity(quantity) {
+  if (quantity === Math.floor(quantity)) {
+    return quantity.toString();
+  }
+  
+  // Handle common fractions
+  if (Math.abs(quantity - 0.25) < 0.01) return '1/4';
+  if (Math.abs(quantity - 0.33) < 0.01) return '1/3';
+  if (Math.abs(quantity - 0.5) < 0.01) return '1/2';
+  if (Math.abs(quantity - 0.67) < 0.01) return '2/3';
+  if (Math.abs(quantity - 0.75) < 0.01) return '3/4';
+  
+  // Round to 2 decimal places for other decimals
+  return parseFloat(quantity.toFixed(2)).toString();
+}
+
+function calculateScaledQuantity(recipe, ingredient) {
+  const scale = recipe.currentServings / recipe.baseServings;
+  return ingredient.baseQuantity * scale;
+}
+
+function getStorageIndicatorClass(fridgeLife) {
+  if (fridgeLife <= 3) return 'fresh';
+  if (fridgeLife <= 7) return 'use-soon';
+  return 'freeze-now';
+}
+
+// Initialize app
+function initApp() {
+  // Set up Firebase auth state listener
+  if (window.firebase) {
+    window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
+      AppState.currentUser = user;
+      updateAuthUI();
+      
+      if (user) {
+        // User is signed in
+        loadUserData();
+        setupRealtimeListeners();
+      } else {
+        // User is signed out
+        loadFromLocalStorage();
+        renderRecipes();
+        renderWeeklyPlanner();
+        renderStorageGuide();
+        renderCookingHacks();
+        updateNutritionGoalsDisplay();
+      }
+    });
+  } else {
+    // Firebase not available, use local storage only
+    const hasLoadedData = loadFromLocalStorage();
+    
+    // If no saved data, use defaults
+    if (!hasLoadedData) {
+      AppState.recipes = [...sampleRecipes];
+      AppState.customIngredients = [...defaultStorageData];
+      AppState.customHacks = [...defaultCookingHacks];
+      // Save the default data
+      saveToLocalStorage();
+    }
+    
+    // Initialize nutrition goals display
+    updateNutritionGoalsDisplay();
+    
+    // Render initial views
+    renderRecipes();
+    renderWeeklyPlanner();
+    renderStorageGuide();
+    renderCookingHacks();
+  }
+  
+  // Setup event listeners
+  setupEventListeners();
+  
+  // Set up authentication form handlers
+  setupAuthFormHandlers();
+  
+  // Set up online/offline listeners
+  setupOnlineOfflineListeners();
+  
+  // Setup modal event listeners
+  setupModalEventListeners();
+  
+  // Show initial tab
+  showTab('recipes');
+  
+  // Setup auto-save (save every 30 seconds if there are changes)
+  setInterval(() => {
+    saveData();
+  }, 30000);
+}
+
+// Event listeners
+function setupEventListeners() {
+  // Tab navigation
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tabId = e.target.dataset.tab;
+      showTab(tabId);
+    });
+  });
+  
+  // Recipe management
+  document.getElementById('add-recipe-btn').addEventListener('click', openAddRecipeModal);
+  document.getElementById('recipe-form').addEventListener('submit', saveRecipe);
+  document.getElementById('cancel-btn').addEventListener('click', closeRecipeModal);
+  document.querySelector('.modal-close').addEventListener('click', closeRecipeModal);
+  document.getElementById('add-ingredient-btn').addEventListener('click', addIngredientField);
+  document.getElementById('storage-guide-link').addEventListener('click', () => showTab('storage'));
+  
+  // Storage guide search and filter
+  document.getElementById('storage-search').addEventListener('input', filterStorageGuide);
+  document.getElementById('storage-category-filter').addEventListener('change', filterStorageGuide);
+  
+  // Cooking hacks filter
+  document.getElementById('hack-category-filter').addEventListener('change', filterCookingHacks);
+  
+  // Nutrition tab
+  document.getElementById('set-nutrition-goals').addEventListener('click', openNutritionGoalsModal);
+  document.getElementById('nutrition-goals-form').addEventListener('submit', saveNutritionGoals);
+  document.getElementById('cancel-goals-btn').addEventListener('click', closeNutritionGoalsModal);
+  document.getElementById('filter-recipes-nutrition').addEventListener('click', filterRecipesByNutrition);
+  
+  // Storage guide CRUD
+  document.getElementById('add-ingredient-storage').addEventListener('click', openAddIngredientModal);
+  document.getElementById('import-from-recipes').addEventListener('click', importIngredientsFromRecipes);
+  document.getElementById('ingredient-form').addEventListener('submit', saveIngredient);
+  document.getElementById('cancel-ingredient-btn').addEventListener('click', closeIngredientModal);
+  
+  // Cooking hacks CRUD
+  document.getElementById('add-cooking-hack').addEventListener('click', openAddHackModal);
+  document.getElementById('hack-form').addEventListener('submit', saveHack);
+  document.getElementById('cancel-hack-btn').addEventListener('click', closeHackModal);
+  
+  // Modal close handlers
+  document.getElementById('nutrition-goals-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'nutrition-goals-modal') closeNutritionGoalsModal();
+  });
+  document.getElementById('ingredient-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'ingredient-modal') closeIngredientModal();
+  });
+  document.getElementById('hack-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'hack-modal') closeHackModal();
+  });
+  
+  // Additional modal close buttons
+  document.querySelectorAll('.modal-close').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const modal = e.target.closest('.modal');
+      if (modal) modal.classList.add('hidden');
+    });
+  });
+  
+  // Search and filter
+  document.getElementById('recipe-search').addEventListener('input', filterRecipes);
+  document.getElementById('category-filter').addEventListener('change', filterRecipes);
+  
+  // Weekly planner
+  document.getElementById('clear-week').addEventListener('click', clearWeeklyPlan);
+  document.getElementById('generate-grocery').addEventListener('click', generateGroceryList);
+  
+  // Grocery list
+  document.getElementById('clear-grocery').addEventListener('click', clearGroceryList);
+  document.getElementById('add-custom-item').addEventListener('click', addCustomGroceryItem);
+  
+  // Modal click outside to close
+  document.getElementById('recipe-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'recipe-modal') {
+      closeRecipeModal();
+    }
+  });
+}
+
+function setupModalEventListeners() {
+  // Recipe search in modal
+  document.getElementById('recipe-modal-search').addEventListener('input', renderRecipeSelectionGrid);
+  
+  // Recipe selection modal close
+  document.getElementById('recipe-selection-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'recipe-selection-modal') {
+      closeRecipeSelectionModal();
+    }
+  });
+  
+  // Modal close button
+  document.querySelector('#recipe-selection-modal .modal-close').addEventListener('click', closeRecipeSelectionModal);
+  
+  // Copy/Clear day buttons
+  document.getElementById('copy-day-btn').addEventListener('click', pasteDay);
+  document.getElementById('clear-day-btn').addEventListener('click', () => {
+    if (AppState.selectedDay) {
+      clearDay(AppState.selectedDay);
+    }
+  });
+}
+
+function closeRecipeSelectionModal() {
+  document.getElementById('recipe-selection-modal').classList.add('hidden');
+  AppState.selectedMealSlot = null;
+}
+
+function pasteDay() {
+  if (!AppState.dayToCopy || !AppState.selectedDay) return;
+  
+  AppState.weeklyPlan[AppState.selectedDay] = { ...AppState.dayToCopy };
+  renderWeeklyPlanner();
+  updateWeeklyStats();
+  
+  showSuccessMessage(`Meals pasted to ${AppState.selectedDay}!`);
+  
+  // Reset copy state
+  AppState.dayToCopy = null;
+  document.getElementById('copy-day-btn').disabled = true;
+  document.getElementById('copy-day-btn').textContent = 'Copy Day';
+}
+
+// Tab management
+function showTab(tabId) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+  
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === tabId);
+  });
+  
+  // Special handling for different tabs
+  if (tabId === 'planner') {
+    updateWeeklyStats();
+  } else if (tabId === 'grocery') {
+    updateGrocerySummary();
+    updateBudgetDisplay();
+  } else if (tabId === 'hacks') {
+    renderCookingHacks();
+  } else if (tabId === 'nutrition') {
+    renderNutritionTab();
+  }
+}
+
+// Recipe management functions
+function openAddRecipeModal() {
+  AppState.currentEditingRecipe = null;
+  document.getElementById('modal-title').textContent = 'Add New Recipe';
+  clearRecipeForm();
+  addIngredientField(); // Add one ingredient field by default
+  document.getElementById('recipe-modal').classList.remove('hidden');
+}
+
+function updateServingSize(recipeId, newServings) {
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe || newServings < 1) return;
+  
+  recipe.currentServings = newServings;
+  renderRecipes();
+  renderRecipeSelectionGrid();
+  updateWeeklyStats();
+}
+
+function resetServingSize(recipeId) {
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+  
+  recipe.currentServings = recipe.baseServings;
+  renderRecipes();
+  renderRecipeSelectionGrid();
+  updateWeeklyStats();
+}
+
+function openEditRecipeModal(recipeId) {
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+  
+  AppState.currentEditingRecipe = recipeId;
+  document.getElementById('modal-title').textContent = 'Edit Recipe';
+  
+  // Populate form with recipe data
+  document.getElementById('recipe-name').value = recipe.name;
+  document.getElementById('recipe-category').value = recipe.category;
+  document.getElementById('prep-time').value = recipe.basePrepTime || recipe.prepTime;
+  document.getElementById('cook-time').value = recipe.baseCookTime || recipe.cookTime;
+  document.getElementById('servings').value = recipe.baseServings || recipe.servings;
+  document.getElementById('fridge-life').value = recipe.fridgeLife;
+  document.getElementById('freezer-life').value = recipe.freezerLife;
+  document.getElementById('estimated-cost').value = recipe.estimatedCost || '';
+  document.getElementById('storage-notes').value = recipe.storageNotes;
+  document.getElementById('instructions').value = recipe.instructions;
+  
+  // Handle existing photo
+  if (recipe.photo) {
+    currentRecipePhoto = recipe.photo;
+    showPhotoPreview(recipe.photo);
+  } else {
+    removePhoto();
+  }
+  
+  // Clear and populate ingredients
+  const ingredientsList = document.getElementById('ingredients-list');
+  ingredientsList.innerHTML = '';
+  const ingredients = recipe.baseIngredients || recipe.ingredients;
+  ingredients.forEach(ingredient => {
+    addIngredientField({
+      name: ingredient.name,
+      quantity: ingredient.baseQuantity || ingredient.quantity,
+      unit: ingredient.unit,
+      category: ingredient.category
+    });
+  });
+  
+  document.getElementById('recipe-modal').classList.remove('hidden');
+}
+
+function closeRecipeModal() {
+  document.getElementById('recipe-modal').classList.add('hidden');
+  clearRecipeForm();
+}
+
+function clearRecipeForm() {
+  document.getElementById('recipe-form').reset();
+  document.getElementById('ingredients-list').innerHTML = '';
+}
+
+function addIngredientField(ingredient = null) {
+  const ingredientsList = document.getElementById('ingredients-list');
+  const ingredientDiv = document.createElement('div');
+  ingredientDiv.className = 'ingredient-item';
+  
+  ingredientDiv.innerHTML = `
+    <input type="text" class="form-control" placeholder="Ingredient name" value="${ingredient?.name || ''}" required>
+    <input type="number" class="form-control" placeholder="Qty" step="0.01" min="0" value="${ingredient?.quantity || ''}" required>
+    <select class="form-control" required>
+      <option value="">Unit</option>
+      <option value="cup" ${ingredient?.unit === 'cup' ? 'selected' : ''}>Cup</option>
+      <option value="tbsp" ${ingredient?.unit === 'tbsp' ? 'selected' : ''}>Tbsp</option>
+      <option value="tsp" ${ingredient?.unit === 'tsp' ? 'selected' : ''}>Tsp</option>
+      <option value="lbs" ${ingredient?.unit === 'lbs' ? 'selected' : ''}>Lbs</option>
+      <option value="oz" ${ingredient?.unit === 'oz' ? 'selected' : ''}>Oz</option>
+      <option value="pieces" ${ingredient?.unit === 'pieces' ? 'selected' : ''}>Pieces</option>
+      <option value="inches" ${ingredient?.unit === 'inches' ? 'selected' : ''}>Inches</option>
+      <option value="stalks" ${ingredient?.unit === 'stalks' ? 'selected' : ''}>Stalks</option>
+      <option value="cups" ${ingredient?.unit === 'cups' ? 'selected' : ''}>Cups</option>
+    </select>
+    <select class="form-control" required>
+      <option value="">Category</option>
+      <option value="Protein" ${ingredient?.category === 'Protein' ? 'selected' : ''}>Protein</option>
+      <option value="Vegetable" ${ingredient?.category === 'Vegetable' ? 'selected' : ''}>Vegetable</option>
+      <option value="Fruit" ${ingredient?.category === 'Fruit' ? 'selected' : ''}>Fruit</option>
+      <option value="Grain" ${ingredient?.category === 'Grain' ? 'selected' : ''}>Grain</option>
+      <option value="Dairy" ${ingredient?.category === 'Dairy' ? 'selected' : ''}>Dairy</option>
+      <option value="Pantry" ${ingredient?.category === 'Pantry' ? 'selected' : ''}>Pantry</option>
+    </select>
+    <button type="button" class="remove-ingredient" onclick="removeIngredientField(this)">×</button>
+  `;
+  
+  ingredientsList.appendChild(ingredientDiv);
+}
+
+function removeIngredientField(button) {
+  button.closest('.ingredient-item').remove();
+}
+
+function saveRecipe(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(e.target);
+  const ingredientItems = document.querySelectorAll('.ingredient-item');
+  
+  const ingredients = [];
+  ingredientItems.forEach(item => {
+    const inputs = item.querySelectorAll('input, select');
+    const ingredient = {
+      name: inputs[0].value,
+      quantity: parseFloat(inputs[1].value),
+      unit: inputs[2].value,
+      category: inputs[3].value
+    };
+    if (ingredient.name && ingredient.quantity && ingredient.unit && ingredient.category) {
+      ingredients.push(ingredient);
+    }
+  });
+  
+  if (ingredients.length === 0) {
+    alert('Please add at least one ingredient.');
+    return;
+  }
+  
+  // Helper function to safely get element value
+  const getElementValue = (id, defaultValue = '') => {
+    const element = document.getElementById(id);
+    return element ? element.value : defaultValue;
+  };
+
+  const getElementValueAsNumber = (id, defaultValue = 0) => {
+    const element = document.getElementById(id);
+    return element ? parseFloat(element.value) || defaultValue : defaultValue;
+  };
+
+  const recipe = {
+    id: AppState.currentEditingRecipe || Date.now(),
+    name: getElementValue('recipe-name'),
+    category: getElementValue('recipe-category'),
+    basePrepTime: parseInt(getElementValue('prep-time')) || 0,
+    baseCookTime: parseInt(getElementValue('cook-time')) || 0,
+    baseServings: parseInt(getElementValue('servings')) || 1,
+    currentServings: parseInt(getElementValue('servings')) || 1,
+    fridgeLife: parseInt(getElementValue('fridge-life')) || 3,
+    freezerLife: parseInt(getElementValue('freezer-life')) || 30,
+    estimatedCost: getElementValueAsNumber('estimated-cost', 0),
+    costPerServing: getElementValueAsNumber('estimated-cost', 0) / (parseInt(getElementValue('servings')) || 1),
+    storageNotes: getElementValue('storage-notes'),
+    instructions: getElementValue('instructions'),
+    photo: currentRecipePhoto,
+    baseIngredients: ingredients.map(ing => ({
+      name: ing.name,
+      baseQuantity: ing.quantity,
+      unit: ing.unit,
+      category: ing.category
+    }))
+  };
+  
+  if (AppState.currentEditingRecipe) {
+    // Update existing recipe
+    const index = AppState.recipes.findIndex(r => r.id === AppState.currentEditingRecipe);
+    AppState.recipes[index] = recipe;
+  } else {
+    // Add new recipe
+    AppState.recipes.push(recipe);
+  }
+  
+  renderRecipes();
+  renderRecipeSelectionGrid();
+  closeRecipeModal();
+  saveToLocalStorage();
+}
+
+function deleteRecipe(recipeId) {
+  if (confirm('Are you sure you want to delete this recipe?')) {
+    AppState.recipes = AppState.recipes.filter(r => r.id !== recipeId);
+    
+    // Remove from weekly plan if assigned
+    Object.keys(AppState.weeklyPlan).forEach(day => {
+      Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
+        if (Array.isArray(AppState.weeklyPlan[day][meal])) {
+          AppState.weeklyPlan[day][meal] = AppState.weeklyPlan[day][meal].filter(id => id !== recipeId);
+        } else if (AppState.weeklyPlan[day][meal] === recipeId) {
+          AppState.weeklyPlan[day][meal] = null;
+        }
+      });
+    });
+    
+    renderRecipes();
+    renderWeeklyPlanner();
+    renderRecipeSelectionGrid();
+    updateWeeklyStats();
+    saveToLocalStorage();
+  }
+}
+
+function renderRecipes() {
+  const recipesGrid = document.getElementById('recipes-grid');
+  const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
+  const categoryFilter = document.getElementById('category-filter').value;
+  
+  let filteredRecipes = AppState.recipes.filter(recipe => {
+    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm) || 
+                         recipe.instructions.toLowerCase().includes(searchTerm);
+    const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+  
+  recipesGrid.innerHTML = filteredRecipes.map(recipe => {
+    const totalPrepTime = (recipe.basePrepTime || recipe.prepTime) * recipe.currentServings / recipe.baseServings;
+    const totalCookTime = (recipe.baseCookTime || recipe.cookTime) * recipe.currentServings / recipe.baseServings;
+    const isScaled = recipe.currentServings !== recipe.baseServings;
+    const totalCost = calculateRecipeCost(recipe);
+    const costPerServing = totalCost / recipe.currentServings;
+    const nutrition = calculateRecipeNutrition(recipe);
+    const nutritionPerServing = {
+      calories: Math.round(nutrition.calories / recipe.currentServings),
+      protein: Math.round(nutrition.protein / recipe.currentServings),
+      carbs: Math.round(nutrition.carbs / recipe.currentServings),
+      fat: Math.round(nutrition.fat / recipe.currentServings),
+      fiber: Math.round(nutrition.fiber / recipe.currentServings),
+      sodium: Math.round(nutrition.sodium / recipe.currentServings)
+    };
+    
+    return `
+    <div class="recipe-card">
+      ${recipe.photo ? `
+        <div class="recipe-photo">
+          <img src="${recipe.photo}" alt="${recipe.name}" class="recipe-image">
+        </div>
+      ` : ''}
+      <div class="recipe-card-header">
+        <h3 class="recipe-title">${recipe.name}</h3>
+        <span class="recipe-category">${recipe.category}</span>
+      </div>
+      
+      <!-- Serving Size Controls -->
+      <div class="serving-controls">
+        <button class="serving-btn" onclick="updateServingSize(${recipe.id}, ${recipe.currentServings - 1})" 
+                ${recipe.currentServings <= 1 ? 'disabled' : ''}>−</button>
+        <div class="serving-info">
+          <div class="current-servings">${recipe.currentServings} servings</div>
+          <div class="base-servings">Base: ${recipe.baseServings}</div>
+        </div>
+        <button class="serving-btn" onclick="updateServingSize(${recipe.id}, ${recipe.currentServings + 1})">+</button>
+        <div class="quick-servings">
+          ${[1, 2, 4, 6, 8].map(size => `
+            <button class="quick-serving-btn ${recipe.currentServings === size ? 'active' : ''}" 
+                    onclick="updateServingSize(${recipe.id}, ${size})">${size}</button>
+          `).join('')}
+        </div>
+        ${isScaled ? `<button class="reset-servings" onclick="resetServingSize(${recipe.id})">Reset</button>` : ''}
+      </div>
+      
+      <div class="prep-time-info">
+        <div class="time-item">
+          <span>⏲️</span>
+          <span>Prep: ${Math.round(totalPrepTime)}m</span>
+          ${isScaled ? `<span class="time-per-serving">(${recipe.basePrepTime || recipe.prepTime}m base)</span>` : ''}
+        </div>
+        <div class="time-item">
+          <span>🍳</span>
+          <span>Cook: ${Math.round(totalCookTime)}m</span>
+          ${isScaled ? `<span class="time-per-serving">(${recipe.baseCookTime || recipe.cookTime}m base)</span>` : ''}
+        </div>
+      </div>
+      
+      <div class="recipe-storage">
+        <div class="storage-info">📅 Fridge: ${recipe.fridgeLife} days</div>
+        <div class="storage-info">❄️ Freezer: ${recipe.freezerLife} days</div>
+      </div>
+      
+      <!-- Nutrition Information -->
+      <div class="recipe-nutrition">
+        <div class="recipe-nutrition-title">Nutrition per serving:</div>
+        <div class="nutrition-grid">
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.calories}</span>
+            <span class="nutrition-value-label">cal</span>
+          </div>
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.protein}g</span>
+            <span class="nutrition-value-label">protein</span>
+          </div>
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.carbs}g</span>
+            <span class="nutrition-value-label">carbs</span>
+          </div>
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.fat}g</span>
+            <span class="nutrition-value-label">fat</span>
+          </div>
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.fiber}g</span>
+            <span class="nutrition-value-label">fiber</span>
+          </div>
+          <div class="nutrition-value">
+            <span class="nutrition-value-number">${nutritionPerServing.sodium}mg</span>
+            <span class="nutrition-value-label">sodium</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Cost Information -->
+      ${totalCost > 0 ? `
+      <div class="recipe-cost-info">
+        <div class="recipe-total-cost">Total: ₱${formatQuantity(totalCost)}</div>
+        <div class="recipe-cost-per-serving">₱${formatQuantity(costPerServing)} per serving</div>
+      </div>
+      ` : ''}
+      
+      <!-- Highlights -->
+      ${recipe.highlights ? `
+      <div class="recipe-highlights">
+        ${recipe.highlights.map(highlight => `<span class="highlight-tag">${highlight}</span>`).join('')}
+      </div>
+      ` : ''}
+      
+      <!-- Scaled Ingredients -->
+      <div class="recipe-ingredients">
+        <h4>Ingredients:</h4>
+        <ul>
+          ${(recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
+            const scaledQty = calculateScaledQuantity(recipe, ingredient);
+            const baseQty = ingredient.baseQuantity || ingredient.quantity;
+            
+            return `
+              <li class="ingredient-quantity">
+                ${isScaled ? `
+                  <span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
+                  <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>
+                ` : `
+                  <span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>
+                `}
+              </li>
+            `;
+          }).join('')}
+        </ul>
+      </div>
+      
+      <p><strong>Instructions:</strong> ${recipe.instructions}</p>
+      
+      <div class="recipe-actions">
+        <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal(${recipe.id})">Edit</button>
+        <button class="btn btn--outline btn--sm" onclick="deleteRecipe(${recipe.id})">Delete</button>
+      </div>
+    </div>
+  `;
+  }).join('');
+}
+
+function filterRecipes() {
+  renderRecipes();
+}
+
+// Weekly planner functions
+function renderWeeklyPlanner() {
+  const plannerGrid = document.getElementById('meal-planner');
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const meals = ['breakfast', 'lunch', 'dinner', 'snacks'];
+  
+  plannerGrid.innerHTML = days.map(day => `
+    <div class="day-column">
+      <div class="day-header">
+        ${day}
+        <div class="day-actions">
+          <button class="day-action-btn" onclick="copyDay('${day}')">Copy</button>
+          <button class="day-action-btn" onclick="clearDay('${day}')">Clear</button>
+        </div>
+      </div>
+      ${meals.map(meal => {
+        const mealData = AppState.weeklyPlan[day][meal];
+        const hasRecipe = meal === 'snacks' ? mealData.length > 0 : mealData !== null;
+        
+        if (hasRecipe) {
+          const recipeId = meal === 'snacks' ? mealData[0] : mealData;
+          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          if (recipe) {
+            const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+            return `
+              <div class="meal-slot has-recipe" 
+                   data-day="${day}" 
+                   data-meal="${meal}"
+                   onclick="openRecipeSelectionModal('${day}', '${meal}')">
+                <button class="remove-recipe" onclick="event.stopPropagation(); removeRecipeFromSlot('${day}', '${meal}')">×</button>
+                <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
+                <div class="meal-slot-content">
+                  <div class="recipe-details">
+                    <div class="recipe-name">${recipe.name}</div>
+                    <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+        }
+        
+        return `
+          <div class="meal-slot" 
+               data-day="${day}" 
+               data-meal="${meal}"
+               onclick="openRecipeSelectionModal('${day}', '${meal}')">
+            <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
+            <div class="meal-slot-content">
+              <div class="meal-slot-empty">Click + to add recipe</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function removeRecipeFromSlot(day, meal) {
+  if (meal === 'snacks') {
+    AppState.weeklyPlan[day][meal] = [];
+  } else {
+    AppState.weeklyPlan[day][meal] = null;
+  }
+  
+  renderWeeklyPlanner();
+  updateWeeklyStats();
+  showSuccessMessage('Recipe removed!');
+}
+
+function copyDay(day) {
+  AppState.dayToCopy = { ...AppState.weeklyPlan[day] };
+  
+  // Enable paste buttons
+  document.getElementById('copy-day-btn').disabled = false;
+  document.getElementById('copy-day-btn').textContent = `Paste ${day}`;
+  
+  showSuccessMessage(`${day}'s meals copied. Click any day to paste.`);
+}
+
+function clearDay(day) {
+  if (confirm(`Are you sure you want to clear all meals for ${day}?`)) {
+    AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+    renderWeeklyPlanner();
+    updateWeeklyStats();
+    showSuccessMessage(`${day} cleared!`);
+  }
+}
+
+function showSuccessMessage(message) {
+  const existingMessage = document.querySelector('.success-message');
+  if (existingMessage) {
+    existingMessage.remove();
+  }
+  
+  const messageEl = document.createElement('div');
+  messageEl.className = 'success-message';
+  messageEl.textContent = message;
+  document.body.appendChild(messageEl);
+  
+  setTimeout(() => messageEl.classList.add('show'), 100);
+  setTimeout(() => {
+    messageEl.classList.remove('show');
+    setTimeout(() => messageEl.remove(), 300);
+  }, 3000);
+}
+
+function openRecipeSelectionModal(day, meal) {
+  AppState.selectedMealSlot = { day, meal };
+  
+  const modal = document.getElementById('recipe-selection-modal');
+  const title = document.getElementById('recipe-selection-title');
+  
+  title.textContent = `Select a Recipe for ${day} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+  
+  renderRecipeSelectionGrid();
+  modal.classList.remove('hidden');
+}
+
+function renderRecipeSelectionGrid() {
+  const grid = document.getElementById('recipe-selection-grid');
+  const searchTerm = document.getElementById('recipe-modal-search').value.toLowerCase();
+  
+  let filteredRecipes = AppState.recipes.filter(recipe => 
+    recipe.name.toLowerCase().includes(searchTerm) || 
+    recipe.category.toLowerCase().includes(searchTerm)
+  );
+  
+  grid.innerHTML = filteredRecipes.map(recipe => {
+    const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+    const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
+    
+    return `
+      <div class="recipe-selection-card" onclick="selectRecipeForPlanning(${recipe.id})">
+        <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
+        <div class="recipe-title">${recipe.name}</div>
+        <div class="recipe-meta">${recipe.category}</div>
+        <div class="recipe-stats">
+          <span>${recipe.currentServings} servings</span>
+          <span>${totalTime}m</span>
+          ${costPerServing > 0 ? `<span>₱${formatQuantity(costPerServing)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (filteredRecipes.length === 0) {
+    grid.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No recipes found. Try a different search term.</p>';
+  }
+}
+
+function getCategoryIcon(category) {
+  const icons = {
+    'Breakfast': '🥞',
+    'Main Dish': '🍽️',
+    'Snack': '🥜',
+    'Dessert': '🍰',
+    'Soup': '🍲',
+    'Salad': '🥗'
+  };
+  return icons[category] || '🍴';
+}
+
+function selectRecipeForPlanning(recipeId) {
+  if (!AppState.selectedMealSlot) {
+    showSuccessMessage('Please select a meal slot first.');
+    return;
+  }
+  
+  const { day, meal } = AppState.selectedMealSlot;
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  
+  if (meal === 'snacks') {
+    // For snacks, allow multiple recipes
+    if (!AppState.weeklyPlan[day][meal].includes(recipeId)) {
+      AppState.weeklyPlan[day][meal].push(recipeId);
+    }
+  } else {
+    // For other meals, replace with new recipe
+    AppState.weeklyPlan[day][meal] = recipeId;
+  }
+  
+  // Close modal and update UI
+  document.getElementById('recipe-selection-modal').classList.add('hidden');
+  renderWeeklyPlanner();
+  updateWeeklyStats();
+  saveToLocalStorage();
+  
+  // Show success message
+  showSuccessMessage(`${recipe?.name || 'Recipe'} added to ${day} ${meal}!`);
+  
+  // Clear selection
+  AppState.selectedMealSlot = null;
+}
+
+function getRecipeName(recipeId) {
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  return recipe ? recipe.name : 'Unknown Recipe';
+}
+
+function clearWeeklyPlan() {
+  if (confirm('Are you sure you want to clear the entire weekly plan?')) {
+    Object.keys(AppState.weeklyPlan).forEach(day => {
+      AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+    });
+    renderWeeklyPlanner();
+    updateWeeklyStats();
+  }
+}
+
+function updateWeeklyStats() {
+  let totalPrepTime = 0;
+  let totalCookTime = 0;
+  let plannedMeals = 0;
+  
+  Object.keys(AppState.weeklyPlan).forEach(day => {
+    Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
+      const mealData = AppState.weeklyPlan[day][meal];
+      
+      if (meal === 'snacks') {
+        mealData.forEach(recipeId => {
+          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          if (recipe) {
+            const scale = recipe.currentServings / recipe.baseServings;
+            totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
+            totalCookTime += (recipe.baseCookTime || recipe.cookTime) * scale;
+            plannedMeals++;
+          }
+        });
+      } else if (mealData) {
+        const recipe = AppState.recipes.find(r => r.id === mealData);
+        if (recipe) {
+          const scale = recipe.currentServings / recipe.baseServings;
+          totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
+          totalCookTime += (recipe.baseCookTime || recipe.cookTime) * scale;
+          plannedMeals++;
+        }
+      }
+    });
+  });
+  
+  document.getElementById('total-prep-time').textContent = `${Math.round(totalPrepTime)} min`;
+  document.getElementById('total-cook-time').textContent = `${Math.round(totalCookTime)} min`;
+  document.getElementById('planned-meals').textContent = plannedMeals;
+}
+
+// Grocery list functions
+function generateGroceryList() {
+  const ingredients = {};
+  
+  // Collect all ingredients from planned meals
+  Object.keys(AppState.weeklyPlan).forEach(day => {
+    Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
+      const mealData = AppState.weeklyPlan[day][meal];
+      
+      if (meal === 'snacks') {
+        mealData.forEach(recipeId => {
+          addRecipeIngredients(recipeId, ingredients);
+        });
+      } else if (mealData) {
+        addRecipeIngredients(mealData, ingredients);
+      }
+    });
+  });
+  
+  // Convert to grocery list format
+  AppState.groceryList = [];
+  Object.keys(ingredients).forEach(category => {
+    Object.keys(ingredients[category]).forEach(name => {
+      const item = ingredients[category][name];
+      AppState.groceryList.push({
+        id: Date.now() + Math.random(),
+        category,
+        name,
+        quantity: item.quantity,
+        unit: item.unit,
+        sources: item.sources || [],
+        checked: false
+      });
+    });
+  });
+  
+  renderGroceryList();
+  showTab('grocery');
+}
+
+function addRecipeIngredients(recipeId, ingredients) {
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+  
+  const recipeIngredients = recipe.baseIngredients || recipe.ingredients;
+  recipeIngredients.forEach(ingredient => {
+    const category = ingredient.category;
+    const name = ingredient.name;
+    const scaledQty = calculateScaledQuantity(recipe, ingredient);
+    
+    if (!ingredients[category]) {
+      ingredients[category] = {};
+    }
+    
+    if (!ingredients[category][name]) {
+      ingredients[category][name] = {
+        quantity: 0,
+        unit: ingredient.unit,
+        sources: []
+      };
+    }
+    
+    ingredients[category][name].quantity += scaledQty;
+    ingredients[category][name].sources.push(`${recipe.name} (${recipe.currentServings} servings)`);
+  });
+}
+
+function renderGroceryList() {
+  const groceryListEl = document.getElementById('grocery-list');
+  
+  if (AppState.groceryList.length === 0) {
+    groceryListEl.innerHTML = '<p>No items in grocery list. Generate from weekly planner.</p>';
+    return;
+  }
+  
+  // Group by category
+  const categories = {};
+  AppState.groceryList.forEach(item => {
+    if (!categories[item.category]) {
+      categories[item.category] = [];
+    }
+    categories[item.category].push(item);
+  });
+  
+  groceryListEl.innerHTML = Object.keys(categories).map(category => {
+    const categoryTotal = categories[category].reduce((total, item) => {
+      const ingredient = findIngredientPrice(item.name);
+      if (ingredient && ingredient.pricePerUnit) {
+        return total + (ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit));
+      }
+      return total;
+    }, 0);
+    
+    return `
+    <div class="grocery-category">
+      <h3 class="category-header">${category} <span class="category-total">₱${formatQuantity(categoryTotal)}</span></h3>
+      ${categories[category].map(item => {
+        const ingredient = findIngredientPrice(item.name);
+        const itemCost = ingredient && ingredient.pricePerUnit ? 
+          ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit) : 0;
+        
+        return `
+        <div class="grocery-item ${item.checked ? 'checked' : ''}">
+          <input type="checkbox" class="grocery-checkbox" 
+                 ${item.checked ? 'checked' : ''}
+                 onchange="toggleGroceryItem(${item.id})">
+          <div class="grocery-item-info">
+            <div class="grocery-item-name">${formatQuantity(item.quantity)} ${item.unit} ${item.name}</div>
+            ${item.sources && item.sources.length > 0 ? `
+              <div class="grocery-item-source">From: ${item.sources.join(', ')}</div>
+            ` : ''}
+            ${itemCost > 0 ? `<div class="ingredient-price">₱${formatQuantity(itemCost)}</div>` : ''}
+          </div>
+        </div>
+        `;
+      }).join('')}
+    </div>
+    `;
+  }).join('');
+  
+  updateBudgetDisplay();
+}
+
+function toggleGroceryItem(itemId) {
+  const item = AppState.groceryList.find(i => i.id === itemId);
+  if (item) {
+    item.checked = !item.checked;
+    renderGroceryList();
+  }
+}
+
+function clearGroceryList() {
+  if (confirm('Are you sure you want to clear the grocery list?')) {
+    AppState.groceryList = [];
+    renderGroceryList();
+  }
+}
+
+function addCustomGroceryItem() {
+  const name = prompt('Enter item name:');
+  if (!name) return;
+  
+  const quantity = parseFloat(prompt('Enter quantity:'));
+  if (isNaN(quantity)) return;
+  
+  const unit = prompt('Enter unit:');
+  if (!unit) return;
+  
+  const category = prompt('Enter category:');
+  if (!category) return;
+  
+  AppState.groceryList.push({
+    id: Date.now() + Math.random(),
+    category,
+    name,
+    quantity,
+    unit,
+    checked: false
+  });
+  
+  renderGroceryList();
+}
+
+function updateGrocerySummary() {
+  const plannedMealsCount = Object.keys(AppState.weeklyPlan).reduce((count, day) => {
+    return count + Object.keys(AppState.weeklyPlan[day]).reduce((dayCount, meal) => {
+      const mealData = AppState.weeklyPlan[day][meal];
+      if (meal === 'snacks') {
+        return dayCount + mealData.length;
+      } else {
+        return dayCount + (mealData ? 1 : 0);
+      }
+    }, 0);
+  }, 0);
+  
+  document.getElementById('selected-meals-count').textContent = plannedMealsCount;
+}
+
+// Storage guide functions
+function renderStorageGuide() {
+  const storageGuideEl = document.getElementById('storage-guide');
+  const searchTerm = document.getElementById('storage-search').value.toLowerCase();
+  const categoryFilter = document.getElementById('storage-category-filter').value;
+  
+  let filteredIngredients = AppState.customIngredients.filter(ingredient => {
+    const matchesSearch = ingredient.name.toLowerCase().includes(searchTerm) || 
+                         ingredient.storageMethod.toLowerCase().includes(searchTerm) ||
+                         ingredient.storageTips.toLowerCase().includes(searchTerm);
+    const matchesCategory = !categoryFilter || ingredient.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+  
+  storageGuideEl.innerHTML = filteredIngredients.map(ingredient => {
+    const indicatorClass = getStorageIndicatorClass(ingredient.fridgeLife);
+    
+    return `
+      <div class="storage-ingredient-card">
+        <div class="ingredient-header">
+          <h4 class="ingredient-name">${ingredient.name}</h4>
+          <span class="storage-indicator ${indicatorClass}"></span>
+        </div>
+        
+        <!-- Pricing Information -->
+        ${ingredient.pricePerUnit ? `
+        <div class="ingredient-pricing">
+          <strong>Price:</strong> ₱${ingredient.pricePerUnit} ${ingredient.unit}
+        </div>
+        ` : ''}
+        
+        <!-- Nutrition Information -->
+        ${ingredient.calories ? `
+        <div class="ingredient-nutrition">
+          <strong>Nutrition (per 100g):</strong>
+          <div class="ingredient-nutrition-grid">
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.calories}</span>
+              <span class="ingredient-nutrition-label">cal</span>
+            </div>
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.protein}g</span>
+              <span class="ingredient-nutrition-label">protein</span>
+            </div>
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.carbs}g</span>
+              <span class="ingredient-nutrition-label">carbs</span>
+            </div>
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.fat}g</span>
+              <span class="ingredient-nutrition-label">fat</span>
+            </div>
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.fiber}g</span>
+              <span class="ingredient-nutrition-label">fiber</span>
+            </div>
+            <div class="ingredient-nutrition-item">
+              <span class="ingredient-nutrition-value">${ingredient.sodium}mg</span>
+              <span class="ingredient-nutrition-label">sodium</span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+        
+        <div class="storage-duration">
+          <div class="duration-item">
+            🧊 Fridge: ${ingredient.fridgeLife} day${ingredient.fridgeLife !== 1 ? 's' : ''}
+          </div>
+          <div class="duration-item">
+            ❄️ Freezer: ${ingredient.freezerLife} day${ingredient.freezerLife !== 1 ? 's' : ''}
+          </div>
+        </div>
+        
+        <div class="storage-method">
+          <strong>Storage:</strong> ${ingredient.storageMethod}
+        </div>
+        
+        <div class="storage-tips">
+          <strong>Tips:</strong> ${ingredient.storageTips}
+        </div>
+        
+        <div class="storage-actions">
+          <button class="btn btn--outline btn--sm edit-ingredient-btn" onclick="openEditIngredientModal(${ingredient.id})">Edit</button>
+          <button class="btn btn--sm delete-ingredient-btn" onclick="deleteIngredient(${ingredient.id})">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (filteredIngredients.length === 0) {
+    storageGuideEl.innerHTML = '<p>No ingredients found matching your search criteria.</p>';
+  }
+}
+
+function filterStorageGuide() {
+  renderStorageGuide();
+}
+
+// Cooking hacks functions
+function renderCookingHacks() {
+  const hacksContainer = document.getElementById('cooking-hacks');
+  const categoryFilter = document.getElementById('hack-category-filter').value;
+  
+  let filteredHacks = AppState.customHacks;
+  if (categoryFilter) {
+    filteredHacks = AppState.customHacks.filter(hack => hack.category === categoryFilter);
+  }
+  
+  // Group by category
+  const categories = {};
+  filteredHacks.forEach(hack => {
+    if (!categories[hack.category]) {
+      categories[hack.category] = [];
+    }
+    categories[hack.category].push(hack);
+  });
+  
+  hacksContainer.innerHTML = Object.keys(categories).map(category => {
+    const hacks = categories[category];
+    
+    return `
+      <div class="hack-category">
+        <h3 class="hack-category-title">${getCategoryIcon(category)} ${category}</h3>
+        <div class="hack-tips">
+          ${hacks.map(hack => `
+            <div class="hack-item">
+              <div class="hack-item-header">
+                <h4 class="hack-item-title">${hack.title}</h4>
+                <div class="hack-actions">
+                  <button class="hack-edit-btn" onclick="openEditHackModal(${hack.id})">Edit</button>
+                  <button class="hack-delete-btn" onclick="deleteHack(${hack.id})">Delete</button>
+                </div>
+              </div>
+              <div class="hack-item-content">${hack.description}</div>
+              <div class="hack-benefits">
+                ${hack.timeSaved ? `<div class="hack-benefit">⏱️ Saves: ${hack.timeSaved}</div>` : ''}
+                ${hack.costSavings ? `<div class="hack-benefit">💰 Saves: ${hack.costSavings}</div>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (Object.keys(categories).length === 0) {
+    hacksContainer.innerHTML = '<p>No cooking hacks found. Add your first hack!</p>';
+  }
+}
+
+function getCategoryIcon(category) {
+  const icons = {
+    'Batch Cooking': '🍱',
+    'Storage': '🏪',
+    'Budget': '💰', 
+    'Equipment': '⚡',
+    'Time-Saving': '⏱️',
+    'Safety': '🛡️'
+  };
+  return icons[category] || '📝';
+}
+
+function filterCookingHacks() {
+  renderCookingHacks();
+}
+
+// Cost calculation functions
+function calculateRecipeCost(recipe) {
+  if (recipe.estimatedCost) {
+    return recipe.estimatedCost * recipe.currentServings / recipe.baseServings;
+  }
+  
+  if (!recipe.baseIngredients) return 0;
+  
+  return recipe.baseIngredients.reduce((total, ingredient) => {
+    const scaledQty = calculateScaledQuantity(recipe, ingredient);
+    const price = ingredient.pricePerUnit || 0;
+    return total + (price * scaledQty / (ingredient.baseQuantity || ingredient.quantity));
+  }, 0);
+}
+
+function calculateGroceryTotal() {
+  return AppState.groceryList.reduce((total, item) => {
+    const ingredient = findIngredientPrice(item.name);
+    if (ingredient && ingredient.pricePerUnit) {
+      return total + (ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit));
+    }
+    return total;
+  }, 0);
+}
+
+function findIngredientPrice(name) {
+  // First check custom ingredients data
+  const storageItem = AppState.customIngredients.find(item => 
+    item.name.toLowerCase().includes(name.toLowerCase()) || 
+    name.toLowerCase().includes(item.name.toLowerCase())
+  );
+  if (storageItem && storageItem.pricePerUnit) {
+    return storageItem;
+  }
+  
+  // Then check recipe ingredients for pricing
+  for (const recipe of AppState.recipes) {
+    if (recipe.baseIngredients) {
+      const ingredient = recipe.baseIngredients.find(ing => 
+        ing.name.toLowerCase().includes(name.toLowerCase()) || 
+        name.toLowerCase().includes(ing.name.toLowerCase())
+      );
+      if (ingredient && ingredient.pricePerUnit) {
+        return ingredient;
+      }
+    }
+  }
+  
+  return null;
+}
+
+function getUnitConversion(fromUnit, toUnit) {
+  // Simple unit conversion - in practice this would be more comprehensive
+  if (fromUnit === toUnit) return 1;
+  
+  const conversions = {
+    'cup': 240,
+    'tbsp': 15,
+    'tsp': 5,
+    'ml': 1,
+    'g': 1,
+    'kg': 1000,
+    'kilo': 1000
+  };
+  
+  const fromFactor = conversions[fromUnit.toLowerCase()] || 1;
+  const toFactor = conversions[toUnit.toLowerCase()] || 1;
+  
+  return fromFactor / toFactor;
+}
+
+// Budget display removed - only keep individual item pricing
+function updateBudgetDisplay() {
+  // Individual pricing is still shown per item in grocery list
+  // Weekly totals and averages removed per user request
+}
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', initApp);
+
+// Nutrition tracking functions
+function calculateRecipeNutrition(recipe) {
+  if (recipe.nutritionPerServing) {
+    // If recipe already has nutrition data, scale it
+    const scale = recipe.currentServings / recipe.baseServings;
+    return {
+      calories: recipe.nutritionPerServing.calories * recipe.currentServings,
+      protein: recipe.nutritionPerServing.protein * recipe.currentServings,
+      carbs: recipe.nutritionPerServing.carbs * recipe.currentServings,
+      fat: recipe.nutritionPerServing.fat * recipe.currentServings,
+      fiber: recipe.nutritionPerServing.fiber * recipe.currentServings,
+      sodium: recipe.nutritionPerServing.sodium * recipe.currentServings
+    };
+  }
+  
+  // Calculate from ingredients
+  const ingredients = recipe.baseIngredients || recipe.ingredients || [];
+  return ingredients.reduce((total, ingredient) => {
+    const scaledQty = calculateScaledQuantity(recipe, ingredient);
+    
+    // Find nutrition data for this ingredient
+    const nutritionData = findIngredientNutrition(ingredient.name);
+    if (nutritionData) {
+      const factor = scaledQty / 100; // Nutrition data is per 100g
+      total.calories += (nutritionData.calories || 0) * factor;
+      total.protein += (nutritionData.protein || 0) * factor;
+      total.carbs += (nutritionData.carbs || 0) * factor;
+      total.fat += (nutritionData.fat || 0) * factor;
+      total.fiber += (nutritionData.fiber || 0) * factor;
+      total.sodium += (nutritionData.sodium || 0) * factor;
+    }
+    
+    return total;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 });
+}
+
+function findIngredientNutrition(name) {
+  // Search in custom ingredients
+  const ingredient = AppState.customIngredients.find(ing => 
+    ing.name.toLowerCase().includes(name.toLowerCase()) || 
+    name.toLowerCase().includes(ing.name.toLowerCase())
+  );
+  
+  if (ingredient && ingredient.calories) {
+    return ingredient;
+  }
+  
+  return null;
+}
+
+function openNutritionGoalsModal() {
+  // Populate form with current goals
+  document.getElementById('goal-calories').value = AppState.nutritionGoals.calories;
+  document.getElementById('goal-protein').value = AppState.nutritionGoals.protein;
+  document.getElementById('goal-carbs').value = AppState.nutritionGoals.carbs;
+  document.getElementById('goal-fat').value = AppState.nutritionGoals.fat;
+  document.getElementById('goal-fiber').value = AppState.nutritionGoals.fiber;
+  document.getElementById('goal-sodium').value = AppState.nutritionGoals.sodium;
+  
+  document.getElementById('nutrition-goals-modal').classList.remove('hidden');
+}
+
+function closeNutritionGoalsModal() {
+  document.getElementById('nutrition-goals-modal').classList.add('hidden');
+}
+
+function saveNutritionGoals(e) {
+  e.preventDefault();
+  
+  AppState.nutritionGoals = {
+    calories: parseInt(document.getElementById('goal-calories').value),
+    protein: parseInt(document.getElementById('goal-protein').value),
+    carbs: parseInt(document.getElementById('goal-carbs').value),
+    fat: parseInt(document.getElementById('goal-fat').value),
+    fiber: parseInt(document.getElementById('goal-fiber').value),
+    sodium: parseInt(document.getElementById('goal-sodium').value)
+  };
+  
+  updateNutritionGoalsDisplay();
+  closeNutritionGoalsModal();
+  saveToLocalStorage();
+}
+
+function updateNutritionGoalsDisplay() {
+  document.getElementById('daily-calories-goal').textContent = AppState.nutritionGoals.calories;
+  document.getElementById('daily-protein-goal').textContent = AppState.nutritionGoals.protein;
+  document.getElementById('daily-carbs-goal').textContent = AppState.nutritionGoals.carbs;
+  document.getElementById('daily-fat-goal').textContent = AppState.nutritionGoals.fat;
+}
+
+function renderNutritionTab() {
+  renderWeeklyNutritionChart();
+  filterRecipesByNutrition();
+}
+
+function renderWeeklyNutritionChart() {
+  const ctx = document.getElementById('nutrition-chart').getContext('2d');
+  
+  // Calculate weekly nutrition from planned meals
+  const weeklyNutrition = calculateWeeklyNutrition();
+  
+  if (window.nutritionChart) {
+    window.nutritionChart.destroy();
+  }
+  
+  window.nutritionChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)', 'Fiber (g)', 'Sodium (mg)'],
+      datasets: [{
+        label: 'Weekly Average',
+        data: [
+          weeklyNutrition.calories / 7,
+          weeklyNutrition.protein / 7,
+          weeklyNutrition.carbs / 7,
+          weeklyNutrition.fat / 7,
+          weeklyNutrition.fiber / 7,
+          weeklyNutrition.sodium / 7
+        ],
+        backgroundColor: '#1FB8CD',
+        borderColor: '#1FB8CD',
+        borderWidth: 1
+      }, {
+        label: 'Daily Goals',
+        data: [
+          AppState.nutritionGoals.calories,
+          AppState.nutritionGoals.protein,
+          AppState.nutritionGoals.carbs,
+          AppState.nutritionGoals.fat,
+          AppState.nutritionGoals.fiber,
+          AppState.nutritionGoals.sodium
+        ],
+        backgroundColor: '#FFC185',
+        borderColor: '#FFC185',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      },
+      plugins: {
+        legend: {
+          display: true
+        }
+      }
+    }
+  });
+}
+
+function calculateWeeklyNutrition() {
+  const weeklyTotal = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 };
+  
+  Object.keys(AppState.weeklyPlan).forEach(day => {
+    Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
+      const mealData = AppState.weeklyPlan[day][meal];
+      
+      if (meal === 'snacks') {
+        mealData.forEach(recipeId => {
+          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          if (recipe) {
+            const nutrition = calculateRecipeNutrition(recipe);
+            weeklyTotal.calories += nutrition.calories;
+            weeklyTotal.protein += nutrition.protein;
+            weeklyTotal.carbs += nutrition.carbs;
+            weeklyTotal.fat += nutrition.fat;
+            weeklyTotal.fiber += nutrition.fiber;
+            weeklyTotal.sodium += nutrition.sodium;
+          }
+        });
+      } else if (mealData) {
+        const recipe = AppState.recipes.find(r => r.id === mealData);
+        if (recipe) {
+          const nutrition = calculateRecipeNutrition(recipe);
+          weeklyTotal.calories += nutrition.calories;
+          weeklyTotal.protein += nutrition.protein;
+          weeklyTotal.carbs += nutrition.carbs;
+          weeklyTotal.fat += nutrition.fat;
+          weeklyTotal.fiber += nutrition.fiber;
+          weeklyTotal.sodium += nutrition.sodium;
+        }
+      }
+    });
+  });
+  
+  return weeklyTotal;
+}
+
+function filterRecipesByNutrition() {
+  const filterType = document.getElementById('nutrition-filter-type').value;
+  const resultsContainer = document.getElementById('nutrition-filtered-recipes');
+  
+  let filteredRecipes = AppState.recipes;
+  
+  if (filterType) {
+    filteredRecipes = AppState.recipes.filter(recipe => {
+      const nutrition = calculateRecipeNutrition(recipe);
+      const perServing = {
+        calories: nutrition.calories / recipe.currentServings,
+        protein: nutrition.protein / recipe.currentServings,
+        carbs: nutrition.carbs / recipe.currentServings,
+        fat: nutrition.fat / recipe.currentServings,
+        fiber: nutrition.fiber / recipe.currentServings
+      };
+      
+      switch (filterType) {
+        case 'high-protein':
+          return perServing.protein > 25;
+        case 'low-carb':
+          return perServing.carbs < 15;
+        case 'low-calorie':
+          return perServing.calories < 300;
+        case 'high-fiber':
+          return perServing.fiber > 5;
+        default:
+          return true;
+      }
+    });
+  }
+  
+  resultsContainer.innerHTML = filteredRecipes.map(recipe => {
+    const nutrition = calculateRecipeNutrition(recipe);
+    const perServing = {
+      calories: Math.round(nutrition.calories / recipe.currentServings),
+      protein: Math.round(nutrition.protein / recipe.currentServings),
+      carbs: Math.round(nutrition.carbs / recipe.currentServings),
+      fat: Math.round(nutrition.fat / recipe.currentServings),
+      fiber: Math.round(nutrition.fiber / recipe.currentServings)
+    };
+    
+    return `
+      <div class="recipe-card">
+        <h4>${recipe.name}</h4>
+        <div class="nutrition-facts">
+          <div class="nutrition-item">
+            <span class="nutrition-item-value">${perServing.calories}</span>
+            <span class="nutrition-item-label">calories</span>
+          </div>
+          <div class="nutrition-item">
+            <span class="nutrition-item-value">${perServing.protein}g</span>
+            <span class="nutrition-item-label">protein</span>
+          </div>
+          <div class="nutrition-item">
+            <span class="nutrition-item-value">${perServing.carbs}g</span>
+            <span class="nutrition-item-label">carbs</span>
+          </div>
+        </div>
+        <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning(${recipe.id})">Add to Plan</button>
+      </div>
+    `;
+  }).join('');
+}
+
+// Ingredient CRUD functions
+function openAddIngredientModal() {
+  AppState.currentEditingIngredient = null;
+  document.getElementById('ingredient-modal-title').textContent = 'Add New Ingredient';
+  clearIngredientForm();
+  document.getElementById('ingredient-modal').classList.remove('hidden');
+}
+
+function openEditIngredientModal(ingredientId) {
+  const ingredient = AppState.customIngredients.find(i => i.id === ingredientId);
+  if (!ingredient) return;
+  
+  AppState.currentEditingIngredient = ingredientId;
+  document.getElementById('ingredient-modal-title').textContent = 'Edit Ingredient';
+  
+  // Populate form
+  document.getElementById('ingredient-name').value = ingredient.name;
+  document.getElementById('ingredient-category').value = ingredient.category;
+  document.getElementById('ingredient-price').value = ingredient.pricePerUnit || '';
+  document.getElementById('ingredient-unit').value = ingredient.unit || '';
+  document.getElementById('ingredient-fridge-life').value = ingredient.fridgeLife;
+  document.getElementById('ingredient-freezer-life').value = ingredient.freezerLife;
+  document.getElementById('ingredient-storage-method').value = ingredient.storageMethod;
+  document.getElementById('ingredient-storage-tips').value = ingredient.storageTips || '';
+  document.getElementById('ingredient-calories').value = ingredient.calories || '';
+  document.getElementById('ingredient-protein').value = ingredient.protein || '';
+  document.getElementById('ingredient-carbs').value = ingredient.carbs || '';
+  document.getElementById('ingredient-fat').value = ingredient.fat || '';
+  document.getElementById('ingredient-fiber').value = ingredient.fiber || '';
+  document.getElementById('ingredient-sodium').value = ingredient.sodium || '';
+  
+  document.getElementById('ingredient-modal').classList.remove('hidden');
+}
+
+function closeIngredientModal() {
+  document.getElementById('ingredient-modal').classList.add('hidden');
+  clearIngredientForm();
+}
+
+function clearIngredientForm() {
+  document.getElementById('ingredient-form').reset();
+}
+
+function saveIngredient(e) {
+  e.preventDefault();
+  
+  const ingredient = {
+    id: AppState.currentEditingIngredient || Date.now(),
+    name: document.getElementById('ingredient-name').value,
+    category: document.getElementById('ingredient-category').value,
+    pricePerUnit: parseFloat(document.getElementById('ingredient-price').value) || 0,
+    unit: document.getElementById('ingredient-unit').value,
+    fridgeLife: parseInt(document.getElementById('ingredient-fridge-life').value),
+    freezerLife: parseInt(document.getElementById('ingredient-freezer-life').value),
+    storageMethod: document.getElementById('ingredient-storage-method').value,
+    storageTips: document.getElementById('ingredient-storage-tips').value,
+    calories: parseFloat(document.getElementById('ingredient-calories').value) || 0,
+    protein: parseFloat(document.getElementById('ingredient-protein').value) || 0,
+    carbs: parseFloat(document.getElementById('ingredient-carbs').value) || 0,
+    fat: parseFloat(document.getElementById('ingredient-fat').value) || 0,
+    fiber: parseFloat(document.getElementById('ingredient-fiber').value) || 0,
+    sodium: parseFloat(document.getElementById('ingredient-sodium').value) || 0
+  };
+  
+  if (AppState.currentEditingIngredient) {
+    // Update existing ingredient
+    const index = AppState.customIngredients.findIndex(i => i.id === AppState.currentEditingIngredient);
+    AppState.customIngredients[index] = ingredient;
+  } else {
+    // Add new ingredient
+    AppState.customIngredients.push(ingredient);
+  }
+  
+  renderStorageGuide();
+  closeIngredientModal();
+  saveToLocalStorage();
+}
+
+function deleteIngredient(ingredientId) {
+  if (confirm('Are you sure you want to delete this ingredient?')) {
+    AppState.customIngredients = AppState.customIngredients.filter(i => i.id !== ingredientId);
+    renderStorageGuide();
+    saveToLocalStorage();
+  }
+}
+
+function importIngredientsFromRecipes() {
+  const newIngredients = [];
+  
+  AppState.recipes.forEach(recipe => {
+    const ingredients = recipe.baseIngredients || recipe.ingredients || [];
+    ingredients.forEach(ingredient => {
+      // Check if ingredient already exists
+      const exists = AppState.customIngredients.find(i => 
+        i.name.toLowerCase() === ingredient.name.toLowerCase()
+      );
+      
+      if (!exists) {
+        newIngredients.push({
+          id: Date.now() + Math.random(),
+          name: ingredient.name,
+          category: ingredient.category,
+          pricePerUnit: 0,
+          unit: 'per 100g',
+          fridgeLife: 7,
+          freezerLife: 90,
+          storageMethod: 'Store properly in refrigerator',
+          storageTips: 'Check regularly for freshness',
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          sodium: 0
+        });
+      }
+    });
+  });
+  
+  AppState.customIngredients.push(...newIngredients);
+  renderStorageGuide();
+  alert(`Imported ${newIngredients.length} new ingredients from recipes.`);
+}
+
+// Cooking Hack CRUD functions
+function openAddHackModal() {
+  AppState.currentEditingHack = null;
+  document.getElementById('hack-modal-title').textContent = 'Add New Cooking Hack';
+  clearHackForm();
+  document.getElementById('hack-modal').classList.remove('hidden');
+}
+
+function openEditHackModal(hackId) {
+  const hack = AppState.customHacks.find(h => h.id === hackId);
+  if (!hack) return;
+  
+  AppState.currentEditingHack = hackId;
+  document.getElementById('hack-modal-title').textContent = 'Edit Cooking Hack';
+  
+  // Populate form
+  document.getElementById('hack-title').value = hack.title;
+  document.getElementById('hack-category').value = hack.category;
+  document.getElementById('hack-description').value = hack.description;
+  document.getElementById('hack-time-saved').value = hack.timeSaved || '';
+  document.getElementById('hack-cost-savings').value = hack.costSavings || '';
+  
+  document.getElementById('hack-modal').classList.remove('hidden');
+}
+
+function closeHackModal() {
+  document.getElementById('hack-modal').classList.add('hidden');
+  clearHackForm();
+}
+
+function clearHackForm() {
+  document.getElementById('hack-form').reset();
+}
+
+function saveHack(e) {
+  e.preventDefault();
+  
+  const hack = {
+    id: AppState.currentEditingHack || Date.now(),
+    title: document.getElementById('hack-title').value,
+    category: document.getElementById('hack-category').value,
+    description: document.getElementById('hack-description').value,
+    timeSaved: document.getElementById('hack-time-saved').value,
+    costSavings: document.getElementById('hack-cost-savings').value
+  };
+  
+  if (AppState.currentEditingHack) {
+    // Update existing hack
+    const index = AppState.customHacks.findIndex(h => h.id === AppState.currentEditingHack);
+    AppState.customHacks[index] = hack;
+  } else {
+    // Add new hack
+    AppState.customHacks.push(hack);
+  }
+  
+  renderCookingHacks();
+  closeHackModal();
+  saveToLocalStorage();
+}
+
+function deleteHack(hackId) {
+  if (confirm('Are you sure you want to delete this cooking hack?')) {
+    AppState.customHacks = AppState.customHacks.filter(h => h.id !== hackId);
+    renderCookingHacks();
+    saveToLocalStorage();
+  }
+}
+
+// Global functions for onclick handlers
+window.updateServingSize = updateServingSize;
+window.resetServingSize = resetServingSize;
+window.openEditRecipeModal = openEditRecipeModal;
+window.deleteRecipe = deleteRecipe;
+window.openRecipeSelectionModal = openRecipeSelectionModal;
+window.selectRecipeForPlanning = selectRecipeForPlanning;
+window.removeRecipeFromSlot = removeRecipeFromSlot;
+window.copyDay = copyDay;
+window.clearDay = clearDay;
+window.toggleGroceryItem = toggleGroceryItem;
+window.removeIngredientField = removeIngredientField;
+window.filterCookingHacks = filterCookingHacks;
+window.calculateRecipeCost = calculateRecipeCost;
+window.openEditIngredientModal = openEditIngredientModal;
+window.deleteIngredient = deleteIngredient;
+window.openEditHackModal = openEditHackModal;
+window.deleteHack = deleteHack;
+window.filterRecipesByNutrition = filterRecipesByNutrition;
+window.getCategoryIcon = getCategoryIcon;
+window.showSuccessMessage = showSuccessMessage;
+window.clearLocalStorage = clearLocalStorage;
+
+// Export/Import functionality
+function exportData() {
+  try {
+    const dataToExport = {
+      recipes: AppState.recipes,
+      weeklyPlan: AppState.weeklyPlan,
+      groceryList: AppState.groceryList,
+      nutritionGoals: AppState.nutritionGoals,
+      customIngredients: AppState.customIngredients,
+      customHacks: AppState.customHacks,
+      exportedAt: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    const dataStr = JSON.stringify(dataToExport, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `meal-prep-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showSuccessMessage('Data exported successfully!');
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    showErrorMessage('Failed to export data. Please try again.');
+  }
+}
+
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        
+        // Validate the imported data structure
+        if (!importedData.recipes || !importedData.weeklyPlan) {
+          throw new Error('Invalid data format');
+        }
+        
+        if (confirm('This will replace all your current data. Are you sure you want to continue?')) {
+          AppState.recipes = importedData.recipes || [];
+          AppState.weeklyPlan = importedData.weeklyPlan || {
+            Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+            Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+          };
+          AppState.groceryList = importedData.groceryList || [];
+          AppState.nutritionGoals = importedData.nutritionGoals || {
+            calories: 2000,
+            protein: 150,
+            carbs: 250,
+            fat: 67,
+            fiber: 25,
+            sodium: 2300
+          };
+          AppState.customIngredients = importedData.customIngredients || [];
+          AppState.customHacks = importedData.customHacks || [];
+          
+          // Save to local storage and refresh UI
+          saveToLocalStorage();
+          renderRecipes();
+          renderWeeklyPlanner();
+          renderStorageGuide();
+          renderCookingHacks();
+          updateNutritionGoalsDisplay();
+          
+          showSuccessMessage('Data imported successfully!');
+        }
+      } catch (error) {
+        console.error('Error importing data:', error);
+        showErrorMessage('Failed to import data. Please check the file format.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+window.exportData = exportData;
+window.importData = importData;
+window.handlePhotoUpload = handlePhotoUpload;
+window.removePhoto = removePhoto;
+
+// Firebase Authentication
+function openLoginModal() {
+  document.getElementById('login-modal').classList.remove('hidden');
+}
+
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.add('hidden');
+  document.getElementById('login-form').reset();
+}
+
+function openSignupModal() {
+  document.getElementById('signup-modal').classList.remove('hidden');
+}
+
+function closeSignupModal() {
+  document.getElementById('signup-modal').classList.add('hidden');
+  document.getElementById('signup-form').reset();
+}
+
+async function signIn(email, password) {
+  try {
+    const userCredential = await window.firebase.signInWithEmailAndPassword(window.firebase.auth, email, password);
+    AppState.currentUser = userCredential.user;
+    showSuccessMessage('Signed in successfully!');
+    closeLoginModal();
+    loadUserData();
+  } catch (error) {
+    console.error('Sign in error:', error);
+    showErrorMessage('Failed to sign in: ' + error.message);
+  }
+}
+
+async function signUp(email, password) {
+  try {
+    const userCredential = await window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password);
+    AppState.currentUser = userCredential.user;
+    showSuccessMessage('Account created successfully!');
+    closeSignupModal();
+    // Initialize user data
+    await initializeUserData();
+  } catch (error) {
+    console.error('Sign up error:', error);
+    showErrorMessage('Failed to create account: ' + error.message);
+  }
+}
+
+async function signOut() {
+  try {
+    await window.firebase.signOut(window.firebase.auth);
+    AppState.currentUser = null;
+    showSuccessMessage('Signed out successfully!');
+    // Clear UI and load local data
+    updateAuthUI();
+    loadFromLocalStorage();
+    renderRecipes();
+    renderWeeklyPlanner();
+    renderStorageGuide();
+    renderCookingHacks();
+  } catch (error) {
+    console.error('Sign out error:', error);
+    showErrorMessage('Failed to sign out: ' + error.message);
+  }
+}
+
+function updateAuthUI() {
+  const userInfo = document.getElementById('user-info');
+  const authButtons = document.getElementById('auth-buttons');
+  const userEmail = document.getElementById('user-email');
+  const sharedRecipesBtn = document.getElementById('shared-recipes-btn');
+  const familySharingBtn = document.getElementById('family-sharing-btn');
+  
+  if (AppState.currentUser) {
+    userEmail.textContent = AppState.currentUser.email;
+    userInfo.classList.remove('hidden');
+    authButtons.classList.add('hidden');
+    if (sharedRecipesBtn) sharedRecipesBtn.style.display = 'inline-block';
+    if (familySharingBtn) familySharingBtn.style.display = 'inline-block';
+  } else {
+    userInfo.classList.add('hidden');
+    authButtons.classList.remove('hidden');
+    if (sharedRecipesBtn) sharedRecipesBtn.style.display = 'none';
+    if (familySharingBtn) familySharingBtn.style.display = 'none';
+  }
+}
+
+// Firestore Data Management
+async function saveToFirestore() {
+  if (!AppState.currentUser || !AppState.isOnline) return;
+  
+  try {
+    const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+    const dataToSave = {
+      recipes: AppState.recipes,
+      weeklyPlan: AppState.weeklyPlan,
+      groceryList: AppState.groceryList,
+      nutritionGoals: AppState.nutritionGoals,
+      customIngredients: AppState.customIngredients,
+      customHacks: AppState.customHacks,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    await window.firebase.setDoc(userDocRef, dataToSave, { merge: true });
+    console.log('Data saved to Firestore');
+  } catch (error) {
+    console.error('Error saving to Firestore:', error);
+    showErrorMessage('Failed to sync data to cloud. Changes saved locally.');
+  }
+}
+
+async function loadFromFirestore() {
+  if (!AppState.currentUser || !AppState.isOnline) return false;
+  
+  try {
+    const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+    const docSnap = await window.firebase.getDoc(userDocRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      AppState.recipes = data.recipes || [];
+      AppState.weeklyPlan = data.weeklyPlan || {
+        Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+      };
+      AppState.groceryList = data.groceryList || [];
+      AppState.nutritionGoals = data.nutritionGoals || {
+        calories: 2000,
+        protein: 150,
+        carbs: 250,
+        fat: 67,
+        fiber: 25,
+        sodium: 2300
+      };
+      AppState.customIngredients = data.customIngredients || [];
+      AppState.customHacks = data.customHacks || [];
+      
+      console.log('Data loaded from Firestore');
+      showSuccessMessage('Data synced from cloud!');
+      return true;
+    }
+  } catch (error) {
+    console.error('Error loading from Firestore:', error);
+    showErrorMessage('Failed to load cloud data. Using local data.');
+  }
+  return false;
+}
+
+async function initializeUserData() {
+  // Save current local data to Firestore for new users
+  await saveToFirestore();
+  loadUserData();
+}
+
+async function loadUserData() {
+  // Try to load from Firestore first, fallback to local storage
+  const loadedFromCloud = await loadFromFirestore();
+  if (!loadedFromCloud) {
+    loadFromLocalStorage();
+  }
+  
+  // Update UI
+  renderRecipes();
+  renderWeeklyPlanner();
+  renderStorageGuide();
+  renderCookingHacks();
+  updateNutritionGoalsDisplay();
+}
+
+// Enhanced save function that saves to both local storage and Firestore
+function saveData() {
+  saveToLocalStorage();
+  saveToFirestore();
+}
+
+// Setup real-time listeners
+function setupRealtimeListeners() {
+  if (!AppState.currentUser || !AppState.isOnline) return;
+  
+  const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+  
+  window.firebase.onSnapshot(userDocRef, (doc) => {
+    if (doc.exists() && AppState.currentUser) {
+      const data = doc.data();
+      // Only update if data is different to avoid infinite loops
+      if (JSON.stringify(data.recipes) !== JSON.stringify(AppState.recipes)) {
+        AppState.recipes = data.recipes || [];
+        AppState.weeklyPlan = data.weeklyPlan || AppState.weeklyPlan;
+        AppState.groceryList = data.groceryList || [];
+        AppState.nutritionGoals = data.nutritionGoals || AppState.nutritionGoals;
+        AppState.customIngredients = data.customIngredients || [];
+        AppState.customHacks = data.customHacks || [];
+        
+        // Update UI
+        renderRecipes();
+        renderWeeklyPlanner();
+        renderStorageGuide();
+        renderCookingHacks();
+        updateNutritionGoalsDisplay();
+        
+        showSuccessMessage('Data updated from cloud!');
+      }
+    }
+  });
+}
+
+// Global functions for authentication
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
+window.openSignupModal = openSignupModal;
+window.closeSignupModal = closeSignupModal;
+window.signOut = signOut;
+
+// Shared Recipes Functions
+function openSharedRecipesModal() {
+  if (!AppState.currentUser) {
+    showErrorMessage('Please sign in to access shared recipes');
+    return;
+  }
+  
+  document.getElementById('shared-recipes-modal').classList.remove('hidden');
+  populateShareRecipeSelect();
+  loadSharedRecipes();
+}
+
+function closeSharedRecipesModal() {
+  document.getElementById('shared-recipes-modal').classList.add('hidden');
+}
+
+function populateShareRecipeSelect() {
+  const select = document.getElementById('share-recipe-select');
+  select.innerHTML = '<option value="">Select a recipe to share...</option>';
+  
+  AppState.recipes.forEach(recipe => {
+    const option = document.createElement('option');
+    option.value = recipe.id;
+    option.textContent = recipe.name;
+    select.appendChild(option);
+  });
+}
+
+async function shareRecipe() {
+  const recipeId = document.getElementById('share-recipe-select').value;
+  if (!recipeId) {
+    showErrorMessage('Please select a recipe to share');
+    return;
+  }
+  
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe) {
+    showErrorMessage('Recipe not found');
+    return;
+  }
+  
+  try {
+    const sharedRecipe = {
+      ...recipe,
+      sharedBy: AppState.currentUser.email,
+      sharedAt: new Date().toISOString(),
+      originalId: recipe.id
+    };
+    
+    // Remove the original ID to avoid conflicts
+    delete sharedRecipe.id;
+    
+    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), sharedRecipe);
+    showSuccessMessage('Recipe shared successfully!');
+    loadSharedRecipes();
+  } catch (error) {
+    console.error('Error sharing recipe:', error);
+    showErrorMessage('Failed to share recipe: ' + error.message);
+  }
+}
+
+async function loadSharedRecipes() {
+  try {
+    const sharedRecipesRef = window.firebase.collection(window.firebase.db, 'sharedRecipes');
+    const q = window.firebase.query(sharedRecipesRef, window.firebase.orderBy('sharedAt', 'desc'));
+    const querySnapshot = await window.firebase.getDocs(q);
+    
+    const sharedRecipesList = document.getElementById('shared-recipes-list');
+    sharedRecipesList.innerHTML = '';
+    
+    if (querySnapshot.empty) {
+      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes available</p>';
+      return;
+    }
+    
+    querySnapshot.forEach((doc) => {
+      const recipe = doc.data();
+      const recipeItem = document.createElement('div');
+      recipeItem.className = 'shared-recipe-item';
+      recipeItem.innerHTML = `
+        <div class="shared-recipe-info">
+          <h4>${recipe.name}</h4>
+          <p>Shared by ${recipe.sharedBy} • ${recipe.category} • ${recipe.servings} servings</p>
+        </div>
+        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
+      `;
+      sharedRecipesList.appendChild(recipeItem);
+    });
+  } catch (error) {
+    console.error('Error loading shared recipes:', error);
+    showErrorMessage('Failed to load shared recipes: ' + error.message);
+  }
+}
+
+async function importSharedRecipe(sharedRecipeId) {
+  try {
+    const docRef = window.firebase.doc(window.firebase.db, 'sharedRecipes', sharedRecipeId);
+    const docSnap = await window.firebase.getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const sharedRecipe = docSnap.data();
+      
+      // Create a new recipe with a unique ID
+      const newRecipe = {
+        ...sharedRecipe,
+        id: generateId(),
+        name: sharedRecipe.name + ' (Shared)',
+        sharedBy: sharedRecipe.sharedBy
+      };
+      
+      // Remove the shared-specific fields
+      delete newRecipe.sharedAt;
+      delete newRecipe.originalId;
+      
+      AppState.recipes.push(newRecipe);
+      saveData();
+      renderRecipes();
+      showSuccessMessage('Recipe imported successfully!');
+      closeSharedRecipesModal();
+    }
+  } catch (error) {
+    console.error('Error importing shared recipe:', error);
+    showErrorMessage('Failed to import recipe: ' + error.message);
+  }
+}
+
+// Global functions for shared recipes
+window.openSharedRecipesModal = openSharedRecipesModal;
+window.closeSharedRecipesModal = closeSharedRecipesModal;
+window.shareRecipe = shareRecipe;
+window.importSharedRecipe = importSharedRecipe;
+
+// Family Sharing Functions
+function openFamilySharingModal() {
+  if (!AppState.currentUser) {
+    showErrorMessage('Please sign in to access family sharing');
+    return;
+  }
+  
+  document.getElementById('family-sharing-modal').classList.remove('hidden');
+  loadFamilyMembers();
+}
+
+function closeFamilySharingModal() {
+  document.getElementById('family-sharing-modal').classList.add('hidden');
+}
+
+async function inviteFamilyMember() {
+  const email = document.getElementById('family-email').value.trim();
+  if (!email) {
+    showErrorMessage('Please enter an email address');
+    return;
+  }
+  
+  if (email === AppState.currentUser.email) {
+    showErrorMessage('You cannot invite yourself');
+    return;
+  }
+  
+  try {
+    const invitation = {
+      fromUser: AppState.currentUser.email,
+      toEmail: email,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      familyGroupId: AppState.currentUser.uid
+    };
+    
+    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'familyInvitations'), invitation);
+    showSuccessMessage('Invitation sent successfully!');
+    document.getElementById('family-email').value = '';
+    loadFamilyMembers();
+  } catch (error) {
+    console.error('Error sending invitation:', error);
+    showErrorMessage('Failed to send invitation: ' + error.message);
+  }
+}
+
+async function loadFamilyMembers() {
+  try {
+    const invitationsRef = window.firebase.collection(window.firebase.db, 'familyInvitations');
+    const q = window.firebase.query(invitationsRef, 
+      window.firebase.where('familyGroupId', '==', AppState.currentUser.uid));
+    const querySnapshot = await window.firebase.getDocs(q);
+    
+    const familyMembersList = document.getElementById('family-members-list');
+    familyMembersList.innerHTML = '';
+    
+    if (querySnapshot.empty) {
+      familyMembersList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No family members yet</p>';
+      return;
+    }
+    
+    querySnapshot.forEach((doc) => {
+      const invitation = doc.data();
+      const memberItem = document.createElement('div');
+      memberItem.className = 'family-member-item';
+      memberItem.innerHTML = `
+        <div class="family-member-info">
+          <h4>${invitation.toEmail}</h4>
+          <p>Invited ${new Date(invitation.createdAt).toLocaleDateString()}</p>
+        </div>
+        <div class="member-status ${invitation.status}">${invitation.status}</div>
+      `;
+      familyMembersList.appendChild(memberItem);
+    });
+  } catch (error) {
+    console.error('Error loading family members:', error);
+    showErrorMessage('Failed to load family members: ' + error.message);
+  }
+}
+
+// Enhanced share recipe function with privacy options
+async function shareRecipe() {
+  const recipeId = document.getElementById('share-recipe-select').value;
+  if (!recipeId) {
+    showErrorMessage('Please select a recipe to share');
+    return;
+  }
+  
+  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  if (!recipe) {
+    showErrorMessage('Recipe not found');
+    return;
+  }
+  
+  const privacy = document.querySelector('input[name="share-privacy"]:checked').value;
+  
+  try {
+    const sharedRecipe = {
+      ...recipe,
+      sharedBy: AppState.currentUser.email,
+      sharedAt: new Date().toISOString(),
+      originalId: recipe.id,
+      privacy: privacy,
+      familyGroupId: privacy === 'family' ? AppState.currentUser.uid : null
+    };
+    
+    // Remove the original ID to avoid conflicts
+    delete sharedRecipe.id;
+    
+    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), sharedRecipe);
+    showSuccessMessage(`Recipe shared ${privacy === 'public' ? 'publicly' : 'with family'}!`);
+    loadSharedRecipes();
+  } catch (error) {
+    console.error('Error sharing recipe:', error);
+    showErrorMessage('Failed to share recipe: ' + error.message);
+  }
+}
+
+// Enhanced load shared recipes with privacy filtering
+async function loadSharedRecipes() {
+  try {
+    const sharedRecipesRef = window.firebase.collection(window.firebase.db, 'sharedRecipes');
+    let q;
+    
+    if (AppState.currentUser) {
+      // Show public recipes and family recipes
+      q = window.firebase.query(sharedRecipesRef, 
+        window.firebase.where('privacy', 'in', ['public', 'family']),
+        window.firebase.orderBy('sharedAt', 'desc'));
+    } else {
+      // Show only public recipes for non-authenticated users
+      q = window.firebase.query(sharedRecipesRef, 
+        window.firebase.where('privacy', '==', 'public'),
+        window.firebase.orderBy('sharedAt', 'desc'));
+    }
+    
+    const querySnapshot = await window.firebase.getDocs(q);
+    
+    const sharedRecipesList = document.getElementById('shared-recipes-list');
+    sharedRecipesList.innerHTML = '';
+    
+    if (querySnapshot.empty) {
+      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes available</p>';
+      return;
+    }
+    
+    querySnapshot.forEach((doc) => {
+      const recipe = doc.data();
+      
+      // Filter family recipes to only show those from the same family group
+      if (recipe.privacy === 'family' && recipe.familyGroupId !== AppState.currentUser.uid) {
+        return;
+      }
+      
+      const recipeItem = document.createElement('div');
+      recipeItem.className = 'shared-recipe-item';
+      recipeItem.innerHTML = `
+        <div class="shared-recipe-info">
+          <h4>${recipe.name} ${recipe.privacy === 'family' ? '👨‍👩‍👧‍👦' : '🌐'}</h4>
+          <p>Shared by ${recipe.sharedBy} • ${recipe.category} • ${recipe.servings} servings</p>
+        </div>
+        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
+      `;
+      sharedRecipesList.appendChild(recipeItem);
+    });
+  } catch (error) {
+    console.error('Error loading shared recipes:', error);
+    showErrorMessage('Failed to load shared recipes: ' + error.message);
+  }
+}
+
+// Data Export Functions
+async function exportAllData() {
+  try {
+    const allData = {
+      user: {
+        email: AppState.currentUser.email,
+        uid: AppState.currentUser.uid,
+        exportDate: new Date().toISOString()
+      },
+      recipes: AppState.recipes,
+      weeklyPlan: AppState.weeklyPlan,
+      groceryList: AppState.groceryList,
+      nutritionGoals: AppState.nutritionGoals,
+      customIngredients: AppState.customIngredients,
+      customHacks: AppState.customHacks
+    };
+    
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `meal-prep-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showSuccessMessage('All data exported successfully!');
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    showErrorMessage('Failed to export data: ' + error.message);
+  }
+}
+
+// Account Deletion Functions
+function openDeleteAccountModal() {
+  document.getElementById('delete-account-modal').classList.remove('hidden');
+  
+  // Enable/disable delete button based on confirmation text
+  const confirmationInput = document.getElementById('delete-confirmation');
+  const deleteBtn = document.getElementById('delete-account-btn');
+  
+  confirmationInput.addEventListener('input', () => {
+    deleteBtn.disabled = confirmationInput.value !== 'DELETE';
+  });
+}
+
+function closeDeleteAccountModal() {
+  document.getElementById('delete-account-modal').classList.add('hidden');
+  document.getElementById('delete-confirmation').value = '';
+  document.getElementById('delete-account-btn').disabled = true;
+}
+
+async function deleteAccount() {
+  const confirmation = document.getElementById('delete-confirmation').value;
+  if (confirmation !== 'DELETE') {
+    showErrorMessage('Please type "DELETE" to confirm');
+    return;
+  }
+  
+  try {
+    // Delete user data from Firestore
+    const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+    await window.firebase.deleteDoc(userDocRef);
+    
+    // Delete family invitations
+    const invitationsRef = window.firebase.collection(window.firebase.db, 'familyInvitations');
+    const q = window.firebase.query(invitationsRef, 
+      window.firebase.where('familyGroupId', '==', AppState.currentUser.uid));
+    const querySnapshot = await window.firebase.getDocs(q);
+    
+    const deletePromises = querySnapshot.docs.map(doc => 
+      window.firebase.deleteDoc(doc.ref)
+    );
+    await Promise.all(deletePromises);
+    
+    // Delete user's shared recipes
+    const sharedRecipesRef = window.firebase.collection(window.firebase.db, 'sharedRecipes');
+    const sharedQ = window.firebase.query(sharedRecipesRef, 
+      window.firebase.where('sharedBy', '==', AppState.currentUser.email));
+    const sharedQuerySnapshot = await window.firebase.getDocs(sharedQ);
+    
+    const deleteSharedPromises = sharedQuerySnapshot.docs.map(doc => 
+      window.firebase.deleteDoc(doc.ref)
+    );
+    await Promise.all(deleteSharedPromises);
+    
+    // Delete the user account
+    await AppState.currentUser.delete();
+    
+    showSuccessMessage('Account deleted successfully');
+    closeDeleteAccountModal();
+    
+    // Clear local data and redirect to sign in
+    AppState.currentUser = null;
+    updateAuthUI();
+    clearLocalStorage();
+    renderRecipes();
+    renderWeeklyPlanner();
+    renderStorageGuide();
+    renderCookingHacks();
+    
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    showErrorMessage('Failed to delete account: ' + error.message);
+  }
+}
+
+// Global functions for new security features
+window.openFamilySharingModal = openFamilySharingModal;
+window.closeFamilySharingModal = closeFamilySharingModal;
+window.inviteFamilyMember = inviteFamilyMember;
+window.exportAllData = exportAllData;
+window.openDeleteAccountModal = openDeleteAccountModal;
+window.closeDeleteAccountModal = closeDeleteAccountModal;
+window.deleteAccount = deleteAccount;
+
+// Setup authentication form handlers
+function setupAuthFormHandlers() {
+  // Login form
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    await signIn(email, password);
+  });
+  
+  // Signup form
+  document.getElementById('signup-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const confirmPassword = document.getElementById('signup-confirm-password').value;
+    
+    if (password !== confirmPassword) {
+      showErrorMessage('Passwords do not match');
+      return;
+    }
+    
+    await signUp(email, password);
+  });
+}
+
+// Setup online/offline listeners
+function setupOnlineOfflineListeners() {
+  window.addEventListener('online', () => {
+    AppState.isOnline = true;
+    showSuccessMessage('Back online! Syncing data...');
+    if (AppState.currentUser) {
+      saveToFirestore();
+      setupRealtimeListeners();
+    }
+  });
+  
+  window.addEventListener('offline', () => {
+    AppState.isOnline = false;
+    showErrorMessage('You are offline. Changes will be saved locally.');
+  });
+}
+
+// Mobile Enhancement Functions
+function setupMobileEnhancements() {
+  // Add touch feedback to meal slots
+  const mealSlots = document.querySelectorAll('.meal-slot');
+  mealSlots.forEach(slot => {
+    slot.addEventListener('touchstart', function() {
+      this.classList.add('touch-active');
+    });
+    
+    slot.addEventListener('touchend', function() {
+      setTimeout(() => {
+        this.classList.remove('touch-active');
+      }, 150);
+    });
+  });
+  
+  // Add haptic feedback for supported devices
+  function addHapticFeedback() {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+  }
+  
+  // Add haptic feedback to important actions
+  const importantButtons = document.querySelectorAll('.btn--primary, .meal-slot, .grocery-checkbox');
+  importantButtons.forEach(button => {
+    button.addEventListener('click', addHapticFeedback);
+  });
+  
+  // Improve scroll behavior for mobile
+  document.body.style.webkitOverflowScrolling = 'touch';
+  
+  // Add pull-to-refresh functionality
+  let startY = 0;
+  let currentY = 0;
+  let isPulling = false;
+  
+  document.addEventListener('touchstart', function(e) {
+    if (window.scrollY === 0) {
+      startY = e.touches[0].clientY;
+      isPulling = true;
+    }
+  });
+  
+  document.addEventListener('touchmove', function(e) {
+    if (isPulling) {
+      currentY = e.touches[0].clientY;
+      const pullDistance = currentY - startY;
+      
+      if (pullDistance > 100) {
+        // Trigger refresh
+        location.reload();
+        isPulling = false;
+      }
+    }
+  });
+  
+  document.addEventListener('touchend', function() {
+    isPulling = false;
+  });
+}
+
+// Initialize mobile enhancements when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Check if device is mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    setupMobileEnhancements();
+    document.body.classList.add('mobile-device');
+  }
+});
+
+// Recipe Photo Management
+let currentRecipePhoto = null;
+
+function handlePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    showErrorMessage('Please select a valid image file.');
+    return;
+  }
+  
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showErrorMessage('Image file is too large. Please select an image smaller than 5MB.');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    currentRecipePhoto = e.target.result;
+    showPhotoPreview(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPhotoPreview(imageSrc) {
+  const preview = document.getElementById('photo-preview');
+  const previewImage = document.getElementById('preview-image');
+  
+  previewImage.src = imageSrc;
+  preview.style.display = 'block';
+}
+
+function removePhoto() {
+  currentRecipePhoto = null;
+  document.getElementById('recipe-photo').value = '';
+  document.getElementById('photo-preview').style.display = 'none';
+}
+
+function clearRecipeForm() {
+  document.getElementById('recipe-form').reset();
+  document.getElementById('ingredients-list').innerHTML = '';
+  removePhoto();
+  AppState.currentEditingRecipe = null;
+}

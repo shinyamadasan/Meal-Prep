@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#21808D">
+    <title>Meal Prep Planner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <div class="container">
+                <div class="header-top">
+                    <h1 class="app-title">🍳 Meal Prep Planner</h1>
+                    <div class="auth-section">
+                        <div id="user-info" class="user-info hidden">
+                            <span id="user-email"></span>
+                            <button class="btn btn--outline btn--sm" onclick="signOut()">Sign Out</button>
+                        </div>
+                        <div id="auth-buttons" class="auth-buttons">
+                            <button class="btn btn--outline btn--sm" onclick="openLoginModal()">Sign In</button>
+                            <button class="btn btn--primary btn--sm" onclick="openSignupModal()">Sign Up</button>
+                        </div>
+                    </div>
+                </div>
+                <nav class="tab-nav">
+                    <button class="tab-btn active" data-tab="recipes">My Recipes</button>
+                    <button class="tab-btn" data-tab="planner">Weekly Planner</button>
+                    <button class="tab-btn" data-tab="grocery">Grocery List</button>
+                    <button class="tab-btn" data-tab="storage">Storage Guide</button>
+                    <button class="tab-btn" data-tab="hacks">Cooking Hacks</button>
+                    <button class="tab-btn" data-tab="nutrition">Nutrition</button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div class="container">
+                <!-- Recipes Tab -->
+                <section id="recipes" class="tab-content active">
+                    <div class="section-header">
+                        <h2>My Recipes</h2>
+                        <div class="header-actions">
+                            <button class="btn btn--secondary" onclick="exportData()">📤 Export Data</button>
+                            <button class="btn btn--secondary" onclick="importData()">📥 Import Data</button>
+                            <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
+                            <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
+                            <button class="btn btn--outline" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
+                            <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
+                        </div>
+                    </div>
+                    
+                    <div class="search-filter">
+                        <input type="text" class="form-control" id="recipe-search" placeholder="Search recipes...">
+                        <select class="form-control" id="category-filter">
+                            <option value="">All Categories</option>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Main Dish">Main Dish</option>
+                            <option value="Snack">Snack</option>
+                            <option value="Dessert">Dessert</option>
+                        </select>
+                    </div>
+
+                    <div id="recipes-grid" class="recipes-grid"></div>
+
+                    <!-- Add Recipe Modal -->
+                    <div id="recipe-modal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 id="modal-title">Add New Recipe</h3>
+                                <button class="modal-close">&times;</button>
+                            </div>
+                            <form id="recipe-form" class="modal-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Recipe Name</label>
+                                        <input type="text" class="form-control" id="recipe-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Category</label>
+                                        <select class="form-control" id="recipe-category" required>
+                                            <option value="">Select Category</option>
+                                            <option value="Breakfast">Breakfast</option>
+                                            <option value="Main Dish">Main Dish</option>
+                                            <option value="Snack">Snack</option>
+                                            <option value="Dessert">Dessert</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Prep Time (minutes)</label>
+                                        <input type="number" class="form-control" id="prep-time" min="0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Cook Time (minutes)</label>
+                                        <input type="number" class="form-control" id="cook-time" min="0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Servings</label>
+                                        <input type="number" class="form-control" id="servings" min="1" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Fridge Life (days)</label>
+                                        <input type="number" class="form-control" id="fridge-life" min="1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Freezer Life (days)</label>
+                                        <input type="number" class="form-control" id="freezer-life" min="1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Estimated Cost (₱)</label>
+                                        <input type="number" class="form-control" id="estimated-cost" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Recipe Photo</label>
+                                    <div class="photo-upload-container">
+                                        <input type="file" class="form-control" id="recipe-photo" accept="image/*" onchange="handlePhotoUpload(event)">
+                                        <div class="photo-preview" id="photo-preview" style="display: none;">
+                                            <img id="preview-image" src="" alt="Recipe preview">
+                                            <button type="button" class="remove-photo" onclick="removePhoto()">×</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Storage Notes</label>
+                                    <textarea class="form-control" id="storage-notes" rows="2"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Ingredients</label>
+                                    <div class="ingredients-header">
+                                        <button type="button" class="btn btn--outline btn--sm" id="add-ingredient-btn">Add Ingredient</button>
+                                        <button type="button" class="btn btn--secondary btn--sm" id="storage-guide-link">📚 Storage Guide</button>
+                                    </div>
+                                    <div id="ingredients-list"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Instructions</label>
+                                    <textarea class="form-control" id="instructions" rows="4" required></textarea>
+                                </div>
+
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn--outline" id="cancel-btn">Cancel</button>
+                                    <button type="submit" class="btn btn--primary">Save Recipe</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Weekly Planner Tab -->
+                <section id="planner" class="tab-content">
+                    <div class="section-header">
+                        <h2>Weekly Meal Planner</h2>
+                        <div class="planner-controls">
+                            <button class="btn btn--outline" id="clear-week">Clear Week</button>
+                            <button class="btn btn--primary" id="generate-grocery">Generate Grocery List</button>
+                        </div>
+                    </div>
+                    
+                    <div class="week-stats">
+                        <div class="stat-card">
+                            <span class="stat-label">Total Prep Time</span>
+                            <span class="stat-value" id="total-prep-time">0 min</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Total Cook Time</span>
+                            <span class="stat-value" id="total-cook-time">0 min</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Planned Meals</span>
+                            <span class="stat-value" id="planned-meals">0</span>
+                        </div>
+                    </div>
+
+                    <div class="weekly-planner-container">
+                        <div class="planner-actions">
+                            <button class="btn btn--outline" id="copy-day-btn" disabled>Copy Day</button>
+                            <button class="btn btn--outline" id="clear-day-btn" disabled>Clear Day</button>
+                        </div>
+                        <div class="meal-planner-grid" id="meal-planner"></div>
+                    </div>
+                </section>
+
+                <!-- Grocery List Tab -->
+                <section id="grocery" class="tab-content">
+                    <div class="section-header">
+                        <h2>Grocery List</h2>
+                        <div class="grocery-controls">
+                            <button class="btn btn--outline" id="clear-grocery">Clear All</button>
+                            <button class="btn btn--secondary" id="add-custom-item">Add Custom Item</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grocery-summary">
+                        <p>Generated from <span id="selected-meals-count">0</span> planned meals</p>
+                    </div>
+
+
+
+                    <div id="grocery-list" class="grocery-categories"></div>
+                </section>
+
+                <!-- Storage Guide Tab -->
+                <section id="storage" class="tab-content">
+                    <div class="section-header">
+                        <h2>Ingredient Storage Guide</h2>
+                        <div class="storage-controls">
+                            <button class="btn btn--primary" id="add-ingredient-storage">Add Ingredient</button>
+                            <button class="btn btn--secondary" id="import-from-recipes">Import from Recipes</button>
+                        </div>
+                    </div>
+                    
+                    <div class="storage-search">
+                        <input type="text" class="form-control" id="storage-search" placeholder="Search ingredients...">
+                        <select class="form-control" id="storage-category-filter">
+                            <option value="">All Categories</option>
+                            <option value="Protein">Proteins</option>
+                            <option value="Vegetable">Vegetables</option>
+                            <option value="Fruit">Fruits</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Pantry">Pantry Items</option>
+                            <option value="Grain">Grains</option>
+                        </select>
+                    </div>
+                    
+                    <div class="storage-legend">
+                        <div class="legend-item">
+                            <span class="storage-indicator fresh"></span>
+                            <span>Fresh (1-3 days)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="storage-indicator use-soon"></span>
+                            <span>Use Soon (4-7 days)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="storage-indicator freeze-now"></span>
+                            <span>Freeze or Use Now (7+ days)</span>
+                        </div>
+                    </div>
+
+                    <div id="storage-guide" class="storage-ingredients-grid"></div>
+                </section>
+
+                <!-- Nutrition Tab -->
+                <section id="nutrition" class="tab-content">
+                    <div class="section-header">
+                        <h2>🥗 Nutrition Tracking</h2>
+                        <button class="btn btn--primary" id="set-nutrition-goals">Set Goals</button>
+                    </div>
+                    
+                    <div class="nutrition-goals-summary">
+                        <div class="goal-card">
+                            <span class="goal-label">Daily Calories</span>
+                            <span class="goal-value" id="daily-calories-goal">2000</span>
+                        </div>
+                        <div class="goal-card">
+                            <span class="goal-label">Protein (g)</span>
+                            <span class="goal-value" id="daily-protein-goal">150</span>
+                        </div>
+                        <div class="goal-card">
+                            <span class="goal-label">Carbs (g)</span>
+                            <span class="goal-value" id="daily-carbs-goal">250</span>
+                        </div>
+                        <div class="goal-card">
+                            <span class="goal-label">Fat (g)</span>
+                            <span class="goal-value" id="daily-fat-goal">67</span>
+                        </div>
+                    </div>
+
+                    <div class="nutrition-summary">
+                        <h3>Weekly Nutrition Summary</h3>
+                        <div id="weekly-nutrition-chart" class="chart-container">
+                            <canvas id="nutrition-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="nutrition-search">
+                        <h3>Find Recipes by Nutrition</h3>
+                        <div class="nutrition-filters">
+                            <select class="form-control" id="nutrition-filter-type">
+                                <option value="">All Recipes</option>
+                                <option value="high-protein">High Protein (&gt;25g)</option>
+                                <option value="low-carb">Low Carb (&lt;15g)</option>
+                                <option value="low-calorie">Low Calorie (&lt;300 cal)</option>
+                                <option value="high-fiber">High Fiber (&gt;5g)</option>
+                            </select>
+                            <button class="btn btn--outline" id="filter-recipes-nutrition">Filter</button>
+                        </div>
+                        <div id="nutrition-filtered-recipes" class="nutrition-recipes-grid"></div>
+                    </div>
+
+                    <!-- Nutrition Goals Modal -->
+                    <div id="nutrition-goals-modal" class="modal hidden">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Set Nutrition Goals</h3>
+                                <button class="modal-close">&times;</button>
+                            </div>
+                            <form id="nutrition-goals-form" class="modal-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Calories</label>
+                                        <input type="number" class="form-control" id="goal-calories" min="800" max="5000" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Protein (g)</label>
+                                        <input type="number" class="form-control" id="goal-protein" min="50" max="300" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Carbs (g)</label>
+                                        <input type="number" class="form-control" id="goal-carbs" min="50" max="500" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Fat (g)</label>
+                                        <input type="number" class="form-control" id="goal-fat" min="20" max="200" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Fiber (g)</label>
+                                        <input type="number" class="form-control" id="goal-fiber" min="15" max="50" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Daily Sodium (mg)</label>
+                                        <input type="number" class="form-control" id="goal-sodium" min="1000" max="4000" required>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn--outline" id="cancel-goals-btn">Cancel</button>
+                                    <button type="submit" class="btn btn--primary">Save Goals</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Cooking Hacks Tab -->
+                <section id="hacks" class="tab-content">
+                    <div class="section-header">
+                        <h2>🍳 Cooking Hacks &amp; Meal Prep Tips</h2>
+                        <div class="hack-controls">
+                            <button class="btn btn--primary" id="add-cooking-hack">Add New Hack</button>
+                            <select class="form-control" id="hack-category-filter">
+                                <option value="">All Categories</option>
+                                <option value="Batch Cooking">Batch Cooking</option>
+                                <option value="Storage">Storage</option>
+                                <option value="Budget">Budget</option>
+                                <option value="Equipment">Equipment</option>
+                                <option value="Time-Saving">Time-Saving</option>
+                                <option value="Safety">Safety</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+
+
+                    <div id="cooking-hacks" class="hacks-grid"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Recipe Selection Modal -->
+    <div id="recipe-selection-modal" class="modal hidden">
+        <div class="modal-content recipe-selection-content">
+            <div class="modal-header">
+                <h3 id="recipe-selection-title">Select a Recipe</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="recipe-search-bar">
+                    <input type="text" class="form-control" id="recipe-modal-search" placeholder="Search recipes...">
+                </div>
+                <div id="recipe-selection-grid" class="recipe-selection-grid"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Chart.js for nutrition charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import { getFirestore, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+      
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+  apiKey: "AIzaSyBg3-oS41S9gpZ6-KKiD_Ktst3ejOjficI",
+  authDomain: "meal-prep-f8907.firebaseapp.com",
+  projectId: "meal-prep-f8907",
+  storageBucket: "meal-prep-f8907.firebasestorage.app",
+  messagingSenderId: "976337827559",
+  appId: "1:976337827559:web:170e295cfde0e5d3fe1442"
+};
+      
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      
+      // Make Firebase available globally
+      window.firebase = { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs };
+    </script>
+    
+    <script src="app.js"></script>
+
+    <!-- Add/Edit Ingredient Modal -->
+    <div id="ingredient-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="ingredient-modal-title">Add New Ingredient</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="ingredient-form" class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Ingredient Name</label>
+                        <input type="text" class="form-control" id="ingredient-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" id="ingredient-category" required>
+                            <option value="">Select Category</option>
+                            <option value="Protein">Protein</option>
+                            <option value="Vegetable">Vegetable</option>
+                            <option value="Fruit">Fruit</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Pantry">Pantry</option>
+                            <option value="Grain">Grain</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Price (₱)</label>
+                        <input type="number" class="form-control" id="ingredient-price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unit</label>
+                        <input type="text" class="form-control" id="ingredient-unit" placeholder="e.g., per kg, per piece" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Fridge Life (days)</label>
+                        <input type="number" class="form-control" id="ingredient-fridge-life" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Freezer Life (days)</label>
+                        <input type="number" class="form-control" id="ingredient-freezer-life" min="1" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Storage Method</label>
+                    <textarea class="form-control" id="ingredient-storage-method" rows="2" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Storage Tips</label>
+                    <textarea class="form-control" id="ingredient-storage-tips" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label"><strong>Nutrition Information (per 100g/100ml)</strong></label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Calories</label>
+                        <input type="number" class="form-control" id="ingredient-calories" min="0" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Protein (g)</label>
+                        <input type="number" class="form-control" id="ingredient-protein" min="0" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Carbs (g)</label>
+                        <input type="number" class="form-control" id="ingredient-carbs" min="0" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fat (g)</label>
+                        <input type="number" class="form-control" id="ingredient-fat" min="0" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Fiber (g)</label>
+                        <input type="number" class="form-control" id="ingredient-fiber" min="0" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sodium (mg)</label>
+                        <input type="number" class="form-control" id="ingredient-sodium" min="0" step="0.1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" id="cancel-ingredient-btn">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Ingredient</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Cooking Hack Modal -->
+    <div id="hack-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="hack-modal-title">Add New Cooking Hack</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="hack-form" class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Hack Title</label>
+                        <input type="text" class="form-control" id="hack-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" id="hack-category" required>
+                            <option value="">Select Category</option>
+                            <option value="Batch Cooking">Batch Cooking</option>
+                            <option value="Storage">Storage</option>
+                            <option value="Budget">Budget</option>
+                            <option value="Equipment">Equipment</option>
+                            <option value="Time-Saving">Time-Saving</option>
+                            <option value="Safety">Safety</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" id="hack-description" rows="3" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Time Saved (optional)</label>
+                        <input type="text" class="form-control" id="hack-time-saved" placeholder="e.g., 15 minutes per meal">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cost Savings (optional)</label>
+                        <input type="text" class="form-control" id="hack-cost-savings" placeholder="e.g., ₱50-100 per kilo">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" id="cancel-hack-btn">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Hack</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Authentication Modals -->
+    <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Sign In</h3>
+                <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+            </div>
+            <form id="login-form" class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="login-password" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" onclick="closeLoginModal()">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Sign In</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="signup-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Sign Up</h3>
+                <button class="modal-close" onclick="closeSignupModal()">&times;</button>
+            </div>
+            <form id="signup-form" class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="signup-email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="signup-password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" class="form-control" id="signup-confirm-password" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" onclick="closeSignupModal()">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Sign Up</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shared Recipes Modal -->
+    <div id="shared-recipes-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Shared Recipes</h3>
+                <button class="modal-close" onclick="closeSharedRecipesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Share a Recipe</label>
+                    <select class="form-control" id="share-recipe-select">
+                        <option value="">Select a recipe to share...</option>
+                    </select>
+                    <div class="privacy-options" style="margin-top: 8px;">
+                        <label class="checkbox-label">
+                            <input type="radio" name="share-privacy" value="public" checked>
+                            <span>🌐 Public (Everyone can see)</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="radio" name="share-privacy" value="family">
+                            <span>👨‍👩‍👧‍👦 Family Only</span>
+                        </label>
+                    </div>
+                    <button class="btn btn--primary btn--sm" onclick="shareRecipe()" style="margin-top: 8px;">Share Recipe</button>
+                </div>
+                <hr>
+                <div class="form-group">
+                    <label class="form-label">Browse Shared Recipes</label>
+                    <div id="shared-recipes-list" class="shared-recipes-list">
+                        <!-- Shared recipes will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Family Sharing Modal -->
+    <div id="family-sharing-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Family Sharing</h3>
+                <button class="modal-close" onclick="closeFamilySharingModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Invite Family Member</label>
+                    <input type="email" class="form-control" id="family-email" placeholder="Enter email address">
+                    <button class="btn btn--primary btn--sm" onclick="inviteFamilyMember()" style="margin-top: 8px;">Send Invitation</button>
+                </div>
+                <hr>
+                <div class="form-group">
+                    <label class="form-label">Family Members</label>
+                    <div id="family-members-list" class="family-members-list">
+                        <!-- Family members will be loaded here -->
+                    </div>
+                </div>
+                <hr>
+                <div class="form-group">
+                    <label class="form-label">Account Management</label>
+                    <div class="account-actions">
+                        <button class="btn btn--outline btn--sm" onclick="exportAllData()">📥 Export All Data</button>
+                        <button class="btn btn--danger btn--sm" onclick="openDeleteAccountModal()">🗑️ Delete Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Confirmation Modal -->
+    <div id="delete-account-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Delete Account</h3>
+                <button class="modal-close" onclick="closeDeleteAccountModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="warning-message">
+                    <p><strong>This action cannot be undone!</strong></p>
+                    <p>Deleting your account will permanently remove:</p>
+                    <ul>
+                        <li>All your recipes</li>
+                        <li>Your meal plans</li>
+                        <li>Your grocery lists</li>
+                        <li>Your nutrition goals</li>
+                        <li>All your data from our servers</li>
+                    </ul>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type "DELETE" to confirm</label>
+                    <input type="text" class="form-control" id="delete-confirmation" placeholder="Type DELETE here">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--outline" onclick="closeDeleteAccountModal()">Cancel</button>
+                    <button class="btn btn--danger" onclick="deleteAccount()" id="delete-account-btn" disabled>Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

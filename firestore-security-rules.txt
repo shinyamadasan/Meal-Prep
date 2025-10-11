@@ -1,0 +1,179 @@
+# Firestore Security Rules for Meal Prep App
+
+## Overview
+These security rules ensure that:
+- Users can only access their own personal data
+- Shared recipes are properly protected
+- Family sharing works securely
+- Data integrity is maintained
+
+## Rules Configuration
+
+Copy and paste these rules into your Firebase Console > Firestore > Rules:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can only access their own personal data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Shared recipes - read access for authenticated users, write for owners
+    match /sharedRecipes/{recipeId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (resource == null || resource.data.sharedBy == request.auth.token.email);
+    }
+    
+    // Family invitations - users can read/write their own invitations
+    match /familyInvitations/{invitationId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.familyGroupId == request.auth.uid || 
+         resource.data.toEmail == request.auth.token.email);
+    }
+  }
+}
+```
+
+## Security Features Explained
+
+### 1. User Data Protection
+- Each user can only access data under their own UID
+- Prevents users from reading/writing other users' data
+- Ensures complete data isolation
+
+### 2. Shared Recipes Security
+- Anyone can read shared recipes (for discovery)
+- Only the original sharer can modify/delete their shared recipes
+- Prevents unauthorized modifications
+
+### 3. Family Sharing Security
+- Users can only manage invitations for their own family group
+- Users can see invitations sent to their email
+- Prevents unauthorized family group access
+
+### 4. Authentication Requirements
+- All operations require user authentication
+- No anonymous access to sensitive data
+- Email verification can be enforced in Firebase Auth settings
+
+## Additional Security Recommendations
+
+### 1. Enable Email Verification
+In Firebase Console > Authentication > Settings:
+- Enable "Email link (passwordless sign-in)"
+- Enable "Email verification"
+
+### 2. Set Password Requirements
+In Firebase Console > Authentication > Settings:
+- Minimum password length: 8 characters
+- Require uppercase, lowercase, numbers
+
+### 3. Enable App Check (Optional)
+For production apps, enable App Check to prevent abuse:
+- Go to Firebase Console > App Check
+- Enable for your web app
+- Add reCAPTCHA verification
+
+### 4. Monitor Usage
+- Set up Firebase Analytics
+- Monitor Firestore usage in Console
+- Set up billing alerts
+
+## Data Structure Security
+
+### User Data Structure
+```
+/users/{userId}/
+├── recipes: [private recipes]
+├── weeklyPlan: [private meal plans]
+├── groceryList: [private lists]
+├── nutritionGoals: [private goals]
+├── customIngredients: [private ingredients]
+├── customHacks: [private hacks]
+└── lastUpdated: timestamp
+```
+
+### Shared Recipes Structure
+```
+/sharedRecipes/{recipeId}/
+├── name: string
+├── sharedBy: email
+├── sharedAt: timestamp
+├── privacy: "public" | "family"
+├── familyGroupId: userId (if family)
+└── [recipe data]
+```
+
+### Family Invitations Structure
+```
+/familyInvitations/{invitationId}/
+├── fromUser: email
+├── toEmail: email
+├── status: "pending" | "accepted"
+├── familyGroupId: userId
+└── createdAt: timestamp
+```
+
+## Testing Security Rules
+
+### 1. Test User Isolation
+- Create two test accounts
+- Verify each can only access their own data
+- Confirm cross-user access is blocked
+
+### 2. Test Shared Recipes
+- Share a recipe from one account
+- Verify other users can read but not modify
+- Test family vs public privacy settings
+
+### 3. Test Family Sharing
+- Send family invitation
+- Verify only family members can see family recipes
+- Test invitation acceptance flow
+
+## Production Deployment Checklist
+
+- [ ] Security rules deployed
+- [ ] Email verification enabled
+- [ ] Strong password requirements set
+- [ ] App Check enabled (optional)
+- [ ] Billing alerts configured
+- [ ] Analytics enabled
+- [ ] Error monitoring set up
+- [ ] Backup strategy implemented
+
+## Support and Maintenance
+
+### Regular Security Reviews
+- Monthly rule audits
+- Quarterly access pattern reviews
+- Annual security assessment
+
+### Monitoring
+- Set up alerts for unusual access patterns
+- Monitor failed authentication attempts
+- Track data usage and costs
+
+### Updates
+- Keep Firebase SDK updated
+- Review and update security rules as needed
+- Test rules after any changes
+
+## Emergency Procedures
+
+### If Security Breach Suspected
+1. Immediately review Firestore access logs
+2. Check for unusual data access patterns
+3. Temporarily restrict access if needed
+4. Contact Firebase support if necessary
+
+### Data Recovery
+- Firestore has built-in backup
+- User data can be exported via admin SDK
+- Shared recipes are preserved in separate collection
+
+This security setup provides enterprise-grade protection for your meal prep app while maintaining ease of use for legitimate users.
