@@ -1196,15 +1196,23 @@ function addIngredientField(ingredient = null) {
     <input type="number" class="form-control" placeholder="Qty" step="0.01" min="0" value="${ingredient?.quantity || ''}" required>
     <select class="form-control" required>
       <option value="">Unit</option>
+      <option value="g" ${ingredient?.unit === 'g' ? 'selected' : ''}>g</option>
+      <option value="kg" ${ingredient?.unit === 'kg' ? 'selected' : ''}>kg</option>
+      <option value="ml" ${ingredient?.unit === 'ml' ? 'selected' : ''}>ml</option>
+      <option value="L" ${ingredient?.unit === 'L' ? 'selected' : ''}>L</option>
+      <option value="cups" ${ingredient?.unit === 'cups' ? 'selected' : ''}>Cups</option>
       <option value="cup" ${ingredient?.unit === 'cup' ? 'selected' : ''}>Cup</option>
       <option value="tbsp" ${ingredient?.unit === 'tbsp' ? 'selected' : ''}>Tbsp</option>
       <option value="tsp" ${ingredient?.unit === 'tsp' ? 'selected' : ''}>Tsp</option>
+      <option value="pieces" ${ingredient?.unit === 'pieces' ? 'selected' : ''}>Pieces</option>
+      <option value="cloves" ${ingredient?.unit === 'cloves' ? 'selected' : ''}>Cloves</option>
+      <option value="can" ${ingredient?.unit === 'can' ? 'selected' : ''}>Can</option>
+      <option value="pack" ${ingredient?.unit === 'pack' ? 'selected' : ''}>Pack</option>
+      <option value="stalks" ${ingredient?.unit === 'stalks' ? 'selected' : ''}>Stalks</option>
+      <option value="bunches" ${ingredient?.unit === 'bunches' ? 'selected' : ''}>Bunches</option>
       <option value="lbs" ${ingredient?.unit === 'lbs' ? 'selected' : ''}>Lbs</option>
       <option value="oz" ${ingredient?.unit === 'oz' ? 'selected' : ''}>Oz</option>
-      <option value="pieces" ${ingredient?.unit === 'pieces' ? 'selected' : ''}>Pieces</option>
       <option value="inches" ${ingredient?.unit === 'inches' ? 'selected' : ''}>Inches</option>
-      <option value="stalks" ${ingredient?.unit === 'stalks' ? 'selected' : ''}>Stalks</option>
-      <option value="cups" ${ingredient?.unit === 'cups' ? 'selected' : ''}>Cups</option>
     </select>
     <select class="form-control" required>
       <option value="">Category</option>
@@ -4096,4 +4104,187 @@ function downloadCSVTemplate() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+// â”€â”€ Paste Recipe Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function openPasteRecipeModal() {
+  document.getElementById('paste-recipe-text').value = '';
+  document.getElementById('paste-recipe-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('paste-recipe-text').focus(), 50);
+}
+
+function closePasteRecipeModal() {
+  document.getElementById('paste-recipe-modal').classList.add('hidden');
+}
+
+function parseAndImportRecipe() {
+  const text = document.getElementById('paste-recipe-text').value.trim();
+  if (!text) return;
+
+  const parsed = parseRecipeText(text);
+
+  closePasteRecipeModal();
+  AppState.currentEditingRecipe = null;
+  document.getElementById('modal-title').textContent = 'Add New Recipe';
+  clearRecipeForm();
+  removePhoto();
+  document.getElementById('recipe-modal').classList.remove('hidden');
+
+  document.getElementById('recipe-name').value = parsed.name;
+  document.getElementById('recipe-category').value = parsed.category;
+  document.getElementById('prep-time').value = parsed.prepTime || 15;
+  document.getElementById('cook-time').value = parsed.cookTime || 30;
+  document.getElementById('servings').value = parsed.servings || 4;
+  document.getElementById('fridge-life').value = 3;
+  document.getElementById('freezer-life').value = 30;
+  document.getElementById('instructions').value = parsed.instructions;
+
+  const ingredientsList = document.getElementById('ingredients-list');
+  ingredientsList.innerHTML = '';
+  if (parsed.ingredients.length > 0) {
+    parsed.ingredients.forEach(ing => addIngredientField(ing));
+  } else {
+    addIngredientField();
+  }
+}
+
+function parseRecipeText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  let name = '';
+  for (const line of lines) {
+    const clean = line.replace(/[*_#]+/g, '').trim();
+    if (clean.length > 3 && !/^(ingredients?|instructions?|directions?|method|notes?|tips?|print|jump|servings?|serves?|prep|cook|total|yield|calories|nutrition)/i.test(clean)) {
+      name = clean;
+      break;
+    }
+  }
+
+  let servings = 4;
+  const servMatch = text.match(/\b(?:serves?|makes?|yields?|servings?)[:\s]+(\d+)/i) ||
+                    text.match(/(\d+)\s+(?:serving|portion|yield)s?\b/i);
+  if (servMatch) servings = parseInt(servMatch[1]);
+
+  function extractMins(re) {
+    const m = text.match(re);
+    if (!m) return 0;
+    return /hr|hour/i.test(m[2]) ? parseInt(m[1]) * 60 : parseInt(m[1]);
+  }
+  const prepTime = extractMins(/prep(?:aration)?\s*(?:time)?[:\s]+(\d+)\s*(hr|hour|min)/i) || 15;
+  const cookTime = extractMins(/cook(?:ing)?\s*(?:time)?[:\s]+(\d+)\s*(hr|hour|min)/i) || 30;
+
+  let mode = 'none';
+  const ingredientLines = [];
+  const instructionLines = [];
+
+  for (const line of lines) {
+    if (/^ingredients?[:\s]*$/i.test(line)) { mode = 'ingredients'; continue; }
+    if (/^(?:instructions?|directions?|method|how to make|steps?|procedure)[:\s]*$/i.test(line)) { mode = 'instructions'; continue; }
+
+    if (mode === 'ingredients') {
+      if (/^[A-Z][A-Z\s]{3,}[:\s]*$/.test(line) && line.length < 35) {
+        if (/^(?:instructions?|directions?|method|how to|steps?)/i.test(line)) mode = 'instructions';
+        continue;
+      }
+      const clean = line.replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, '').trim();
+      if (clean) ingredientLines.push(clean);
+    } else if (mode === 'instructions') {
+      if (/^[A-Z][A-Z\s]{3,}[:\s]*$/.test(line) && line.length < 35) continue;
+      const clean = line.replace(/^[-*]\s*/, '').trim();
+      if (clean) instructionLines.push(clean);
+    }
+  }
+
+  if (ingredientLines.length === 0) {
+    for (const line of lines) {
+      if (/^[\d]/.test(line) && /\d+\s+\w/.test(line)) {
+        ingredientLines.push(line.replace(/^[-*]\s*/, '').trim());
+      }
+    }
+  }
+  if (instructionLines.length === 0) {
+    for (const line of lines) {
+      if (/^\d+[.)]\s/.test(line)) instructionLines.push(line);
+    }
+  }
+
+  const ingredients = ingredientLines.map(parseIngredientLine).filter(Boolean);
+  const instructions = instructionLines.join('\n');
+  const category = guessRecipeCategory(name);
+
+  return { name, servings, prepTime, cookTime, category, ingredients, instructions };
+}
+
+function parseFraction(str) {
+  str = str.trim();
+  const mixed = str.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3]);
+  const frac = str.match(/^(\d+)\/(\d+)$/);
+  if (frac) return parseInt(frac[1]) / parseInt(frac[2]);
+  return parseFloat(str) || 1;
+}
+
+function normalizeUnit(raw) {
+  if (!raw) return 'pieces';
+  const u = raw.toLowerCase().replace(/\.$/, '');
+  if (/^cups?$/.test(u)) return 'cups';
+  if (/^(tbsp|tablespoons?)$/.test(u)) return 'tbsp';
+  if (/^(tsp|teaspoons?)$/.test(u)) return 'tsp';
+  if (/^(lbs?|pounds?)$/.test(u)) return 'lbs';
+  if (/^(oz|ounces?)$/.test(u)) return 'oz';
+  if (/^(g|grams?)$/.test(u)) return 'g';
+  if (/^(kg|kilos?|kilograms?)$/.test(u)) return 'kg';
+  if (/^(ml|milliliters?)$/.test(u)) return 'ml';
+  if (/^(l|liters?|litres?)$/.test(u)) return 'L';
+  if (/^(stalks?|stems?)$/.test(u)) return 'stalks';
+  if (/^cloves?$/.test(u)) return 'cloves';
+  if (/^cans?$/.test(u)) return 'can';
+  if (/^(packs?|packets?)$/.test(u)) return 'pack';
+  if (/^bunches?$/.test(u)) return 'bunches';
+  return 'pieces';
+}
+
+function guessIngredientCategory(name) {
+  const n = name.toLowerCase();
+  if (/chicken|pork|beef|fish|tilapia|bangus|milkfish|shrimp|prawn|squid|crab|tuna|salmon|egg|tofu|meat|liver|sardine|galunggong|baboy|manok|baka/.test(n)) return 'Protein';
+  if (/garlic|onion|ginger|tomato|potato|carrot|bell pepper|celery|cabbage|kangkong|sitaw|okra|eggplant|ampalaya|pechay|mushroom|broccoli|leek|chili|spinach|bok choy|kalabasa|squash|sibuyas|kamatis|kintsay/.test(n)) return 'Vegetable';
+  if (/milk|cream|cheese|butter|yogurt|condensed|evaporated/.test(n)) return 'Dairy';
+  if (/rice|flour|bread|pasta|noodles|corn|oats|pancit|bihon|sotanghon|canton|miki|wheat/.test(n)) return 'Grain';
+  if (/banana|mango|calamansi|lemon|lime|apple|orange|pineapple|coconut|avocado|papaya|jackfruit|langka/.test(n)) return 'Fruit';
+  return 'Pantry';
+}
+
+function guessRecipeCategory(name) {
+  const n = name.toLowerCase();
+  if (/breakfast|oatmeal|toast|pancake|tapsilog|longsilog|tocilog/.test(n)) return 'Breakfast';
+  if (/salad|dip|side/.test(n)) return 'Snack';
+  if (/cake|cookie|brownie|pudding|leche flan|maja|kalamay|polvoron|pie|dessert/.test(n)) return 'Dessert';
+  return 'Main Dish';
+}
+
+function parseIngredientLine(line) {
+  line = line.replace(/Â¼/g,'1/4').replace(/Â½/g,'1/2').replace(/Â¾/g,'3/4')
+             .replace(/â…“/g,'1/3').replace(/â…”/g,'2/3').replace(/â…›/g,'1/8');
+
+  const units = 'cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|ounces?|grams?|g|kg|kilos?|kilograms?|ml|milliliters?|L|liters?|litres?|stalks?|stems?|cloves?|cans?|packs?|packets?|bunches?|pieces?|pcs|slices?|heads?|inches?|whole';
+  const re = new RegExp('^(\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:\\.\\d+)?)\\s+(' + units + ')\\.?\\s+(.+)', 'i');
+
+  const m1 = line.match(re);
+  if (m1) {
+    const ingName = m1[3].replace(/[,;(].*/, '').trim();
+    return { quantity: parseFraction(m1[1]), unit: normalizeUnit(m1[2]), name: ingName, category: guessIngredientCategory(ingName) };
+  }
+
+  const m2 = line.match(/^(\d+(?:\.\d+)?|\d+\/\d+|\d+\s+\d+\/\d+)\s+(.+)/);
+  if (m2) {
+    const ingName = m2[2].replace(/[,;(].*/, '').trim();
+    return { quantity: parseFraction(m2[1]), unit: 'pieces', name: ingName, category: guessIngredientCategory(ingName) };
+  }
+
+  if (line.length > 1 && line.length < 80) {
+    const ingName = line.replace(/[,;(].*/, '').trim();
+    return { quantity: 1, unit: 'pieces', name: ingName, category: guessIngredientCategory(ingName) };
+  }
+
+  return null;
 }

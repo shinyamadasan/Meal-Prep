@@ -61,6 +61,7 @@
                             <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
                             <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
                             <button class="btn btn--outline" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
+                            <button class="btn btn--secondary" onclick="openPasteRecipeModal()">📝 Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>
                     </div>
@@ -847,6 +848,27 @@
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closeCustomItemModal()">Cancel</button>
                 <button class="btn btn--primary" onclick="confirmCustomGroceryItem()">Add to List</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste Recipe Modal -->
+    <div id="paste-recipe-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>📝 Paste Recipe Text</h3>
+                <button class="modal-close" onclick="closePasteRecipeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:0.75rem;color:var(--text-secondary);font-size:0.875rem;">
+                    Copy a recipe from any website (Panlasang Pinoy, AllRecipes, etc.) and paste it below. The app will auto-fill the recipe form — you can review and adjust before saving.
+                </p>
+                <textarea id="paste-recipe-text" class="form-control" rows="16"
+                    placeholder="Paste the full recipe page text here..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closePasteRecipeModal()">Cancel</button>
+                <button class="btn btn--primary" onclick="parseAndImportRecipe()">Parse &amp; Fill Form →</button>
             </div>
         </div>
     </div>
