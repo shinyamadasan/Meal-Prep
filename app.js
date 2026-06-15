@@ -4667,3 +4667,92 @@ function lookupPantryKnowledge(name) {
   ) || null;
 }
 
+
+
+// ── Nutrition Database Search (USDA FoodData Central) ─────────────────────────
+
+const USDA_KEY = 'DEMO_KEY';
+const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
+
+async function searchNutritionDB() {
+  const input = document.getElementById('nutrition-db-query');
+  const query = input ? input.value.trim() : '';
+  if (!query) return;
+
+  const resultsEl = document.getElementById('nutrition-db-results');
+  resultsEl.classList.remove('hidden');
+  resultsEl.innerHTML = '<div class="nutrition-db-loading">Searching…</div>';
+
+  try {
+    const params = new URLSearchParams({
+      query: query,
+      pageSize: '10',
+      dataType: 'Survey (FNDDS),Foundation,SR Legacy',
+      api_key: USDA_KEY
+    });
+    const res = await fetch(USDA_URL + '?' + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    if (!data.foods || data.foods.length === 0) {
+      resultsEl.innerHTML = '<div class="nutrition-db-empty">No results. Try a more general term (e.g. "chicken" instead of "chicken adobo").</div>';
+      return;
+    }
+
+    renderNutritionDBResults(data.foods);
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="nutrition-db-error">Search failed. Check your connection and try again.</div>';
+  }
+}
+
+function getNutrientVal(nutrients, id) {
+  var n = nutrients.find(function(x) { return x.nutrientId === id; });
+  return n ? Math.round(n.value) : 0;
+}
+
+function renderNutritionDBResults(foods) {
+  var resultsEl = document.getElementById('nutrition-db-results');
+  var html = '';
+
+  foods.forEach(function(food) {
+    var cal  = getNutrientVal(food.foodNutrients, 1008);
+    var pro  = getNutrientVal(food.foodNutrients, 1003);
+    var carb = getNutrientVal(food.foodNutrients, 1005);
+    var fat  = getNutrientVal(food.foodNutrients, 1004);
+
+    var per = food.servingSize
+      ? 'per ' + food.servingSize + (food.servingSizeUnit || 'g')
+      : 'per 100g';
+
+    var name = food.description
+      .toLowerCase()
+      .replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+
+    var brand = food.brandOwner ? ' <span class="nutrition-db-brand">(' + food.brandOwner + ')</span>' : '';
+
+    html += '<div class="nutrition-db-item" onclick="applyNutritionResult(' + cal + ',' + pro + ',' + carb + ',' + fat + ')">';
+    html += '<div class="nutrition-db-item-name">' + name + brand + '</div>';
+    html += '<div class="nutrition-db-item-values">';
+    html += '<span class="nv-cal">' + cal + ' kcal</span>';
+    html += '<span>P ' + pro + 'g</span>';
+    html += '<span>C ' + carb + 'g</span>';
+    html += '<span>F ' + fat + 'g</span>';
+    html += '<span class="nutrition-db-per">' + per + '</span>';
+    html += '</div></div>';
+  });
+
+  resultsEl.innerHTML = html;
+}
+
+function applyNutritionResult(cal, pro, carb, fat) {
+  document.getElementById('nutrition-calories').value = cal || '';
+  document.getElementById('nutrition-protein').value  = pro  || '';
+  document.getElementById('nutrition-carbs').value    = carb || '';
+  document.getElementById('nutrition-fat').value      = fat  || '';
+
+  var resultsEl = document.getElementById('nutrition-db-results');
+  var queryEl   = document.getElementById('nutrition-db-query');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  if (queryEl)   queryEl.value = '';
+}
+

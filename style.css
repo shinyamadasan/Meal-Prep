@@ -3728,3 +3728,107 @@ select.form-control {
   background: #064e3b;
   color: #6ee7b7;
 }
+
+
+/* ── Nutrition Database Search ─────────────────────────────────────────────── */
+
+.nutrition-db-search {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--color-bg-3);
+}
+
+.nutrition-db-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.875rem;
+}
+
+.nutrition-db-header small {
+  font-weight: normal;
+  font-size: 0.72rem;
+  color: var(--text-secondary, var(--color-text-secondary));
+  opacity: 0.75;
+}
+
+.nutrition-db-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nutrition-db-input-row .form-control {
+  flex: 1;
+}
+
+.nutrition-db-results {
+  margin-top: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  background: var(--color-surface);
+}
+
+.nutrition-db-results.hidden { display: none; }
+
+.nutrition-db-loading,
+.nutrition-db-empty,
+.nutrition-db-error {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.nutrition-db-error { color: var(--color-error); }
+
+.nutrition-db-item {
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.12s;
+}
+
+.nutrition-db-item:last-child { border-bottom: none; }
+
+.nutrition-db-item:hover {
+  background: var(--color-bg-3);
+}
+
+.nutrition-db-item-name {
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-medium);
+  margin-bottom: 0.2rem;
+  line-height: 1.3;
+}
+
+.nutrition-db-brand {
+  font-weight: normal;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.nutrition-db-item-values {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.nv-cal {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+}
+
+.nutrition-db-per {
+  margin-left: auto;
+  font-style: italic;
+  font-size: 0.7rem;
+}
+
