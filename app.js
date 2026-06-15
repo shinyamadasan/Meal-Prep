@@ -4328,21 +4328,52 @@ function renderPantry() {
   if (!list) return;
 
   const n = AppState.pantry.length;
-  count.textContent = n > 0 ? `(${n} item${n !== 1 ? 's' : ''})` : '';
+  count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
 
   if (n === 0) {
     list.innerHTML = '<p class="pantry-empty">No items yet. Add ingredients you already have at home.</p>';
     return;
   }
 
-  list.innerHTML = '<div class="pantry-list-grid">' +
-    AppState.pantry.map(p =>
-      `<div class="pantry-item">` +
-      `<span class="pantry-item-name">${p.name}</span>` +
-      `<button class="pantry-remove" onclick="removeFromPantry('${p.id}')" title="Remove">×</button>` +
-      `</div>`
-    ).join('') +
-  '</div>';
+  var html = '<div class="pantry-cards">';
+  AppState.pantry.forEach(function(p) {
+    var k = lookupPantryKnowledge(p.name);
+    var safeId = String(p.id).replace('.', '_');
+    if (k) {
+      html += '<div class="pantry-card" id="pcard-' + safeId + '">';
+      html += '<div class="pantry-card-header">';
+      html += '<span class="pantry-card-title">' + k.icon + ' ' + p.name + '</span>';
+      html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
+      html += '</div>';
+      html += '<div class="pantry-card-meta">';
+      html += '<span class="pantry-location-badge">' + k.locationIcon + ' ' + k.location + '</span>';
+      html += '<span class="pantry-lasts">⏱️ ' + k.lasts + '</span>';
+      html += '<button class="pantry-info-btn" onclick="togglePantryCard(\'' + safeId + '\')" title="Storage guide">ℹ️ Guide</button>';
+      html += '</div>';
+      html += '<div class="pantry-card-detail hidden" id="pdetail-' + safeId + '">';
+      html += '<div class="pantry-detail-row"><b>📦 How to store:</b> ' + k.store + '</div>';
+      html += '<div class="pantry-detail-row"><b>🚫 Signs it\'s bad:</b> ' + k.spoilage + '</div>';
+      html += '<div class="pantry-detail-row"><b>🔍 Freshness guide:</b> ' + k.freshness + '</div>';
+      if (k.tip) html += '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>';
+      html += '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="pantry-card pantry-card--plain">';
+      html += '<span class="pantry-card-title">' + p.name + '</span>';
+      html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
+      html += '</div>';
+    }
+  });
+  html += '</div>';
+  list.innerHTML = html;
+}
+
+function togglePantryCard(safeId) {
+  var detail = document.getElementById('pdetail-' + safeId);
+  var btn = detail ? detail.parentElement.querySelector('.pantry-info-btn') : null;
+  if (!detail) return;
+  var hidden = detail.classList.toggle('hidden');
+  if (btn) btn.textContent = hidden ? 'ℹ️ Guide' : '▲ Hide';
 }
 
 function togglePantrySection() {
@@ -4380,3 +4411,259 @@ function removeFromPantry(id) {
   renderPantry();
   renderGroceryList();
 }
+
+
+// ── Pantry Knowledge Base ─────────────────────────────────────────────
+
+const PANTRY_KNOWLEDGE = [
+  {
+    names: ['potato', 'potatoes', 'patatas'],
+    icon: '🥔',
+    location: 'Counter / Pantry',
+    locationIcon: '🗄️',
+    lasts: '2–5 weeks',
+    store: 'Cool, dark, dry place with good airflow. Never in the fridge — cold turns starch into sugar and makes them gritty.',
+    spoilage: 'Soft or mushy spots, green patches (toxic — cut away generously), foul smell, or shriveled skin.',
+    freshness: '🟢 New: firm, smooth, no sprouts. 🟡 OK: small sprouts (remove before cooking). 🔴 Old: shriveled, large sprouts, green tint.',
+    tip: '⚠️ Store away from onions — they release gases that make each other rot faster.'
+  },
+  {
+    names: ['sweet potato', 'kamote', 'camote'],
+    icon: '🍠',
+    location: 'Counter / Pantry',
+    locationIcon: '🗄️',
+    lasts: '3–5 weeks',
+    store: 'Cool, dry, dark place. Fridge makes them hard in the center.',
+    spoilage: 'Soft spots, black or white mold, shriveling, unpleasant smell.',
+    freshness: '🟢 New: firm, smooth skin, no soft spots. 🟡 OK: small blemishes (cut away). 🔴 Old: very soft, mushy ends.',
+    tip: 'Keep at room temp if using within a month. Do not refrigerate uncooked.'
+  },
+  {
+    names: ['onion', 'onions', 'sibuyas', 'red onion', 'white onion'],
+    icon: '🧅',
+    location: 'Pantry (cool & dry)',
+    locationIcon: '🗄️',
+    lasts: '1–3 months (whole)',
+    store: 'Cool, dry, well-ventilated area. Open basket or mesh bag. Keep away from potatoes.',
+    spoilage: 'Mold (fuzzy or dark spots), very soft, slimy layers, foul smell.',
+    freshness: '🟢 New: firm, dry papery skin, no soft spots. 🟡 OK: outer skin peeling but inner is firm. 🔴 Old: very soft, sprouting (still edible but use fast).',
+    tip: '⚠️ Never mix with potatoes. Once cut, wrap tightly and refrigerate — use within 7–10 days.'
+  },
+  {
+    names: ['garlic', 'bawang', 'garlic clove', 'garlic cloves'],
+    icon: '🧄',
+    location: 'Counter / Pantry',
+    locationIcon: '🗄️',
+    lasts: '3–6 months (whole bulb)',
+    store: 'Open container at room temp. Good airflow is key. Don\'t seal in a bag.',
+    spoilage: 'Mold on cloves, brown/mushy interior, very shriveled, strong sour smell.',
+    freshness: '🟢 New: firm, tight skin, white inside. 🟡 OK: slightly soft but white inside, green sprout (still fine). 🔴 Old: mushy, yellow/brown flesh.',
+    tip: 'Peeled garlic goes in the fridge (1–2 weeks). Minced garlic in oil must be refrigerated and used within 1 week.'
+  },
+  {
+    names: ['tomato', 'tomatoes', 'kamatis'],
+    icon: '🍅',
+    location: 'Counter (not fridge)',
+    locationIcon: '🍃',
+    lasts: '4–7 days at counter',
+    store: 'Room temperature, stem side down, away from direct sunlight. Fridge kills the flavor and texture.',
+    spoilage: 'Mold, very soft/mushy, split skin with liquid seeping, sour fermented smell.',
+    freshness: '🟢 New: firm, bright color, fresh smell. 🟡 OK: slightly soft but no mold. 🔴 Old: very soft, wrinkled, discolored.',
+    tip: 'Refrigerate only if fully ripe and you need to extend by 2–3 days. Let it come back to room temp before eating.'
+  },
+  {
+    names: ['egg', 'eggs', 'itlog'],
+    icon: '🥚',
+    location: 'Fridge',
+    locationIcon: '🧊',
+    lasts: '3–5 weeks',
+    store: 'Main body of fridge (NOT the door — temperature fluctuates). Keep in original carton.',
+    spoilage: 'Float test: fill bowl with water — fresh eggs sink flat, old eggs stand upright, bad eggs float. Cracked shell = use immediately or discard.',
+    freshness: '🟢 New: sinks flat on its side. 🟡 OK: sinks but stands upright. 🔴 Bad: floats (discard) or smells sulfurous when cracked.',
+    tip: 'The float test is reliable. Eggs rarely go "bad" before the date if refrigerated — they just get less fresh (whites get watery).'
+  },
+  {
+    names: ['chicken', 'chicken breast', 'chicken thigh', 'manok', 'raw chicken'],
+    icon: '🍗',
+    location: 'Fridge / Freezer',
+    locationIcon: '🧊',
+    lasts: '1–2 days (fridge) • 9 months (freezer)',
+    store: 'Bottom shelf of fridge in sealed container to avoid cross-contamination. Freeze if not using within 2 days.',
+    spoilage: 'Slimy or sticky texture, gray/green color, sour or ammonia smell — discard immediately.',
+    freshness: '🟢 New: pink, firm, mild smell. 🟡 OK: still pink but slightly tacky (rinse and cook same day). 🔴 Old: gray, slimy, strong smell.',
+    tip: 'Thaw in the fridge overnight, not on the counter. Never refreeze thawed raw chicken.'
+  },
+  {
+    names: ['pork', 'baboy', 'pork belly', 'pork chop', 'liempo'],
+    icon: '🥩',
+    location: 'Fridge / Freezer',
+    locationIcon: '🧊',
+    lasts: '3–5 days (fridge) • 6 months (freezer)',
+    store: 'Sealed container, bottom shelf. Keep away from cooked food.',
+    spoilage: 'Slimy texture, dull gray-brown (not pink), sour or off smell.',
+    freshness: '🟢 New: pink-red, firm, fresh smell. 🟡 OK: slightly darker but firm. 🔴 Old: brown-gray, soft, off smell.',
+    tip: 'Cooked pork lasts 3–4 days in fridge. Vacuum-sealed pork can last up to 2 weeks unopened.'
+  },
+  {
+    names: ['beef', 'baka', 'ground beef', 'beef steak', 'karne'],
+    icon: '🥩',
+    location: 'Fridge / Freezer',
+    locationIcon: '🧊',
+    lasts: '3–5 days (fridge) • 4–12 months (freezer)',
+    store: 'Sealed container, bottom shelf. Keep original packaging if using within 2 days.',
+    spoilage: 'Brown-gray color throughout (not just surface), slimy texture, sour smell.',
+    freshness: '🟢 New: bright red (surface may be darker underneath — normal). 🟡 OK: slightly brown on surface but red inside. 🔴 Old: brown throughout, off smell.',
+    tip: 'Brown surface on beef is just oxidation — it\'s safe if it smells fine. Cut it open: if red inside, it\'s good.'
+  },
+  {
+    names: ['fish', 'isda', 'tilapia', 'bangus', 'milkfish', 'galunggong', 'tuna', 'salmon', 'raw fish'],
+    icon: '🐟',
+    location: 'Fridge / Freezer',
+    locationIcon: '🧊',
+    lasts: '1–2 days (fridge) • 3–6 months (freezer)',
+    store: 'Coldest part of fridge, in a covered container or on ice. Freeze if not cooking today.',
+    spoilage: 'Strong "fishy" ammonia smell (fresh fish smells like the sea), milky eyes, soft/mushy flesh, brown gills.',
+    freshness: '🟢 New: clear eyes, red gills, firm flesh, mild sea smell. 🟡 OK: slightly cloudy eyes but firm. 🔴 Old: cloudy/sunken eyes, gray gills, strong odor.',
+    tip: 'Fish is the most perishable protein. When in doubt, throw it out.'
+  },
+  {
+    names: ['carrot', 'carrots', 'karot'],
+    icon: '🥕',
+    location: 'Fridge (crisper)',
+    locationIcon: '🧊',
+    lasts: '3–4 weeks',
+    store: 'Remove green tops (they drain moisture), store in perforated bag in crisper drawer.',
+    spoilage: 'Slimy, black mold spots, very rubbery or mushy, sour smell.',
+    freshness: '🟢 New: bright orange, very firm, fresh smell. 🟡 OK: slightly limp but no mold (can refresh in ice water). 🔴 Old: very soft, discolored ends, slimy.',
+    tip: 'Slightly limp carrots can be revived! Soak in cold water for 30 minutes.'
+  },
+  {
+    names: ['rice', 'bigas', 'white rice', 'brown rice'],
+    icon: '🍚',
+    location: 'Pantry (airtight)',
+    locationIcon: '🗄️',
+    lasts: 'White rice: 1–2 years • Brown rice: 6 months',
+    store: 'Airtight container in cool, dry, dark place. Keep away from moisture.',
+    spoilage: 'Bugs/weevils, clumping from moisture, musty or rancid smell (brown rice goes rancid faster).',
+    freshness: '🟢 New: dry, separate grains, no smell. 🟡 OK: slight clumping (dry it out). 🔴 Old/Bad: bugs, strong odor, oily texture (brown rice).',
+    tip: 'Store cooked rice in fridge within 1 hour. Never leave cooked rice at room temp — bacteria grow fast.'
+  },
+  {
+    names: ['bread', 'tinapay', 'loaf', 'pandesal'],
+    icon: '🍞',
+    location: 'Counter / Freezer',
+    locationIcon: '🍃',
+    lasts: '3–5 days counter • 3 months frozen',
+    store: 'Room temp in bread bag or box if using within days. Freeze for longer (toast from frozen).',
+    spoilage: 'Visible mold (even a small spot = discard the whole loaf), sour smell, very hard/dry.',
+    freshness: '🟢 New: soft, fresh smell. 🟡 OK: slightly stiff but no mold (toast it). 🔴 Old: mold visible anywhere.',
+    tip: '⚠️ Don\'t refrigerate bread — it actually goes stale faster in the fridge. Freeze instead.'
+  },
+  {
+    names: ['banana', 'saging', 'lakatan', 'latundan'],
+    icon: '🍌',
+    location: 'Counter',
+    locationIcon: '🍃',
+    lasts: '5–7 days at counter',
+    store: 'Room temperature, hang if possible. Keep away from other fruits (releases ethylene gas).',
+    spoilage: 'Completely black and liquid inside, mold on skin, fermented smell.',
+    freshness: '🟢 New: firm, yellow with green tips. 🟡 OK: all yellow or spots — sweetest stage. 🔴 Too ripe: fully black outside (still fine for baking/smoothies). 🔴 Bad: mold, liquid.',
+    tip: 'Separate from the bunch to slow ripening. Refrigerate ripe bananas — skin turns black but flesh stays good for 1–2 weeks.'
+  },
+  {
+    names: ['cabbage', 'repolyo', 'napa cabbage', 'pechay baguio'],
+    icon: '🥬',
+    location: 'Fridge (crisper)',
+    locationIcon: '🧊',
+    lasts: '1–2 months (whole) • 1–2 weeks (cut)',
+    store: 'Whole, unwashed in crisper. Wrap cut cabbage tightly in plastic.',
+    spoilage: 'Slimy outer leaves, strong sulfur smell, black/brown spots throughout.',
+    freshness: '🟢 New: tight, heavy for its size, crisp outer leaves. 🟡 OK: remove wilted outer leaves — inner is still fine. 🔴 Old: slimy, smells strongly.',
+    tip: 'Remove outer leaves as needed. The inner leaves stay fresh much longer.'
+  },
+  {
+    names: ['butter', 'margarine'],
+    icon: '🧈',
+    location: 'Fridge',
+    locationIcon: '🧊',
+    lasts: '1 month (counter if salted) • 3 months (fridge) • 1 year (freezer)',
+    store: 'Covered container to prevent odor absorption. Can keep salted butter at counter temp in a butter dish for up to 2 weeks.',
+    spoilage: 'Yellow discoloration, rancid sour smell, off taste.',
+    freshness: '🟢 New: pale yellow, fresh cream smell. 🟡 OK: slightly darker edges (trim if needed). 🔴 Old: rancid smell, very yellow, oily surface.',
+    tip: 'Unsalted butter spoils faster than salted. Always smell before using.'
+  },
+  {
+    names: ['milk', 'gatas'],
+    icon: '🥛',
+    location: 'Fridge',
+    locationIcon: '🧊',
+    lasts: '5–7 days after opening',
+    store: 'Back of fridge (coldest part), not the door. Keep tightly sealed.',
+    spoilage: 'Curdled (chunky texture), sour smell, yellow tint.',
+    freshness: '🟢 New: white, mild smell. 🟡 OK: slightly sour smell but not curdled (use for baking). 🔴 Old: chunky, sour, discolored.',
+    tip: 'Smell test is reliable. Unopened milk can last a week past the date if properly refrigerated.'
+  },
+  {
+    names: ['lemon', 'lime', 'calamansi', 'dayap'],
+    icon: '🍋',
+    location: 'Counter or Fridge',
+    locationIcon: '🍃',
+    lasts: '1 week counter • 3–4 weeks fridge',
+    store: 'Room temp if using soon. Refrigerate in a bag for longer storage.',
+    spoilage: 'Mold (white or green fuzz), very soft/mushy, dried out with no juice, sour fermented smell.',
+    freshness: '🟢 New: firm, heavy for size, bright color. 🟡 OK: slightly soft but no mold. 🔴 Old: very light (dried out), mold, hollow feeling.',
+    tip: 'Microwave for 10–15 seconds before juicing — you\'ll get 50% more juice.'
+  },
+  {
+    names: ['cooking oil', 'vegetable oil', 'palm oil', 'coconut oil', 'olive oil'],
+    icon: '🫙',
+    location: 'Pantry (cool & dark)',
+    locationIcon: '🗄️',
+    lasts: '1–2 years unopened • 6 months opened',
+    store: 'Sealed, away from heat and direct light. Don\'t store near the stove.',
+    spoilage: 'Rancid smell (like crayons or old paint), very dark color, cloudy (for clear oils).',
+    freshness: '🟢 New: clear, neutral smell. 🟡 OK: mild smell (use fast). 🔴 Old: rancid — smells off, tastes bitter.',
+    tip: 'Used frying oil should be filtered and stored in a sealed container in the fridge. Discard after 8–10 uses.'
+  },
+  {
+    names: ['soy sauce', 'toyo'],
+    icon: '🫙',
+    location: 'Pantry or Fridge',
+    locationIcon: '🗄️',
+    lasts: '2–3 years unopened • 1 year opened',
+    store: 'Pantry if using frequently. Fridge after opening for best quality.',
+    spoilage: 'Mold growth on surface, very cloudy, off smell. Soy sauce rarely goes "bad" but quality degrades.',
+    freshness: '🟢 New: deep brown, savory smell. 🟡 OK: slightly lighter in color. 🔴 Old: mold or very off smell.',
+    tip: 'A dark sediment at the bottom is normal and safe.'
+  },
+  {
+    names: ['fish sauce', 'patis'],
+    icon: '🫙',
+    location: 'Pantry',
+    locationIcon: '🗄️',
+    lasts: '3–4 years',
+    store: 'Cool, dark place. Does not need refrigeration.',
+    spoilage: 'Mold on surface, color turns very dark/black, extremely strong rotting smell (beyond the usual pungent smell).',
+    freshness: '🟢 New: amber/golden brown. 🟡 OK: darker but clear. 🔴 Old: very dark, mold, off smell.',
+    tip: 'High salt content means it rarely spoils. Crystallization around the lid is normal.'
+  },
+  {
+    names: ['vinegar', 'suka'],
+    icon: '🫙',
+    location: 'Pantry',
+    locationIcon: '🗄️',
+    lasts: 'Indefinitely',
+    store: 'Room temperature, tightly sealed, away from light.',
+    spoilage: 'Practically never spoils. A "mother" (dark floating strand) may develop but is harmless.',
+    freshness: 'Check that the seal is tight and there\'s no debris.',
+    tip: 'Vinegar is self-preserving. No expiry to worry about.'
+  }
+];
+
+function lookupPantryKnowledge(name) {
+  const n = name.toLowerCase().trim();
+  return PANTRY_KNOWLEDGE.find(k =>
+    k.names.some(kn => n.includes(kn) || kn.includes(n))
+  ) || null;
+}
+

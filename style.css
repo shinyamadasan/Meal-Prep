@@ -3775,21 +3775,108 @@ select.form-control {
   flex: 1;
 }
 
-.pantry-list-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+.pantry-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.5rem;
 }
 
-.pantry-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+.pantry-card {
   background: var(--color-bg-1);
   border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pantry-card--plain {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+}
+
+.pantry-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pantry-card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.pantry-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.pantry-location-badge {
+  background: var(--color-bg-2, #f0f9ff);
+  color: var(--text-primary);
   border-radius: 999px;
-  padding: 0.25rem 0.6rem 0.25rem 0.75rem;
-  font-size: 0.8125rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.73rem;
+  border: 1px solid var(--color-border);
+}
+
+.pantry-lasts {
+  font-size: 0.73rem;
+}
+
+.pantry-info-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.pantry-info-btn:hover {
+  background: var(--color-bg-2);
+  color: var(--text-primary);
+}
+
+.pantry-card-detail {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pantry-card-detail.hidden { display: none; }
+
+.pantry-detail-row {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.pantry-tip {
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0 6px 6px 0;
+  color: #78350f;
+  font-size: 0.75rem;
+}
+
+[data-color-scheme="dark"] .pantry-tip {
+  background: #292116;
+  color: #fde68a;
+  border-left-color: #d97706;
 }
 
 .pantry-remove {
@@ -3800,6 +3887,7 @@ select.form-control {
   font-size: 1rem;
   line-height: 1;
   padding: 0 0.1rem;
+  flex-shrink: 0;
 }
 
 .pantry-remove:hover { color: var(--color-danger, #e53e3e); }
