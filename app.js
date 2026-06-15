@@ -4380,7 +4380,7 @@ function togglePantrySection() {
   const body = document.getElementById('pantry-body');
   const icon = document.getElementById('pantry-toggle-icon');
   const isHidden = body.classList.toggle('hidden');
-  icon.textContent = isHidden ? 'â–¶' : 'â–¼';
+  icon.textContent = isHidden ? '▶' : '▼';
 }
 
 function addToPantry() {
