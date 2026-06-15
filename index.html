@@ -6,6 +6,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#21808D">
+    <meta name="apple-mobile-web-app-title" content="Meal Prep">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.svg">
     <title>Meal Prep Planner</title>
     <link rel="stylesheet" href="style.css">
     <script>
@@ -135,6 +138,25 @@
                                     <div class="form-group">
                                         <label class="form-label">Estimated Cost (₱)</label>
                                         <input type="number" class="form-control" id="estimated-cost" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Calories / serving</label>
+                                        <input type="number" class="form-control" id="nutrition-calories" min="0" placeholder="e.g. 450">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Protein (g)</label>
+                                        <input type="number" class="form-control" id="nutrition-protein" min="0" placeholder="e.g. 35">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Carbs (g)</label>
+                                        <input type="number" class="form-control" id="nutrition-carbs" min="0" placeholder="e.g. 20">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Fat (g)</label>
+                                        <input type="number" class="form-control" id="nutrition-fat" min="0" placeholder="e.g. 15">
                                     </div>
                                 </div>
 
@@ -774,6 +796,61 @@
     </div>
 
     <!-- CSV Import Preview Modal -->
+    <!-- Add Custom Grocery Item Modal -->
+    <div id="custom-item-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3>Add Custom Item</h3>
+                <button class="modal-close" onclick="closeCustomItemModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Item Name *</label>
+                    <input type="text" class="form-control" id="custom-item-name" placeholder="e.g. Soy Sauce" autocomplete="off">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Quantity *</label>
+                        <input type="number" class="form-control" id="custom-item-qty" value="1" min="0.1" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Unit</label>
+                        <input type="text" class="form-control" id="custom-item-unit" placeholder="pcs, cups, g, ml…" list="unit-suggestions">
+                        <datalist id="unit-suggestions">
+                            <option value="pcs">
+                            <option value="g">
+                            <option value="kg">
+                            <option value="ml">
+                            <option value="L">
+                            <option value="cups">
+                            <option value="tbsp">
+                            <option value="tsp">
+                            <option value="pack">
+                            <option value="can">
+                        </datalist>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select class="form-control" id="custom-item-category">
+                        <option value="Other">Other</option>
+                        <option value="Protein">Protein</option>
+                        <option value="Vegetable">Vegetable</option>
+                        <option value="Fruit">Fruit</option>
+                        <option value="Dairy">Dairy</option>
+                        <option value="Grain">Grain</option>
+                        <option value="Pantry">Pantry</option>
+                        <option value="Spice">Spice</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closeCustomItemModal()">Cancel</button>
+                <button class="btn btn--primary" onclick="confirmCustomGroceryItem()">Add to List</button>
+            </div>
+        </div>
+    </div>
+
     <div id="csv-preview-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -788,5 +865,10 @@
             </div>
         </div>
     </div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    </script>
 </body>
 </html>

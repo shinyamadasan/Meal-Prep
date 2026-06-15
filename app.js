@@ -1015,6 +1015,14 @@ function setupEventListeners() {
   document.getElementById('clear-grocery').addEventListener('click', clearGroceryList);
   document.getElementById('add-custom-item').addEventListener('click', addCustomGroceryItem);
   
+  // Custom item modal: Enter key submits, click outside closes
+  document.getElementById('custom-item-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'custom-item-modal') closeCustomItemModal();
+  });
+  document.getElementById('custom-item-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmCustomGroceryItem();
+  });
+
   // Modal click outside to close
   document.getElementById('recipe-modal').addEventListener('click', (e) => {
     if (e.target.id === 'recipe-modal') {
@@ -1136,6 +1144,11 @@ function openEditRecipeModal(recipeId) {
   document.getElementById('fridge-life').value = recipe.fridgeLife;
   document.getElementById('freezer-life').value = recipe.freezerLife;
   document.getElementById('estimated-cost').value = recipe.estimatedCost || '';
+  const np = recipe.nutritionPerServing || {};
+  document.getElementById('nutrition-calories').value = np.calories || '';
+  document.getElementById('nutrition-protein').value  = np.protein  || '';
+  document.getElementById('nutrition-carbs').value    = np.carbs    || '';
+  document.getElementById('nutrition-fat').value      = np.fat      || '';
   document.getElementById('storage-notes').value = recipe.storageNotes;
   document.getElementById('instructions').value = recipe.instructions;
   
@@ -1270,6 +1283,14 @@ function saveRecipe(e) {
       category: ing.category
     }))
   };
+
+  const nutCal  = getElementValueAsNumber('nutrition-calories', 0);
+  const nutPro  = getElementValueAsNumber('nutrition-protein', 0);
+  const nutCarb = getElementValueAsNumber('nutrition-carbs', 0);
+  const nutFat  = getElementValueAsNumber('nutrition-fat', 0);
+  if (nutCal || nutPro || nutCarb || nutFat) {
+    recipe.nutritionPerServing = { calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat, fiber: 0, sodium: 0 };
+  }
   
   if (AppState.currentEditingRecipe) {
     // Update existing recipe
@@ -1930,18 +1951,28 @@ function clearGroceryList() {
 }
 
 function addCustomGroceryItem() {
-  const name = prompt('Enter item name:');
-  if (!name) return;
-  
-  const quantity = parseFloat(prompt('Enter quantity:'));
-  if (isNaN(quantity)) return;
-  
-  const unit = prompt('Enter unit:');
-  if (!unit) return;
-  
-  const category = prompt('Enter category:');
-  if (!category) return;
-  
+  document.getElementById('custom-item-name').value = '';
+  document.getElementById('custom-item-qty').value = '1';
+  document.getElementById('custom-item-unit').value = '';
+  document.getElementById('custom-item-category').value = 'Other';
+  document.getElementById('custom-item-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('custom-item-name').focus(), 50);
+}
+
+function closeCustomItemModal() {
+  document.getElementById('custom-item-modal').classList.add('hidden');
+}
+
+function confirmCustomGroceryItem() {
+  const name = document.getElementById('custom-item-name').value.trim();
+  if (!name) { document.getElementById('custom-item-name').focus(); return; }
+
+  const quantity = parseFloat(document.getElementById('custom-item-qty').value);
+  if (isNaN(quantity) || quantity <= 0) return;
+
+  const unit = document.getElementById('custom-item-unit').value.trim() || 'pcs';
+  const category = document.getElementById('custom-item-category').value;
+
   AppState.groceryList.push({
     id: Date.now() + Math.random(),
     category,
@@ -1950,7 +1981,8 @@ function addCustomGroceryItem() {
     unit,
     checked: false
   });
-  
+
+  closeCustomItemModal();
   renderGroceryList();
 }
 

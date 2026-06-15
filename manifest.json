@@ -1,0 +1,19 @@
+{
+  "name": "Meal Prep Planner",
+  "short_name": "Meal Prep",
+  "description": "Plan your weekly meals, track nutrition, and generate grocery lists.",
+  "start_url": "/Meal-Prep/",
+  "scope": "/Meal-Prep/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#21808D",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
