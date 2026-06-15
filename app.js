@@ -1092,6 +1092,7 @@ function showTab(tabId) {
   } else if (tabId === 'grocery') {
     updateGrocerySummary();
     updateBudgetDisplay();
+    renderGroceryList();
   } else if (tabId === 'hacks') {
     renderCookingHacks();
   } else if (tabId === 'nutrition') {
