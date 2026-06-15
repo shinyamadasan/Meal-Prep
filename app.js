@@ -924,6 +924,10 @@ function initApp() {
   initWeekTemplateButton();
   updateThemeToggleIcon();
 
+  // Attach ingredient autocomplete to pantry input
+  var pantryInput = document.getElementById('pantry-input');
+  if (pantryInput) attachIngredientAutocomplete(pantryInput);
+
   // Setup event listeners
   setupEventListeners();
   

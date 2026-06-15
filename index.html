@@ -283,7 +283,10 @@
                         </div>
                         <div id="pantry-body" class="hidden">
                             <div class="pantry-add-row">
-                                <input type="text" id="pantry-input" class="form-control" placeholder="e.g. Garlic, Soy sauce, Rice…" autocomplete="off">
+                                <div class="ing-name-wrap" style="flex:1">
+                                    <input type="text" id="pantry-input" class="form-control" placeholder="e.g. Garlic, Soy sauce, Rice…" autocomplete="off">
+                                    <div class="ing-suggestions hidden"></div>
+                                </div>
                                 <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
                             </div>
                             <div id="pantry-list"></div>
