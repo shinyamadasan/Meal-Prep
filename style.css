@@ -3832,3 +3832,60 @@ select.form-control {
   font-size: 0.7rem;
 }
 
+
+/* ── Ingredient Autocomplete ─────────────────────────────────────────────── */
+
+.ing-name-wrap {
+  position: relative;
+  flex: 2;
+  min-width: 0;
+}
+
+.ing-name-wrap .form-control {
+  width: 100%;
+}
+
+.ing-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-top: none;
+  border-radius: 0 0 var(--radius-base) var(--radius-base);
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.ing-suggestions.hidden { display: none; }
+
+.ing-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  gap: 0.5rem;
+}
+
+.ing-suggestion-item:last-child { border-bottom: none; }
+
+.ing-suggestion-item:hover {
+  background: var(--color-bg-3);
+}
+
+.ing-sug-name {
+  font-size: 0.825rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.ing-sug-meta {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}

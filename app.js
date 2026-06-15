@@ -1202,43 +1202,30 @@ function addIngredientField(ingredient = null) {
   const ingredientsList = document.getElementById('ingredients-list');
   const ingredientDiv = document.createElement('div');
   ingredientDiv.className = 'ingredient-item';
-  
+
+  const units = ['g','kg','ml','L','cups','cup','tbsp','tsp','pieces','cloves','can','pack','stalks','bunches','lbs','oz','inches'];
+  const cats  = ['Protein','Vegetable','Fruit','Grain','Dairy','Pantry'];
+
+  const unitOpts = units.map(u => `<option value="${u}" ${ingredient?.unit === u ? 'selected' : ''}>${u}</option>`).join('');
+  const catOpts  = cats.map(c =>  `<option value="${c}" ${ingredient?.category === c ? 'selected' : ''}>${c}</option>`).join('');
+
   ingredientDiv.innerHTML = `
-    <input type="text" class="form-control" placeholder="Ingredient name" value="${ingredient?.name || ''}" required>
+    <div class="ing-name-wrap">
+      <input type="text" class="form-control" placeholder="Type to search ingredient…" value="${ingredient?.name || ''}" required>
+      <div class="ing-suggestions hidden"></div>
+    </div>
     <input type="number" class="form-control" placeholder="Qty" step="0.01" min="0" value="${ingredient?.quantity || ''}" required>
     <select class="form-control" required>
-      <option value="">Unit</option>
-      <option value="g" ${ingredient?.unit === 'g' ? 'selected' : ''}>g</option>
-      <option value="kg" ${ingredient?.unit === 'kg' ? 'selected' : ''}>kg</option>
-      <option value="ml" ${ingredient?.unit === 'ml' ? 'selected' : ''}>ml</option>
-      <option value="L" ${ingredient?.unit === 'L' ? 'selected' : ''}>L</option>
-      <option value="cups" ${ingredient?.unit === 'cups' ? 'selected' : ''}>Cups</option>
-      <option value="cup" ${ingredient?.unit === 'cup' ? 'selected' : ''}>Cup</option>
-      <option value="tbsp" ${ingredient?.unit === 'tbsp' ? 'selected' : ''}>Tbsp</option>
-      <option value="tsp" ${ingredient?.unit === 'tsp' ? 'selected' : ''}>Tsp</option>
-      <option value="pieces" ${ingredient?.unit === 'pieces' ? 'selected' : ''}>Pieces</option>
-      <option value="cloves" ${ingredient?.unit === 'cloves' ? 'selected' : ''}>Cloves</option>
-      <option value="can" ${ingredient?.unit === 'can' ? 'selected' : ''}>Can</option>
-      <option value="pack" ${ingredient?.unit === 'pack' ? 'selected' : ''}>Pack</option>
-      <option value="stalks" ${ingredient?.unit === 'stalks' ? 'selected' : ''}>Stalks</option>
-      <option value="bunches" ${ingredient?.unit === 'bunches' ? 'selected' : ''}>Bunches</option>
-      <option value="lbs" ${ingredient?.unit === 'lbs' ? 'selected' : ''}>Lbs</option>
-      <option value="oz" ${ingredient?.unit === 'oz' ? 'selected' : ''}>Oz</option>
-      <option value="inches" ${ingredient?.unit === 'inches' ? 'selected' : ''}>Inches</option>
+      <option value="">Unit</option>${unitOpts}
     </select>
     <select class="form-control" required>
-      <option value="">Category</option>
-      <option value="Protein" ${ingredient?.category === 'Protein' ? 'selected' : ''}>Protein</option>
-      <option value="Vegetable" ${ingredient?.category === 'Vegetable' ? 'selected' : ''}>Vegetable</option>
-      <option value="Fruit" ${ingredient?.category === 'Fruit' ? 'selected' : ''}>Fruit</option>
-      <option value="Grain" ${ingredient?.category === 'Grain' ? 'selected' : ''}>Grain</option>
-      <option value="Dairy" ${ingredient?.category === 'Dairy' ? 'selected' : ''}>Dairy</option>
-      <option value="Pantry" ${ingredient?.category === 'Pantry' ? 'selected' : ''}>Pantry</option>
+      <option value="">Category</option>${catOpts}
     </select>
     <button type="button" class="remove-ingredient" onclick="removeIngredientField(this)">×</button>
   `;
-  
+
   ingredientsList.appendChild(ingredientDiv);
+  attachIngredientAutocomplete(ingredientDiv.querySelector('.ing-name-wrap input'));
 }
 
 function removeIngredientField(button) {
@@ -4754,5 +4741,231 @@ function applyNutritionResult(cal, pro, carb, fat) {
   var queryEl   = document.getElementById('nutrition-db-query');
   if (resultsEl) resultsEl.classList.add('hidden');
   if (queryEl)   queryEl.value = '';
+}
+
+
+
+// ── Ingredient Autocomplete Database ──────────────────────────────────────────
+
+const INGREDIENT_DB = [
+  // Proteins
+  { name: 'Chicken Breast', unit: 'g', category: 'Protein' },
+  { name: 'Chicken Thigh', unit: 'g', category: 'Protein' },
+  { name: 'Chicken Leg', unit: 'pieces', category: 'Protein' },
+  { name: 'Ground Chicken', unit: 'g', category: 'Protein' },
+  { name: 'Whole Chicken', unit: 'g', category: 'Protein' },
+  { name: 'Pork Belly (Liempo)', unit: 'g', category: 'Protein' },
+  { name: 'Ground Pork', unit: 'g', category: 'Protein' },
+  { name: 'Pork Chop', unit: 'g', category: 'Protein' },
+  { name: 'Pork Ribs', unit: 'g', category: 'Protein' },
+  { name: 'Pork Shoulder', unit: 'g', category: 'Protein' },
+  { name: 'Pork Liver', unit: 'g', category: 'Protein' },
+  { name: 'Ground Beef', unit: 'g', category: 'Protein' },
+  { name: 'Beef', unit: 'g', category: 'Protein' },
+  { name: 'Beef Brisket', unit: 'g', category: 'Protein' },
+  { name: 'Shrimp', unit: 'g', category: 'Protein' },
+  { name: 'Bangus (Milkfish)', unit: 'g', category: 'Protein' },
+  { name: 'Tilapia', unit: 'g', category: 'Protein' },
+  { name: 'Salmon', unit: 'g', category: 'Protein' },
+  { name: 'Tuna', unit: 'g', category: 'Protein' },
+  { name: 'Galunggong', unit: 'g', category: 'Protein' },
+  { name: 'Squid (Pusit)', unit: 'g', category: 'Protein' },
+  { name: 'Crab', unit: 'pieces', category: 'Protein' },
+  { name: 'Mussels (Tahong)', unit: 'g', category: 'Protein' },
+  { name: 'Clams (Halaan)', unit: 'g', category: 'Protein' },
+  { name: 'Eggs', unit: 'pieces', category: 'Protein' },
+  { name: 'Tofu (Tokwa)', unit: 'g', category: 'Protein' },
+  { name: 'Longganisa', unit: 'pieces', category: 'Protein' },
+  { name: 'Hotdog', unit: 'pieces', category: 'Protein' },
+  { name: 'Bacon', unit: 'g', category: 'Protein' },
+  { name: 'Ham', unit: 'g', category: 'Protein' },
+  { name: 'Sardines (Canned)', unit: 'can', category: 'Protein' },
+  { name: 'Tuna (Canned)', unit: 'can', category: 'Protein' },
+  { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein' },
+
+  // Vegetables
+  { name: 'Garlic (Bawang)', unit: 'cloves', category: 'Vegetable' },
+  { name: 'Onion (Sibuyas)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Red Onion', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Shallots', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Tomato (Kamatis)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Potato (Patatas)', unit: 'g', category: 'Vegetable' },
+  { name: 'Sweet Potato (Kamote)', unit: 'g', category: 'Vegetable' },
+  { name: 'Carrot (Karot)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Cabbage (Repolyo)', unit: 'g', category: 'Vegetable' },
+  { name: 'Kangkong', unit: 'bunches', category: 'Vegetable' },
+  { name: 'Pechay', unit: 'bunches', category: 'Vegetable' },
+  { name: 'Spinach', unit: 'g', category: 'Vegetable' },
+  { name: 'Ampalaya (Bitter Melon)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Talong (Eggplant)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Sitaw (String Beans)', unit: 'g', category: 'Vegetable' },
+  { name: 'Okra', unit: 'g', category: 'Vegetable' },
+  { name: 'Malunggay (Moringa)', unit: 'cups', category: 'Vegetable' },
+  { name: 'Kalabasa (Squash)', unit: 'g', category: 'Vegetable' },
+  { name: 'Upo (Bottle Gourd)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Patola (Sponge Gourd)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Bell Pepper', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Green Bell Pepper', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable' },
+  { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable' },
+  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable' },
+  { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable' },
+  { name: 'Mushroom', unit: 'g', category: 'Vegetable' },
+  { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Cucumber', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Lettuce', unit: 'g', category: 'Vegetable' },
+  { name: 'Broccoli', unit: 'g', category: 'Vegetable' },
+  { name: 'Cauliflower', unit: 'g', category: 'Vegetable' },
+  { name: 'Chili (Siling Labuyo)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Siling Haba (Long Green Chili)', unit: 'pieces', category: 'Vegetable' },
+  { name: 'Bean Sprouts (Toge)', unit: 'g', category: 'Vegetable' },
+  { name: 'Bok Choy', unit: 'g', category: 'Vegetable' },
+
+  // Fruits
+  { name: 'Banana (Saging)', unit: 'pieces', category: 'Fruit' },
+  { name: 'Mango (Mangga)', unit: 'pieces', category: 'Fruit' },
+  { name: 'Pineapple (Pinya)', unit: 'pieces', category: 'Fruit' },
+  { name: 'Calamansi', unit: 'pieces', category: 'Fruit' },
+  { name: 'Lemon', unit: 'pieces', category: 'Fruit' },
+  { name: 'Lime', unit: 'pieces', category: 'Fruit' },
+  { name: 'Papaya', unit: 'pieces', category: 'Fruit' },
+  { name: 'Coconut (Niyog)', unit: 'pieces', category: 'Fruit' },
+  { name: 'Apple', unit: 'pieces', category: 'Fruit' },
+  { name: 'Avocado', unit: 'pieces', category: 'Fruit' },
+
+  // Grains & Starches
+  { name: 'White Rice (Bigas)', unit: 'cups', category: 'Grain' },
+  { name: 'Brown Rice', unit: 'cups', category: 'Grain' },
+  { name: 'Glutinous Rice (Malagkit)', unit: 'cups', category: 'Grain' },
+  { name: 'Cornstarch', unit: 'tbsp', category: 'Grain' },
+  { name: 'All-Purpose Flour', unit: 'cups', category: 'Grain' },
+  { name: 'Breadcrumbs', unit: 'cups', category: 'Grain' },
+  { name: 'Pasta', unit: 'g', category: 'Grain' },
+  { name: 'Bihon Noodles', unit: 'g', category: 'Grain' },
+  { name: 'Canton Noodles', unit: 'g', category: 'Grain' },
+  { name: 'Sotanghon (Glass Noodles)', unit: 'g', category: 'Grain' },
+  { name: 'Miki Noodles', unit: 'g', category: 'Grain' },
+  { name: 'Bread (Tinapay)', unit: 'pieces', category: 'Grain' },
+  { name: 'Pandesal', unit: 'pieces', category: 'Grain' },
+
+  // Dairy
+  { name: 'Milk (Gatas)', unit: 'ml', category: 'Dairy' },
+  { name: 'Evaporated Milk', unit: 'ml', category: 'Dairy' },
+  { name: 'Condensed Milk', unit: 'ml', category: 'Dairy' },
+  { name: 'Cheese', unit: 'g', category: 'Dairy' },
+  { name: 'Cream', unit: 'ml', category: 'Dairy' },
+  { name: 'Cream Cheese', unit: 'g', category: 'Dairy' },
+  { name: 'Butter', unit: 'tbsp', category: 'Dairy' },
+  { name: 'Margarine', unit: 'tbsp', category: 'Dairy' },
+  { name: 'Yogurt', unit: 'ml', category: 'Dairy' },
+
+  // Pantry / Condiments / Spices
+  { name: 'Soy Sauce (Toyo)', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Fish Sauce (Patis)', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Vinegar (Suka)', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Oyster Sauce', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Coconut Milk', unit: 'ml', category: 'Pantry' },
+  { name: 'Coconut Cream', unit: 'ml', category: 'Pantry' },
+  { name: 'Tomato Paste', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Tomato Sauce', unit: 'ml', category: 'Pantry' },
+  { name: 'Cooking Oil', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Sesame Oil', unit: 'tsp', category: 'Pantry' },
+  { name: 'Salt', unit: 'tsp', category: 'Pantry' },
+  { name: 'Black Pepper', unit: 'tsp', category: 'Pantry' },
+  { name: 'White Pepper', unit: 'tsp', category: 'Pantry' },
+  { name: 'Sugar', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Brown Sugar', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Peppercorn', unit: 'tsp', category: 'Pantry' },
+  { name: 'Bay Leaves', unit: 'pieces', category: 'Pantry' },
+  { name: 'Chili Flakes', unit: 'tsp', category: 'Pantry' },
+  { name: 'Paprika', unit: 'tsp', category: 'Pantry' },
+  { name: 'Cumin', unit: 'tsp', category: 'Pantry' },
+  { name: 'Turmeric', unit: 'tsp', category: 'Pantry' },
+  { name: 'Oregano', unit: 'tsp', category: 'Pantry' },
+  { name: 'Thyme', unit: 'tsp', category: 'Pantry' },
+  { name: 'Basil', unit: 'tsp', category: 'Pantry' },
+  { name: 'Parsley', unit: 'tsp', category: 'Pantry' },
+  { name: 'Garlic Powder', unit: 'tsp', category: 'Pantry' },
+  { name: 'Onion Powder', unit: 'tsp', category: 'Pantry' },
+  { name: 'Worcestershire Sauce', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Ketchup', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Banana Ketchup', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Mayonnaise', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Hoisin Sauce', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Chili Sauce', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Cooking Wine', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Beef Broth / Stock', unit: 'ml', category: 'Pantry' },
+  { name: 'Chicken Broth / Stock', unit: 'ml', category: 'Pantry' },
+  { name: 'Water', unit: 'ml', category: 'Pantry' },
+  { name: 'Annatto (Atsuete)', unit: 'tsp', category: 'Pantry' },
+  { name: 'Tamarind (Sampalok)', unit: 'g', category: 'Pantry' },
+  { name: 'Tamarind Paste', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Bagoong', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Shrimp Paste', unit: 'tbsp', category: 'Pantry' },
+  { name: 'Cooking Cream', unit: 'ml', category: 'Pantry' },
+  { name: 'Baking Powder', unit: 'tsp', category: 'Pantry' },
+  { name: 'Baking Soda', unit: 'tsp', category: 'Pantry' },
+  { name: 'Vanilla Extract', unit: 'tsp', category: 'Pantry' },
+];
+
+function filterIngredients(query) {
+  var q = query.toLowerCase();
+  return INGREDIENT_DB.filter(function(i) {
+    return i.name.toLowerCase().includes(q);
+  }).slice(0, 8);
+}
+
+function attachIngredientAutocomplete(nameInput) {
+  var wrap = nameInput.parentElement;
+
+  nameInput.addEventListener('input', function() {
+    var q = this.value.trim();
+    var suggestBox = wrap.querySelector('.ing-suggestions');
+    if (!q || q.length < 1) { suggestBox.classList.add('hidden'); return; }
+
+    var matches = filterIngredients(q);
+    if (matches.length === 0) { suggestBox.classList.add('hidden'); return; }
+
+    suggestBox.innerHTML = matches.map(function(item) {
+      return '<div class="ing-suggestion-item" data-name="' + item.name +
+        '" data-unit="' + item.unit + '" data-cat="' + item.category + '">' +
+        '<span class="ing-sug-name">' + item.name + '</span>' +
+        '<span class="ing-sug-meta">' + item.unit + ' &bull; ' + item.category + '</span>' +
+        '</div>';
+    }).join('');
+    suggestBox.classList.remove('hidden');
+
+    suggestBox.querySelectorAll('.ing-suggestion-item').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        e.preventDefault(); // prevent blur before click
+        var row = nameInput.closest('.ingredient-item');
+        nameInput.value = el.dataset.name;
+
+        var selects = row.querySelectorAll('select');
+        // selects[0] = unit, selects[1] = category
+        for (var o of selects[0].options) {
+          if (o.value === el.dataset.unit) { o.selected = true; break; }
+        }
+        for (var o of selects[1].options) {
+          if (o.value === el.dataset.cat) { o.selected = true; break; }
+        }
+
+        suggestBox.classList.add('hidden');
+        var qtyInput = row.querySelector('input[type="number"]');
+        if (qtyInput) qtyInput.focus();
+      });
+    });
+  });
+
+  nameInput.addEventListener('blur', function() {
+    var suggestBox = wrap.querySelector('.ing-suggestions');
+    setTimeout(function() { suggestBox.classList.add('hidden'); }, 150);
+  });
+
+  nameInput.addEventListener('keydown', function(e) {
+    var suggestBox = wrap.querySelector('.ing-suggestions');
+    if (e.key === 'Escape') suggestBox.classList.add('hidden');
+  });
 }
 
