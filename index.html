@@ -8,6 +8,13 @@
     <meta name="theme-color" content="#21808D">
     <title>Meal Prep Planner</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+      (function() {
+        var saved = localStorage.getItem('colorScheme');
+        var scheme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-color-scheme', scheme);
+      })();
+    </script>
 </head>
 <body>
     <div class="app">
@@ -16,6 +23,7 @@
                 <div class="header-top">
                     <h1 class="app-title">🍳 Meal Prep Planner</h1>
                     <div class="auth-section">
+                        <button id="theme-toggle" class="btn btn--outline btn--sm" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
                         <div id="user-info" class="user-info hidden">
                             <span id="user-email"></span>
                             <button class="btn btn--outline btn--sm" onclick="signOut()">Sign Out</button>
@@ -46,6 +54,7 @@
                         <div class="header-actions">
                             <button class="btn btn--secondary" onclick="exportData()">📤 Export Data</button>
                             <button class="btn btn--secondary" onclick="importData()">📥 Import Data</button>
+                            <button class="btn btn--secondary" onclick="importFromCSV()">📋 Import CSV</button>
                             <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
                             <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
                             <button class="btn btn--outline" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
@@ -61,6 +70,14 @@
                             <option value="Main Dish">Main Dish</option>
                             <option value="Snack">Snack</option>
                             <option value="Dessert">Dessert</option>
+                        </select>
+                        <select class="form-control" id="preptime-filter">
+                            <option value="">All Times</option>
+                            <option value="15">Under 15 min</option>
+                            <option value="30">Under 30 min</option>
+                            <option value="45">Under 45 min</option>
+                            <option value="60">Under 1 hour</option>
+                            <option value="999">1 hour+</option>
                         </select>
                     </div>
 
@@ -166,6 +183,9 @@
                         <h2>Weekly Meal Planner</h2>
                         <div class="planner-controls">
                             <button class="btn btn--outline" id="clear-week">Clear Week</button>
+                            <button class="btn btn--outline" onclick="saveWeekAsTemplate()">💾 Save Week</button>
+                            <button class="btn btn--outline" id="load-week-template-btn" onclick="loadWeekTemplate()" disabled>📋 Load Saved Week</button>
+                            <button class="btn btn--secondary" onclick="openPrepMode()">🍳 Prep Mode</button>
                             <button class="btn btn--primary" id="generate-grocery">Generate Grocery List</button>
                         </div>
                     </div>
@@ -185,6 +205,14 @@
                         </div>
                     </div>
 
+                    <div id="storage-alerts"></div>
+
+                    <div class="mobile-day-nav" id="mobile-day-nav">
+                        <button class="mobile-day-btn" onclick="prevPlannerDay()">&#8249;</button>
+                        <span id="mobile-day-label">Monday</span>
+                        <button class="mobile-day-btn" onclick="nextPlannerDay()">&#8250;</button>
+                    </div>
+
                     <div class="weekly-planner-container">
                         <div class="planner-actions">
                             <button class="btn btn--outline" id="copy-day-btn" disabled>Copy Day</button>
@@ -201,12 +229,16 @@
                         <div class="grocery-controls">
                             <button class="btn btn--outline" id="clear-grocery">Clear All</button>
                             <button class="btn btn--secondary" id="add-custom-item">Add Custom Item</button>
+                            <button class="btn btn--secondary" onclick="printGroceryList()">🖨️ Print</button>
+                            <button class="btn btn--secondary" onclick="copyGroceryList()">📋 Copy List</button>
                         </div>
                     </div>
                     
                     <div class="grocery-summary">
                         <p>Generated from <span id="selected-meals-count">0</span> planned meals</p>
                     </div>
+
+                    <div id="weekly-cost-summary"></div>
 
 
 
@@ -285,6 +317,11 @@
                         <div id="weekly-nutrition-chart" class="chart-container">
                             <canvas id="nutrition-chart"></canvas>
                         </div>
+                    </div>
+
+                    <div class="nutrition-summary">
+                        <h3>Daily Breakdown</h3>
+                        <div id="daily-nutrition-breakdown"></div>
                     </div>
 
                     <div class="nutrition-search">
@@ -711,6 +748,43 @@
                     <button class="btn btn--outline" onclick="closeDeleteAccountModal()">Cancel</button>
                     <button class="btn btn--danger" onclick="deleteAccount()" id="delete-account-btn" disabled>Delete Account</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <!-- Prep Mode Modal -->
+    <div id="prep-mode-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;">
+            <div class="modal-header">
+                <h3>🍳 Cook Day Checklist</h3>
+                <button class="modal-close" onclick="closePrepMode()">&times;</button>
+            </div>
+            <div style="padding:0.75rem 1.5rem;border-bottom:1px solid var(--border-color,#e0e0e0);">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <div style="flex:1;background:var(--surface-secondary,#f0f0f0);border-radius:99px;height:10px;overflow:hidden;">
+                        <div id="prep-progress-bar" style="height:100%;background:var(--primary,#21808D);border-radius:99px;width:0%;transition:width 0.3s;"></div>
+                    </div>
+                    <span id="prep-progress-label" style="font-size:0.875rem;white-space:nowrap;color:var(--text-secondary,#666);">0 / 0 done</span>
+                </div>
+            </div>
+            <div class="modal-body" id="prep-mode-body" style="overflow-y:auto;flex:1;"></div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closePrepMode()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Import Preview Modal -->
+    <div id="csv-preview-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Import Recipes from CSV</h3>
+                <button class="modal-close" onclick="closeCSVPreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="csv-preview-body"></div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="downloadCSVTemplate()">📥 Download Template</button>
+                <button class="btn btn--outline" onclick="closeCSVPreviewModal()">Cancel</button>
+                <button class="btn btn--primary" id="confirm-csv-import-btn" onclick="confirmCSVImport()">Import Recipes</button>
             </div>
         </div>
     </div>

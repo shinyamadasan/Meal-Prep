@@ -1,0 +1,975 @@
+{
+  "user": {
+    "email": "imported-data@mealprep.com",
+    "exportDate": "2024-01-15T00:00:00.000Z"
+  },
+  "recipes": [
+    {
+      "id": "chicken-tinola-instant-pot",
+      "name": "Chicken Tinola (Instant Pot Dump Version)",
+      "category": "Main Dish",
+      "basePrepTime": 10,
+      "baseCookTime": 10,
+      "baseServings": 3,
+      "currentServings": 3,
+      "fridgeLife": 4,
+      "freezerLife": 30,
+      "estimatedCost": 180,
+      "costPerServing": 60,
+      "storageNotes": "Store in airtight container. Reheat gently to avoid overcooking vegetables.",
+      "instructions": "Pressure Cook: 1. Add chicken, ginger, onion, papaya/sayote, water, fish sauce, salt/pepper. 2. Set Pressure Cook: 10 minutes. 3. Quick release. 4. Open lid → stir in pechay or malunggay (let sit for 2 mins to soften). Slow Cook: 1. Dump all ingredients (except greens). 2. Set Slow Cook: 6 hours (LOW). 3. Add greens in the last 30 minutes.",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Chicken (bone-in pieces)",
+          "baseQuantity": 500,
+          "unit": "g",
+          "category": "Protein"
+        },
+        {
+          "name": "Ginger",
+          "baseQuantity": 1,
+          "unit": "thumb-sized",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Onion",
+          "baseQuantity": 1,
+          "unit": "small",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Green papaya or sayote",
+          "baseQuantity": 1.5,
+          "unit": "cups",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Water or chicken broth",
+          "baseQuantity": 2.5,
+          "unit": "cups",
+          "category": "Pantry"
+        },
+        {
+          "name": "Fish sauce",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Malunggay or pechay",
+          "baseQuantity": 1,
+          "unit": "handful",
+          "category": "Vegetable"
+        }
+      ]
+    },
+    {
+      "id": "garlic-herb-chicken",
+      "name": "Garlic Herb Chicken (Simple and Versatile)",
+      "category": "Main Dish",
+      "basePrepTime": 5,
+      "baseCookTime": 12,
+      "baseServings": 3,
+      "currentServings": 3,
+      "fridgeLife": 4,
+      "freezerLife": 30,
+      "estimatedCost": 200,
+      "costPerServing": 67,
+      "storageNotes": "Store in airtight container. Can be air-fried or pan-seared after for crispy skin.",
+      "instructions": "Pressure Cook: 1. Dump all ingredients in. 2. Set Pressure Cook: 12 minutes. 3. Natural or quick release. 4. Optional: Air-fry or pan-sear after for crispy skin. Slow Cook: 1. Dump everything in. 2. Set Slow Cook: 4–5 hours (LOW).",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Chicken thighs",
+          "baseQuantity": 500,
+          "unit": "g",
+          "category": "Protein"
+        },
+        {
+          "name": "Garlic",
+          "baseQuantity": 6,
+          "unit": "cloves",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Dried herbs (thyme, rosemary, Italian mix)",
+          "baseQuantity": 1,
+          "unit": "tsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Salt",
+          "baseQuantity": 1,
+          "unit": "tsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Black pepper",
+          "baseQuantity": 0.5,
+          "unit": "tsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Olive oil",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Water or broth",
+          "baseQuantity": 2,
+          "unit": "tbsp",
+          "category": "Pantry"
+        }
+      ]
+    },
+    {
+      "id": "pork-chicken-ginataan",
+      "name": "Pork or Chicken Ginataan (Coconut Milk Stew)",
+      "category": "Main Dish",
+      "basePrepTime": 10,
+      "baseCookTime": 12,
+      "baseServings": 4,
+      "currentServings": 4,
+      "fridgeLife": 4,
+      "freezerLife": 15,
+      "estimatedCost": 250,
+      "costPerServing": 63,
+      "storageNotes": "Stores well for 3–4 days in the fridge. Freezes okay, but thaw gently due to coconut milk.",
+      "instructions": "Pressure Cook: 1. Dump meat, onion, ginger, kalabasa, coconut milk, fish sauce. 2. Set Pressure Cook: 10–12 minutes. 3. Quick release. 4. Stir in sitaw → cover for 2–3 minutes to soften from residual heat. Slow Cook: 1. Dump everything except sitaw. 2. Set Slow Cook: 6 hours (LOW). 3. Add sitaw during last 30–45 mins.",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Pork cubes (kasim) or chicken",
+          "baseQuantity": 500,
+          "unit": "g",
+          "category": "Protein"
+        },
+        {
+          "name": "Kalabasa, cubed",
+          "baseQuantity": 1,
+          "unit": "cup",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Sitaw (cut into 2-inch pieces)",
+          "baseQuantity": 1,
+          "unit": "cup",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Onion, sliced",
+          "baseQuantity": 1,
+          "unit": "small",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Ginger, sliced",
+          "baseQuantity": 1,
+          "unit": "thumb-sized",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Coconut milk",
+          "baseQuantity": 1,
+          "unit": "can (400ml)",
+          "category": "Pantry"
+        },
+        {
+          "name": "Fish sauce",
+          "baseQuantity": 2,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Chili (optional)",
+          "baseQuantity": 1,
+          "unit": "pc",
+          "category": "Vegetable"
+        }
+      ]
+    },
+    {
+      "id": "kimchi-jjigae",
+      "name": "Kimchi-jjigae",
+      "category": "Main Dish",
+      "basePrepTime": 10,
+      "baseCookTime": 20,
+      "baseServings": 2,
+      "currentServings": 2,
+      "fridgeLife": 3,
+      "freezerLife": 30,
+      "estimatedCost": 120,
+      "costPerServing": 60,
+      "storageNotes": "Store in airtight container. Reheat gently to maintain texture.",
+      "instructions": "1. Sauté pork until browned. 2. Add onion and cook until soft. 3. Add kimchi and cook for 2-3 minutes. 4. Add water and bring to boil. 5. Add tofu and gochujang. 6. Simmer for 15-20 minutes. 7. Season with fish sauce to taste.",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Pork, cubed",
+          "baseQuantity": 0.5,
+          "unit": "cup",
+          "category": "Protein"
+        },
+        {
+          "name": "Onion",
+          "baseQuantity": 0.5,
+          "unit": "cup",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Green onion",
+          "baseQuantity": 0.25,
+          "unit": "cup",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Aged kimchi",
+          "baseQuantity": 0.5,
+          "unit": "cup",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Water",
+          "baseQuantity": 2,
+          "unit": "cups",
+          "category": "Pantry"
+        },
+        {
+          "name": "Tofu",
+          "baseQuantity": 0.5,
+          "unit": "cup",
+          "category": "Protein"
+        },
+        {
+          "name": "Gochujang",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Fish sauce",
+          "baseQuantity": 1,
+          "unit": "tsp",
+          "category": "Pantry"
+        }
+      ]
+    },
+    {
+      "id": "masala-butter-chicken",
+      "name": "Masala Butter Chicken",
+      "category": "Main Dish",
+      "basePrepTime": 15,
+      "baseCookTime": 240,
+      "baseServings": 4,
+      "currentServings": 4,
+      "fridgeLife": 4,
+      "freezerLife": 30,
+      "estimatedCost": 300,
+      "costPerServing": 75,
+      "storageNotes": "Store in airtight container. Reheat gently to maintain creaminess.",
+      "instructions": "1. Mix chicken with salt, pepper, curry powder, garam masala, and chili powder. 2. Add onion, garlic, tomato puree, yogurt, coconut milk, and butter. 3. Mix everything and slow cook for 4 hours. 4. Serve with rice or naan.",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Chicken breast, cubed",
+          "baseQuantity": 2,
+          "unit": "pcs",
+          "category": "Protein"
+        },
+        {
+          "name": "Salt",
+          "baseQuantity": 1,
+          "unit": "tsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Pepper",
+          "baseQuantity": 0.5,
+          "unit": "tsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Curry powder",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Garam masala",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Chili powder",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Onion",
+          "baseQuantity": 1,
+          "unit": "pc",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Garlic",
+          "baseQuantity": 4,
+          "unit": "cloves",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Tomato puree",
+          "baseQuantity": 100,
+          "unit": "g",
+          "category": "Pantry"
+        },
+        {
+          "name": "Yogurt",
+          "baseQuantity": 200,
+          "unit": "g",
+          "category": "Dairy"
+        },
+        {
+          "name": "Coconut milk",
+          "baseQuantity": 400,
+          "unit": "ml",
+          "category": "Pantry"
+        },
+        {
+          "name": "Butter",
+          "baseQuantity": 100,
+          "unit": "g",
+          "category": "Dairy"
+        }
+      ]
+    },
+    {
+      "id": "slow-cooker-beef-broccoli",
+      "name": "Slow Cooker Beef and Broccoli",
+      "category": "Main Dish",
+      "basePrepTime": 15,
+      "baseCookTime": 270,
+      "baseServings": 6,
+      "currentServings": 6,
+      "fridgeLife": 4,
+      "freezerLife": 30,
+      "estimatedCost": 400,
+      "costPerServing": 67,
+      "storageNotes": "Store in airtight container. Reheat gently to maintain texture.",
+      "instructions": "1. In the insert of the crockpot, whisk together beef broth, soy sauce, sesame oil, minced garlic, and brown sugar. 2. Place slices of beef in the liquid and toss to coat. 3. Cover with lid and cook on low heat for 4 hours. 4. After 4 hours, whisk together cornstarch and water in small bowl. Pour into crock pot, add the broccoli and gently stir to combine. 5. Cover with lid and cook 30 minutes to cook broccoli and thicken sauce. 6. Serve with warm white rice.",
+      "photo": null,
+      "baseIngredients": [
+        {
+          "name": "Sirloin steak or boneless beef chuck roast",
+          "baseQuantity": 2,
+          "unit": "lb",
+          "category": "Protein"
+        },
+        {
+          "name": "Beef broth",
+          "baseQuantity": 1,
+          "unit": "cup",
+          "category": "Pantry"
+        },
+        {
+          "name": "Low sodium soy sauce",
+          "baseQuantity": 0.5,
+          "unit": "cup",
+          "category": "Pantry"
+        },
+        {
+          "name": "Brown sugar",
+          "baseQuantity": 0.25,
+          "unit": "cup",
+          "category": "Pantry"
+        },
+        {
+          "name": "Sesame oil",
+          "baseQuantity": 1,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Garlic, minced",
+          "baseQuantity": 4,
+          "unit": "cloves",
+          "category": "Vegetable"
+        },
+        {
+          "name": "Cornstarch",
+          "baseQuantity": 4,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Water",
+          "baseQuantity": 4,
+          "unit": "tbsp",
+          "category": "Pantry"
+        },
+        {
+          "name": "Broccoli, cut into florets",
+          "baseQuantity": 1,
+          "unit": "head",
+          "category": "Vegetable"
+        },
+        {
+          "name": "White rice, cooked",
+          "baseQuantity": 3,
+          "unit": "cups",
+          "category": "Grain"
+        }
+      ]
+    }
+  ],
+  "weeklyPlan": {
+    "Monday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Tuesday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Wednesday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Thursday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Friday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Saturday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] },
+    "Sunday": { "breakfast": null, "lunch": null, "dinner": null, "snacks": [] }
+  },
+  "groceryList": [
+    {
+      "id": "chicken-thighs",
+      "name": "Chicken thighs or legs",
+      "quantity": "1 kg",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "Bone-in or boneless"
+    },
+    {
+      "id": "pork-cubes",
+      "name": "Pork cubes (kasim)",
+      "quantity": "1 kg",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "For ginataan or adobo"
+    },
+    {
+      "id": "beef-sirloin",
+      "name": "Sirloin steak or boneless beef chuck roast",
+      "quantity": "2 lb",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "For beef and broccoli"
+    },
+    {
+      "id": "eggs",
+      "name": "Eggs",
+      "quantity": "14 pcs",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "For breakfast + dinner"
+    },
+    {
+      "id": "canned-tuna",
+      "name": "Canned tuna (in water or oil)",
+      "quantity": "4 cans",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "For bowls + lunch"
+    },
+    {
+      "id": "canned-sardines",
+      "name": "Canned sardines",
+      "quantity": "2 cans",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "Easy backup meal"
+    },
+    {
+      "id": "monggo",
+      "name": "Monggo (mung beans, dried)",
+      "quantity": "250g (½ pack)",
+      "category": "Protein",
+      "purchased": false,
+      "notes": "For 2 meals + leftover"
+    },
+    {
+      "id": "brown-rice",
+      "name": "Brown/red rice",
+      "quantity": "2 cups (uncooked = ~750g)",
+      "category": "Grain",
+      "purchased": false,
+      "notes": "Batch cook & reheat"
+    },
+    {
+      "id": "kamote",
+      "name": "Kamote (sweet potato)",
+      "quantity": "2-4 pcs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Boil or roast"
+    },
+    {
+      "id": "saba",
+      "name": "Saba (banana)",
+      "quantity": "2-4 pcs",
+      "category": "Fruit",
+      "purchased": false,
+      "notes": "For snacks/breakfast"
+    },
+    {
+      "id": "rolled-oats",
+      "name": "Rolled oats",
+      "quantity": "250g",
+      "category": "Grain",
+      "purchased": false,
+      "notes": "For 2–3 breakfasts"
+    },
+    {
+      "id": "peanut-butter",
+      "name": "Peanut butter (natural, unsweetened)",
+      "quantity": "1 small jar",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "Optional healthy fat"
+    },
+    {
+      "id": "whole-wheat-bread",
+      "name": "Whole wheat bread (optional)",
+      "quantity": "1 loaf",
+      "category": "Grain",
+      "purchased": false,
+      "notes": "For avocado/egg toast"
+    },
+    {
+      "id": "pechay",
+      "name": "Pechay",
+      "quantity": "2 bundles",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Tinola + stir-fry"
+    },
+    {
+      "id": "kangkong",
+      "name": "Kangkong",
+      "quantity": "2 bundles",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Sautéed + side"
+    },
+    {
+      "id": "sayote",
+      "name": "Sayote",
+      "quantity": "2–3 pcs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Gisa or tinola"
+    },
+    {
+      "id": "ampalaya",
+      "name": "Ampalaya or cabbage",
+      "quantity": "1 whole",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Easy veggie base"
+    },
+    {
+      "id": "kalabasa",
+      "name": "Kalabasa",
+      "quantity": "500g",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Add to monggo"
+    },
+    {
+      "id": "tomato",
+      "name": "Tomato",
+      "quantity": "4–6 pcs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "For egg or salad"
+    },
+    {
+      "id": "onion-red",
+      "name": "Onion (red)",
+      "quantity": "3 pcs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Base flavor"
+    },
+    {
+      "id": "garlic",
+      "name": "Garlic",
+      "quantity": "2 bulbs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Always needed"
+    },
+    {
+      "id": "ginger",
+      "name": "Ginger",
+      "quantity": "1 small piece (thumb-sized)",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Tinola + flavor"
+    },
+    {
+      "id": "cucumber",
+      "name": "Cucumber",
+      "quantity": "2 pcs",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "Fresh side salad"
+    },
+    {
+      "id": "malunggay",
+      "name": "Malunggay leaves",
+      "quantity": "1 bunch",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "For monggo/tinola (fresh or frozen)"
+    },
+    {
+      "id": "carrots",
+      "name": "Carrots",
+      "quantity": "1 bunch",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "For stir-fry"
+    },
+    {
+      "id": "potato",
+      "name": "Potato",
+      "quantity": "1 kg",
+      "category": "Vegetable",
+      "purchased": false,
+      "notes": "For various dishes"
+    },
+    {
+      "id": "banana",
+      "name": "Banana (latundan or lakatan)",
+      "quantity": "6 pcs",
+      "category": "Fruit",
+      "purchased": false,
+      "notes": "Easy morning snack"
+    },
+    {
+      "id": "papaya",
+      "name": "Papaya (ripe)",
+      "quantity": "1 medium",
+      "category": "Fruit",
+      "purchased": false,
+      "notes": "For digestion, breakfast"
+    },
+    {
+      "id": "calamansi",
+      "name": "Calamansi",
+      "quantity": "1 small bag (~10 pcs)",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "Natural seasoning"
+    },
+    {
+      "id": "soy-sauce",
+      "name": "Soy sauce",
+      "quantity": "Small bottle",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "Minimal use"
+    },
+    {
+      "id": "sukang-puti",
+      "name": "Sukang puti",
+      "quantity": "Small bottle",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "For sawsawan + flavor"
+    },
+    {
+      "id": "chili-flakes",
+      "name": "Chili flakes or sili",
+      "quantity": "1 small bag",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "For spice (optional)"
+    },
+    {
+      "id": "black-pepper",
+      "name": "Black pepper, salt",
+      "quantity": "As needed",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "Pantry basics"
+    },
+    {
+      "id": "cooking-oil",
+      "name": "Cooking oil",
+      "quantity": "250ml (canola or olive)",
+      "category": "Pantry",
+      "purchased": false,
+      "notes": "Use sparingly"
+    }
+  ],
+  "nutritionGoals": {
+    "calories": 2000,
+    "protein": 150,
+    "carbs": 250,
+    "fat": 67,
+    "fiber": 25,
+    "sodium": 2300
+  },
+  "customIngredients": [
+    {
+      "id": "chicken-thighs-custom",
+      "name": "Chicken Thighs",
+      "category": "Protein",
+      "price": 180,
+      "unit": "kg",
+      "fridgeLife": 3,
+      "freezerLife": 90,
+      "storageMethod": "Refrigerate in original packaging or airtight container",
+      "storageTips": "Store in coldest part of fridge. Can be frozen for up to 3 months.",
+      "nutrition": {
+        "calories": 209,
+        "protein": 18.6,
+        "carbs": 0,
+        "fat": 14.7,
+        "fiber": 0,
+        "sodium": 77
+      }
+    },
+    {
+      "id": "pork-cubes-custom",
+      "name": "Pork Cubes (Kasim)",
+      "category": "Protein",
+      "price": 220,
+      "unit": "kg",
+      "fridgeLife": 3,
+      "freezerLife": 90,
+      "storageMethod": "Refrigerate in airtight container",
+      "storageTips": "Store in coldest part of fridge. Can be frozen for up to 3 months.",
+      "nutrition": {
+        "calories": 263,
+        "protein": 16.9,
+        "carbs": 0,
+        "fat": 21.6,
+        "fiber": 0,
+        "sodium": 62
+      }
+    },
+    {
+      "id": "kalabasa-custom",
+      "name": "Kalabasa (Squash)",
+      "category": "Vegetable",
+      "price": 60,
+      "unit": "kg",
+      "fridgeLife": 7,
+      "freezerLife": 180,
+      "storageMethod": "Store whole in cool, dry place. Cut pieces in fridge.",
+      "storageTips": "Whole kalabasa can last 2-4 weeks. Cut pieces should be used within a week.",
+      "nutrition": {
+        "calories": 34,
+        "protein": 1,
+        "carbs": 8.6,
+        "fat": 0.1,
+        "fiber": 1.5,
+        "sodium": 4
+      }
+    },
+    {
+      "id": "sayote-custom",
+      "name": "Sayote (Chayote)",
+      "category": "Vegetable",
+      "price": 40,
+      "unit": "kg",
+      "fridgeLife": 14,
+      "freezerLife": 180,
+      "storageMethod": "Store in fridge crisper drawer",
+      "storageTips": "Keep unwashed until ready to use. Can be blanched and frozen.",
+      "nutrition": {
+        "calories": 19,
+        "protein": 0.8,
+        "carbs": 4.5,
+        "fat": 0.1,
+        "fiber": 1.7,
+        "sodium": 2
+      }
+    },
+    {
+      "id": "pechay-custom",
+      "name": "Pechay (Bok Choy)",
+      "category": "Vegetable",
+      "price": 30,
+      "unit": "bundle",
+      "fridgeLife": 3,
+      "freezerLife": 90,
+      "storageMethod": "Wrap in damp paper towel, store in fridge",
+      "storageTips": "Use within 2-3 days. Can be blanched and frozen for longer storage.",
+      "nutrition": {
+        "calories": 13,
+        "protein": 1.5,
+        "carbs": 2.2,
+        "fat": 0.2,
+        "fiber": 1,
+        "sodium": 65
+      }
+    },
+    {
+      "id": "kangkong-custom",
+      "name": "Kangkong (Water Spinach)",
+      "category": "Vegetable",
+      "price": 25,
+      "unit": "bundle",
+      "fridgeLife": 2,
+      "freezerLife": 90,
+      "storageMethod": "Store in fridge, use quickly",
+      "storageTips": "Very perishable. Use within 1-2 days or blanch and freeze.",
+      "nutrition": {
+        "calories": 19,
+        "protein": 2.6,
+        "carbs": 3.1,
+        "fat": 0.2,
+        "fiber": 2.1,
+        "sodium": 79
+      }
+    },
+    {
+      "id": "malunggay-custom",
+      "name": "Malunggay Leaves",
+      "category": "Vegetable",
+      "price": 20,
+      "unit": "bunch",
+      "fridgeLife": 3,
+      "freezerLife": 180,
+      "storageMethod": "Store in fridge, use quickly",
+      "storageTips": "Very delicate. Use within 2-3 days or blanch and freeze.",
+      "nutrition": {
+        "calories": 64,
+        "protein": 6.7,
+        "carbs": 8.3,
+        "fat": 1.4,
+        "fiber": 2,
+        "sodium": 42
+      }
+    },
+    {
+      "id": "coconut-milk-custom",
+      "name": "Coconut Milk",
+      "category": "Pantry",
+      "price": 45,
+      "unit": "can (400ml)",
+      "fridgeLife": 3,
+      "freezerLife": 30,
+      "storageMethod": "Refrigerate after opening",
+      "storageTips": "Use within 3 days after opening. Can be frozen but may separate.",
+      "nutrition": {
+        "calories": 230,
+        "protein": 2.3,
+        "carbs": 5.5,
+        "fat": 24,
+        "fiber": 2.2,
+        "sodium": 13
+      }
+    },
+    {
+      "id": "fish-sauce-custom",
+      "name": "Fish Sauce",
+      "category": "Pantry",
+      "price": 35,
+      "unit": "bottle",
+      "fridgeLife": 365,
+      "freezerLife": 0,
+      "storageMethod": "Store at room temperature",
+      "storageTips": "Keeps for years at room temperature. No need to refrigerate.",
+      "nutrition": {
+        "calories": 6,
+        "protein": 1,
+        "carbs": 0.6,
+        "fat": 0,
+        "fiber": 0,
+        "sodium": 1613
+      }
+    }
+  ],
+  "customHacks": [
+    {
+      "id": "batch-cook-rice",
+      "title": "Batch Cook Rice and Kamote",
+      "category": "Batch Cooking",
+      "description": "Cook 2 cups of brown rice and boil 4-6 kamote pieces on Sunday. Store in portioned containers in fridge (4 days) or freezer (7+ days). Reheat as needed throughout the week.",
+      "timeSaved": "30 minutes per meal",
+      "costSavings": "₱50-100 per week"
+    },
+    {
+      "id": "prep-eggs",
+      "title": "Boil Eggs in Advance",
+      "category": "Time-Saving",
+      "description": "Boil 10-12 eggs on Sunday. Store with shell in fridge for up to 1 week. Perfect for quick breakfasts or protein additions to meals.",
+      "timeSaved": "15 minutes per meal",
+      "costSavings": "₱20-30 per week"
+    },
+    {
+      "id": "chop-garlic-onion",
+      "title": "Pre-chop Garlic and Onion",
+      "category": "Time-Saving",
+      "description": "Chop garlic and onion in bulk on Sunday. Store in small jar/container with 1 tsp oil (optional) in fridge for 3-4 days. Ready to use for any dish.",
+      "timeSaved": "10 minutes per meal",
+      "costSavings": "₱30-50 per week"
+    },
+    {
+      "id": "blanch-leafy-greens",
+      "title": "Blanch Leafy Greens",
+      "category": "Storage",
+      "description": "Blanch pechay, kangkong, and malunggay leaves. Store in fridge for 5-7 days or freeze for 1-2 months. Prevents wilting and extends shelf life significantly.",
+      "timeSaved": "5 minutes per meal",
+      "costSavings": "₱40-60 per week"
+    },
+    {
+      "id": "one-pan-veggies",
+      "title": "One Pan for All Veggie Dishes",
+      "category": "Equipment",
+      "description": "Use the same pan for sautéing all vegetable dishes. Clean between uses with minimal water. Saves time and reduces dishwashing.",
+      "timeSaved": "10 minutes per meal",
+      "costSavings": "₱20-30 per week (water/soap)"
+    },
+    {
+      "id": "freeze-leftovers",
+      "title": "Freeze Leftover Dishes",
+      "category": "Storage",
+      "description": "Monggo, adobo, and tinola make excellent leftovers. Portion into containers and freeze for up to 3 months. Thaw and reheat for quick meals.",
+      "timeSaved": "20 minutes per meal",
+      "costSavings": "₱100-150 per week"
+    },
+    {
+      "id": "buy-whole-chicken",
+      "title": "Buy Whole Chicken and Cut Yourself",
+      "category": "Budget",
+      "description": "Buy whole chicken and cut into pieces yourself. Use bones for stock, breast for quick meals, thighs for slow cooking. Much cheaper than pre-cut pieces.",
+      "timeSaved": "0 minutes",
+      "costSavings": "₱50-80 per chicken"
+    },
+    {
+      "id": "use-vegetable-scraps",
+      "title": "Make Stock from Vegetable Scraps",
+      "category": "Budget",
+      "description": "Save onion peels, carrot tops, celery ends, and other vegetable scraps. Boil with water and salt to make free vegetable stock. Use in soups and stews.",
+      "timeSaved": "0 minutes",
+      "costSavings": "₱30-50 per week"
+    },
+    {
+      "id": "cook-monggo-bulk",
+      "title": "Cook Monggo in Bulk",
+      "category": "Batch Cooking",
+      "description": "Cook 250g monggo (1:3 ratio with water) with kalabasa and malunggay. Makes 4-6 servings. Store in airtight container in fridge for 3-4 days.",
+      "timeSaved": "25 minutes per meal",
+      "costSavings": "₱40-60 per week"
+    },
+    {
+      "id": "freeze-ginger",
+      "title": "Freeze Ginger for Long-term Storage",
+      "category": "Storage",
+      "description": "Peel and slice ginger, then freeze in small portions. Thaws quickly and maintains flavor. Lasts for months in freezer.",
+      "timeSaved": "5 minutes per meal",
+      "costSavings": "₱20-30 per month"
+    }
+  ]
+}
+

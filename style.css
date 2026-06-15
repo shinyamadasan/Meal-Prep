@@ -3481,3 +3481,247 @@ select.form-control {
   src: url('https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2')
     format('woff2');
 }
+/* Prep Mode */
+.prep-recipe-card {
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.prep-recipe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.prep-usage-badge {
+  font-size: 0.75rem;
+  background: var(--primary-light, #e0f4f5);
+  color: var(--primary, #21808D);
+  border-radius: 99px;
+  padding: 0.2rem 0.6rem;
+  font-weight: 600;
+}
+.prep-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #888);
+  margin: 0.75rem 0 0.35rem;
+}
+.prep-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.prep-check-row input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--primary, #21808D);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Daily Nutrition Breakdown */
+.day-nutrition-goal-note {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+  margin-bottom: 0.75rem;
+}
+.day-nutrition-row {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+}
+.day-nutrition-row:last-child { border-bottom: none; }
+.day-nutrition-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary, #333);
+}
+.day-nutrition-bar-wrap {
+  background: var(--surface-secondary, #f0f0f0);
+  border-radius: 99px;
+  height: 8px;
+  overflow: hidden;
+}
+.day-nutrition-bar {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+.day-nutrition-stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #555);
+  white-space: nowrap;
+}
+.day-nutrition-stats.empty {
+  color: var(--text-secondary, #aaa);
+  font-style: italic;
+}
+@media (max-width: 600px) {
+  .day-nutrition-row { grid-template-columns: 3rem 1fr; }
+  .day-nutrition-stats { grid-column: 1 / -1; padding-left: 3rem; flex-wrap: wrap; gap: 0.4rem; }
+}
+
+/* Storage Expiry Alerts */
+.storage-alert-banner {
+  background: #fff8e1;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+.storage-alert-list {
+  margin: 0.4rem 0 0 1.25rem;
+  padding: 0;
+}
+.storage-alert-list li { margin: 0.2rem 0; }
+.meal-slot.expiry-warning {
+  border-color: #f59e0b !important;
+  background: #fffbeb !important;
+}
+.expiry-badge { font-size: 0.85em; cursor: help; }
+
+/* Weekly Cost Summary */
+.cost-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.cost-summary-card {
+  background: var(--surface-secondary, #f5f5f5);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cost-summary-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  font-weight: 500;
+}
+.cost-summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary, #21808D);
+}
+@media (max-width: 600px) {
+  .cost-summary-bar { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Mobile overrides ─────────────────────────────────────────────────────── */
+
+/* Tab nav — horizontal scroll instead of wrapping */
+@media (max-width: 768px) {
+  .tab-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* Planner controls + header actions + grocery controls — horizontal scroll */
+@media (max-width: 768px) {
+  .planner-controls {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    justify-content: flex-start;
+  }
+  .planner-controls::-webkit-scrollbar { display: none; }
+  .planner-controls .btn { flex-shrink: 0; }
+
+  .header-actions {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    width: 100%;
+  }
+  .header-actions::-webkit-scrollbar { display: none; }
+  .header-actions .btn {
+    flex-shrink: 0;
+    width: auto !important;
+  }
+
+  .grocery-controls {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .grocery-controls::-webkit-scrollbar { display: none; }
+  .grocery-controls .btn { flex-shrink: 0; width: auto !important; }
+}
+
+/* Mobile day navigator */
+.mobile-day-nav {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+}
+.mobile-day-nav span {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.mobile-day-btn {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-primary, #21808D);
+  padding: 0 0.5rem;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  .mobile-day-nav { display: flex; }
+
+  /* Hide all day columns except the active one */
+  .day-column { display: none; }
+  .day-column.mobile-active { display: block; }
+
+  /* Make the single visible day column full-width */
+  .meal-planner-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

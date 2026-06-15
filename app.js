@@ -890,6 +890,8 @@ function initApp() {
         renderStorageGuide();
         renderCookingHacks();
         updateNutritionGoalsDisplay();
+        initWeekTemplateButton();
+        updateThemeToggleIcon();
       }
     });
   } else {
@@ -914,7 +916,10 @@ function initApp() {
     renderStorageGuide();
     renderCookingHacks();
   }
-  
+
+  initWeekTemplateButton();
+  updateThemeToggleIcon();
+
   // Setup event listeners
   setupEventListeners();
   
@@ -1000,6 +1005,7 @@ function setupEventListeners() {
   // Search and filter
   document.getElementById('recipe-search').addEventListener('input', filterRecipes);
   document.getElementById('category-filter').addEventListener('change', filterRecipes);
+  document.getElementById('preptime-filter').addEventListener('change', filterRecipes);
   
   // Weekly planner
   document.getElementById('clear-week').addEventListener('click', clearWeeklyPlan);
@@ -1307,12 +1313,16 @@ function renderRecipes() {
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
   const categoryFilter = document.getElementById('category-filter').value;
-  
+  const preptimeFilter = document.getElementById('preptime-filter').value;
+
   let filteredRecipes = AppState.recipes.filter(recipe => {
-    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm) || 
-                         recipe.instructions.toLowerCase().includes(searchTerm);
+    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm) ||
+                         (recipe.instructions || '').toLowerCase().includes(searchTerm);
     const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const totalTime = (recipe.basePrepTime || 0) + (recipe.baseCookTime || 0);
+    const matchesTime = !preptimeFilter ||
+      (preptimeFilter === '999' ? totalTime >= 60 : totalTime < parseInt(preptimeFilter));
+    return matchesSearch && matchesCategory && matchesTime;
   });
   
   recipesGrid.innerHTML = filteredRecipes.map(recipe => {
@@ -1463,13 +1473,42 @@ function filterRecipes() {
 }
 
 // Weekly planner functions
+// Days in fridge assuming Sunday batch cook (Monday = 1 day stored, ..., Sunday = 7)
+const DAY_FRIDGE_INDEX = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
+
+// ── Mobile day navigator ──────────────────────────────────────────────────────
+const PLANNER_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const _todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+let mobilePlannerDay = Math.max(PLANNER_DAYS.indexOf(_todayName), 0);
+
+function prevPlannerDay() {
+  mobilePlannerDay = (mobilePlannerDay + 6) % 7;
+  updateMobileDayNav();
+}
+function nextPlannerDay() {
+  mobilePlannerDay = (mobilePlannerDay + 1) % 7;
+  updateMobileDayNav();
+}
+function updateMobileDayNav() {
+  const label = document.getElementById('mobile-day-label');
+  if (label) label.textContent = PLANNER_DAYS[mobilePlannerDay];
+  document.querySelectorAll('.day-column').forEach((col, i) => {
+    col.classList.toggle('mobile-active', i === mobilePlannerDay);
+  });
+}
+
+function willExpire(recipe, day) {
+  const fridgeLife = recipe.fridgeLife || recipe.fridgeLife === 0 ? recipe.fridgeLife : 999;
+  return fridgeLife < DAY_FRIDGE_INDEX[day];
+}
+
 function renderWeeklyPlanner() {
   const plannerGrid = document.getElementById('meal-planner');
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const meals = ['breakfast', 'lunch', 'dinner', 'snacks'];
-  
-  plannerGrid.innerHTML = days.map(day => `
-    <div class="day-column">
+
+  plannerGrid.innerHTML = days.map((day, i) => `
+    <div class="day-column${i === mobilePlannerDay ? ' mobile-active' : ''}">
       <div class="day-header">
         ${day}
         <div class="day-actions">
@@ -1480,44 +1519,77 @@ function renderWeeklyPlanner() {
       ${meals.map(meal => {
         const mealData = AppState.weeklyPlan[day][meal];
         const hasRecipe = meal === 'snacks' ? mealData.length > 0 : mealData !== null;
-        
+
         if (hasRecipe) {
           const recipeId = meal === 'snacks' ? mealData[0] : mealData;
           const recipe = AppState.recipes.find(r => r.id === recipeId);
           if (recipe) {
             const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+            const expired = willExpire(recipe, day);
             return `
-              <div class="meal-slot has-recipe" 
-                   data-day="${day}" 
+              <div class="meal-slot has-recipe${expired ? ' expiry-warning' : ''}"
+                   data-day="${day}"
                    data-meal="${meal}"
                    onclick="openRecipeSelectionModal('${day}', '${meal}')">
                 <button class="remove-recipe" onclick="event.stopPropagation(); removeRecipeFromSlot('${day}', '${meal}')">×</button>
                 <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
                 <div class="meal-slot-content">
                   <div class="recipe-details">
-                    <div class="recipe-name">${recipe.name}</div>
+                    <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">⚠️</span>' : ''}</div>
                     <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
                   </div>
                 </div>
-              </div>
-            `;
+              </div>`;
           }
         }
-        
+
         return `
-          <div class="meal-slot" 
-               data-day="${day}" 
+          <div class="meal-slot"
+               data-day="${day}"
                data-meal="${meal}"
                onclick="openRecipeSelectionModal('${day}', '${meal}')">
             <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
             <div class="meal-slot-content">
               <div class="meal-slot-empty">Click + to add recipe</div>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('')}
     </div>
   `).join('');
+
+  updateMobileDayNav();
+  renderStorageAlerts();
+}
+
+function renderStorageAlerts() {
+  const el = document.getElementById('storage-alerts');
+  if (!el) return;
+
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const issues = [];
+
+  days.forEach(day => {
+    const plan = AppState.weeklyPlan[day];
+    const check = id => {
+      const recipe = AppState.recipes.find(r => r.id === id);
+      if (recipe && willExpire(recipe, day)) {
+        issues.push(`<strong>${recipe.name}</strong> on ${day} (fridge life: ${recipe.fridgeLife}d, stored ${DAY_FRIDGE_INDEX[day]}d by then)`);
+      }
+    };
+    ['breakfast', 'lunch', 'dinner'].forEach(meal => { if (plan[meal]) check(plan[meal]); });
+    (plan.snacks || []).forEach(check);
+  });
+
+  if (issues.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="storage-alert-banner">
+      <strong>⚠️ Storage Alert</strong> — ${issues.length} meal${issues.length > 1 ? 's' : ''} may expire before their planned day (assuming Sunday batch cook):
+      <ul class="storage-alert-list">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
+    </div>`;
 }
 
 function removeRecipeFromSlot(day, meal) {
@@ -2136,8 +2208,53 @@ function getUnitConversion(fromUnit, toUnit) {
 
 // Budget display removed - only keep individual item pricing
 function updateBudgetDisplay() {
-  // Individual pricing is still shown per item in grocery list
-  // Weekly totals and averages removed per user request
+  renderWeeklyCostSummary();
+}
+
+function renderWeeklyCostSummary() {
+  const el = document.getElementById('weekly-cost-summary');
+  if (!el) return;
+
+  let totalCost = 0;
+  let mealCount = 0;
+
+  Object.values(AppState.weeklyPlan).forEach(day => {
+    ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+      if (day[meal]) {
+        const recipe = AppState.recipes.find(r => r.id === day[meal]);
+        if (recipe) { totalCost += calculateRecipeCost(recipe); mealCount++; }
+      }
+    });
+    (day.snacks || []).forEach(id => {
+      const recipe = AppState.recipes.find(r => r.id === id);
+      if (recipe) { totalCost += calculateRecipeCost(recipe); mealCount++; }
+    });
+  });
+
+  if (totalCost === 0) { el.innerHTML = ''; return; }
+
+  const perDay   = totalCost / 7;
+  const perMeal  = mealCount > 0 ? totalCost / mealCount : 0;
+
+  el.innerHTML = `
+    <div class="cost-summary-bar">
+      <div class="cost-summary-card">
+        <span class="cost-summary-label">Week Total</span>
+        <span class="cost-summary-value">₱${Math.round(totalCost).toLocaleString()}</span>
+      </div>
+      <div class="cost-summary-card">
+        <span class="cost-summary-label">Per Day</span>
+        <span class="cost-summary-value">₱${Math.round(perDay).toLocaleString()}</span>
+      </div>
+      <div class="cost-summary-card">
+        <span class="cost-summary-label">Per Meal</span>
+        <span class="cost-summary-value">₱${Math.round(perMeal).toLocaleString()}</span>
+      </div>
+      <div class="cost-summary-card">
+        <span class="cost-summary-label">Meals Planned</span>
+        <span class="cost-summary-value">${mealCount}</span>
+      </div>
+    </div>`;
 }
 
 // Initialize app when DOM is loaded
@@ -2235,7 +2352,62 @@ function updateNutritionGoalsDisplay() {
 
 function renderNutritionTab() {
   renderWeeklyNutritionChart();
+  renderDailyNutritionBreakdown();
   filterRecipesByNutrition();
+}
+
+function calculateDayNutrition(dayPlan) {
+  const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const addRecipe = id => {
+    const recipe = AppState.recipes.find(r => r.id === id);
+    if (!recipe) return;
+    const n = calculateRecipeNutrition(recipe);
+    totals.calories += n.calories;
+    totals.protein  += n.protein;
+    totals.carbs    += n.carbs;
+    totals.fat      += n.fat;
+  };
+  ['breakfast', 'lunch', 'dinner'].forEach(meal => { if (dayPlan[meal]) addRecipe(dayPlan[meal]); });
+  (dayPlan.snacks || []).forEach(addRecipe);
+  return totals;
+}
+
+function renderDailyNutritionBreakdown() {
+  const el = document.getElementById('daily-nutrition-breakdown');
+  if (!el) return;
+
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const goalCal = AppState.nutritionGoals.calories || 2000;
+
+  const rows = days.map(day => {
+    const n = calculateDayNutrition(AppState.weeklyPlan[day]);
+    const isEmpty = n.calories === 0 && n.protein === 0;
+    const pct = Math.min(Math.round((n.calories / goalCal) * 100), 100);
+    const over = n.calories > goalCal * 1.15;
+    const low  = n.calories < goalCal * 0.5 && !isEmpty;
+    const barColor = over ? '#e74c3c' : low ? '#f39c12' : '#21808D';
+
+    return `
+      <div class="day-nutrition-row">
+        <div class="day-nutrition-label">${day.slice(0, 3)}</div>
+        <div class="day-nutrition-bar-wrap">
+          <div class="day-nutrition-bar" style="width:${isEmpty ? 0 : pct}%;background:${barColor};"></div>
+        </div>
+        ${isEmpty
+          ? '<div class="day-nutrition-stats empty">No meals planned</div>'
+          : `<div class="day-nutrition-stats">
+               <span>${Math.round(n.calories)} kcal</span>
+               <span>${Math.round(n.protein)}g protein</span>
+               <span>${Math.round(n.carbs)}g carbs</span>
+               <span>${Math.round(n.fat)}g fat</span>
+             </div>`
+        }
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="day-nutrition-goal-note">Goal: ${goalCal} kcal / day</div>
+    ${rows}`;
 }
 
 function renderWeeklyNutritionChart() {
@@ -3514,4 +3686,382 @@ function clearRecipeForm() {
   document.getElementById('ingredients-list').innerHTML = '';
   removePhoto();
   AppState.currentEditingRecipe = null;
+}
+
+// ── Dark Mode ─────────────────────────────────────────────────────────────────
+
+function toggleDarkMode() {
+  const current = document.documentElement.getAttribute('data-color-scheme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-color-scheme', next);
+  localStorage.setItem('colorScheme', next);
+  updateThemeToggleIcon();
+}
+
+function updateThemeToggleIcon() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const isDark = document.documentElement.getAttribute('data-color-scheme') === 'dark';
+  btn.textContent = isDark ? '☀️' : '🌙';
+  btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+// ── Grocery List — Print & Copy ───────────────────────────────────────────────
+
+function getGroceryByCategory() {
+  const categories = {};
+  AppState.groceryList.forEach(item => {
+    if (!categories[item.category]) categories[item.category] = [];
+    categories[item.category].push(item);
+  });
+  return categories;
+}
+
+function printGroceryList() {
+  if (AppState.groceryList.length === 0) {
+    showErrorMessage('Your grocery list is empty — generate it from the Weekly Planner first.');
+    return;
+  }
+
+  const categories = getGroceryByCategory();
+  const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const rows = Object.keys(categories).map(cat => `
+    <h3 style="margin:1.25rem 0 0.4rem;font-size:0.95rem;text-transform:uppercase;letter-spacing:0.05em;color:#555;border-bottom:1px solid #ddd;padding-bottom:0.3rem;">${cat}</h3>
+    ${categories[cat].map(item => `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0;font-size:0.95rem;">
+        <span style="display:inline-block;width:16px;height:16px;border:1.5px solid #999;border-radius:3px;flex-shrink:0;"></span>
+        <span>${formatQuantity(item.quantity)} ${item.unit} <strong>${item.name}</strong></span>
+      </div>`).join('')}
+  `).join('');
+
+  const win = window.open('', '_blank', 'width=520,height=700');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>Grocery List</title>
+    <style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:480px;margin:0 auto;}h1{font-size:1.3rem;margin-bottom:0.25rem;}p{color:#666;font-size:0.85rem;margin:0 0 1rem;}@media print{body{padding:1rem;}}</style>
+  </head><body>
+    <h1>🛒 Grocery List</h1>
+    <p>${date}</p>
+    ${rows}
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function copyGroceryList() {
+  if (AppState.groceryList.length === 0) {
+    showErrorMessage('Your grocery list is empty — generate it from the Weekly Planner first.');
+    return;
+  }
+
+  const categories = getGroceryByCategory();
+  const date = new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const lines = [`🛒 Grocery List — ${date}`, ''];
+  Object.keys(categories).forEach(cat => {
+    lines.push(cat.toUpperCase());
+    categories[cat].forEach(item => {
+      lines.push(`• ${formatQuantity(item.quantity)} ${item.unit} ${item.name}`);
+    });
+    lines.push('');
+  });
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    showSuccessMessage('Grocery list copied! Paste it into WhatsApp or Notes.');
+  }).catch(() => {
+    showErrorMessage('Could not copy — try selecting and copying the list manually.');
+  });
+}
+
+// ── Cook Day / Prep Mode ──────────────────────────────────────────────────────
+
+let prepCheckState = {};
+
+function openPrepMode() {
+  const recipeUsage = {};
+  Object.values(AppState.weeklyPlan).forEach(day => {
+    ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+      if (day[meal]) recipeUsage[day[meal]] = (recipeUsage[day[meal]] || 0) + 1;
+    });
+    (day.snacks || []).forEach(id => {
+      recipeUsage[id] = (recipeUsage[id] || 0) + 1;
+    });
+  });
+
+  const ids = Object.keys(recipeUsage);
+  if (ids.length === 0) {
+    showErrorMessage('Your week is empty — add some meals to the planner first.');
+    return;
+  }
+
+  prepCheckState = {};
+  const recipes = ids.map(id => AppState.recipes.find(r => String(r.id) === String(id))).filter(Boolean);
+
+  const cards = recipes.map(recipe => {
+    const count = recipeUsage[recipe.id];
+    const ingredients = recipe.baseIngredients || recipe.ingredients || [];
+    const steps = parseInstructionSteps(recipe.instructions || '');
+
+    const ingHTML = ingredients.map((ing, i) => {
+      const key = `${recipe.id}-ing-${i}`;
+      prepCheckState[key] = false;
+      const qty = ing.baseQuantity || ing.quantity || '';
+      return `
+        <label class="prep-check-row" onclick="togglePrepCheck('${key}')">
+          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')">
+          <span>${ing.name}${qty ? ' — ' + qty + ' ' + (ing.unit || '') : ''}</span>
+        </label>`;
+    }).join('');
+
+    const stepsHTML = steps.map((step, i) => {
+      const key = `${recipe.id}-step-${i}`;
+      prepCheckState[key] = false;
+      return `
+        <label class="prep-check-row" onclick="togglePrepCheck('${key}')">
+          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')">
+          <span>${step}</span>
+        </label>`;
+    }).join('');
+
+    return `
+      <div class="prep-recipe-card">
+        <div class="prep-recipe-header">
+          <strong>${recipe.name}</strong>
+          <span class="prep-usage-badge">×${count} this week</span>
+        </div>
+        ${ingHTML ? `<p class="prep-section-label">Ingredients</p>${ingHTML}` : ''}
+        ${stepsHTML ? `<p class="prep-section-label">Steps</p>${stepsHTML}` : ''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('prep-mode-body').innerHTML = cards;
+  updatePrepProgress();
+  document.getElementById('prep-mode-modal').classList.remove('hidden');
+}
+
+function parseInstructionSteps(text) {
+  if (!text) return [];
+  // Split on newlines first
+  let lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+  // If single long line with numbered steps inline, split on "1.", "2." etc.
+  if (lines.length === 1 && /\d+\./.test(lines[0])) {
+    lines = lines[0].split(/(?=\d+\.)/).map(l => l.trim()).filter(Boolean);
+  }
+  return lines;
+}
+
+function togglePrepCheck(key) {
+  prepCheckState[key] = !prepCheckState[key];
+  const chk = document.getElementById('chk-' + key);
+  if (chk) chk.checked = prepCheckState[key];
+  const label = chk ? chk.closest('label') : null;
+  if (label) label.style.opacity = prepCheckState[key] ? '0.45' : '1';
+  updatePrepProgress();
+}
+
+function updatePrepProgress() {
+  const keys = Object.keys(prepCheckState);
+  const done = keys.filter(k => prepCheckState[k]).length;
+  const pct = keys.length ? Math.round((done / keys.length) * 100) : 0;
+  document.getElementById('prep-progress-bar').style.width = pct + '%';
+  document.getElementById('prep-progress-label').textContent = `${done} / ${keys.length} done`;
+}
+
+function closePrepMode() {
+  document.getElementById('prep-mode-modal').classList.add('hidden');
+  prepCheckState = {};
+}
+
+// ── CSV Import ────────────────────────────────────────────────────────────────
+
+let csvParsedRecipes = [];
+
+function importFromCSV() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const recipes = parseCSVToRecipes(ev.target.result);
+        if (recipes.length === 0) {
+          showErrorMessage('No valid recipes found in the CSV. Make sure the file has a header row and at least one recipe row.');
+          return;
+        }
+        openCSVPreviewModal(recipes);
+      } catch (err) {
+        showErrorMessage('Failed to parse CSV: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function parseCSVRow(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
+function parseCSVToRecipes(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+  if (lines.length < 2) throw new Error('CSV must have a header row and at least one recipe.');
+
+  const headers = parseCSVRow(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
+  const recipes = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const fields = parseCSVRow(lines[i]);
+    if (fields.every(f => !f)) continue;
+
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = fields[idx] || ''; });
+
+    const name = (row.name || row.recipe_name || '').trim();
+    if (!name) continue;
+
+    const servings = parseInt(row.servings) || 1;
+    const cost = parseFloat(row.cost || row.estimated_cost) || 0;
+
+    const baseIngredients = (row.ingredients || '').split('|').map(part => {
+      const [ingName, qty, unit, cat] = part.split(':');
+      return {
+        name: (ingName || '').trim(),
+        baseQuantity: parseFloat(qty) || 1,
+        unit: (unit || 'piece').trim(),
+        category: (cat || 'Other').trim()
+      };
+    }).filter(ing => ing.name);
+
+    recipes.push({
+      id: Date.now() + i,
+      name,
+      category: (row.category || 'Main Dish').trim(),
+      basePrepTime: parseInt(row.prep_time) || 0,
+      baseCookTime: parseInt(row.cook_time) || 0,
+      baseServings: servings,
+      currentServings: servings,
+      fridgeLife: parseInt(row.fridge_life) || 3,
+      freezerLife: parseInt(row.freezer_life) || 30,
+      estimatedCost: cost,
+      costPerServing: cost / servings,
+      storageNotes: (row.storage_notes || '').trim(),
+      instructions: (row.instructions || '').trim(),
+      photo: null,
+      baseIngredients
+    });
+  }
+
+  return recipes;
+}
+
+function openCSVPreviewModal(recipes) {
+  csvParsedRecipes = recipes;
+
+  const rows = recipes.map(r => `
+    <tr style="border-bottom:1px solid var(--border-color,#e0e0e0);">
+      <td style="padding:0.5rem 0.75rem;">${r.name}</td>
+      <td style="padding:0.5rem 0.75rem;">${r.category}</td>
+      <td style="padding:0.5rem 0.75rem;">${r.baseServings}</td>
+      <td style="padding:0.5rem 0.75rem;">${r.baseIngredients.length} item${r.baseIngredients.length !== 1 ? 's' : ''}</td>
+    </tr>`).join('');
+
+  document.getElementById('csv-preview-body').innerHTML = `
+    <p style="margin-bottom:1rem;">Found <strong>${recipes.length}</strong> recipe${recipes.length !== 1 ? 's' : ''} — these will be added to your existing recipes.</p>
+    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color,#e0e0e0);border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.875rem;">
+        <thead>
+          <tr style="background:var(--surface-secondary,#f5f5f5);position:sticky;top:0;">
+            <th style="padding:0.5rem 0.75rem;text-align:left;border-bottom:1px solid var(--border-color,#e0e0e0);">Name</th>
+            <th style="padding:0.5rem 0.75rem;text-align:left;border-bottom:1px solid var(--border-color,#e0e0e0);">Category</th>
+            <th style="padding:0.5rem 0.75rem;text-align:left;border-bottom:1px solid var(--border-color,#e0e0e0);">Servings</th>
+            <th style="padding:0.5rem 0.75rem;text-align:left;border-bottom:1px solid var(--border-color,#e0e0e0);">Ingredients</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('confirm-csv-import-btn').textContent = `Import ${recipes.length} Recipe${recipes.length !== 1 ? 's' : ''}`;
+  document.getElementById('csv-preview-modal').classList.remove('hidden');
+}
+
+function closeCSVPreviewModal() {
+  document.getElementById('csv-preview-modal').classList.add('hidden');
+  csvParsedRecipes = [];
+}
+
+function confirmCSVImport() {
+  if (!csvParsedRecipes.length) return;
+  AppState.recipes.push(...csvParsedRecipes);
+  saveData();
+  renderRecipes();
+  closeCSVPreviewModal();
+  showSuccessMessage(`${csvParsedRecipes.length} recipe${csvParsedRecipes.length !== 1 ? 's' : ''} imported successfully!`);
+}
+
+// ── Week Template ─────────────────────────────────────────────────────────────
+
+const WEEK_TEMPLATE_KEY = 'mealPrepWeekTemplate';
+
+function saveWeekAsTemplate() {
+  const hasAnything = Object.values(AppState.weeklyPlan).some(day =>
+    day.breakfast || day.lunch || day.dinner || day.snacks.length > 0
+  );
+  if (!hasAnything) {
+    showErrorMessage('Your week is empty — add some meals before saving.');
+    return;
+  }
+  localStorage.setItem(WEEK_TEMPLATE_KEY, JSON.stringify(AppState.weeklyPlan));
+  document.getElementById('load-week-template-btn').disabled = false;
+  showSuccessMessage('Week saved! Use "Load Saved Week" next week to restore it.');
+}
+
+function loadWeekTemplate() {
+  const saved = localStorage.getItem(WEEK_TEMPLATE_KEY);
+  if (!saved) return;
+  if (!confirm('This will replace your current week\'s plan with the saved one. Continue?')) return;
+  AppState.weeklyPlan = JSON.parse(saved);
+  saveData();
+  renderWeeklyPlanner();
+  showSuccessMessage('Saved week loaded successfully!');
+}
+
+function initWeekTemplateButton() {
+  if (localStorage.getItem(WEEK_TEMPLATE_KEY)) {
+    const btn = document.getElementById('load-week-template-btn');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function downloadCSVTemplate() {
+  const header = 'name,category,prep_time,cook_time,servings,fridge_life,freezer_life,cost,storage_notes,instructions,ingredients';
+  const example = '"Chicken Adobo","Main Dish",10,30,4,3,30,200,"Keep refrigerated","1. Brown chicken. 2. Add soy sauce and vinegar. 3. Simmer 20 mins.","chicken:500:g:Protein|soy sauce:60:ml:Condiment|garlic:4:cloves:Vegetable"';
+  const blob = new Blob([header + '\n' + example], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'recipe-import-template.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

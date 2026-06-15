@@ -1,0 +1,77 @@
+# Simplified Firestore Security Rules - Private Data Only
+
+## Overview
+These simplified security rules ensure that:
+- Users can only access their own personal data
+- No sharing features - completely private
+- Simple and secure setup
+
+## Rules Configuration
+
+Copy and paste these rules into your Firebase Console > Firestore > Rules:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can only access their own personal data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+## What These Rules Do
+
+### ✅ User Data Protection
+- Each user can only access data under their own UID
+- Prevents users from reading/writing other users' data
+- Ensures complete data isolation
+- No sharing features - completely private
+
+### ✅ Authentication Requirements
+- All operations require user authentication
+- No anonymous access to data
+- Secure user management
+
+## Setup Instructions
+
+1. **Go to Firebase Console > Firestore Database > Rules**
+2. **Replace the default rules** with the rules above
+3. **Click "Publish"**
+4. **Your app is now secure!**
+
+## Benefits of This Approach
+
+- ✅ **Simple setup** - No complex sharing rules
+- ✅ **Maximum privacy** - Your data is completely private
+- ✅ **No sharing errors** - No permission issues
+- ✅ **Easy maintenance** - Simple rules to manage
+- ✅ **Secure** - Enterprise-grade data protection
+
+## Data Structure
+
+Your data will be stored like this:
+```
+/users/{your-uid}/
+├── recipes: [your private recipes]
+├── weeklyPlan: [your private meal plans]
+├── groceryList: [your private lists]
+├── nutritionGoals: [your private goals]
+├── customIngredients: [your private ingredients]
+├── customHacks: [your private hacks]
+└── lastUpdated: timestamp
+```
+
+## Testing
+
+After setting up the rules:
+1. **Sign up** with a test account
+2. **Add a recipe** - should save without errors
+3. **Check Firebase Console** - you should see your data
+4. **No permission errors** - everything should work smoothly
+
+This simplified approach gives you all the benefits of cloud storage without any sharing complexity!
+
