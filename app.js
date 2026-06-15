@@ -1009,7 +1009,7 @@ function setupEventListeners() {
   
   // Weekly planner
   document.getElementById('clear-week').addEventListener('click', clearWeeklyPlan);
-  document.getElementById('generate-grocery').addEventListener('click', generateGroceryList);
+  document.getElementById('generate-grocery').addEventListener('click', () => showTab('grocery'));
   
   // Grocery list
   document.getElementById('clear-grocery').addEventListener('click', clearGroceryList);
@@ -1065,7 +1065,8 @@ function pasteDay() {
   AppState.weeklyPlan[AppState.selectedDay] = { ...AppState.dayToCopy };
   renderWeeklyPlanner();
   updateWeeklyStats();
-  
+  generateGroceryList();
+
   showSuccessMessage(`Meals pasted to ${AppState.selectedDay}!`);
   
   // Reset copy state
@@ -1631,6 +1632,7 @@ function removeRecipeFromSlot(day, meal) {
   
   renderWeeklyPlanner();
   updateWeeklyStats();
+  generateGroceryList();
   showSuccessMessage('Recipe removed!');
 }
 
@@ -1649,6 +1651,7 @@ function clearDay(day) {
     AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
     renderWeeklyPlanner();
     updateWeeklyStats();
+    generateGroceryList();
     showSuccessMessage(`${day} cleared!`);
   }
 }
@@ -1762,7 +1765,8 @@ function selectRecipeForPlanning(recipeId) {
   renderWeeklyPlanner();
   updateWeeklyStats();
   saveData();
-  
+  generateGroceryList();
+
   // Show success message
   showSuccessMessage(`${recipe?.name || 'Recipe'} added to ${day} ${meal}!`);
   
@@ -1782,6 +1786,7 @@ function clearWeeklyPlan() {
     });
     renderWeeklyPlanner();
     updateWeeklyStats();
+    generateGroceryList();
   }
 }
 
@@ -1858,7 +1863,6 @@ function generateGroceryList() {
   });
   
   renderGroceryList();
-  showTab('grocery');
 }
 
 function addRecipeIngredients(recipeId, ingredients) {
@@ -4083,6 +4087,7 @@ function loadWeekTemplate() {
   AppState.weeklyPlan = JSON.parse(saved);
   saveData();
   renderWeeklyPlanner();
+  generateGroceryList();
   showSuccessMessage('Saved week loaded successfully!');
 }
 
