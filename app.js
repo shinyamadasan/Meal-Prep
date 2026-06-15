@@ -1551,7 +1551,7 @@ function renderWeeklyPlanner() {
   plannerGrid.innerHTML = days.map((day, i) => `
     <div class="day-column${i === mobilePlannerDay ? ' mobile-active' : ''}">
       <div class="day-header">
-        ${day}
+        <span class="day-name">${day}</span>
         <div class="day-actions">
           <button class="day-action-btn" onclick="copyDay('${day}')">Copy</button>
           <button class="day-action-btn" onclick="clearDay('${day}')">Clear</button>
