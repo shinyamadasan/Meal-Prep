@@ -3732,3 +3732,102 @@ select.form-control {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* â”€â”€ Pantry Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+#pantry-section {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.pantry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-1);
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  user-select: none;
+}
+
+.pantry-header:hover {
+  background: var(--color-secondary);
+}
+
+#pantry-body {
+  padding: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+#pantry-body.hidden {
+  display: none;
+}
+
+.pantry-add-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.pantry-add-row .form-control {
+  flex: 1;
+}
+
+.pantry-list-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pantry-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.pantry-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+}
+
+.pantry-remove:hover { color: var(--color-danger, #e53e3e); }
+
+.pantry-empty {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Grocery item in-pantry state */
+.grocery-item.in-pantry {
+  opacity: 0.6;
+}
+
+.pantry-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  font-weight: 600;
+}
+
+[data-color-scheme="dark"] .pantry-badge {
+  background: #064e3b;
+  color: #6ee7b7;
+}

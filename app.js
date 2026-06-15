@@ -25,6 +25,7 @@ const AppState = {
   currentEditingHack: null,
   customIngredients: [],
   customHacks: [],
+  pantry: [],
   currentUser: null,
   isOnline: navigator.onLine
 };
@@ -41,6 +42,7 @@ function saveToLocalStorage() {
       nutritionGoals: AppState.nutritionGoals,
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
+      pantry: AppState.pantry,
       lastSaved: new Date().toISOString()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -77,7 +79,8 @@ function loadFromLocalStorage() {
       };
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
-      
+      AppState.pantry = data.pantry || [];
+
       console.log('Data loaded from local storage');
       if (data.lastSaved) {
         showSuccessMessage(`Data loaded (last saved: ${new Date(data.lastSaved).toLocaleString()})`);
@@ -915,6 +918,7 @@ function initApp() {
     renderWeeklyPlanner();
     renderStorageGuide();
     renderCookingHacks();
+    renderPantry();
   }
 
   initWeekTemplateButton();
@@ -1014,6 +1018,11 @@ function setupEventListeners() {
   // Grocery list
   document.getElementById('clear-grocery').addEventListener('click', clearGroceryList);
   document.getElementById('add-custom-item').addEventListener('click', addCustomGroceryItem);
+
+  // Pantry input: Enter key adds item
+  document.getElementById('pantry-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addToPantry();
+  });
   
   // Custom item modal: Enter key submits, click outside closes
   document.getElementById('custom-item-modal').addEventListener('click', (e) => {
@@ -1094,6 +1103,7 @@ function showTab(tabId) {
     updateGrocerySummary();
     updateBudgetDisplay();
     renderGroceryList();
+    renderPantry();
   } else if (tabId === 'hacks') {
     renderCookingHacks();
   } else if (tabId === 'nutrition') {
@@ -1926,13 +1936,18 @@ function renderGroceryList() {
         const itemCost = ingredient && ingredient.pricePerUnit ? 
           ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit) : 0;
         
+        const inPantry = isInPantry(item.name);
+        const isChecked = item.checked || inPantry;
         return `
-        <div class="grocery-item ${item.checked ? 'checked' : ''}">
-          <input type="checkbox" class="grocery-checkbox" 
-                 ${item.checked ? 'checked' : ''}
+        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}">
+          <input type="checkbox" class="grocery-checkbox"
+                 ${isChecked ? 'checked' : ''}
                  onchange="toggleGroceryItem(${item.id})">
           <div class="grocery-item-info">
-            <div class="grocery-item-name">${formatQuantity(item.quantity)} ${item.unit} ${item.name}</div>
+            <div class="grocery-item-name">
+              ${formatQuantity(item.quantity)} ${item.unit} ${item.name}
+              ${inPantry ? '<span class="pantry-badge">🏠 In stock</span>' : ''}
+            </div>
             ${item.sources && item.sources.length > 0 ? `
               <div class="grocery-item-source">From: ${item.sources.join(', ')}</div>
             ` : ''}
@@ -3029,6 +3044,7 @@ async function saveToFirestore() {
       nutritionGoals: AppState.nutritionGoals,
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
+      pantry: AppState.pantry,
       lastUpdated: new Date().toISOString()
     };
     
@@ -3126,7 +3142,8 @@ function setupRealtimeListeners() {
         AppState.nutritionGoals = data.nutritionGoals || AppState.nutritionGoals;
         AppState.customIngredients = data.customIngredients || [];
         AppState.customHacks = data.customHacks || [];
-        
+        AppState.pantry = data.pantry || [];
+
         // Update UI
         renderRecipes();
         renderWeeklyPlanner();
@@ -4293,4 +4310,73 @@ function parseIngredientLine(line) {
   }
 
   return null;
+}
+
+// â”€â”€ Pantry Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function isInPantry(name) {
+  const n = name.toLowerCase();
+  return AppState.pantry.some(p => {
+    const pn = p.name.toLowerCase();
+    return n.includes(pn) || pn.includes(n);
+  });
+}
+
+function renderPantry() {
+  const list = document.getElementById('pantry-list');
+  const count = document.getElementById('pantry-count');
+  if (!list) return;
+
+  const n = AppState.pantry.length;
+  count.textContent = n > 0 ? `(${n} item${n !== 1 ? 's' : ''})` : '';
+
+  if (n === 0) {
+    list.innerHTML = '<p class="pantry-empty">No items yet. Add ingredients you already have at home.</p>';
+    return;
+  }
+
+  list.innerHTML = '<div class="pantry-list-grid">' +
+    AppState.pantry.map(p =>
+      `<div class="pantry-item">` +
+      `<span class="pantry-item-name">${p.name}</span>` +
+      `<button class="pantry-remove" onclick="removeFromPantry('${p.id}')" title="Remove">×</button>` +
+      `</div>`
+    ).join('') +
+  '</div>';
+}
+
+function togglePantrySection() {
+  const body = document.getElementById('pantry-body');
+  const icon = document.getElementById('pantry-toggle-icon');
+  const isHidden = body.classList.toggle('hidden');
+  icon.textContent = isHidden ? 'â–¶' : 'â–¼';
+}
+
+function addToPantry() {
+  const input = document.getElementById('pantry-input');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+
+  // Avoid duplicates (case-insensitive)
+  if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    input.value = '';
+    input.focus();
+    return;
+  }
+
+  AppState.pantry.push({ id: Date.now() + Math.random(), name });
+  input.value = '';
+  input.focus();
+
+  saveData();
+  renderPantry();
+  renderGroceryList(); // refresh badges
+}
+
+function removeFromPantry(id) {
+  id = parseFloat(id);
+  AppState.pantry = AppState.pantry.filter(p => p.id !== id);
+  saveData();
+  renderPantry();
+  renderGroceryList();
 }

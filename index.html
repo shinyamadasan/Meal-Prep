@@ -263,7 +263,20 @@
 
                     <div id="weekly-cost-summary"></div>
 
-
+                    <!-- Pantry Section -->
+                    <div id="pantry-section">
+                        <div class="pantry-header" onclick="togglePantrySection()">
+                            <span>🏠 My Pantry <span id="pantry-count"></span></span>
+                            <span id="pantry-toggle-icon">▶</span>
+                        </div>
+                        <div id="pantry-body" class="hidden">
+                            <div class="pantry-add-row">
+                                <input type="text" id="pantry-input" class="form-control" placeholder="e.g. Garlic, Soy sauce, Rice…" autocomplete="off">
+                                <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
+                            </div>
+                            <div id="pantry-list"></div>
+                        </div>
+                    </div>
 
                     <div id="grocery-list" class="grocery-categories"></div>
                 </section>
