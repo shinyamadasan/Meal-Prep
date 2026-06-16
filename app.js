@@ -599,7 +599,8 @@ const sampleRecipes = [
       { name: "Garlic cloves", baseQuantity: 6, unit: "pieces", category: "Vegetable" },
       { name: "Bay leaves", baseQuantity: 3, unit: "pieces", category: "Pantry" }
     ],
-    instructions: "Add all ingredients to Instant Pot. Pressure cook high 8 minutes, quick release. Remove chicken, reduce sauce on sauté mode. Serve over rice."
+    instructions: "Add all ingredients to Instant Pot. Pressure cook high 8 minutes, quick release. Remove chicken, reduce sauce on sauté mode. Serve over rice.",
+    nutritionPerServing: { calories: 285, protein: 28, carbs: 4, fat: 17, fiber: 0, sodium: 890 }
   },
   {
     id: 2,
@@ -618,7 +619,8 @@ const sampleRecipes = [
       { name: "Granola", baseQuantity: 0.25, unit: "cup", category: "Pantry" },
       { name: "Honey", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
-    instructions: "Layer yogurt, berries, and granola in a jar. Drizzle with honey. Add granola just before eating to maintain crunch."
+    instructions: "Layer yogurt, berries, and granola in a jar. Drizzle with honey. Add granola just before eating to maintain crunch.",
+    nutritionPerServing: { calories: 380, protein: 20, carbs: 52, fat: 8, fiber: 4, sodium: 65 }
   },
   {
     id: 3,
@@ -638,7 +640,8 @@ const sampleRecipes = [
       { name: "Soy sauce", baseQuantity: 2, unit: "tbsp", category: "Pantry" },
       { name: "Sesame oil", baseQuantity: 1, unit: "tsp", category: "Pantry" }
     ],
-    instructions: "Slice ginger and place under fish. Steam 8 minutes. Top with scallions, soy sauce, and hot sesame oil."
+    instructions: "Slice ginger and place under fish. Steam 8 minutes. Top with scallions, soy sauce, and hot sesame oil.",
+    nutritionPerServing: { calories: 240, protein: 48, carbs: 2, fat: 4, fiber: 0, sodium: 540 }
   },
   {
     id: 4,
@@ -658,7 +661,8 @@ const sampleRecipes = [
       { name: "Banana", baseQuantity: 0.5, unit: "piece", category: "Fruit" },
       { name: "Peanut butter", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
-    instructions: "Mix oats, milk, and chia seeds in jar. Add sliced banana and peanut butter. Refrigerate overnight. Stir before eating."
+    instructions: "Mix oats, milk, and chia seeds in jar. Add sliced banana and peanut butter. Refrigerate overnight. Stir before eating.",
+    nutritionPerServing: { calories: 420, protein: 15, carbs: 54, fat: 16, fiber: 6, sodium: 95 }
   },
   {
     id: 5,
@@ -679,7 +683,8 @@ const sampleRecipes = [
       { name: "Onion", baseQuantity: 1, unit: "piece", category: "Vegetable" },
       { name: "Garlic cloves", baseQuantity: 3, unit: "pieces", category: "Vegetable" }
     ],
-    instructions: "Sauté vegetables until soft. Add lentils and broth. Simmer 20 minutes until lentils are tender. Season to taste."
+    instructions: "Sauté vegetables until soft. Add lentils and broth. Simmer 20 minutes until lentils are tender. Season to taste.",
+    nutritionPerServing: { calories: 145, protein: 9, carbs: 23, fat: 1, fiber: 6, sodium: 310 }
   },
   {
     id: 6,
@@ -705,7 +710,8 @@ const sampleRecipes = [
       { name: "Fish sauce", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 2 },
       { name: "Pechay or malunggay", baseQuantity: 1, unit: "handful", category: "Vegetable", pricePerUnit: 10 }
     ],
-    instructions: "Pressure Cook Method: 1. Add chicken, ginger, onion, sayote, water, fish sauce, salt/pepper 2. Set Pressure Cook: 10 minutes 3. Quick release 4. Stir in pechay or malunggay (let sit 2 mins to soften). Slow Cook Method: 1. Dump all ingredients except greens 2. Set Slow Cook: 6 hours (LOW) 3. Add greens in last 30 minutes"
+    instructions: "Pressure Cook Method: 1. Add chicken, ginger, onion, sayote, water, fish sauce, salt/pepper 2. Set Pressure Cook: 10 minutes 3. Quick release 4. Stir in pechay or malunggay (let sit 2 mins to soften). Slow Cook Method: 1. Dump all ingredients except greens 2. Set Slow Cook: 6 hours (LOW) 3. Add greens in last 30 minutes",
+    nutritionPerServing: { calories: 180, protein: 20, carbs: 4, fat: 8, fiber: 1, sodium: 420 }
   },
   {
     id: 7,
@@ -731,7 +737,8 @@ const sampleRecipes = [
       { name: "Olive oil", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 8 },
       { name: "Water or broth", baseQuantity: 2, unit: "tbsp", category: "Pantry", pricePerUnit: 2 }
     ],
-    instructions: "Pressure Cook Method: 1. Dump all ingredients in pot 2. Set Pressure Cook: 12 minutes 3. Natural or quick release 4. Optional: Air-fry or pan-sear after for crispy skin. Slow Cook Method: 1. Dump everything in 2. Set Slow Cook: 4-5 hours (LOW)"
+    instructions: "Pressure Cook Method: 1. Dump all ingredients in pot 2. Set Pressure Cook: 12 minutes 3. Natural or quick release 4. Optional: Air-fry or pan-sear after for crispy skin. Slow Cook Method: 1. Dump everything in 2. Set Slow Cook: 4-5 hours (LOW)",
+    nutritionPerServing: { calories: 335, protein: 26, carbs: 2, fat: 24, fiber: 0, sodium: 380 }
   },
   {
     id: 8,
@@ -757,7 +764,8 @@ const sampleRecipes = [
       { name: "Coconut milk", baseQuantity: 400, unit: "ml can", category: "Pantry", pricePerUnit: 45 },
       { name: "Fish sauce", baseQuantity: 2, unit: "tbsp", category: "Pantry", pricePerUnit: 4 }
     ],
-    instructions: "Pressure Cook Method: 1. Add meat, onion, ginger, kalabasa, coconut milk, fish sauce 2. Set Pressure Cook: 10-12 minutes 3. Quick release 4. Stir in sitaw → cover 2-3 minutes to soften. Slow Cook Method: 1. Add everything except sitaw 2. Set Slow Cook: 6 hours (LOW) 3. Add sitaw during last 30-45 mins"
+    instructions: "Pressure Cook Method: 1. Add meat, onion, ginger, kalabasa, coconut milk, fish sauce 2. Set Pressure Cook: 10-12 minutes 3. Quick release 4. Stir in sitaw → cover 2-3 minutes to soften. Slow Cook Method: 1. Add everything except sitaw 2. Set Slow Cook: 6 hours (LOW) 3. Add sitaw during last 30-45 mins",
+    nutritionPerServing: { calories: 380, protein: 22, carbs: 7, fat: 24, fiber: 2, sodium: 480 }
   },
   {
     id: 9,
@@ -784,7 +792,8 @@ const sampleRecipes = [
       { name: "Gochujang", baseQuantity: 1, unit: "tbsp", category: "Pantry", pricePerUnit: 15 },
       { name: "Fish sauce", baseQuantity: 1, unit: "tsp", category: "Pantry", pricePerUnit: 2 }
     ],
-    instructions: "Add all ingredients to pot. Pressure cook 15 minutes or slow cook 3-4 hours."
+    instructions: "Add all ingredients to pot. Pressure cook 15 minutes or slow cook 3-4 hours.",
+    nutritionPerServing: { calories: 215, protein: 15, carbs: 8, fat: 13, fiber: 2, sodium: 720 }
   },
   {
     id: 10,
@@ -813,7 +822,8 @@ const sampleRecipes = [
       { name: "Coconut milk", baseQuantity: 400, unit: "ml", category: "Pantry", pricePerUnit: 45 },
       { name: "Butter", baseQuantity: 100, unit: "g", category: "Dairy", pricePerUnit: 25 }
     ],
-    instructions: "Mix everything and slow cook for 4 hours. Season with salt and pepper before serving."
+    instructions: "Mix everything and slow cook for 4 hours. Season with salt and pepper before serving.",
+    nutritionPerServing: { calories: 520, protein: 42, carbs: 7, fat: 34, fiber: 1, sodium: 560 }
   },
   {
     id: 11,
@@ -841,7 +851,8 @@ const sampleRecipes = [
       { name: "Broccoli", baseQuantity: 1, unit: "head", category: "Vegetable", pricePerUnit: 50 },
       { name: "White rice", baseQuantity: 2, unit: "cups", category: "Grain", pricePerUnit: 15 }
     ],
-    instructions: "1. In crockpot, whisk together beef broth, soy sauce, sesame oil, minced garlic, and brown sugar. 2. Place slices of beef in liquid and toss to coat. 3. Cook on low heat for 4 hours. 4. After 4 hours, whisk together cornstarch and water. Pour into crock pot, add broccoli and stir. 5. Cook 30 minutes to cook broccoli and thicken sauce. 6. Serve with warm white rice."
+    instructions: "1. In crockpot, whisk together beef broth, soy sauce, sesame oil, minced garlic, and brown sugar. 2. Place slices of beef in liquid and toss to coat. 3. Cook on low heat for 4 hours. 4. After 4 hours, whisk together cornstarch and water. Pour into crock pot, add broccoli and stir. 5. Cook 30 minutes to cook broccoli and thicken sauce. 6. Serve with warm white rice.",
+    nutritionPerServing: { calories: 490, protein: 40, carbs: 32, fat: 15, fiber: 3, sodium: 680 }
   }
 ];
 
@@ -2407,6 +2418,10 @@ function renderNutritionTab() {
   filterRecipesByNutrition();
 }
 
+function openMissingNutritionHelp() {
+  alert('To add nutrition to a recipe:\n1. Click "📊 Set Nutrition" on any recipe card, OR go to My Recipes and click Edit.\n2. In the recipe form, use the "🔍 Look up nutrition data" search box (USDA Food Database).\n3. Search for your main ingredient, click a result to fill in the values, then save the recipe.');
+}
+
 function calculateDayNutrition(dayPlan) {
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
   const addRecipe = id => {
@@ -2590,7 +2605,12 @@ function filterRecipesByNutrition() {
     });
   }
   
-  resultsContainer.innerHTML = filteredRecipes.map(recipe => {
+  const missingCount = filteredRecipes.filter(r => !r.nutritionPerServing || r.nutritionPerServing.calories === 0).length;
+  const bulkBtn = missingCount > 0
+    ? `<div class="nutrition-bulk-action"><span>${missingCount} recipe${missingCount > 1 ? 's' : ''} missing nutrition data.</span> <button class="btn btn--secondary btn--sm" onclick="openMissingNutritionHelp()">How to add nutrition?</button></div>`
+    : '';
+
+  resultsContainer.innerHTML = bulkBtn + filteredRecipes.map(recipe => {
     const nutrition = calculateRecipeNutrition(recipe);
     const perServing = {
       calories: Math.round(nutrition.calories / recipe.currentServings),
@@ -2599,10 +2619,12 @@ function filterRecipesByNutrition() {
       fat: Math.round(nutrition.fat / recipe.currentServings),
       fiber: Math.round(nutrition.fiber / recipe.currentServings)
     };
-    
+    const hasNutrition = perServing.calories > 0;
+
     return `
       <div class="recipe-card">
         <h4>${recipe.name}</h4>
+        ${hasNutrition ? `
         <div class="nutrition-facts">
           <div class="nutrition-item">
             <span class="nutrition-item-value">${perServing.calories}</span>
@@ -2616,8 +2638,11 @@ function filterRecipesByNutrition() {
             <span class="nutrition-item-value">${perServing.carbs}g</span>
             <span class="nutrition-item-label">carbs</span>
           </div>
+        </div>` : `<p class="nutrition-missing-note">No nutrition data. <button class="btn-link" onclick="openEditRecipeModal(${recipe.id})">Add via recipe edit →</button></p>`}
+        <div class="recipe-card-actions">
+          <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning('${recipe.id}')">Add to Plan</button>
+          ${!hasNutrition ? `<button class="btn btn--secondary btn--sm" onclick="openEditRecipeModal(${recipe.id})">📊 Set Nutrition</button>` : ''}
         </div>
-        <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning('${recipe.id}')">Add to Plan</button>
       </div>
     `;
   }).join('');
@@ -2834,6 +2859,7 @@ window.deleteIngredient = deleteIngredient;
 window.openEditHackModal = openEditHackModal;
 window.deleteHack = deleteHack;
 window.filterRecipesByNutrition = filterRecipesByNutrition;
+window.openMissingNutritionHelp = openMissingNutritionHelp;
 window.getCategoryIcon = getCategoryIcon;
 window.showSuccessMessage = showSuccessMessage;
 window.clearLocalStorage = clearLocalStorage;
