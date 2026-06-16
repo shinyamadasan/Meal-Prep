@@ -2023,8 +2023,9 @@ function generateGroceryList() {
     });
   });
   
-  // Convert to grocery list format
-  AppState.groceryList = [];
+  // Convert to grocery list format. Keep manually-added custom items — only the
+  // meal-plan-generated items are rebuilt from the weekly plan.
+  AppState.groceryList = AppState.groceryList.filter(item => item.custom);
   Object.keys(ingredients).forEach(category => {
     Object.keys(ingredients[category]).forEach(name => {
       const item = ingredients[category][name];
@@ -2175,9 +2176,11 @@ function confirmCustomGroceryItem() {
     name,
     quantity,
     unit,
-    checked: false
+    checked: false,
+    custom: true   // manually added — must survive grocery-list regeneration
   });
 
+  saveData();
   closeCustomItemModal();
   renderGroceryList();
 }
