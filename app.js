@@ -3673,42 +3673,47 @@ async function shareRecipe() {
   }
 }
 
-// Enhanced load shared recipes with privacy filtering
+// Load shared recipes the user is allowed to see: all public recipes plus
+// their OWN family recipes. Uses two separate queries that the Firestore
+// security rules can verify, then merges them. A single
+// where('privacy','in',['public','family']) query would be rejected by the
+// secure rules because it could return other users' family recipes.
 async function loadSharedRecipes() {
   try {
-    const sharedRecipesRef = window.firebase.collection(window.firebase.db, 'sharedRecipes');
-    let q;
-    
+    const fb = window.firebase;
+    const ref = fb.collection(fb.db, 'sharedRecipes');
+
+    const queries = [
+      fb.query(ref, fb.where('privacy', '==', 'public'), fb.orderBy('sharedAt', 'desc'))
+    ];
     if (AppState.currentUser) {
-      // Show public recipes and family recipes
-      q = window.firebase.query(sharedRecipesRef, 
-        window.firebase.where('privacy', 'in', ['public', 'family']),
-        window.firebase.orderBy('sharedAt', 'desc'));
-    } else {
-      // Show only public recipes for non-authenticated users
-      q = window.firebase.query(sharedRecipesRef, 
-        window.firebase.where('privacy', '==', 'public'),
-        window.firebase.orderBy('sharedAt', 'desc'));
+      queries.push(
+        fb.query(ref, fb.where('familyGroupId', '==', AppState.currentUser.uid), fb.orderBy('sharedAt', 'desc'))
+      );
     }
-    
-    const querySnapshot = await window.firebase.getDocs(q);
-    
+
+    const snaps = await Promise.all(queries.map(function (q) { return fb.getDocs(q); }));
+    const seen = {};
+    const docs = [];
+    snaps.forEach(function (snap) {
+      snap.forEach(function (d) {
+        if (!seen[d.id]) { seen[d.id] = true; docs.push(d); }
+      });
+    });
+    docs.sort(function (a, b) {
+      return (b.data().sharedAt || '').localeCompare(a.data().sharedAt || '');
+    });
+
     const sharedRecipesList = document.getElementById('shared-recipes-list');
     sharedRecipesList.innerHTML = '';
-    
-    if (querySnapshot.empty) {
+
+    if (docs.length === 0) {
       sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes available</p>';
       return;
     }
-    
-    querySnapshot.forEach((doc) => {
+
+    docs.forEach((doc) => {
       const recipe = doc.data();
-      
-      // Filter family recipes to only show those from the same family group
-      if (recipe.privacy === 'family' && recipe.familyGroupId !== AppState.currentUser.uid) {
-        return;
-      }
-      
       const recipeItem = document.createElement('div');
       recipeItem.className = 'shared-recipe-item';
       recipeItem.innerHTML = `

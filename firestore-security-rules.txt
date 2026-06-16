@@ -15,28 +15,62 @@ Copy and paste these rules into your Firebase Console > Firestore > Rules:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users can only access their own personal data
+
+    // Each user's private data — only the owner can read/write.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Shared recipes - read access for authenticated users, write for owners
+
+    // Shared recipes.
+    //   Read   — public recipes are visible to any signed-in user; family
+    //            recipes are visible ONLY to the family owner (enforced at the
+    //            database, not just in the browser).
+    //   Create — you may only share AS yourself, and a family share must be
+    //            under your own family group (no spoofing someone else).
+    //   Update / Delete — only the original sharer.
     match /sharedRecipes/{recipeId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        (resource == null || resource.data.sharedBy == request.auth.token.email);
+      allow read: if request.auth != null && (
+        resource.data.privacy == 'public' ||
+        resource.data.familyGroupId == request.auth.uid
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.sharedBy == request.auth.token.email &&
+        (request.resource.data.privacy != 'family' ||
+         request.resource.data.familyGroupId == request.auth.uid);
+      allow update, delete: if request.auth != null &&
+        resource.data.sharedBy == request.auth.token.email;
     }
-    
-    // Family invitations - users can read/write their own invitations
+
+    // Family invitations — visible to the inviter and to the invited email.
+    // Create only under your own family group.
     match /familyInvitations/{invitationId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.familyGroupId == request.auth.uid || 
-         resource.data.toEmail == request.auth.token.email);
+      allow read: if request.auth != null && (
+        resource.data.familyGroupId == request.auth.uid ||
+        resource.data.toEmail == request.auth.token.email
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.familyGroupId == request.auth.uid;
+      allow update, delete: if request.auth != null && (
+        resource.data.familyGroupId == request.auth.uid ||
+        resource.data.toEmail == request.auth.token.email
+      );
     }
   }
 }
 ```
+
+> **Note — the family-privacy fix.** The previous version used
+> `allow read: if request.auth != null` on `sharedRecipes`, which let *any*
+> signed-in user read *every* shared recipe — including ones marked "family".
+> The privacy was only hidden in the browser. The rule above enforces it at the
+> database: family recipes are readable only by their owner.
+>
+> **Note — composite indexes.** The app now loads shared recipes with two
+> queries: `where('privacy','==','public')` and
+> `where('familyGroupId','==',<uid>)`, each ordered by `sharedAt`. The first
+> time you open **Shared Recipes** after deploying, Firestore may throw an error
+> with a link to auto-create the required composite index — click it, wait ~1
+> min, and reload.
 
 ## Security Features Explained
 
