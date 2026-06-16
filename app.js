@@ -59,6 +59,7 @@ function loadFromLocalStorage() {
     if (saved) {
       const data = JSON.parse(saved);
       AppState.recipes = data.recipes || [];
+      patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -92,6 +93,19 @@ function loadFromLocalStorage() {
     showErrorMessage('Failed to load saved data. Starting with fresh data.');
   }
   return false;
+}
+
+// Patches nutrition data into sample recipes that were saved before nutrition was added.
+// Safe to call after every load — only fills gaps, never overwrites user-entered data.
+function patchMissingNutrition(recipes) {
+  recipes.forEach(function(recipe) {
+    if (!recipe.nutritionPerServing || recipe.nutritionPerServing.calories === 0) {
+      var source = sampleRecipes.find(function(s) { return s.id === recipe.id; });
+      if (source && source.nutritionPerServing) {
+        recipe.nutritionPerServing = source.nutritionPerServing;
+      }
+    }
+  });
 }
 
 function clearLocalStorage() {
@@ -3084,6 +3098,7 @@ async function loadFromFirestore() {
     if (docSnap.exists()) {
       const data = docSnap.data();
       AppState.recipes = data.recipes || [];
+      patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -3104,7 +3119,7 @@ async function loadFromFirestore() {
       };
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
-      
+
       console.log('Data loaded from Firestore');
       showSuccessMessage('Data synced from cloud!');
       return true;
@@ -3155,6 +3170,7 @@ function setupRealtimeListeners() {
       // Only update if data is different to avoid infinite loops
       if (JSON.stringify(data.recipes) !== JSON.stringify(AppState.recipes)) {
         AppState.recipes = data.recipes || [];
+        patchMissingNutrition(AppState.recipes);
         AppState.weeklyPlan = data.weeklyPlan || AppState.weeklyPlan;
         AppState.groceryList = data.groceryList || [];
         AppState.nutritionGoals = data.nutritionGoals || AppState.nutritionGoals;
