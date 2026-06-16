@@ -2638,10 +2638,10 @@ function filterRecipesByNutrition() {
             <span class="nutrition-item-value">${perServing.carbs}g</span>
             <span class="nutrition-item-label">carbs</span>
           </div>
-        </div>` : `<p class="nutrition-missing-note">No nutrition data. <button class="btn-link" onclick="openEditRecipeModal(${recipe.id})">Add via recipe edit →</button></p>`}
+        </div>` : `<p class="nutrition-missing-note">No nutrition data. <button class="btn-link" onclick="openEditRecipeModal('${recipe.id}')">Add via recipe edit →</button></p>`}
         <div class="recipe-card-actions">
           <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning('${recipe.id}')">Add to Plan</button>
-          ${!hasNutrition ? `<button class="btn btn--secondary btn--sm" onclick="openEditRecipeModal(${recipe.id})">📊 Set Nutrition</button>` : ''}
+          ${!hasNutrition ? `<button class="btn btn--secondary btn--sm" onclick="openEditRecipeModal('${recipe.id}')">📊 Set Nutrition</button>` : ''}
         </div>
       </div>
     `;
@@ -2860,6 +2860,7 @@ window.openEditHackModal = openEditHackModal;
 window.deleteHack = deleteHack;
 window.filterRecipesByNutrition = filterRecipesByNutrition;
 window.openMissingNutritionHelp = openMissingNutritionHelp;
+window.searchUSDAFallback = searchUSDAFallback;
 window.getCategoryIcon = getCategoryIcon;
 window.showSuccessMessage = showSuccessMessage;
 window.clearLocalStorage = clearLocalStorage;
@@ -4686,7 +4687,124 @@ function lookupPantryKnowledge(name) {
 
 
 
-// ── Nutrition Database Search (USDA FoodData Central) ─────────────────────────
+// ── Local Nutrition Database (per 100g unless noted) ──────────────────────────
+
+const LOCAL_NUTRITION_DB = [
+  // Proteins
+  { name: 'Chicken Breast', calories: 165, protein: 31, carbs: 0, fat: 3.6, fiber: 0, sodium: 74 },
+  { name: 'Chicken Thigh', calories: 209, protein: 26, carbs: 0, fat: 11, fiber: 0, sodium: 84 },
+  { name: 'Chicken Leg', calories: 184, protein: 22, carbs: 0, fat: 10, fiber: 0, sodium: 79 },
+  { name: 'Whole Chicken', calories: 215, protein: 18, carbs: 0, fat: 15, fiber: 0, sodium: 70 },
+  { name: 'Ground Chicken', calories: 170, protein: 21, carbs: 0, fat: 9, fiber: 0, sodium: 80 },
+  { name: 'Pork Belly', calories: 518, protein: 9, carbs: 0, fat: 53, fiber: 0, sodium: 39 },
+  { name: 'Ground Pork', calories: 297, protein: 17, carbs: 0, fat: 25, fiber: 0, sodium: 63 },
+  { name: 'Pork Chop', calories: 231, protein: 25, carbs: 0, fat: 14, fiber: 0, sodium: 62 },
+  { name: 'Pork Shoulder', calories: 215, protein: 19, carbs: 0, fat: 15, fiber: 0, sodium: 60 },
+  { name: 'Pork Liver', calories: 134, protein: 21, carbs: 3.8, fat: 3.7, fiber: 0, sodium: 87 },
+  { name: 'Ground Beef', calories: 254, protein: 17, carbs: 0, fat: 20, fiber: 0, sodium: 75 },
+  { name: 'Beef', calories: 250, protein: 26, carbs: 0, fat: 17, fiber: 0, sodium: 55 },
+  { name: 'Beef Brisket', calories: 292, protein: 18, carbs: 0, fat: 24, fiber: 0, sodium: 66 },
+  { name: 'Sirloin Steak', calories: 207, protein: 26, carbs: 0, fat: 11, fiber: 0, sodium: 59 },
+  { name: 'Shrimp', calories: 99, protein: 24, carbs: 0, fat: 0.3, fiber: 0, sodium: 111 },
+  { name: 'Bangus', calories: 148, protein: 20, carbs: 0, fat: 7, fiber: 0, sodium: 78 },
+  { name: 'Tilapia', calories: 96, protein: 20, carbs: 0, fat: 2, fiber: 0, sodium: 56 },
+  { name: 'Salmon', calories: 208, protein: 20, carbs: 0, fat: 13, fiber: 0, sodium: 59 },
+  { name: 'Tuna', calories: 144, protein: 23, carbs: 0, fat: 5, fiber: 0, sodium: 47 },
+  { name: 'Tuna Canned', calories: 116, protein: 25, carbs: 0, fat: 1, fiber: 0, sodium: 368 },
+  { name: 'Sardines', calories: 208, protein: 25, carbs: 0, fat: 11, fiber: 0, sodium: 307 },
+  { name: 'Galunggong', calories: 121, protein: 20, carbs: 0, fat: 4, fiber: 0, sodium: 68 },
+  { name: 'Squid', calories: 92, protein: 16, carbs: 3, fat: 1.4, fiber: 0, sodium: 44 },
+  { name: 'Mussels', calories: 86, protein: 12, carbs: 4, fat: 2.2, fiber: 0, sodium: 286 },
+  { name: 'Eggs', calories: 155, protein: 13, carbs: 1.1, fat: 11, fiber: 0, sodium: 124 },
+  { name: 'Tofu', calories: 76, protein: 8, carbs: 1.9, fat: 4.8, fiber: 0.3, sodium: 7 },
+  { name: 'Longganisa', calories: 290, protein: 12, carbs: 8, fat: 24, fiber: 0, sodium: 520 },
+  { name: 'Bacon', calories: 541, protein: 37, carbs: 1.4, fat: 42, fiber: 0, sodium: 1717 },
+  { name: 'Corned Beef', calories: 251, protein: 15, carbs: 1, fat: 20, fiber: 0, sodium: 973 },
+  // Vegetables
+  { name: 'Garlic', calories: 149, protein: 6.4, carbs: 33, fat: 0.5, fiber: 2.1, sodium: 17 },
+  { name: 'Onion', calories: 40, protein: 1.1, carbs: 9.3, fat: 0.1, fiber: 1.7, sodium: 4 },
+  { name: 'Tomato', calories: 18, protein: 0.9, carbs: 3.9, fat: 0.2, fiber: 1.2, sodium: 5 },
+  { name: 'Potato', calories: 77, protein: 2, carbs: 17, fat: 0.1, fiber: 2.2, sodium: 6 },
+  { name: 'Sweet Potato', calories: 86, protein: 1.6, carbs: 20, fat: 0.1, fiber: 3, sodium: 55 },
+  { name: 'Carrot', calories: 41, protein: 0.9, carbs: 10, fat: 0.2, fiber: 2.8, sodium: 69 },
+  { name: 'Cabbage', calories: 25, protein: 1.3, carbs: 5.8, fat: 0.1, fiber: 2.5, sodium: 18 },
+  { name: 'Kangkong', calories: 19, protein: 2.6, carbs: 2.1, fat: 0.2, fiber: 2, sodium: 113 },
+  { name: 'Pechay', calories: 13, protein: 1.5, carbs: 2.2, fat: 0.2, fiber: 1, sodium: 65 },
+  { name: 'Spinach', calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4, fiber: 2.2, sodium: 79 },
+  { name: 'Ampalaya', calories: 17, protein: 1, carbs: 3.7, fat: 0.2, fiber: 2.8, sodium: 5 },
+  { name: 'Eggplant', calories: 25, protein: 1, carbs: 5.9, fat: 0.2, fiber: 3, sodium: 2 },
+  { name: 'Sitaw', calories: 47, protein: 2.6, carbs: 10, fat: 0.3, fiber: 3.7, sodium: 6 },
+  { name: 'Okra', calories: 33, protein: 1.9, carbs: 7, fat: 0.2, fiber: 3.2, sodium: 7 },
+  { name: 'Kalabasa', calories: 26, protein: 1, carbs: 6.5, fat: 0.1, fiber: 0.5, sodium: 1 },
+  { name: 'Malunggay', calories: 64, protein: 9.4, carbs: 8.3, fat: 1.4, fiber: 2, sodium: 9 },
+  { name: 'Bell Pepper', calories: 31, protein: 1, carbs: 6, fat: 0.3, fiber: 2.1, sodium: 4 },
+  { name: 'Broccoli', calories: 34, protein: 2.8, carbs: 7, fat: 0.4, fiber: 2.6, sodium: 33 },
+  { name: 'Mushroom', calories: 22, protein: 3.1, carbs: 3.3, fat: 0.3, fiber: 1, sodium: 5 },
+  { name: 'Corn', calories: 86, protein: 3.3, carbs: 19, fat: 1.4, fiber: 2.7, sodium: 15 },
+  { name: 'Ginger', calories: 80, protein: 1.8, carbs: 18, fat: 0.8, fiber: 2, sodium: 13 },
+  { name: 'Bok Choy', calories: 13, protein: 1.5, carbs: 2.2, fat: 0.2, fiber: 1, sodium: 65 },
+  { name: 'Celery', calories: 16, protein: 0.7, carbs: 3, fat: 0.2, fiber: 1.6, sodium: 80 },
+  { name: 'Cauliflower', calories: 25, protein: 1.9, carbs: 5, fat: 0.3, fiber: 2, sodium: 30 },
+  { name: 'Bean Sprouts', calories: 30, protein: 3, carbs: 5.9, fat: 0.2, fiber: 1.8, sodium: 6 },
+  // Fruits
+  { name: 'Banana', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, fiber: 2.6, sodium: 1 },
+  { name: 'Mango', calories: 60, protein: 0.8, carbs: 15, fat: 0.4, fiber: 1.6, sodium: 1 },
+  { name: 'Pineapple', calories: 50, protein: 0.5, carbs: 13, fat: 0.1, fiber: 1.4, sodium: 1 },
+  { name: 'Avocado', calories: 160, protein: 2, carbs: 9, fat: 15, fiber: 6.7, sodium: 7 },
+  { name: 'Papaya', calories: 43, protein: 0.5, carbs: 11, fat: 0.3, fiber: 1.7, sodium: 8 },
+  { name: 'Coconut Meat', calories: 354, protein: 3.3, carbs: 15, fat: 33, fiber: 9, sodium: 20 },
+  // Grains & Starches
+  { name: 'White Rice (cooked)', calories: 130, protein: 2.7, carbs: 28, fat: 0.3, fiber: 0.4, sodium: 1 },
+  { name: 'Brown Rice (cooked)', calories: 123, protein: 2.7, carbs: 26, fat: 1, fiber: 1.8, sodium: 5 },
+  { name: 'Pasta (cooked)', calories: 158, protein: 5.8, carbs: 31, fat: 0.9, fiber: 1.8, sodium: 1 },
+  { name: 'All-Purpose Flour', calories: 364, protein: 10, carbs: 76, fat: 1, fiber: 2.7, sodium: 2 },
+  { name: 'Cornstarch', calories: 381, protein: 0.3, carbs: 91, fat: 0.1, fiber: 0.9, sodium: 9 },
+  { name: 'Pandesal', calories: 270, protein: 8, carbs: 50, fat: 4, fiber: 1.5, sodium: 400 },
+  { name: 'Bread', calories: 265, protein: 9, carbs: 49, fat: 3.2, fiber: 2.7, sodium: 491 },
+  // Dairy
+  { name: 'Milk', calories: 61, protein: 3.2, carbs: 4.8, fat: 3.3, fiber: 0, sodium: 43 },
+  { name: 'Evaporated Milk', calories: 134, protein: 6.8, carbs: 10, fat: 7.6, fiber: 0, sodium: 106 },
+  { name: 'Condensed Milk', calories: 321, protein: 7.9, carbs: 54, fat: 8.7, fiber: 0, sodium: 127 },
+  { name: 'Butter', calories: 717, protein: 0.9, carbs: 0.1, fat: 81, fiber: 0, sodium: 576 },
+  { name: 'Cheese', calories: 402, protein: 25, carbs: 1.3, fat: 33, fiber: 0, sodium: 621 },
+  { name: 'Cream Cheese', calories: 342, protein: 6, carbs: 4.1, fat: 34, fiber: 0, sodium: 321 },
+  { name: 'Cream', calories: 340, protein: 2.8, carbs: 2.8, fat: 36, fiber: 0, sodium: 38 },
+  { name: 'Yogurt', calories: 59, protein: 3.5, carbs: 3.6, fat: 3.3, fiber: 0, sodium: 36 },
+  { name: 'Greek Yogurt', calories: 97, protein: 9, carbs: 3.6, fat: 5, fiber: 0, sodium: 36 },
+  { name: 'Coconut Milk', calories: 230, protein: 2.3, carbs: 6, fat: 24, fiber: 0, sodium: 15 },
+  { name: 'Coconut Cream', calories: 330, protein: 3.6, carbs: 7, fat: 35, fiber: 0, sodium: 17 },
+  // Pantry
+  { name: 'Cooking Oil', calories: 884, protein: 0, carbs: 0, fat: 100, fiber: 0, sodium: 0 },
+  { name: 'Olive Oil', calories: 884, protein: 0, carbs: 0, fat: 100, fiber: 0, sodium: 2 },
+  { name: 'Sesame Oil', calories: 884, protein: 0, carbs: 0, fat: 100, fiber: 0, sodium: 0 },
+  { name: 'Soy Sauce', calories: 53, protein: 8.1, carbs: 5, fat: 0.1, fiber: 0.8, sodium: 5493 },
+  { name: 'Fish Sauce', calories: 35, protein: 5, carbs: 3.6, fat: 0, fiber: 0, sodium: 5670 },
+  { name: 'Oyster Sauce', calories: 51, protein: 0.9, carbs: 10.8, fat: 0.2, fiber: 0, sodium: 2733 },
+  { name: 'Vinegar', calories: 18, protein: 0, carbs: 0.6, fat: 0, fiber: 0, sodium: 2 },
+  { name: 'Tomato Sauce', calories: 29, protein: 1.6, carbs: 6.2, fat: 0.3, fiber: 1.5, sodium: 397 },
+  { name: 'Tomato Paste', calories: 82, protein: 4.3, carbs: 19, fat: 0.5, fiber: 4.3, sodium: 59 },
+  { name: 'Sugar', calories: 387, protein: 0, carbs: 100, fat: 0, fiber: 0, sodium: 1 },
+  { name: 'Brown Sugar', calories: 380, protein: 0, carbs: 98, fat: 0, fiber: 0, sodium: 28 },
+  { name: 'Salt', calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 38758 },
+  { name: 'Mayonnaise', calories: 680, protein: 1, carbs: 5, fat: 75, fiber: 0, sodium: 635 },
+  { name: 'Ketchup', calories: 112, protein: 1.3, carbs: 28, fat: 0.1, fiber: 0.3, sodium: 1040 },
+  { name: 'Hoisin Sauce', calories: 220, protein: 3.5, carbs: 46, fat: 2.3, fiber: 1.8, sodium: 1750 },
+  { name: 'Bagoong', calories: 130, protein: 20, carbs: 2, fat: 4, fiber: 0, sodium: 4200 },
+  { name: 'Lentils (cooked)', calories: 116, protein: 9, carbs: 20, fat: 0.4, fiber: 7.9, sodium: 2 },
+  { name: 'Chickpeas (cooked)', calories: 164, protein: 8.9, carbs: 27, fat: 2.6, fiber: 7.6, sodium: 7 },
+  { name: 'Kimchi', calories: 15, protein: 1.1, carbs: 2.4, fat: 0.5, fiber: 1.6, sodium: 498 },
+  { name: 'Gochujang', calories: 175, protein: 5, carbs: 35, fat: 2, fiber: 1.5, sodium: 1490 },
+  { name: 'Tamarind', calories: 239, protein: 2.8, carbs: 63, fat: 0.6, fiber: 5.1, sodium: 28 },
+];
+
+function searchLocalNutrition(query) {
+  var q = query.toLowerCase();
+  return LOCAL_NUTRITION_DB.filter(function(item) {
+    return item.name.toLowerCase().includes(q);
+  }).slice(0, 8);
+}
+
+// ── Nutrition Search (local DB first, USDA as fallback) ────────────────────────
 
 const USDA_KEY = 'DEMO_KEY';
 const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
@@ -4698,7 +4816,14 @@ async function searchNutritionDB() {
 
   const resultsEl = document.getElementById('nutrition-db-results');
   resultsEl.classList.remove('hidden');
-  resultsEl.innerHTML = '<div class="nutrition-db-loading">Searching…</div>';
+
+  const localResults = searchLocalNutrition(query);
+  if (localResults.length > 0) {
+    renderLocalNutritionResults(localResults, query);
+    return;
+  }
+
+  resultsEl.innerHTML = '<div class="nutrition-db-loading">Not in local DB. Searching USDA…</div>';
 
   try {
     const params = new URLSearchParams({
@@ -4712,13 +4837,61 @@ async function searchNutritionDB() {
     const data = await res.json();
 
     if (!data.foods || data.foods.length === 0) {
-      resultsEl.innerHTML = '<div class="nutrition-db-empty">No results. Try a more general term (e.g. "chicken" instead of "chicken adobo").</div>';
+      resultsEl.innerHTML = '<div class="nutrition-db-empty">No results. Try a simpler term (e.g. "chicken" not "chicken adobo").</div>';
       return;
     }
 
-    renderNutritionDBResults(data.foods);
+    renderUSDANutritionResults(data.foods);
   } catch (e) {
-    resultsEl.innerHTML = '<div class="nutrition-db-error">Search failed. Check your connection and try again.</div>';
+    resultsEl.innerHTML = '<div class="nutrition-db-error">USDA search failed. Check your connection.</div>';
+  }
+}
+
+function renderLocalNutritionResults(items, query) {
+  var resultsEl = document.getElementById('nutrition-db-results');
+  var html = '<div class="nutrition-db-source">📦 Local database (instant)</div>';
+
+  items.forEach(function(item) {
+    html += '<div class="nutrition-db-item" onclick="applyNutritionResult(' + item.calories + ',' + item.protein + ',' + item.carbs + ',' + item.fat + ')">';
+    html += '<div class="nutrition-db-item-name">' + item.name + '</div>';
+    html += '<div class="nutrition-db-item-values">';
+    html += '<span class="nv-cal">' + item.calories + ' kcal</span>';
+    html += '<span>P ' + item.protein + 'g</span>';
+    html += '<span>C ' + item.carbs + 'g</span>';
+    html += '<span>F ' + item.fat + 'g</span>';
+    html += '<span class="nutrition-db-per">per 100g</span>';
+    html += '</div></div>';
+  });
+
+  html += '<div class="nutrition-db-usda-link"><button class="btn-link" onclick="searchUSDAFallback()">Not what you need? Search USDA online →</button></div>';
+  resultsEl.innerHTML = html;
+}
+
+async function searchUSDAFallback() {
+  const input = document.getElementById('nutrition-db-query');
+  const query = input ? input.value.trim() : '';
+  if (!query) return;
+
+  const resultsEl = document.getElementById('nutrition-db-results');
+  resultsEl.innerHTML = '<div class="nutrition-db-loading">Searching USDA…</div>';
+
+  try {
+    const params = new URLSearchParams({
+      query: query,
+      pageSize: '10',
+      dataType: 'Survey (FNDDS),Foundation,SR Legacy',
+      api_key: USDA_KEY
+    });
+    const res = await fetch(USDA_URL + '?' + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.foods || data.foods.length === 0) {
+      resultsEl.innerHTML = '<div class="nutrition-db-empty">No USDA results either. Try a different search term.</div>';
+      return;
+    }
+    renderUSDANutritionResults(data.foods);
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="nutrition-db-error">USDA search failed. Check your connection.</div>';
   }
 }
 
@@ -4727,9 +4900,9 @@ function getNutrientVal(nutrients, id) {
   return n ? Math.round(n.value) : 0;
 }
 
-function renderNutritionDBResults(foods) {
+function renderUSDANutritionResults(foods) {
   var resultsEl = document.getElementById('nutrition-db-results');
-  var html = '';
+  var html = '<div class="nutrition-db-source">📡 USDA FoodData Central</div>';
 
   foods.forEach(function(food) {
     var cal  = getNutrientVal(food.foodNutrients, 1008);
@@ -4761,6 +4934,10 @@ function renderNutritionDBResults(foods) {
   resultsEl.innerHTML = html;
 }
 
+function renderNutritionDBResults(foods) {
+  renderUSDANutritionResults(foods);
+}
+
 function applyNutritionResult(cal, pro, carb, fat) {
   document.getElementById('nutrition-calories').value = cal || '';
   document.getElementById('nutrition-protein').value  = pro  || '';
@@ -4779,164 +4956,164 @@ function applyNutritionResult(cal, pro, carb, fat) {
 
 const INGREDIENT_DB = [
   // Proteins
-  { name: 'Chicken Breast', unit: 'g', category: 'Protein' },
-  { name: 'Chicken Thigh', unit: 'g', category: 'Protein' },
-  { name: 'Chicken Leg', unit: 'pieces', category: 'Protein' },
-  { name: 'Ground Chicken', unit: 'g', category: 'Protein' },
-  { name: 'Whole Chicken', unit: 'g', category: 'Protein' },
-  { name: 'Pork Belly (Liempo)', unit: 'g', category: 'Protein' },
-  { name: 'Ground Pork', unit: 'g', category: 'Protein' },
-  { name: 'Pork Chop', unit: 'g', category: 'Protein' },
-  { name: 'Pork Ribs', unit: 'g', category: 'Protein' },
-  { name: 'Pork Shoulder', unit: 'g', category: 'Protein' },
-  { name: 'Pork Liver', unit: 'g', category: 'Protein' },
-  { name: 'Ground Beef', unit: 'g', category: 'Protein' },
-  { name: 'Beef', unit: 'g', category: 'Protein' },
-  { name: 'Beef Brisket', unit: 'g', category: 'Protein' },
-  { name: 'Shrimp', unit: 'g', category: 'Protein' },
-  { name: 'Bangus (Milkfish)', unit: 'g', category: 'Protein' },
-  { name: 'Tilapia', unit: 'g', category: 'Protein' },
-  { name: 'Salmon', unit: 'g', category: 'Protein' },
-  { name: 'Tuna', unit: 'g', category: 'Protein' },
-  { name: 'Galunggong', unit: 'g', category: 'Protein' },
-  { name: 'Squid (Pusit)', unit: 'g', category: 'Protein' },
-  { name: 'Crab', unit: 'pieces', category: 'Protein' },
-  { name: 'Mussels (Tahong)', unit: 'g', category: 'Protein' },
-  { name: 'Clams (Halaan)', unit: 'g', category: 'Protein' },
-  { name: 'Eggs', unit: 'pieces', category: 'Protein' },
-  { name: 'Tofu (Tokwa)', unit: 'g', category: 'Protein' },
-  { name: 'Longganisa', unit: 'pieces', category: 'Protein' },
-  { name: 'Hotdog', unit: 'pieces', category: 'Protein' },
-  { name: 'Bacon', unit: 'g', category: 'Protein' },
-  { name: 'Ham', unit: 'g', category: 'Protein' },
-  { name: 'Sardines (Canned)', unit: 'can', category: 'Protein' },
-  { name: 'Tuna (Canned)', unit: 'can', category: 'Protein' },
-  { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein' },
+  { name: 'Chicken Breast', unit: 'g', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Chicken Thigh', unit: 'g', category: 'Protein', price: '₱180/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Chicken Leg', unit: 'pieces', category: 'Protein', price: '₱55/pc', store: 'Wet Market / Supermarket' },
+  { name: 'Ground Chicken', unit: 'g', category: 'Protein', price: '₱220/kg', store: 'Supermarket' },
+  { name: 'Whole Chicken', unit: 'g', category: 'Protein', price: '₱160/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Pork Belly (Liempo)', unit: 'g', category: 'Protein', price: '₱280/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Ground Pork', unit: 'g', category: 'Protein', price: '₱230/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Pork Chop', unit: 'g', category: 'Protein', price: '₱260/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Pork Ribs', unit: 'g', category: 'Protein', price: '₱300/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Pork Shoulder', unit: 'g', category: 'Protein', price: '₱220/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Pork Liver', unit: 'g', category: 'Protein', price: '₱120/kg', store: 'Wet Market' },
+  { name: 'Ground Beef', unit: 'g', category: 'Protein', price: '₱320/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Beef', unit: 'g', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Beef Brisket', unit: 'g', category: 'Protein', price: '₱380/kg', store: 'Supermarket' },
+  { name: 'Shrimp', unit: 'g', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Seafood Market' },
+  { name: 'Bangus (Milkfish)', unit: 'g', category: 'Protein', price: '₱140/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Tilapia', unit: 'g', category: 'Protein', price: '₱120/kg', store: 'Wet Market' },
+  { name: 'Salmon', unit: 'g', category: 'Protein', price: '₱600/kg', store: 'Supermarket / S&R' },
+  { name: 'Tuna', unit: 'g', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Galunggong', unit: 'g', category: 'Protein', price: '₱90/kg', store: 'Wet Market' },
+  { name: 'Squid (Pusit)', unit: 'g', category: 'Protein', price: '₱200/kg', store: 'Wet Market' },
+  { name: 'Crab', unit: 'pieces', category: 'Protein', price: '₱80–150/pc', store: 'Wet Market / Seafood Market' },
+  { name: 'Mussels (Tahong)', unit: 'g', category: 'Protein', price: '₱60/kg', store: 'Wet Market' },
+  { name: 'Clams (Halaan)', unit: 'g', category: 'Protein', price: '₱80/kg', store: 'Wet Market' },
+  { name: 'Eggs', unit: 'pieces', category: 'Protein', price: '₱10/pc', store: 'Grocery / Supermarket' },
+  { name: 'Tofu (Tokwa)', unit: 'g', category: 'Protein', price: '₱35/block', store: 'Wet Market / Grocery' },
+  { name: 'Longganisa', unit: 'pieces', category: 'Protein', price: '₱80/pack', store: 'Supermarket / Grocery' },
+  { name: 'Hotdog', unit: 'pieces', category: 'Protein', price: '₱60/pack', store: 'Supermarket / Grocery' },
+  { name: 'Bacon', unit: 'g', category: 'Protein', price: '₱250/200g', store: 'Supermarket' },
+  { name: 'Ham', unit: 'g', category: 'Protein', price: '₱300/kg', store: 'Supermarket' },
+  { name: 'Sardines (Canned)', unit: 'can', category: 'Protein', price: '₱30/can', store: 'Any Store' },
+  { name: 'Tuna (Canned)', unit: 'can', category: 'Protein', price: '₱55/can', store: 'Any Store' },
+  { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein', price: '₱75/can', store: 'Any Store' },
 
   // Vegetables
-  { name: 'Garlic (Bawang)', unit: 'cloves', category: 'Vegetable' },
-  { name: 'Onion (Sibuyas)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Red Onion', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Shallots', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Tomato (Kamatis)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Potato (Patatas)', unit: 'g', category: 'Vegetable' },
-  { name: 'Sweet Potato (Kamote)', unit: 'g', category: 'Vegetable' },
-  { name: 'Carrot (Karot)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Cabbage (Repolyo)', unit: 'g', category: 'Vegetable' },
-  { name: 'Kangkong', unit: 'bunches', category: 'Vegetable' },
-  { name: 'Pechay', unit: 'bunches', category: 'Vegetable' },
-  { name: 'Spinach', unit: 'g', category: 'Vegetable' },
-  { name: 'Ampalaya (Bitter Melon)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Talong (Eggplant)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Sitaw (String Beans)', unit: 'g', category: 'Vegetable' },
-  { name: 'Okra', unit: 'g', category: 'Vegetable' },
-  { name: 'Malunggay (Moringa)', unit: 'cups', category: 'Vegetable' },
-  { name: 'Kalabasa (Squash)', unit: 'g', category: 'Vegetable' },
-  { name: 'Upo (Bottle Gourd)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Patola (Sponge Gourd)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Bell Pepper', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Green Bell Pepper', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable' },
-  { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable' },
-  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable' },
-  { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable' },
-  { name: 'Mushroom', unit: 'g', category: 'Vegetable' },
-  { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Cucumber', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Lettuce', unit: 'g', category: 'Vegetable' },
-  { name: 'Broccoli', unit: 'g', category: 'Vegetable' },
-  { name: 'Cauliflower', unit: 'g', category: 'Vegetable' },
-  { name: 'Chili (Siling Labuyo)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Siling Haba (Long Green Chili)', unit: 'pieces', category: 'Vegetable' },
-  { name: 'Bean Sprouts (Toge)', unit: 'g', category: 'Vegetable' },
-  { name: 'Bok Choy', unit: 'g', category: 'Vegetable' },
+  { name: 'Garlic (Bawang)', unit: 'cloves', category: 'Vegetable', price: '₱80/100g', store: 'Wet Market / Grocery' },
+  { name: 'Onion (Sibuyas)', unit: 'pieces', category: 'Vegetable', price: '₱80/kg', store: 'Wet Market / Grocery' },
+  { name: 'Red Onion', unit: 'pieces', category: 'Vegetable', price: '₱90/kg', store: 'Wet Market / Grocery' },
+  { name: 'Shallots', unit: 'pieces', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market' },
+  { name: 'Tomato (Kamatis)', unit: 'pieces', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market / Grocery' },
+  { name: 'Potato (Patatas)', unit: 'g', category: 'Vegetable', price: '₱70/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Sweet Potato (Kamote)', unit: 'g', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market' },
+  { name: 'Carrot (Karot)', unit: 'pieces', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market / Grocery' },
+  { name: 'Cabbage (Repolyo)', unit: 'g', category: 'Vegetable', price: '₱40/kg', store: 'Wet Market / Grocery' },
+  { name: 'Kangkong', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market' },
+  { name: 'Pechay', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market / Grocery' },
+  { name: 'Spinach', unit: 'g', category: 'Vegetable', price: '₱80/200g', store: 'Supermarket' },
+  { name: 'Ampalaya (Bitter Melon)', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market' },
+  { name: 'Talong (Eggplant)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery' },
+  { name: 'Sitaw (String Beans)', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market' },
+  { name: 'Okra', unit: 'g', category: 'Vegetable', price: '₱40/250g', store: 'Wet Market / Grocery' },
+  { name: 'Malunggay (Moringa)', unit: 'cups', category: 'Vegetable', price: '₱10/bunch', store: 'Wet Market' },
+  { name: 'Kalabasa (Squash)', unit: 'g', category: 'Vegetable', price: '₱30/kg', store: 'Wet Market' },
+  { name: 'Upo (Bottle Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market' },
+  { name: 'Patola (Sponge Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market' },
+  { name: 'Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market / Supermarket' },
+  { name: 'Green Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱25/pc', store: 'Wet Market / Grocery' },
+  { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱35/pc', store: 'Wet Market / Supermarket' },
+  { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable', price: '₱20/bundle', store: 'Wet Market / Grocery' },
+  { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable', price: '₱15/bundle', store: 'Wet Market / Grocery' },
+  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable', price: '₱60/100g', store: 'Wet Market / Grocery' },
+  { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable', price: '₱10/bundle', store: 'Wet Market' },
+  { name: 'Mushroom', unit: 'g', category: 'Vegetable', price: '₱150/200g', store: 'Supermarket' },
+  { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery' },
+  { name: 'Cucumber', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery' },
+  { name: 'Lettuce', unit: 'g', category: 'Vegetable', price: '₱50/head', store: 'Wet Market / Supermarket' },
+  { name: 'Broccoli', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket' },
+  { name: 'Cauliflower', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket' },
+  { name: 'Chili (Siling Labuyo)', unit: 'pieces', category: 'Vegetable', price: '₱30/100g', store: 'Wet Market / Grocery' },
+  { name: 'Siling Haba (Long Green Chili)', unit: 'pieces', category: 'Vegetable', price: '₱20/100g', store: 'Wet Market' },
+  { name: 'Bean Sprouts (Toge)', unit: 'g', category: 'Vegetable', price: '₱20/200g', store: 'Wet Market / Grocery' },
+  { name: 'Bok Choy', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market / Supermarket' },
 
   // Fruits
-  { name: 'Banana (Saging)', unit: 'pieces', category: 'Fruit' },
-  { name: 'Mango (Mangga)', unit: 'pieces', category: 'Fruit' },
-  { name: 'Pineapple (Pinya)', unit: 'pieces', category: 'Fruit' },
-  { name: 'Calamansi', unit: 'pieces', category: 'Fruit' },
-  { name: 'Lemon', unit: 'pieces', category: 'Fruit' },
-  { name: 'Lime', unit: 'pieces', category: 'Fruit' },
-  { name: 'Papaya', unit: 'pieces', category: 'Fruit' },
-  { name: 'Coconut (Niyog)', unit: 'pieces', category: 'Fruit' },
-  { name: 'Apple', unit: 'pieces', category: 'Fruit' },
-  { name: 'Avocado', unit: 'pieces', category: 'Fruit' },
+  { name: 'Banana (Saging)', unit: 'pieces', category: 'Fruit', price: '₱10/pc', store: 'Any Store' },
+  { name: 'Mango (Mangga)', unit: 'pieces', category: 'Fruit', price: '₱40/pc', store: 'Wet Market / Grocery' },
+  { name: 'Pineapple (Pinya)', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Grocery' },
+  { name: 'Calamansi', unit: 'pieces', category: 'Fruit', price: '₱5/pc', store: 'Wet Market / Grocery' },
+  { name: 'Lemon', unit: 'pieces', category: 'Fruit', price: '₱25/pc', store: 'Supermarket' },
+  { name: 'Lime', unit: 'pieces', category: 'Fruit', price: '₱20/pc', store: 'Supermarket' },
+  { name: 'Papaya', unit: 'pieces', category: 'Fruit', price: '₱40/pc', store: 'Wet Market / Grocery' },
+  { name: 'Coconut (Niyog)', unit: 'pieces', category: 'Fruit', price: '₱30/pc', store: 'Wet Market' },
+  { name: 'Apple', unit: 'pieces', category: 'Fruit', price: '₱35/pc', store: 'Supermarket / Grocery' },
+  { name: 'Avocado', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Supermarket' },
 
   // Grains & Starches
-  { name: 'White Rice (Bigas)', unit: 'cups', category: 'Grain' },
-  { name: 'Brown Rice', unit: 'cups', category: 'Grain' },
-  { name: 'Glutinous Rice (Malagkit)', unit: 'cups', category: 'Grain' },
-  { name: 'Cornstarch', unit: 'tbsp', category: 'Grain' },
-  { name: 'All-Purpose Flour', unit: 'cups', category: 'Grain' },
-  { name: 'Breadcrumbs', unit: 'cups', category: 'Grain' },
-  { name: 'Pasta', unit: 'g', category: 'Grain' },
-  { name: 'Bihon Noodles', unit: 'g', category: 'Grain' },
-  { name: 'Canton Noodles', unit: 'g', category: 'Grain' },
-  { name: 'Sotanghon (Glass Noodles)', unit: 'g', category: 'Grain' },
-  { name: 'Miki Noodles', unit: 'g', category: 'Grain' },
-  { name: 'Bread (Tinapay)', unit: 'pieces', category: 'Grain' },
-  { name: 'Pandesal', unit: 'pieces', category: 'Grain' },
+  { name: 'White Rice (Bigas)', unit: 'cups', category: 'Grain', price: '₱55/kg', store: 'Any Store' },
+  { name: 'Brown Rice', unit: 'cups', category: 'Grain', price: '₱80/kg', store: 'Supermarket / Health Store' },
+  { name: 'Glutinous Rice (Malagkit)', unit: 'cups', category: 'Grain', price: '₱75/kg', store: 'Grocery / Supermarket' },
+  { name: 'Cornstarch', unit: 'tbsp', category: 'Grain', price: '₱25/pack', store: 'Any Store' },
+  { name: 'All-Purpose Flour', unit: 'cups', category: 'Grain', price: '₱55/kg', store: 'Any Store' },
+  { name: 'Breadcrumbs', unit: 'cups', category: 'Grain', price: '₱45/pack', store: 'Supermarket / Grocery' },
+  { name: 'Pasta', unit: 'g', category: 'Grain', price: '₱55/500g', store: 'Supermarket / Grocery' },
+  { name: 'Bihon Noodles', unit: 'g', category: 'Grain', price: '₱35/pack', store: 'Any Store' },
+  { name: 'Canton Noodles', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store' },
+  { name: 'Sotanghon (Glass Noodles)', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store' },
+  { name: 'Miki Noodles', unit: 'g', category: 'Grain', price: '₱20/pack', store: 'Wet Market / Grocery' },
+  { name: 'Bread (Tinapay)', unit: 'pieces', category: 'Grain', price: '₱60/loaf', store: 'Bakery / Grocery' },
+  { name: 'Pandesal', unit: 'pieces', category: 'Grain', price: '₱4/pc', store: 'Any Bakery' },
 
   // Dairy
-  { name: 'Milk (Gatas)', unit: 'ml', category: 'Dairy' },
-  { name: 'Evaporated Milk', unit: 'ml', category: 'Dairy' },
-  { name: 'Condensed Milk', unit: 'ml', category: 'Dairy' },
-  { name: 'Cheese', unit: 'g', category: 'Dairy' },
-  { name: 'Cream', unit: 'ml', category: 'Dairy' },
-  { name: 'Cream Cheese', unit: 'g', category: 'Dairy' },
-  { name: 'Butter', unit: 'tbsp', category: 'Dairy' },
-  { name: 'Margarine', unit: 'tbsp', category: 'Dairy' },
-  { name: 'Yogurt', unit: 'ml', category: 'Dairy' },
+  { name: 'Milk (Gatas)', unit: 'ml', category: 'Dairy', price: '₱90/1L', store: 'Supermarket / Grocery' },
+  { name: 'Evaporated Milk', unit: 'ml', category: 'Dairy', price: '₱40/can', store: 'Any Store' },
+  { name: 'Condensed Milk', unit: 'ml', category: 'Dairy', price: '₱45/can', store: 'Any Store' },
+  { name: 'Cheese', unit: 'g', category: 'Dairy', price: '₱120/165g', store: 'Supermarket / Grocery' },
+  { name: 'Cream', unit: 'ml', category: 'Dairy', price: '₱75/250ml', store: 'Supermarket' },
+  { name: 'Cream Cheese', unit: 'g', category: 'Dairy', price: '₱150/250g', store: 'Supermarket' },
+  { name: 'Butter', unit: 'tbsp', category: 'Dairy', price: '₱130/200g', store: 'Supermarket / Grocery' },
+  { name: 'Margarine', unit: 'tbsp', category: 'Dairy', price: '₱80/250g', store: 'Any Store' },
+  { name: 'Yogurt', unit: 'ml', category: 'Dairy', price: '₱80/150g', store: 'Supermarket' },
 
   // Pantry / Condiments / Spices
-  { name: 'Soy Sauce (Toyo)', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Fish Sauce (Patis)', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Vinegar (Suka)', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Oyster Sauce', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Coconut Milk', unit: 'ml', category: 'Pantry' },
-  { name: 'Coconut Cream', unit: 'ml', category: 'Pantry' },
-  { name: 'Tomato Paste', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Tomato Sauce', unit: 'ml', category: 'Pantry' },
-  { name: 'Cooking Oil', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Sesame Oil', unit: 'tsp', category: 'Pantry' },
-  { name: 'Salt', unit: 'tsp', category: 'Pantry' },
-  { name: 'Black Pepper', unit: 'tsp', category: 'Pantry' },
-  { name: 'White Pepper', unit: 'tsp', category: 'Pantry' },
-  { name: 'Sugar', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Brown Sugar', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Peppercorn', unit: 'tsp', category: 'Pantry' },
-  { name: 'Bay Leaves', unit: 'pieces', category: 'Pantry' },
-  { name: 'Chili Flakes', unit: 'tsp', category: 'Pantry' },
-  { name: 'Paprika', unit: 'tsp', category: 'Pantry' },
-  { name: 'Cumin', unit: 'tsp', category: 'Pantry' },
-  { name: 'Turmeric', unit: 'tsp', category: 'Pantry' },
-  { name: 'Oregano', unit: 'tsp', category: 'Pantry' },
-  { name: 'Thyme', unit: 'tsp', category: 'Pantry' },
-  { name: 'Basil', unit: 'tsp', category: 'Pantry' },
-  { name: 'Parsley', unit: 'tsp', category: 'Pantry' },
-  { name: 'Garlic Powder', unit: 'tsp', category: 'Pantry' },
-  { name: 'Onion Powder', unit: 'tsp', category: 'Pantry' },
-  { name: 'Worcestershire Sauce', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Ketchup', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Banana Ketchup', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Mayonnaise', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Hoisin Sauce', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Chili Sauce', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Cooking Wine', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Beef Broth / Stock', unit: 'ml', category: 'Pantry' },
-  { name: 'Chicken Broth / Stock', unit: 'ml', category: 'Pantry' },
-  { name: 'Water', unit: 'ml', category: 'Pantry' },
-  { name: 'Annatto (Atsuete)', unit: 'tsp', category: 'Pantry' },
-  { name: 'Tamarind (Sampalok)', unit: 'g', category: 'Pantry' },
-  { name: 'Tamarind Paste', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Bagoong', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Shrimp Paste', unit: 'tbsp', category: 'Pantry' },
-  { name: 'Cooking Cream', unit: 'ml', category: 'Pantry' },
-  { name: 'Baking Powder', unit: 'tsp', category: 'Pantry' },
-  { name: 'Baking Soda', unit: 'tsp', category: 'Pantry' },
-  { name: 'Vanilla Extract', unit: 'tsp', category: 'Pantry' },
+  { name: 'Soy Sauce (Toyo)', unit: 'tbsp', category: 'Pantry', price: '₱25/200ml', store: 'Any Store' },
+  { name: 'Fish Sauce (Patis)', unit: 'tbsp', category: 'Pantry', price: '₱25/200ml', store: 'Any Store' },
+  { name: 'Vinegar (Suka)', unit: 'tbsp', category: 'Pantry', price: '₱20/200ml', store: 'Any Store' },
+  { name: 'Oyster Sauce', unit: 'tbsp', category: 'Pantry', price: '₱50/230g', store: 'Supermarket / Grocery' },
+  { name: 'Coconut Milk', unit: 'ml', category: 'Pantry', price: '₱45/400ml', store: 'Any Store' },
+  { name: 'Coconut Cream', unit: 'ml', category: 'Pantry', price: '₱50/400ml', store: 'Supermarket / Grocery' },
+  { name: 'Tomato Paste', unit: 'tbsp', category: 'Pantry', price: '₱30/small can', store: 'Any Store' },
+  { name: 'Tomato Sauce', unit: 'ml', category: 'Pantry', price: '₱30/250ml', store: 'Any Store' },
+  { name: 'Cooking Oil', unit: 'tbsp', category: 'Pantry', price: '₱80/1L', store: 'Any Store' },
+  { name: 'Sesame Oil', unit: 'tsp', category: 'Pantry', price: '₱120/200ml', store: 'Supermarket / Asian Store' },
+  { name: 'Salt', unit: 'tsp', category: 'Pantry', price: '₱15/pack', store: 'Any Store' },
+  { name: 'Black Pepper', unit: 'tsp', category: 'Pantry', price: '₱20/small pack', store: 'Any Store' },
+  { name: 'White Pepper', unit: 'tsp', category: 'Pantry', price: '₱20/small pack', store: 'Grocery / Supermarket' },
+  { name: 'Sugar', unit: 'tbsp', category: 'Pantry', price: '₱65/kg', store: 'Any Store' },
+  { name: 'Brown Sugar', unit: 'tbsp', category: 'Pantry', price: '₱70/kg', store: 'Any Store' },
+  { name: 'Peppercorn', unit: 'tsp', category: 'Pantry', price: '₱30/pack', store: 'Grocery / Supermarket' },
+  { name: 'Bay Leaves', unit: 'pieces', category: 'Pantry', price: '₱15/pack', store: 'Grocery / Supermarket' },
+  { name: 'Chili Flakes', unit: 'tsp', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket' },
+  { name: 'Paprika', unit: 'tsp', category: 'Pantry', price: '₱35/pack', store: 'Supermarket' },
+  { name: 'Cumin', unit: 'tsp', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Asian Store' },
+  { name: 'Turmeric', unit: 'tsp', category: 'Pantry', price: '₱30/pack', store: 'Supermarket / Asian Store' },
+  { name: 'Oregano', unit: 'tsp', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket' },
+  { name: 'Thyme', unit: 'tsp', category: 'Pantry', price: '₱30/pack', store: 'Supermarket' },
+  { name: 'Basil', unit: 'tsp', category: 'Pantry', price: '₱30/pack', store: 'Supermarket' },
+  { name: 'Parsley', unit: 'tsp', category: 'Pantry', price: '₱30/pack', store: 'Supermarket' },
+  { name: 'Garlic Powder', unit: 'tsp', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket' },
+  { name: 'Onion Powder', unit: 'tsp', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket' },
+  { name: 'Worcestershire Sauce', unit: 'tbsp', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket' },
+  { name: 'Ketchup', unit: 'tbsp', category: 'Pantry', price: '₱40/320g', store: 'Any Store' },
+  { name: 'Banana Ketchup', unit: 'tbsp', category: 'Pantry', price: '₱35/320g', store: 'Any Store' },
+  { name: 'Mayonnaise', unit: 'tbsp', category: 'Pantry', price: '₱70/470g', store: 'Supermarket / Grocery' },
+  { name: 'Hoisin Sauce', unit: 'tbsp', category: 'Pantry', price: '₱90/240g', store: 'Supermarket / Asian Store' },
+  { name: 'Chili Sauce', unit: 'tbsp', category: 'Pantry', price: '₱55/bottle', store: 'Supermarket / Asian Store' },
+  { name: 'Cooking Wine', unit: 'tbsp', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket / Asian Store' },
+  { name: 'Beef Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery' },
+  { name: 'Chicken Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery' },
+  { name: 'Water', unit: 'ml', category: 'Pantry', price: '₱0', store: 'Any' },
+  { name: 'Annatto (Atsuete)', unit: 'tsp', category: 'Pantry', price: '₱20/pack', store: 'Wet Market / Asian Store' },
+  { name: 'Tamarind (Sampalok)', unit: 'g', category: 'Pantry', price: '₱30/100g', store: 'Wet Market / Grocery' },
+  { name: 'Tamarind Paste', unit: 'tbsp', category: 'Pantry', price: '₱50/jar', store: 'Supermarket / Asian Store' },
+  { name: 'Bagoong', unit: 'tbsp', category: 'Pantry', price: '₱40/small jar', store: 'Any Store' },
+  { name: 'Shrimp Paste', unit: 'tbsp', category: 'Pantry', price: '₱35/small jar', store: 'Wet Market / Grocery' },
+  { name: 'Cooking Cream', unit: 'ml', category: 'Pantry', price: '₱75/250ml', store: 'Supermarket' },
+  { name: 'Baking Powder', unit: 'tsp', category: 'Pantry', price: '₱25/pack', store: 'Any Store' },
+  { name: 'Baking Soda', unit: 'tsp', category: 'Pantry', price: '₱20/pack', store: 'Any Store' },
+  { name: 'Vanilla Extract', unit: 'tsp', category: 'Pantry', price: '₱45/bottle', store: 'Supermarket / Grocery' },
 ];
 
 function filterIngredients(query) {
@@ -4958,10 +5135,14 @@ function attachIngredientAutocomplete(nameInput) {
     if (matches.length === 0) { suggestBox.classList.add('hidden'); return; }
 
     suggestBox.innerHTML = matches.map(function(item) {
+      var priceStore = (item.price ? item.price : '') + (item.store ? ' &nbsp;📍 ' + item.store : '');
       return '<div class="ing-suggestion-item" data-name="' + item.name +
         '" data-unit="' + item.unit + '" data-cat="' + item.category + '">' +
+        '<div class="ing-sug-main">' +
         '<span class="ing-sug-name">' + item.name + '</span>' +
-        '<span class="ing-sug-meta">' + item.unit + ' &bull; ' + item.category + '</span>' +
+        '<span class="ing-sug-unit">' + item.unit + ' &bull; ' + item.category + '</span>' +
+        '</div>' +
+        (priceStore ? '<div class="ing-sug-price">' + priceStore + '</div>' : '') +
         '</div>';
     }).join('');
     suggestBox.classList.remove('hidden');
