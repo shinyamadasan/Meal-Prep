@@ -27,6 +27,7 @@ const AppState = {
   customHacks: [],
   pantry: [],
   ingredientPrices: {},
+  myStores: [],
   customStores: [],
   currentUser: null,
   isOnline: navigator.onLine
@@ -46,6 +47,7 @@ function saveToLocalStorage() {
       customHacks: AppState.customHacks,
       pantry: AppState.pantry,
       ingredientPrices: AppState.ingredientPrices,
+      myStores: AppState.myStores,
       customStores: AppState.customStores,
       lastSaved: new Date().toISOString()
     };
@@ -86,6 +88,7 @@ function loadFromLocalStorage() {
       AppState.customHacks = data.customHacks || [];
       AppState.pantry = data.pantry || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
+      AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
 
       console.log('Data loaded from local storage');
@@ -2994,8 +2997,10 @@ window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
 window.renderIngredientsTab = renderIngredientsTab;
 window.filterIngredientCatalog = filterIngredientCatalog;
-window.saveIngredientPrice = saveIngredientPrice;
-window.handleStoreChange = handleStoreChange;
+window.addMyStore = addMyStore;
+window.removeMyStore = removeMyStore;
+window.saveIngredientUnit = saveIngredientUnit;
+window.saveIngredientStorePrice = saveIngredientStorePrice;
 window.showPantryAddRow = showPantryAddRow;
 window.confirmAddIngredientToPantry = confirmAddIngredientToPantry;
 window.removeIngredientFromPantry = removeIngredientFromPantry;
@@ -3239,6 +3244,7 @@ async function saveToFirestore() {
       customHacks: AppState.customHacks,
       pantry: AppState.pantry,
       ingredientPrices: AppState.ingredientPrices,
+      myStores: AppState.myStores,
       customStores: AppState.customStores,
       lastUpdated: new Date().toISOString()
     };
@@ -3284,6 +3290,7 @@ async function loadFromFirestore() {
       AppState.customHacks = data.customHacks || [];
       AppState.pantry = data.pantry || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
+      AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
 
       // If we patched nutrition into old data, write it back so Firebase stops sending stale data
@@ -4622,11 +4629,8 @@ function removeFromPantry(id) {
 
 // ── Ingredient Catalog (Ingredients Tab) ─────────────────────────────────────
 
-const DEFAULT_STORES = [
-  'Any Store', 'Wet Market / Palengke', 'SM Supermarket', 'Robinsons',
-  'Puregold', 'Landers', 'S&R', 'Seafood Market', 'Grocery', 'Asian Store',
-  'Online (Shopee/Lazada)'
-];
+const INGREDIENT_UNITS = ['g','kg','ml','L','cups','cup','tbsp','tsp','pieces','cloves','can','pack','stalks','bunches','lbs','oz','slices'];
+const DEFAULT_MY_STORES = ['Wet Market / Palengke', 'SM Supermarket', 'Puregold'];
 
 function escJ(str) {
   return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -4640,77 +4644,106 @@ function getCatEmoji(cat) {
   return { Protein: '🥩', Vegetable: '🥦', Fruit: '🍊', Grain: '🌾', Dairy: '🥛', Pantry: '🫙' }[cat] || '🥄';
 }
 
+function getMyStores() {
+  var s = AppState.myStores;
+  return (s && s.length) ? s : DEFAULT_MY_STORES.slice();
+}
+
 function renderIngredientsTab() {
   var list = document.getElementById('ingredients-catalog');
   if (!list) return;
 
+  var myStores = getMyStores();
+  var prices = AppState.ingredientPrices || {};
+
+  // ── Stores management bar ──
+  var storesHtml = '<div class="ingcat-stores-bar">';
+  storesHtml += '<span class="ingcat-stores-label">My Stores:</span>';
+  storesHtml += '<div class="ingcat-stores-tags">';
+  myStores.forEach(function(s) {
+    storesHtml += '<span class="ingcat-store-tag">' + escapeHtml(s) +
+      '<button class="ingcat-store-remove" onclick="removeMyStore(\'' + escJ(s) + '\')" title="Remove store">×</button></span>';
+  });
+  storesHtml += '</div>';
+  storesHtml += '<button class="btn btn--sm btn--outline" onclick="addMyStore()">+ Add Store</button>';
+  storesHtml += '</div>';
+
+  // ── Search bar ──
+  var searchHtml = '<div class="ingcat-search-bar"><input type="text" id="ingcat-search" class="form-control" placeholder="Search ingredients..." oninput="filterIngredientCatalog(this.value)"></div>';
+
+  // ── Column headers ──
+  var colHeaderHtml = '<div class="ingcat-header-row">';
+  colHeaderHtml += '<div class="ingcat-col-name">Ingredient</div>';
+  colHeaderHtml += '<div class="ingcat-col-unit">Unit</div>';
+  myStores.forEach(function(s) {
+    colHeaderHtml += '<div class="ingcat-col-store">' + escapeHtml(s) + '</div>';
+  });
+  colHeaderHtml += '<div class="ingcat-col-pantry">Pantry</div>';
+  colHeaderHtml += '</div>';
+
+  // ── Ingredient rows grouped by category ──
   var groups = {};
   INGREDIENT_DB.forEach(function(item) {
     if (!groups[item.category]) groups[item.category] = [];
     groups[item.category].push(item);
   });
 
-  var allStores = DEFAULT_STORES.concat(AppState.customStores || []);
-  var prices = AppState.ingredientPrices || {};
+  var rowsHtml = '';
   var itemIdx = 0;
 
-  var html = '<div class="ingcat-search-bar"><input type="text" id="ingcat-search" class="form-control" placeholder="Search ingredients..." oninput="filterIngredientCatalog(this.value)"></div>';
-
   Object.keys(groups).forEach(function(cat) {
-    html += '<div class="ingcat-section" data-cat="' + cat + '">';
-    html += '<h3 class="ingcat-heading">' + getCatEmoji(cat) + ' ' + cat + '</h3>';
-    html += '<div class="ingcat-list">';
+    rowsHtml += '<div class="ingcat-section" data-cat="' + cat + '">';
+    rowsHtml += '<div class="ingcat-cat-header">' + getCatEmoji(cat) + ' ' + cat + '</div>';
 
     groups[cat].forEach(function(item) {
       var idx = itemIdx++;
       var override = prices[item.name] || {};
-      var price = override.price !== undefined ? override.price : item.price;
-      var store = override.store !== undefined ? override.store : item.store;
+      var unit = override.unit || item.unit;
+      var storePrices = override.prices || {};
       var pantryEntry = AppState.pantry.find(function(p) {
         return p.name.toLowerCase() === item.name.toLowerCase();
       });
 
-      html += '<div class="ingcat-row" data-name="' + escapeHtml(item.name) + '">';
+      rowsHtml += '<div class="ingcat-row" data-name="' + escapeHtml(item.name) + '">';
 
-      // Name + unit
-      html += '<div class="ingcat-name-col">';
-      html += '<span class="ingcat-item-name">' + item.name + '</span>';
-      html += '<span class="ingcat-item-unit"> / ' + item.unit + '</span>';
-      html += '</div>';
+      // Name
+      rowsHtml += '<div class="ingcat-col-name"><span class="ingcat-item-name">' + item.name + '</span></div>';
 
-      // Price input
-      html += '<input class="ingcat-price-input" value="' + escapeHtml(price) + '" placeholder="e.g. ₱200/kg" ';
-      html += 'onblur="saveIngredientPrice(\'' + escJ(item.name) + '\', this.value, null)">';
-
-      // Store select
-      html += '<select class="ingcat-store-select" onchange="handleStoreChange(\'' + escJ(item.name) + '\', this)">';
-      allStores.forEach(function(s) {
-        html += '<option value="' + escapeHtml(s) + '"' + (store === s ? ' selected' : '') + '>' + s + '</option>';
+      // Unit selector
+      rowsHtml += '<div class="ingcat-col-unit"><select class="ingcat-unit-select" onchange="saveIngredientUnit(\'' + escJ(item.name) + '\', this.value)">';
+      INGREDIENT_UNITS.forEach(function(u) {
+        rowsHtml += '<option value="' + u + '"' + (unit === u ? ' selected' : '') + '>' + u + '</option>';
       });
-      if (store && !allStores.includes(store)) {
-        html += '<option value="' + escapeHtml(store) + '" selected>' + store + '</option>';
-      }
-      html += '<option value="__add_store__">+ Add store...</option>';
-      html += '</select>';
+      rowsHtml += '</select></div>';
 
-      // Pantry column
-      html += '<div class="ingcat-pantry-col" id="ingpantry-' + idx + '">';
+      // Price per store
+      myStores.forEach(function(s) {
+        var p = storePrices[s] || '';
+        rowsHtml += '<div class="ingcat-col-store">';
+        rowsHtml += '<input class="ingcat-price-input" value="' + escapeHtml(p) + '" placeholder="e.g. ₱150"';
+        rowsHtml += ' onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)">';
+        rowsHtml += '</div>';
+      });
+
+      // Pantry
+      rowsHtml += '<div class="ingcat-col-pantry" id="ingpantry-' + idx + '">';
       if (pantryEntry) {
-        var qtyStr = pantryEntry.quantity ? pantryEntry.quantity + ' ' + (pantryEntry.unit || '') : '';
-        html += '<span class="ingcat-in-pantry">✓' + (qtyStr ? ' ' + qtyStr : '') + '</span>';
-        html += '<button class="btn btn--xs btn--outline ingcat-remove-btn" onclick="removeIngredientFromPantry(\'' + escJ(String(pantryEntry.id)) + '\',' + idx + ')">Remove</button>';
+        var qtyStr = pantryEntry.quantity ? pantryEntry.quantity + ' ' + (pantryEntry.unit || '') : '';
+        rowsHtml += '<span class="ingcat-in-pantry">✓' + (qtyStr ? ' ' + qtyStr : '') + '</span>';
+        rowsHtml += '<button class="btn btn--xs btn--outline" onclick="removeIngredientFromPantry(\'' + escJ(String(pantryEntry.id)) + '\')">Remove</button>';
       } else {
-        html += '<button class="btn btn--xs btn--primary" onclick="showPantryAddRow(' + idx + ',\'' + escJ(item.name) + '\',\'' + item.unit + '\')">+ Pantry</button>';
+        rowsHtml += '<button class="btn btn--xs btn--primary" onclick="showPantryAddRow(' + idx + ',\'' + escJ(item.name) + '\',\'' + escJ(unit) + '\')">+ Pantry</button>';
       }
-      html += '</div>';
+      rowsHtml += '</div>';
 
-      html += '</div>'; // ingcat-row
+      rowsHtml += '</div>'; // ingcat-row
     });
 
-    html += '</div></div>'; // ingcat-list + ingcat-section
+    rowsHtml += '</div>'; // ingcat-section
   });
 
-  list.innerHTML = html;
+  list.innerHTML = storesHtml + searchHtml +
+    '<div class="ingcat-table">' + colHeaderHtml + rowsHtml + '</div>';
 }
 
 function filterIngredientCatalog(query) {
@@ -4725,30 +4758,36 @@ function filterIngredientCatalog(query) {
   });
 }
 
-function saveIngredientPrice(name, price, store) {
+function addMyStore() {
+  var name = prompt('Store name:');
+  if (!name || !name.trim()) return;
+  name = name.trim();
+  var stores = getMyStores();
+  if (!stores.includes(name)) {
+    AppState.myStores = stores.concat([name]);
+    saveData();
+    renderIngredientsTab();
+  }
+}
+
+function removeMyStore(store) {
+  AppState.myStores = getMyStores().filter(function(s) { return s !== store; });
+  saveData();
+  renderIngredientsTab();
+}
+
+function saveIngredientUnit(name, unit) {
   var current = AppState.ingredientPrices[name] || {};
-  var dbItem = INGREDIENT_DB.find(function(i) { return i.name === name; }) || {};
-  AppState.ingredientPrices[name] = {
-    price: price !== null ? price : (current.price !== undefined ? current.price : dbItem.price || ''),
-    store: store !== null ? store : (current.store !== undefined ? current.store : dbItem.store || '')
-  };
+  AppState.ingredientPrices[name] = Object.assign({}, current, { unit: unit });
   saveData();
 }
 
-function handleStoreChange(name, selectEl) {
-  if (selectEl.value === '__add_store__') {
-    var newStore = prompt('Enter store name:');
-    if (newStore && newStore.trim()) {
-      newStore = newStore.trim();
-      if (!(AppState.customStores || []).includes(newStore)) {
-        AppState.customStores = (AppState.customStores || []).concat([newStore]);
-      }
-      saveIngredientPrice(name, null, newStore);
-    }
-    renderIngredientsTab();
-    return;
-  }
-  saveIngredientPrice(name, null, selectEl.value);
+function saveIngredientStorePrice(name, store, price) {
+  var current = AppState.ingredientPrices[name] || {};
+  var storePrices = Object.assign({}, current.prices || {});
+  storePrices[store] = price;
+  AppState.ingredientPrices[name] = Object.assign({}, current, { prices: storePrices });
+  saveData();
 }
 
 function showPantryAddRow(idx, name, unit) {
@@ -4757,7 +4796,7 @@ function showPantryAddRow(idx, name, unit) {
   col.innerHTML =
     '<input type="number" id="ingqty-' + idx + '" class="ingcat-qty-input" placeholder="Qty" min="0.1" step="any">' +
     '<span class="ingcat-qty-unit">' + unit + '</span>' +
-    '<button class="btn btn--xs btn--primary" onclick="confirmAddIngredientToPantry(\'' + escJ(name) + '\',' + idx + ',\'' + unit + '\')">Add</button>' +
+    '<button class="btn btn--xs btn--primary" onclick="confirmAddIngredientToPantry(\'' + escJ(name) + '\',' + idx + ',\'' + escJ(unit) + '\')">Add</button>' +
     '<button class="btn btn--xs btn--outline" onclick="renderIngredientsTab()">✕</button>';
   var input = document.getElementById('ingqty-' + idx);
   if (input) input.focus();
@@ -4772,19 +4811,13 @@ function confirmAddIngredientToPantry(name, idx, unit) {
   AppState.pantry = AppState.pantry.filter(function(p) {
     return p.name.toLowerCase() !== name.toLowerCase();
   });
-  AppState.pantry.push({
-    id: Date.now() + Math.random(),
-    name: name,
-    quantity: qty || null,
-    unit: unit,
-    category: category
-  });
+  AppState.pantry.push({ id: Date.now() + Math.random(), name: name, quantity: qty || null, unit: unit, category: category });
   saveData();
   renderIngredientsTab();
   renderPantry();
 }
 
-function removeIngredientFromPantry(id, idx) {
+function removeIngredientFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(function(p) { return String(p.id) !== String(id); });
   saveData();
   renderPantry();
