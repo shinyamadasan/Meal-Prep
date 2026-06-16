@@ -4376,9 +4376,10 @@ select.form-control {
 /* On-open freshness banner */
 .freshness-banner {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
   margin: 0 0 1rem;
   padding: 0.6rem 1rem;
   border-radius: 8px;
