@@ -112,42 +112,24 @@ function patchMissingNutrition(recipes) {
   return patched;
 }
 
-function clearLocalStorage() {
-  if (confirm('Clear ALL saved data and reset to defaults? This cannot be undone.')) {
-    localStorage.removeItem(STORAGE_KEY);
-    // Reset AppState to defaults
-    AppState.recipes = sampleRecipes.map(function(r) { return Object.assign({}, r); });
-    AppState.weeklyPlan = {
-      Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-      Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
-    };
-    AppState.pantry = [];
-    AppState.groceryList = [];
-    AppState.customIngredients = [...defaultStorageData];
-    AppState.customHacks = [...defaultCookingHacks];
-    AppState.nutritionGoals = { calories: 2000, protein: 150, carbs: 250, fat: 67, fiber: 25, sodium: 2300 };
+async function clearLocalStorage() {
+  if (!confirm('Clear ALL saved data and reset to defaults? This cannot be undone.')) return;
 
-    // Also wipe Firebase so it doesn't sync old data back on reload
-    if (AppState.currentUser && window.firebase && window.firebase.db) {
+  // Wipe localStorage
+  localStorage.removeItem(STORAGE_KEY);
+
+  // Delete the entire Firestore document so it can't sync old data back on reload
+  if (AppState.currentUser && window.firebase && window.firebase.db) {
+    try {
       const ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
-      window.firebase.setDoc(ref, {
-        recipes: AppState.recipes,
-        weeklyPlan: AppState.weeklyPlan,
-        pantry: [],
-        groceryList: [],
-        customIngredients: AppState.customIngredients,
-        customHacks: AppState.customHacks,
-        nutritionGoals: AppState.nutritionGoals
-      }).then(function() { location.reload(); });
-    } else {
-      location.reload();
+      await window.firebase.deleteDoc(ref);
+    } catch (e) {
+      console.error('Firebase clear failed:', e);
+      // Still reload — localStorage is gone, fresh defaults will load
     }
   }
+
+  location.reload();
 }
 
 function showErrorMessage(message) {
