@@ -3134,6 +3134,7 @@ window.removeFromPantry = removeFromPantry;
 window.updatePantryDate = updatePantryDate;
 window.updatePantryShelf = updatePantryShelf;
 window.setPantryStorage = setPantryStorage;
+window.togglePantryStaple = togglePantryStaple;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -4753,7 +4754,8 @@ function renderPantry() {
   // before storage tracking existed still land in a sensible section).
   function effStorage(p) { return p.storage || inferStorage(p.name, p.category); }
 
-  // Fridge / Freezer / Counter toggle that moves an item between sections.
+  // Fridge / Freezer / Counter toggle that moves an item between sections,
+  // plus a "staple" checkbox (staples are never deducted when cooking).
   function storageToggle(p) {
     var cur = effStorage(p);
     var opts = [['fridge', '📅 Fridge'], ['freezer', '❄️ Freezer'], ['counter', '🗄️ Counter']];
@@ -4763,6 +4765,9 @@ function renderPantry() {
            p.id + '\', \'' + o[0] + '\')">' + o[1] + '</button>';
     });
     h += '</div>';
+    h += '<label class="pantry-staple" title="Staples (spices, condiments) are never deducted when you cook">' +
+         '<input type="checkbox" ' + (isStaple(p) ? 'checked' : '') +
+         ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)"> staple</label>';
     return h;
   }
 
@@ -4831,6 +4836,14 @@ function setPantryStorage(id, storage) {
   renderPantry();
 }
 
+function togglePantryStaple(id, checked) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  p.staple = !!checked;
+  saveData();
+  renderPantry();
+}
+
 // Persist edits to a pantry item's purchase date / shelf life, then re-render.
 function updatePantryDate(id, value) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
@@ -4852,9 +4865,58 @@ function updatePantryShelf(id, value) {
 
 // ── Cooked meal tracking ─────────────────────────────────────────────────────
 
-// Mark a recipe as cooked today → create a tracked batch (defaults to fridge).
-// Snapshots the recipe's fridge/freezer life so later recipe edits don't
-// retroactively change batches already in your fridge.
+// Staples (spices, condiments, salt, sugar, oil) are "always stocked" and never
+// deducted when cooking. Default = Pantry category; per-item `staple` overrides.
+function isStaple(p) {
+  if (p.staple === true) return true;
+  if (p.staple === false) return false;
+  return (p.category || '').toLowerCase() === 'pantry';
+}
+
+// Fuzzy-match a recipe ingredient name to a pantry item (same matching style as
+// findIngredientNutrition).
+function findPantryMatch(ingredientName) {
+  var n = (ingredientName || '').toLowerCase().trim();
+  var norm = normalizeIngredientName(ingredientName);
+  function m(pn, term) { return term && (pn.includes(term) || term.includes(pn)); }
+  return AppState.pantry.find(function(p) {
+    var pn = p.name.toLowerCase();
+    return m(pn, n) || m(pn, norm);
+  }) || null;
+}
+
+function capList(arr, max) {
+  if (arr.length <= max) return arr.join(', ');
+  return arr.slice(0, max).join(', ') + ' +' + (arr.length - max) + ' more';
+}
+
+// Subtract a cooked recipe's ingredients from the pantry. Skips staples, items
+// not in the pantry, and tracked items with no quantity set. Reconciles units
+// through the gram-bridge so kg/g/ml/pieces all line up. Returns a summary.
+function deductIngredientsForRecipe(recipe) {
+  var ingredients = recipe.baseIngredients || recipe.ingredients || [];
+  var deducted = [], outOfStock = [];
+  ingredients.forEach(function(ing) {
+    var p = findPantryMatch(ing.name);
+    if (!p) return;                                   // not in pantry
+    if (isStaple(p)) return;                           // staple — never deducted
+    if (p.quantity == null || isNaN(p.quantity)) return; // tracked but no quantity
+    var scaledQty = calculateScaledQuantity(recipe, ing);
+    if (!scaledQty || isNaN(scaledQty)) return;
+    var gramsUsed = toGrams(scaledQty, ing.unit);
+    var gramsPerPantryUnit = toGrams(1, p.unit) || 1;
+    var used = gramsUsed / gramsPerPantryUnit;        // in the pantry item's unit
+    if (used <= 0) return;
+    p.quantity = parseFloat(Math.max(0, p.quantity - used).toFixed(2));
+    deducted.push('−' + formatQuantity(used) + ' ' + (p.unit || '') + ' ' + p.name);
+    if (p.quantity <= 0) outOfStock.push(p.name);
+  });
+  return { deducted: deducted, outOfStock: outOfStock };
+}
+
+// Mark a recipe as cooked today → create a tracked batch (defaults to fridge)
+// AND deduct its ingredients from the pantry. Snapshots the recipe's
+// fridge/freezer life so later recipe edits don't retroactively change batches.
 function markRecipeCooked(recipeId) {
   var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
   if (!recipe) { showErrorMessage('Recipe not found'); return; }
@@ -4868,9 +4930,18 @@ function markRecipeCooked(recipeId) {
     fridgeLife: recipe.fridgeLife || 0,
     freezerLife: recipe.freezerLife || 0
   });
+
+  var sum = deductIngredientsForRecipe(recipe);
+
   saveData();
   renderCookedMeals();
-  showSuccessMessage('Added "' + recipe.name + '" to 🧊 My Fridge — now tracking freshness.');
+  renderPantry();
+
+  var msg = 'Added "' + recipe.name + '" to 🧊 My Fridge.';
+  if (sum.deducted.length) msg += ' Deducted: ' + capList(sum.deducted, 4) + '.';
+  else msg += ' (No tracked pantry items to deduct.)';
+  if (sum.outOfStock.length) msg += ' ⚠️ Now out: ' + capList(sum.outOfStock, 4) + '.';
+  showSuccessMessage(msg);
 }
 
 function cookedShelfLife(m) {

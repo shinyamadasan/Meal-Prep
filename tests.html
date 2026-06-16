@@ -102,6 +102,30 @@
       check('freshnessStatus -1 = expired', freshnessStatus(-1).cls === 'fresh-expired');
       check('freshnessStatus 0 = "Use today!"', freshnessStatus(0).label === 'Use today!');
 
+      // --- pantry deduction when cooking ---
+      check('isStaple: Pantry category = staple', isStaple({ category: 'Pantry' }) === true);
+      check('isStaple: Protein = not staple', isStaple({ category: 'Protein' }) === false);
+      check('isStaple: explicit override wins', isStaple({ category: 'Pantry', staple: false }) === false);
+      AppState.pantry = [
+        { id: 'p1', name: 'Pork', category: 'Protein', unit: 'kg', quantity: 1 },
+        { id: 'p2', name: 'Eggs', category: 'Protein', unit: 'pieces', quantity: 12 },
+        { id: 'p3', name: 'Salt', category: 'Pantry', unit: 'g', quantity: 500 }
+      ];
+      var dedRecipe = {
+        baseServings: 2, currentServings: 2,
+        baseIngredients: [
+          { name: 'Pork', baseQuantity: 500, unit: 'g' },
+          { name: 'Eggs', baseQuantity: 2, unit: 'pieces' },
+          { name: 'Salt', baseQuantity: 1, unit: 'tsp' }
+        ]
+      };
+      var ded = deductIngredientsForRecipe(dedRecipe);
+      check('deduct: 1kg pork - 500g = 0.5kg', Math.abs(AppState.pantry[0].quantity - 0.5) < 0.001);
+      check('deduct: 12 eggs - 2 = 10', AppState.pantry[1].quantity === 10);
+      check('deduct: salt (staple) untouched', AppState.pantry[2].quantity === 500);
+      check('deduct: 2 tracked items reported, salt skipped', ded.deducted.length === 2);
+      AppState.pantry = [];
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;
