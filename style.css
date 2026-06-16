@@ -4478,3 +4478,62 @@ select.form-control {
   cursor: pointer;
 }
 .pantry-staple input { cursor: pointer; }
+
+/* Planner: "add to which days" chips in the recipe picker */
+.planner-day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+.planner-day-picker-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-right: 0.25rem;
+}
+.planner-day-chip {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.planner-day-chip.active {
+  background: var(--color-primary, var(--color-success));
+  border-color: var(--color-primary, var(--color-success));
+  color: #fff;
+}
+.planner-day-all { font-weight: 600; }
+
+/* Recents / section labels in the recipe picker grid (span full width) */
+.recipe-selection-group-label {
+  grid-column: 1 / -1;
+  flex-basis: 100%;
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin: 0.25rem 0 0;
+}
+
+/* "✓ Cooked" button inside a filled planner slot */
+.slot-cooked-btn {
+  font: inherit;
+  font-size: 0.7rem;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--color-success);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-success);
+  cursor: pointer;
+}
+.slot-cooked-btn:hover {
+  background: var(--color-success);
+  color: #fff;
+}

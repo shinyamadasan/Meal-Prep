@@ -31,9 +31,19 @@ const AppState = {
   myStores: [],
   customStores: [],
   cookedMeals: [],
+  recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
+  selectedPlannerDays: [],    // transient: days the picker will assign to
   currentUser: null,
   isOnline: navigator.onLine
 };
+
+// Track a recipe as recently used (front of the list, deduped, capped).
+function recordRecentRecipe(recipeId) {
+  var id = String(recipeId);
+  AppState.recentRecipes = [id].concat(
+    (AppState.recentRecipes || []).filter(function(x) { return String(x) !== id; })
+  ).slice(0, 8);
+}
 
 // ── Freshness tracking (pantry expiry + cooked-meal shelf life) ───────────────
 var FRESHNESS_WARN_DAYS = 2; // warn when this many days or fewer remain
@@ -136,6 +146,7 @@ function saveToLocalStorage() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
+      recentRecipes: AppState.recentRecipes,
       lastSaved: new Date().toISOString()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -179,6 +190,7 @@ function loadFromLocalStorage() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
+      AppState.recentRecipes = data.recentRecipes || [];
 
       console.log('Data loaded from local storage');
       if (data.lastSaved) {
@@ -1747,6 +1759,7 @@ function renderWeeklyPlanner() {
                     <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">⚠️</span>' : ''}</div>
                     <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
                   </div>
+                  <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${recipe.id}')" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
                 </div>
               </div>`;
           }
@@ -1854,48 +1867,107 @@ function showSuccessMessage(message) {
 
 function openRecipeSelectionModal(day, meal) {
   AppState.selectedMealSlot = { day, meal };
-  
+  AppState.selectedPlannerDays = [day]; // default: just the day you clicked
+
   const modal = document.getElementById('recipe-selection-modal');
   const title = document.getElementById('recipe-selection-title');
-  
-  title.textContent = `Select a Recipe for ${day} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
-  
+  const search = document.getElementById('recipe-modal-search');
+
+  title.textContent = `Add to ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+  if (search) search.value = '';
+
+  renderPlannerDayPicker();
   renderRecipeSelectionGrid();
   modal.classList.remove('hidden');
+  if (search) setTimeout(function() { search.focus(); }, 50);
+}
+
+// Day chips in the picker: pick which days this recipe will be added to.
+function renderPlannerDayPicker() {
+  var el = document.getElementById('recipe-selection-days');
+  if (!el) return;
+  var sel = AppState.selectedPlannerDays || [];
+  var allOn = sel.length === PLANNER_DAYS.length;
+  var html = '<span class="planner-day-picker-label">Add to:</span>';
+  PLANNER_DAYS.forEach(function(d) {
+    var on = sel.indexOf(d) >= 0;
+    html += '<button type="button" class="planner-day-chip' + (on ? ' active' : '') +
+            '" onclick="togglePlannerDay(\'' + d + '\')">' + d.slice(0, 3) + '</button>';
+  });
+  html += '<button type="button" class="planner-day-chip planner-day-all' + (allOn ? ' active' : '') +
+          '" onclick="toggleAllPlannerDays()">All week</button>';
+  el.innerHTML = html;
+}
+
+function togglePlannerDay(day) {
+  var sel = AppState.selectedPlannerDays || [];
+  var i = sel.indexOf(day);
+  if (i >= 0) {
+    if (sel.length > 1) sel.splice(i, 1); // keep at least one day selected
+  } else {
+    sel.push(day);
+  }
+  AppState.selectedPlannerDays = sel;
+  renderPlannerDayPicker();
+}
+
+function toggleAllPlannerDays() {
+  var sel = AppState.selectedPlannerDays || [];
+  if (sel.length === PLANNER_DAYS.length) {
+    AppState.selectedPlannerDays = [AppState.selectedMealSlot.day];
+  } else {
+    AppState.selectedPlannerDays = PLANNER_DAYS.slice();
+  }
+  renderPlannerDayPicker();
+}
+
+function recipeSelectionCard(recipe) {
+  const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+  const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
+  return `
+    <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${recipe.id}')">
+      <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
+      <div class="recipe-title">${recipe.name}</div>
+      <div class="recipe-meta">${recipe.category}</div>
+      <div class="recipe-stats">
+        <span>${recipe.currentServings} servings</span>
+        <span>${totalTime}m</span>
+        ${costPerServing > 0 ? `<span>₱${formatQuantity(costPerServing)}</span>` : ''}
+      </div>
+    </div>`;
 }
 
 function renderRecipeSelectionGrid() {
   const grid = document.getElementById('recipe-selection-grid');
   const searchTerm = document.getElementById('recipe-modal-search').value.toLowerCase();
-  
-  let filteredRecipes = AppState.recipes.filter(recipe => 
-    recipe.name.toLowerCase().includes(searchTerm) || 
+
+  const filtered = AppState.recipes.filter(recipe =>
+    recipe.name.toLowerCase().includes(searchTerm) ||
     recipe.category.toLowerCase().includes(searchTerm)
   );
-  
-  grid.innerHTML = filteredRecipes.map(recipe => {
-    const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
-    const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
-    
-    console.log('Creating recipe card for:', recipe.name, 'with id:', recipe.id);
-    
-    return `
-      <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${recipe.id}')">
-        <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
-        <div class="recipe-title">${recipe.name}</div>
-        <div class="recipe-meta">${recipe.category}</div>
-        <div class="recipe-stats">
-          <span>${recipe.currentServings} servings</span>
-          <span>${totalTime}m</span>
-          ${costPerServing > 0 ? `<span>₱${formatQuantity(costPerServing)}</span>` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  if (filteredRecipes.length === 0) {
-    grid.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No recipes found. Try a different search term.</p>';
+
+  let html = '';
+
+  // Recently-used recipes pinned at the top for one-tap adding (only when not searching).
+  if (!searchTerm) {
+    const recents = (AppState.recentRecipes || [])
+      .map(id => AppState.recipes.find(r => String(r.id) === String(id)))
+      .filter(Boolean)
+      .slice(0, 6);
+    if (recents.length) {
+      html += '<div class="recipe-selection-group-label">⭐ Recent</div>';
+      html += recents.map(recipeSelectionCard).join('');
+      html += '<div class="recipe-selection-group-label">All recipes</div>';
+    }
   }
+
+  if (filtered.length === 0 && !html) {
+    grid.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No recipes found. Try a different search term.</p>';
+    return;
+  }
+
+  html += filtered.map(recipeSelectionCard).join('');
+  grid.innerHTML = html;
 }
 
 function getCategoryIcon(category) {
@@ -1911,45 +1983,41 @@ function getCategoryIcon(category) {
 }
 
 function selectRecipeForPlanning(recipeId) {
-  console.log('selectRecipeForPlanning called with recipeId:', recipeId);
-  console.log('AppState.selectedMealSlot:', AppState.selectedMealSlot);
-  
   if (!AppState.selectedMealSlot) {
-    console.log('No meal slot selected');
     showSuccessMessage('Please select a meal slot first.');
     return;
   }
-  
+
   const { day, meal } = AppState.selectedMealSlot;
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
-  
-  console.log('Selected day:', day, 'meal:', meal);
-  console.log('Found recipe:', recipe);
-  
-  if (meal === 'snacks') {
-    // For snacks, allow multiple recipes
-    if (!AppState.weeklyPlan[day][meal].includes(recipeId)) {
-      AppState.weeklyPlan[day][meal].push(recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
+  const days = (AppState.selectedPlannerDays && AppState.selectedPlannerDays.length)
+    ? AppState.selectedPlannerDays : [day];
+
+  // Assign to every selected day for this meal.
+  days.forEach(function(d) {
+    if (meal === 'snacks') {
+      if (!AppState.weeklyPlan[d][meal].includes(recipeId)) {
+        AppState.weeklyPlan[d][meal].push(recipeId);
+      }
+    } else {
+      AppState.weeklyPlan[d][meal] = recipeId;
     }
-  } else {
-    // For other meals, replace with new recipe
-    AppState.weeklyPlan[day][meal] = recipeId;
-  }
-  
-  console.log('Updated weekly plan:', AppState.weeklyPlan);
-  
-  // Close modal and update UI
+  });
+
+  recordRecentRecipe(recipeId);
+
   document.getElementById('recipe-selection-modal').classList.add('hidden');
   renderWeeklyPlanner();
   updateWeeklyStats();
   saveData();
   generateGroceryList();
 
-  // Show success message
-  showSuccessMessage(`${recipe?.name || 'Recipe'} added to ${day} ${meal}!`);
-  
-  // Clear selection
+  const where = days.length === 1 ? days[0]
+    : (days.length === 7 ? 'every day' : days.length + ' days');
+  showSuccessMessage(`${recipe ? recipe.name : 'Recipe'} added to ${meal} (${where})!`);
+
   AppState.selectedMealSlot = null;
+  AppState.selectedPlannerDays = [];
 }
 
 function getRecipeName(recipeId) {
@@ -3109,6 +3177,8 @@ window.openEditRecipeModal = openEditRecipeModal;
 window.deleteRecipe = deleteRecipe;
 window.openRecipeSelectionModal = openRecipeSelectionModal;
 window.selectRecipeForPlanning = selectRecipeForPlanning;
+window.togglePlannerDay = togglePlannerDay;
+window.toggleAllPlannerDays = toggleAllPlannerDays;
 window.addRecipeToPlanFromNutrition = addRecipeToPlanFromNutrition;
 window.confirmQuickPlan = confirmQuickPlan;
 window.removeRecipeFromSlot = removeRecipeFromSlot;
@@ -3403,6 +3473,7 @@ async function saveToFirestore() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
+      recentRecipes: AppState.recentRecipes,
       lastUpdated: new Date().toISOString()
     };
 
@@ -3451,6 +3522,7 @@ async function loadFromFirestore() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
+      AppState.recentRecipes = data.recentRecipes || [];
 
       // If we patched nutrition into old data, write it back so Firebase stops sending stale data
       if (didPatch) { setTimeout(saveToFirestore, 500); }
@@ -3520,6 +3592,7 @@ function setupRealtimeListeners() {
         AppState.ingredientPrices = data.ingredientPrices || {};
         AppState.customStores = data.customStores || [];
         AppState.cookedMeals = data.cookedMeals || [];
+        AppState.recentRecipes = data.recentRecipes || [];
 
         // Update UI
         renderRecipes();
