@@ -2374,7 +2374,7 @@ function calculateRecipeNutrition(recipe) {
     // Find nutrition data for this ingredient
     const nutritionData = findIngredientNutrition(ingredient.name);
     if (nutritionData) {
-      const factor = scaledQty / 100; // Nutrition data is per 100g
+      const factor = toGrams(scaledQty, ingredient.unit) / 100; // Nutrition data is per 100g
       total.calories += (nutritionData.calories || 0) * factor;
       total.protein += (nutritionData.protein || 0) * factor;
       total.carbs += (nutritionData.carbs || 0) * factor;
@@ -2387,18 +2387,34 @@ function calculateRecipeNutrition(recipe) {
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 });
 }
 
+function toGrams(quantity, unit) {
+  var u = (unit || 'g').toLowerCase().trim();
+  var factors = {
+    'g': 1, 'kg': 1000, 'ml': 1, 'l': 1000,
+    'tbsp': 15, 'tsp': 5, 'cup': 240, 'cups': 240,
+    'oz': 28.35, 'lbs': 453.6, 'lb': 453.6,
+    'pieces': 100, 'piece': 100, 'cloves': 5,
+    'can': 400, 'pack': 200, 'stalks': 50, 'bunches': 150, 'bunch': 150,
+    'inches': 25, 'slices': 30, 'slice': 30, 'heads': 200, 'head': 200
+  };
+  return quantity * (factors[u] !== undefined ? factors[u] : 1);
+}
+
 function findIngredientNutrition(name) {
-  // Search in custom ingredients
-  const ingredient = AppState.customIngredients.find(ing => 
-    ing.name.toLowerCase().includes(name.toLowerCase()) || 
-    name.toLowerCase().includes(ing.name.toLowerCase())
-  );
-  
-  if (ingredient && ingredient.calories) {
-    return ingredient;
-  }
-  
-  return null;
+  var n = name.toLowerCase().trim();
+
+  // Search user's custom ingredients first (may have manually entered nutrition)
+  var custom = AppState.customIngredients.find(function(ing) {
+    var iname = ing.name.toLowerCase();
+    return iname.includes(n) || n.includes(iname);
+  });
+  if (custom && custom.calories) return custom;
+
+  // Fall back to built-in LOCAL_NUTRITION_DB
+  return LOCAL_NUTRITION_DB.find(function(item) {
+    var iname = item.name.toLowerCase();
+    return iname.includes(n) || n.includes(iname);
+  }) || null;
 }
 
 function openNutritionGoalsModal() {
