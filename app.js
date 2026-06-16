@@ -1412,20 +1412,20 @@ function renderRecipes() {
       
       <!-- Serving Size Controls -->
       <div class="serving-controls">
-        <button class="serving-btn" onclick="updateServingSize(${recipe.id}, ${recipe.currentServings - 1})" 
+        <button class="serving-btn" onclick="updateServingSize('${recipe.id}', ${recipe.currentServings - 1})"
                 ${recipe.currentServings <= 1 ? 'disabled' : ''}>−</button>
         <div class="serving-info">
           <div class="current-servings">${recipe.currentServings} servings</div>
           <div class="base-servings">Base: ${recipe.baseServings}</div>
         </div>
-        <button class="serving-btn" onclick="updateServingSize(${recipe.id}, ${recipe.currentServings + 1})">+</button>
+        <button class="serving-btn" onclick="updateServingSize('${recipe.id}', ${recipe.currentServings + 1})">+</button>
         <div class="quick-servings">
           ${[1, 2, 4, 6, 8].map(size => `
-            <button class="quick-serving-btn ${recipe.currentServings === size ? 'active' : ''}" 
-                    onclick="updateServingSize(${recipe.id}, ${size})">${size}</button>
+            <button class="quick-serving-btn ${recipe.currentServings === size ? 'active' : ''}"
+                    onclick="updateServingSize('${recipe.id}', ${size})">${size}</button>
           `).join('')}
         </div>
-        ${isScaled ? `<button class="reset-servings" onclick="resetServingSize(${recipe.id})">Reset</button>` : ''}
+        ${isScaled ? `<button class="reset-servings" onclick="resetServingSize('${recipe.id}')">Reset</button>` : ''}
       </div>
       
       <div class="prep-time-info">
@@ -1517,8 +1517,8 @@ function renderRecipes() {
       <p><strong>Instructions:</strong> ${recipe.instructions}</p>
       
       <div class="recipe-actions">
-        <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal(${recipe.id})">Edit</button>
-        <button class="btn btn--outline btn--sm" onclick="deleteRecipe(${recipe.id})">Delete</button>
+        <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Edit</button>
+        <button class="btn btn--outline btn--sm" onclick="deleteRecipe('${recipe.id}')">Delete</button>
       </div>
     </div>
   `;
@@ -2654,7 +2654,7 @@ function filterRecipesByNutrition() {
           </div>
         </div>` : `<p class="nutrition-missing-note">No nutrition data. <button class="btn-link" onclick="openEditRecipeModal('${recipe.id}')">Add via recipe edit →</button></p>`}
         <div class="recipe-card-actions">
-          <button class="btn btn--outline btn--sm" onclick="selectRecipeForPlanning('${recipe.id}')">Add to Plan</button>
+          <button class="btn btn--outline btn--sm" onclick="addRecipeToPlanFromNutrition('${recipe.id}')">Add to Plan</button>
           ${!hasNutrition ? `<button class="btn btn--secondary btn--sm" onclick="openEditRecipeModal('${recipe.id}')">📊 Set Nutrition</button>` : ''}
         </div>
       </div>
@@ -2854,6 +2854,44 @@ function deleteHack(hackId) {
   }
 }
 
+// Opens the recipe selection modal pre-filtered so the user can pick a day/meal
+function addRecipeToPlanFromNutrition(recipeId) {
+  // Switch to planner tab so context is clear, then open meal slot picker
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const meals = ['breakfast','lunch','dinner','snacks'];
+  const dayOpts = days.map(d => `<option value="${d}">${d}</option>`).join('');
+  const mealOpts = meals.map(m => `<option value="${m}">${m.charAt(0).toUpperCase()+m.slice(1)}</option>`).join('');
+
+  const existing = document.getElementById('quick-plan-picker');
+  if (existing) existing.remove();
+
+  const picker = document.createElement('div');
+  picker.id = 'quick-plan-picker';
+  picker.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--color-surface);border:1px solid var(--color-border);border-radius:12px;padding:1.5rem;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.2);min-width:280px;';
+  picker.innerHTML = `
+    <h3 style="margin:0 0 1rem">Add to Weekly Plan</h3>
+    <label style="display:block;margin-bottom:.5rem">Day
+      <select id="qpp-day" style="display:block;width:100%;margin-top:.25rem;padding:.5rem;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);">${dayOpts}</select>
+    </label>
+    <label style="display:block;margin-bottom:1rem">Meal
+      <select id="qpp-meal" style="display:block;width:100%;margin-top:.25rem;padding:.5rem;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface);">${mealOpts}</select>
+    </label>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button onclick="document.getElementById('quick-plan-picker').remove()" style="padding:.5rem 1rem;border:1px solid var(--color-border);border-radius:6px;background:none;cursor:pointer;">Cancel</button>
+      <button onclick="confirmQuickPlan('${recipeId}')" style="padding:.5rem 1rem;border:none;border-radius:6px;background:var(--color-primary);color:#fff;cursor:pointer;">Add</button>
+    </div>
+  `;
+  document.body.appendChild(picker);
+}
+
+function confirmQuickPlan(recipeId) {
+  const day  = document.getElementById('qpp-day').value;
+  const meal = document.getElementById('qpp-meal').value;
+  AppState.selectedMealSlot = { day, meal };
+  selectRecipeForPlanning(recipeId);
+  document.getElementById('quick-plan-picker').remove();
+}
+
 // Global functions for onclick handlers
 window.updateServingSize = updateServingSize;
 window.resetServingSize = resetServingSize;
@@ -2861,6 +2899,8 @@ window.openEditRecipeModal = openEditRecipeModal;
 window.deleteRecipe = deleteRecipe;
 window.openRecipeSelectionModal = openRecipeSelectionModal;
 window.selectRecipeForPlanning = selectRecipeForPlanning;
+window.addRecipeToPlanFromNutrition = addRecipeToPlanFromNutrition;
+window.confirmQuickPlan = confirmQuickPlan;
 window.removeRecipeFromSlot = removeRecipeFromSlot;
 window.copyDay = copyDay;
 window.clearDay = clearDay;
@@ -2878,6 +2918,52 @@ window.searchUSDAFallback = searchUSDAFallback;
 window.getCategoryIcon = getCategoryIcon;
 window.showSuccessMessage = showSuccessMessage;
 window.clearLocalStorage = clearLocalStorage;
+// These were missing — caused dark mode, pantry, auth, and export buttons to silently do nothing
+window.toggleDarkMode = toggleDarkMode;
+window.addToPantry = addToPantry;
+window.togglePantrySection = togglePantrySection;
+window.togglePantryCard = togglePantryCard;
+window.removeFromPantry = removeFromPantry;
+window.searchNutritionDB = searchNutritionDB;
+window.applyNutritionResult = applyNutritionResult;
+window.exportData = exportData;
+window.importData = importData;
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
+window.openSignupModal = openSignupModal;
+window.closeSignupModal = closeSignupModal;
+window.signOut = signOut;
+window.importFromCSV = importFromCSV;
+window.saveWeekAsTemplate = saveWeekAsTemplate;
+window.loadWeekTemplate = loadWeekTemplate;
+window.openPrepMode = openPrepMode;
+window.closePrepMode = closePrepMode;
+window.prevPlannerDay = prevPlannerDay;
+window.nextPlannerDay = nextPlannerDay;
+window.printGroceryList = printGroceryList;
+window.copyGroceryList = copyGroceryList;
+window.openSharedRecipesModal = openSharedRecipesModal;
+window.closeSharedRecipesModal = closeSharedRecipesModal;
+window.shareRecipe = shareRecipe;
+window.openFamilySharingModal = openFamilySharingModal;
+window.closeFamilySharingModal = closeFamilySharingModal;
+window.inviteFamilyMember = inviteFamilyMember;
+window.exportAllData = exportAllData;
+window.openDeleteAccountModal = openDeleteAccountModal;
+window.closeDeleteAccountModal = closeDeleteAccountModal;
+window.deleteAccount = deleteAccount;
+window.removePhoto = removePhoto;
+window.closeCustomItemModal = closeCustomItemModal;
+window.confirmCustomGroceryItem = confirmCustomGroceryItem;
+window.openPasteRecipeModal = openPasteRecipeModal;
+window.closePasteRecipeModal = closePasteRecipeModal;
+window.parseAndImportRecipe = parseAndImportRecipe;
+window.closeCSVPreviewModal = closeCSVPreviewModal;
+window.downloadCSVTemplate = downloadCSVTemplate;
+window.confirmCSVImport = confirmCSVImport;
+window.openNutritionGoalsModal = openNutritionGoalsModal;
+window.closeNutritionGoalsModal = closeNutritionGoalsModal;
+window.saveNutritionGoals = saveNutritionGoals;
 
 // Export/Import functionality
 function exportData() {
