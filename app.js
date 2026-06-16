@@ -2400,21 +2400,39 @@ function toGrams(quantity, unit) {
   return quantity * (factors[u] !== undefined ? factors[u] : 1);
 }
 
+function normalizeIngredientName(name) {
+  return name.toLowerCase()
+    .replace(/\([^)]*\)/g, '')        // strip "(bone-in pieces)", "(optional)", etc.
+    .replace(/\s+or\s+.*/i, '')       // strip "or sayote", "or chicken broth"
+    .replace(/\b(bone-in|boneless|fresh|dried|sliced|diced|chopped|minced|small|medium|large|thumb-sized|instant|whole|raw|cooked)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function findIngredientNutrition(name) {
   var n = name.toLowerCase().trim();
+  var normalized = normalizeIngredientName(name);
 
-  // Search user's custom ingredients first (may have manually entered nutrition)
+  function searchDB(term) {
+    if (!term) return null;
+    return LOCAL_NUTRITION_DB.find(function(item) {
+      var iname = item.name.toLowerCase();
+      return iname.includes(term) || term.includes(iname);
+    }) || null;
+  }
+
+  // Search user's custom ingredients first
   var custom = AppState.customIngredients.find(function(ing) {
     var iname = ing.name.toLowerCase();
-    return iname.includes(n) || n.includes(iname);
+    return iname.includes(n) || n.includes(iname) || iname.includes(normalized) || normalized.includes(iname);
   });
   if (custom && custom.calories) return custom;
 
-  // Fall back to built-in LOCAL_NUTRITION_DB
-  return LOCAL_NUTRITION_DB.find(function(item) {
-    var iname = item.name.toLowerCase();
-    return iname.includes(n) || n.includes(iname);
-  }) || null;
+  // Try original name, then normalized, then first significant word
+  return searchDB(n)
+    || searchDB(normalized)
+    || searchDB(normalized.split(/\s+/)[0])
+    || null;
 }
 
 function openNutritionGoalsModal() {
