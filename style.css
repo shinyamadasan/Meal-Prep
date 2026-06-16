@@ -4205,3 +4205,37 @@ select.form-control {
   border-radius: 4px;
   cursor: pointer;
 }
+
+.ingcat-add-btn {
+  margin: 0.75rem 0;
+}
+
+.ingcat-custom-section {
+  margin-bottom: 1rem;
+  border-color: var(--color-primary);
+}
+
+.ingcat-custom-badge {
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  border-radius: 10px;
+  padding: 0.1rem 0.45rem;
+  vertical-align: middle;
+  font-weight: var(--font-weight-medium);
+  margin-left: 0.4rem;
+}
+
+.ingcat-col-actions {
+  min-width: 110px;
+  width: 110px;
+  padding: 0.3rem 0.4rem;
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.ingcat-delete-btn {
+  color: var(--color-danger, #ef4444);
+  border-color: var(--color-danger, #ef4444);
+}

@@ -909,6 +909,73 @@
         </div>
     </div>
 
+    <!-- Custom Ingredient Modal -->
+    <div id="user-ingredient-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:480px">
+            <div class="modal-header">
+                <h3 id="user-ingredient-modal-title">Add Custom Ingredient</h3>
+                <button class="modal-close" onclick="closeUserIngredientModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" id="ui-name" class="form-control" placeholder="e.g. San Marino Tuna">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+                    <div class="form-group">
+                        <label class="form-label">Unit *</label>
+                        <select id="ui-unit" class="form-control">
+                            <option>g</option><option>kg</option><option>ml</option><option>L</option>
+                            <option>can</option><option>pieces</option><option>cups</option>
+                            <option>tbsp</option><option>tsp</option><option>pack</option>
+                            <option>slices</option><option>cloves</option><option>lbs</option><option>oz</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category *</label>
+                        <select id="ui-category" class="form-control">
+                            <option>Protein</option><option>Vegetable</option><option>Fruit</option>
+                            <option>Grain</option><option>Dairy</option><option>Pantry</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size:0.8rem;color:var(--color-text-secondary);margin:0.5rem 0 0.75rem">
+                    Nutrition values per 100g (check the nutrition label)
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem">
+                    <div class="form-group">
+                        <label class="form-label">Calories</label>
+                        <input type="number" id="ui-calories" class="form-control" placeholder="120" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Protein (g)</label>
+                        <input type="number" id="ui-protein" class="form-control" placeholder="25" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Carbs (g)</label>
+                        <input type="number" id="ui-carbs" class="form-control" placeholder="1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fat (g)</label>
+                        <input type="number" id="ui-fat" class="form-control" placeholder="2" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fiber (g)</label>
+                        <input type="number" id="ui-fiber" class="form-control" placeholder="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sodium (mg)</label>
+                        <input type="number" id="ui-sodium" class="form-control" placeholder="300" min="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closeUserIngredientModal()">Cancel</button>
+                <button class="btn btn--primary" onclick="saveUserIngredient()">Save Ingredient</button>
+            </div>
+        </div>
+    </div>
+
     <div id="csv-preview-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">

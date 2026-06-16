@@ -26,6 +26,7 @@ const AppState = {
   customIngredients: [],
   customHacks: [],
   pantry: [],
+  userIngredients: [],
   ingredientPrices: {},
   myStores: [],
   customStores: [],
@@ -46,6 +47,7 @@ function saveToLocalStorage() {
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
       pantry: AppState.pantry,
+      userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
       myStores: AppState.myStores,
       customStores: AppState.customStores,
@@ -87,6 +89,7 @@ function loadFromLocalStorage() {
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
       AppState.pantry = data.pantry || [];
+      AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
@@ -2424,6 +2427,25 @@ function findIngredientNutrition(name) {
   var n = name.toLowerCase().trim();
   var normalized = normalizeIngredientName(name);
 
+  function matchTerm(iname, term) {
+    return iname.includes(term) || term.includes(iname);
+  }
+
+  // 1. User's own custom ingredients (most specific)
+  var userIng = (AppState.userIngredients || []).find(function(ing) {
+    var iname = ing.name.toLowerCase();
+    return matchTerm(iname, n) || matchTerm(iname, normalized);
+  });
+  if (userIng && userIng.calories != null) return userIng;
+
+  // 2. Storage guide custom ingredients (legacy, rarely has nutrition)
+  var custom = AppState.customIngredients.find(function(ing) {
+    var iname = ing.name.toLowerCase();
+    return matchTerm(iname, n) || matchTerm(iname, normalized);
+  });
+  if (custom && custom.calories) return custom;
+
+  // 3. Built-in LOCAL_NUTRITION_DB (try original, normalized, first keyword)
   function searchDB(term) {
     if (!term) return null;
     return LOCAL_NUTRITION_DB.find(function(item) {
@@ -2431,15 +2453,6 @@ function findIngredientNutrition(name) {
       return iname.includes(term) || term.includes(iname);
     }) || null;
   }
-
-  // Search user's custom ingredients first
-  var custom = AppState.customIngredients.find(function(ing) {
-    var iname = ing.name.toLowerCase();
-    return iname.includes(n) || n.includes(iname) || iname.includes(normalized) || normalized.includes(iname);
-  });
-  if (custom && custom.calories) return custom;
-
-  // Try original name, then normalized, then first significant word
   return searchDB(n)
     || searchDB(normalized)
     || searchDB(normalized.split(/\s+/)[0])
@@ -2996,6 +3009,11 @@ window.togglePantrySection = togglePantrySection;
 window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
 window.renderIngredientsTab = renderIngredientsTab;
+window.openAddUserIngredientModal = openAddUserIngredientModal;
+window.openEditUserIngredientModal = openEditUserIngredientModal;
+window.closeUserIngredientModal = closeUserIngredientModal;
+window.saveUserIngredient = saveUserIngredient;
+window.deleteUserIngredient = deleteUserIngredient;
 window.filterIngredientCatalog = filterIngredientCatalog;
 window.addMyStore = addMyStore;
 window.removeMyStore = removeMyStore;
@@ -3243,6 +3261,7 @@ async function saveToFirestore() {
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
       pantry: AppState.pantry,
+      userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
       myStores: AppState.myStores,
       customStores: AppState.customStores,
@@ -3289,6 +3308,7 @@ async function loadFromFirestore() {
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
       AppState.pantry = data.pantry || [];
+      AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
@@ -4742,7 +4762,56 @@ function renderIngredientsTab() {
     rowsHtml += '</div>'; // ingcat-section
   });
 
-  list.innerHTML = storesHtml + searchHtml +
+  // ── My Custom Ingredients section ──
+  var userIngs = AppState.userIngredients || [];
+  var userSection = '';
+  if (userIngs.length > 0) {
+    userSection += '<div class="ingcat-table ingcat-custom-section">';
+    userSection += '<div class="ingcat-header-row">';
+    userSection += '<div class="ingcat-col-name">My Ingredients <span class="ingcat-custom-badge">custom</span></div>';
+    userSection += '<div class="ingcat-col-unit">Unit</div>';
+    myStores.forEach(function(s) { userSection += '<div class="ingcat-col-store">' + escapeHtml(s) + '</div>'; });
+    userSection += '<div class="ingcat-col-pantry">Pantry</div>';
+    userSection += '<div class="ingcat-col-actions"></div>';
+    userSection += '</div>';
+
+    userIngs.forEach(function(item, idx) {
+      var uIdx = 'u' + idx;
+      var override = prices[item.name] || {};
+      var unit = override.unit || item.unit;
+      var storePrices = override.prices || {};
+      var pantryEntry = AppState.pantry.find(function(p) { return p.name.toLowerCase() === item.name.toLowerCase(); });
+
+      userSection += '<div class="ingcat-row" data-name="' + escapeHtml(item.name) + '">';
+      userSection += '<div class="ingcat-col-name"><span class="ingcat-item-name">' + escapeHtml(item.name) + '</span></div>';
+      userSection += '<div class="ingcat-col-unit"><select class="ingcat-unit-select" onchange="saveIngredientUnit(\'' + escJ(item.name) + '\',this.value)">';
+      INGREDIENT_UNITS.forEach(function(u) { userSection += '<option value="' + u + '"' + (unit === u ? ' selected' : '') + '>' + u + '</option>'; });
+      userSection += '</select></div>';
+      myStores.forEach(function(s) {
+        var p = storePrices[s] || '';
+        userSection += '<div class="ingcat-col-store"><input class="ingcat-price-input" value="' + escapeHtml(p) + '" placeholder="e.g. ₱55" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)"></div>';
+      });
+      userSection += '<div class="ingcat-col-pantry" id="ingpantry-' + uIdx + '">';
+      if (pantryEntry) {
+        var qtyStr = pantryEntry.quantity ? pantryEntry.quantity + ' ' + (pantryEntry.unit || '') : '';
+        userSection += '<span class="ingcat-in-pantry">✓' + (qtyStr ? ' ' + qtyStr : '') + '</span>';
+        userSection += '<button class="btn btn--xs btn--outline" onclick="removeIngredientFromPantry(\'' + escJ(String(pantryEntry.id)) + '\')">Remove</button>';
+      } else {
+        userSection += '<button class="btn btn--xs btn--primary" onclick="showPantryAddRow(\'' + uIdx + '\',\'' + escJ(item.name) + '\',\'' + escJ(unit) + '\')">+ Pantry</button>';
+      }
+      userSection += '</div>';
+      userSection += '<div class="ingcat-col-actions">';
+      userSection += '<button class="btn btn--xs btn--outline" onclick="openEditUserIngredientModal(\'' + escJ(item.id) + '\')">Edit</button>';
+      userSection += '<button class="btn btn--xs btn--outline ingcat-delete-btn" onclick="deleteUserIngredient(\'' + escJ(item.id) + '\')">Delete</button>';
+      userSection += '</div>';
+      userSection += '</div>';
+    });
+    userSection += '</div>';
+  }
+
+  var addBtnHtml = '<button class="btn btn--primary ingcat-add-btn" onclick="openAddUserIngredientModal()">+ Add My Ingredient</button>';
+
+  list.innerHTML = storesHtml + searchHtml + addBtnHtml + userSection +
     '<div class="ingcat-table">' + colHeaderHtml + rowsHtml + '</div>';
 }
 
@@ -4821,6 +4890,79 @@ function removeIngredientFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(function(p) { return String(p.id) !== String(id); });
   saveData();
   renderPantry();
+  renderIngredientsTab();
+}
+
+// ── Custom (User) Ingredient CRUD ────────────────────────────────────────────
+
+var _editingUserIngredientId = null;
+
+function openAddUserIngredientModal() {
+  _editingUserIngredientId = null;
+  document.getElementById('user-ingredient-modal-title').textContent = 'Add Custom Ingredient';
+  ['ui-name','ui-calories','ui-protein','ui-carbs','ui-fat','ui-fiber','ui-sodium'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ui-unit').value = 'g';
+  document.getElementById('ui-category').value = 'Protein';
+  document.getElementById('user-ingredient-modal').classList.remove('hidden');
+}
+
+function openEditUserIngredientModal(id) {
+  var ing = (AppState.userIngredients || []).find(function(i) { return i.id === id; });
+  if (!ing) return;
+  _editingUserIngredientId = id;
+  document.getElementById('user-ingredient-modal-title').textContent = 'Edit Ingredient';
+  document.getElementById('ui-name').value = ing.name || '';
+  document.getElementById('ui-unit').value = ing.unit || 'g';
+  document.getElementById('ui-category').value = ing.category || 'Protein';
+  document.getElementById('ui-calories').value = ing.calories || '';
+  document.getElementById('ui-protein').value = ing.protein || '';
+  document.getElementById('ui-carbs').value = ing.carbs || '';
+  document.getElementById('ui-fat').value = ing.fat || '';
+  document.getElementById('ui-fiber').value = ing.fiber || '';
+  document.getElementById('ui-sodium').value = ing.sodium || '';
+  document.getElementById('user-ingredient-modal').classList.remove('hidden');
+}
+
+function closeUserIngredientModal() {
+  document.getElementById('user-ingredient-modal').classList.add('hidden');
+}
+
+function saveUserIngredient() {
+  var name = document.getElementById('ui-name').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+
+  var ingredient = {
+    id: _editingUserIngredientId || ('ui_' + Date.now()),
+    name: name,
+    unit: document.getElementById('ui-unit').value,
+    category: document.getElementById('ui-category').value,
+    calories: parseFloat(document.getElementById('ui-calories').value) || 0,
+    protein:  parseFloat(document.getElementById('ui-protein').value)  || 0,
+    carbs:    parseFloat(document.getElementById('ui-carbs').value)    || 0,
+    fat:      parseFloat(document.getElementById('ui-fat').value)      || 0,
+    fiber:    parseFloat(document.getElementById('ui-fiber').value)    || 0,
+    sodium:   parseFloat(document.getElementById('ui-sodium').value)   || 0
+  };
+
+  if (_editingUserIngredientId) {
+    AppState.userIngredients = (AppState.userIngredients || []).map(function(i) {
+      return i.id === _editingUserIngredientId ? ingredient : i;
+    });
+  } else {
+    AppState.userIngredients = (AppState.userIngredients || []).concat([ingredient]);
+  }
+
+  saveData();
+  closeUserIngredientModal();
+  renderIngredientsTab();
+}
+
+function deleteUserIngredient(id) {
+  if (!confirm('Remove this custom ingredient?')) return;
+  AppState.userIngredients = (AppState.userIngredients || []).filter(function(i) { return i.id !== id; });
+  saveData();
   renderIngredientsTab();
 }
 
@@ -5511,9 +5653,11 @@ const INGREDIENT_DB = [
 
 function filterIngredients(query) {
   var q = query.toLowerCase();
-  return INGREDIENT_DB.filter(function(i) {
-    return i.name.toLowerCase().includes(q);
-  }).slice(0, 8);
+  var userMatches = (AppState.userIngredients || [])
+    .filter(function(i) { return i.name.toLowerCase().includes(q); })
+    .map(function(i) { return { name: i.name, unit: i.unit, category: i.category, price: '', store: '', isCustom: true }; });
+  var dbMatches = INGREDIENT_DB.filter(function(i) { return i.name.toLowerCase().includes(q); });
+  return userMatches.concat(dbMatches).slice(0, 10);
 }
 
 function attachIngredientAutocomplete(nameInput) {
