@@ -3869,6 +3869,73 @@ select.form-control {
 }
 
 
+/* ── Nutrition Tab Recipe Cards ──────────────────────────────────────────── */
+
+.nutr-recipe-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.nutr-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nutr-card-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.nutr-card-servings {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.nutr-macros {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nutr-macro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-bg-3);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  min-width: 48px;
+}
+
+.nutr-macro-val {
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+
+.nutr-cal .nutr-macro-val {
+  color: var(--color-primary);
+}
+
+.nutr-macro-lbl {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.nutr-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
 /* ── Ingredient Autocomplete ─────────────────────────────────────────────── */
 
 .ing-name-wrap {

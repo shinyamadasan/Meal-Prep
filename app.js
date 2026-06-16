@@ -96,24 +96,57 @@ function loadFromLocalStorage() {
 }
 
 // Patches nutrition data into sample recipes that were saved before nutrition was added.
-// Safe to call after every load — only fills gaps, never overwrites user-entered data.
+// Returns true if anything was patched (caller should re-save to Firebase).
 function patchMissingNutrition(recipes) {
+  var patched = false;
   recipes.forEach(function(recipe) {
     if (!recipe.nutritionPerServing || recipe.nutritionPerServing.calories === 0) {
-      var source = sampleRecipes.find(function(s) { return s.id === recipe.id; });
+      // Use loose string comparison — Firestore may store numeric IDs as strings
+      var source = sampleRecipes.find(function(s) { return String(s.id) === String(recipe.id); });
       if (source && source.nutritionPerServing) {
         recipe.nutritionPerServing = source.nutritionPerServing;
+        patched = true;
       }
     }
   });
+  return patched;
 }
 
 function clearLocalStorage() {
-  if (confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {
+  if (confirm('Clear ALL saved data and reset to defaults? This cannot be undone.')) {
     localStorage.removeItem(STORAGE_KEY);
-    showSuccessMessage('All saved data has been cleared.');
-    // Reload the page to reset to default state
-    location.reload();
+    // Reset AppState to defaults
+    AppState.recipes = sampleRecipes.map(function(r) { return Object.assign({}, r); });
+    AppState.weeklyPlan = {
+      Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+      Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+    };
+    AppState.pantry = [];
+    AppState.groceryList = [];
+    AppState.customIngredients = [...defaultStorageData];
+    AppState.customHacks = [...defaultCookingHacks];
+    AppState.nutritionGoals = { calories: 2000, protein: 150, carbs: 250, fat: 67, fiber: 25, sodium: 2300 };
+
+    // Also wipe Firebase so it doesn't sync old data back on reload
+    if (AppState.currentUser && window.firebase && window.firebase.db) {
+      const ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+      window.firebase.setDoc(ref, {
+        recipes: AppState.recipes,
+        weeklyPlan: AppState.weeklyPlan,
+        pantry: [],
+        groceryList: [],
+        customIngredients: AppState.customIngredients,
+        customHacks: AppState.customHacks,
+        nutritionGoals: AppState.nutritionGoals
+      }).then(function() { location.reload(); });
+    } else {
+      location.reload();
+    }
   }
 }
 
@@ -2636,26 +2669,37 @@ function filterRecipesByNutrition() {
     const hasNutrition = perServing.calories > 0;
 
     return `
-      <div class="recipe-card">
-        <h4>${recipe.name}</h4>
+      <div class="recipe-card nutr-recipe-card">
+        <div class="nutr-card-top">
+          <h4 class="nutr-card-name">${recipe.name}</h4>
+          <span class="nutr-card-servings">${recipe.currentServings} serving${recipe.currentServings !== 1 ? 's' : ''}</span>
+        </div>
         ${hasNutrition ? `
-        <div class="nutrition-facts">
-          <div class="nutrition-item">
-            <span class="nutrition-item-value">${perServing.calories}</span>
-            <span class="nutrition-item-label">calories</span>
+        <div class="nutr-macros">
+          <div class="nutr-macro nutr-cal">
+            <span class="nutr-macro-val">${perServing.calories}</span>
+            <span class="nutr-macro-lbl">kcal</span>
           </div>
-          <div class="nutrition-item">
-            <span class="nutrition-item-value">${perServing.protein}g</span>
-            <span class="nutrition-item-label">protein</span>
+          <div class="nutr-macro">
+            <span class="nutr-macro-val">${perServing.protein}g</span>
+            <span class="nutr-macro-lbl">protein</span>
           </div>
-          <div class="nutrition-item">
-            <span class="nutrition-item-value">${perServing.carbs}g</span>
-            <span class="nutrition-item-label">carbs</span>
+          <div class="nutr-macro">
+            <span class="nutr-macro-val">${perServing.carbs}g</span>
+            <span class="nutr-macro-lbl">carbs</span>
           </div>
-        </div>` : `<p class="nutrition-missing-note">No nutrition data. <button class="btn-link" onclick="openEditRecipeModal('${recipe.id}')">Add via recipe edit →</button></p>`}
-        <div class="recipe-card-actions">
-          <button class="btn btn--outline btn--sm" onclick="addRecipeToPlanFromNutrition('${recipe.id}')">Add to Plan</button>
-          ${!hasNutrition ? `<button class="btn btn--secondary btn--sm" onclick="openEditRecipeModal('${recipe.id}')">📊 Set Nutrition</button>` : ''}
+          <div class="nutr-macro">
+            <span class="nutr-macro-val">${perServing.fat}g</span>
+            <span class="nutr-macro-lbl">fat</span>
+          </div>
+          ${perServing.fiber > 0 ? `<div class="nutr-macro"><span class="nutr-macro-val">${perServing.fiber}g</span><span class="nutr-macro-lbl">fiber</span></div>` : ''}
+        </div>` : `
+        <p class="nutrition-missing-note">No nutrition data yet.
+          <button class="btn-link" onclick="openEditRecipeModal('${recipe.id}')">Add in recipe editor →</button>
+        </p>`}
+        <div class="nutr-card-actions">
+          <button class="btn btn--primary btn--sm" onclick="addRecipeToPlanFromNutrition('${recipe.id}')">+ Add to Plan</button>
+          ${!hasNutrition ? `<button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Set Nutrition</button>` : ''}
         </div>
       </div>
     `;
@@ -3184,7 +3228,7 @@ async function loadFromFirestore() {
     if (docSnap.exists()) {
       const data = docSnap.data();
       AppState.recipes = data.recipes || [];
-      patchMissingNutrition(AppState.recipes);
+      const didPatch = patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -3205,6 +3249,9 @@ async function loadFromFirestore() {
       };
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
+
+      // If we patched nutrition into old data, write it back so Firebase stops sending stale data
+      if (didPatch) { setTimeout(saveToFirestore, 500); }
 
       console.log('Data loaded from Firestore');
       showSuccessMessage('Data synced from cloud!');
