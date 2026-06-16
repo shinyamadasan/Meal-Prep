@@ -70,6 +70,35 @@ function inferCategory(name) {
   return loose ? loose.category : '';
 }
 
+// Best-effort default storage location ('fridge' | 'freezer' | 'counter') for an
+// ingredient, from the storage-guide data when known, else by category. Storage-
+// guide locations list the PRIMARY spot first (e.g. "Fridge / Freezer",
+// "Counter / Freezer"), so we pick whichever keyword appears earliest.
+function inferStorage(name, category) {
+  var k = (typeof lookupPantryKnowledge === 'function') ? lookupPantryKnowledge(name) : null;
+  if (k && k.location) {
+    var loc = k.location.toLowerCase();
+    function pos(words) {
+      var best = Infinity;
+      words.forEach(function(w) { var i = loc.indexOf(w); if (i >= 0 && i < best) best = i; });
+      return best;
+    }
+    var idx = {
+      counter: pos(['counter', 'pantry', 'cabinet', 'shelf', 'cupboard']),
+      fridge: /not\s+fridge/.test(loc) ? Infinity : pos(['fridge', 'refriger']),
+      freezer: pos(['freezer'])
+    };
+    var best = null, bestPos = Infinity;
+    ['counter', 'fridge', 'freezer'].forEach(function(key) {
+      if (idx[key] < bestPos) { bestPos = idx[key]; best = key; }
+    });
+    if (best) return best;
+  }
+  var c = (category || '').toLowerCase();
+  if (c === 'pantry' || c === 'grain') return 'counter';
+  return 'fridge';
+}
+
 // Whole days remaining until (startDate + shelfLifeDays). Negative = expired.
 function daysLeftFrom(startDateStr, shelfLifeDays) {
   if (!startDateStr || shelfLifeDays == null || isNaN(shelfLifeDays)) return null;
@@ -3104,6 +3133,7 @@ window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
 window.updatePantryDate = updatePantryDate;
 window.updatePantryShelf = updatePantryShelf;
+window.setPantryStorage = setPantryStorage;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -4719,43 +4749,86 @@ function renderPantry() {
     return h;
   }
 
-  var html = banner + '<div class="pantry-cards">';
-  AppState.pantry.forEach(function(p) {
+  // Effective storage location: explicit if set, else inferred (so items saved
+  // before storage tracking existed still land in a sensible section).
+  function effStorage(p) { return p.storage || inferStorage(p.name, p.category); }
+
+  // Fridge / Freezer / Counter toggle that moves an item between sections.
+  function storageToggle(p) {
+    var cur = effStorage(p);
+    var opts = [['fridge', '📅 Fridge'], ['freezer', '❄️ Freezer'], ['counter', '🗄️ Counter']];
+    var h = '<div class="storage-toggle">';
+    opts.forEach(function(o) {
+      h += '<button class="' + (cur === o[0] ? 'active' : '') + '" onclick="setPantryStorage(\'' +
+           p.id + '\', \'' + o[0] + '\')">' + o[1] + '</button>';
+    });
+    h += '</div>';
+    return h;
+  }
+
+  function buildCard(p) {
     var k = lookupPantryKnowledge(p.name);
     var safeId = String(p.id).replace('.', '_');
+    var c = '';
     if (k) {
-      html += '<div class="pantry-card" id="pcard-' + safeId + '">';
-      html += '<div class="pantry-card-header">';
+      c += '<div class="pantry-card" id="pcard-' + safeId + '">';
+      c += '<div class="pantry-card-header">';
       var qtyLabel = p.quantity ? p.quantity + ' ' + (p.unit || '') + ' ' : '';
-      html += '<span class="pantry-card-title">' + k.icon + ' ' + qtyLabel + p.name + '</span>';
-      html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
-      html += '</div>';
-      html += freshRow(p);
-      html += '<div class="pantry-card-meta">';
-      html += '<span class="pantry-location-badge">' + k.locationIcon + ' ' + k.location + '</span>';
-      html += '<span class="pantry-lasts">⏱️ ' + k.lasts + '</span>';
-      html += '<button class="pantry-info-btn" onclick="togglePantryCard(\'' + safeId + '\')" title="Storage guide">ℹ️ Guide</button>';
-      html += '</div>';
-      html += '<div class="pantry-card-detail hidden" id="pdetail-' + safeId + '">';
-      html += '<div class="pantry-detail-row"><b>📦 How to store:</b> ' + k.store + '</div>';
-      html += '<div class="pantry-detail-row"><b>🚫 Signs it\'s bad:</b> ' + k.spoilage + '</div>';
-      html += '<div class="pantry-detail-row"><b>🔍 Freshness guide:</b> ' + k.freshness + '</div>';
-      if (k.tip) html += '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>';
-      html += '</div>';
-      html += '</div>';
+      c += '<span class="pantry-card-title">' + k.icon + ' ' + qtyLabel + p.name + '</span>';
+      c += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
+      c += '</div>';
+      c += freshRow(p);
+      c += storageToggle(p);
+      c += '<div class="pantry-card-meta">';
+      c += '<span class="pantry-location-badge">' + k.locationIcon + ' ' + k.location + '</span>';
+      c += '<span class="pantry-lasts">⏱️ ' + k.lasts + '</span>';
+      c += '<button class="pantry-info-btn" onclick="togglePantryCard(\'' + safeId + '\')" title="Storage guide">ℹ️ Guide</button>';
+      c += '</div>';
+      c += '<div class="pantry-card-detail hidden" id="pdetail-' + safeId + '">';
+      c += '<div class="pantry-detail-row"><b>📦 How to store:</b> ' + k.store + '</div>';
+      c += '<div class="pantry-detail-row"><b>🚫 Signs it\'s bad:</b> ' + k.spoilage + '</div>';
+      c += '<div class="pantry-detail-row"><b>🔍 Freshness guide:</b> ' + k.freshness + '</div>';
+      if (k.tip) c += '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>';
+      c += '</div>';
+      c += '</div>';
     } else {
       var qtyLabelPlain = p.quantity ? p.quantity + ' ' + (p.unit || '') + ' ' : '';
-      html += '<div class="pantry-card pantry-card--plain">';
-      html += '<div class="pantry-card-header">';
-      html += '<span class="pantry-card-title">' + qtyLabelPlain + p.name + '</span>';
-      html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
-      html += '</div>';
-      html += freshRow(p);
-      html += '</div>';
+      c += '<div class="pantry-card pantry-card--plain">';
+      c += '<div class="pantry-card-header">';
+      c += '<span class="pantry-card-title">' + qtyLabelPlain + p.name + '</span>';
+      c += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
+      c += '</div>';
+      c += freshRow(p);
+      c += storageToggle(p);
+      c += '</div>';
     }
+    return c;
+  }
+
+  var groups = [
+    { key: 'fridge', label: '📅 In the Fridge' },
+    { key: 'freezer', label: '❄️ In the Freezer' },
+    { key: 'counter', label: '🗄️ Counter / Pantry' }
+  ];
+  var html = banner;
+  groups.forEach(function(g) {
+    var items = AppState.pantry.filter(function(p) { return effStorage(p) === g.key; });
+    if (items.length === 0) return;
+    html += '<div class="fridge-subsection-title">' + g.label +
+            ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
+    html += '<div class="pantry-cards">';
+    items.forEach(function(p) { html += buildCard(p); });
+    html += '</div>';
   });
-  html += '</div>';
   list.innerHTML = html;
+}
+
+function setPantryStorage(id, storage) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  p.storage = storage;
+  saveData();
+  renderPantry();
 }
 
 // Persist edits to a pantry item's purchase date / shelf life, then re-render.
@@ -4839,33 +4912,44 @@ function renderCookedMeals() {
   }
   if (section) section.classList.remove('hidden');
 
-  // Most urgent (fewest days left) first.
-  var sorted = meals.slice().sort(function(a, b) {
-    var da = daysLeftFrom(a.cookedDate, cookedShelfLife(a));
-    var db = daysLeftFrom(b.cookedDate, cookedShelfLife(b));
-    if (da == null) return 1;
-    if (db == null) return -1;
-    return da - db;
-  });
-
-  var html = '';
-  sorted.forEach(function(m) {
+  function buildCookedCard(m) {
     var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
     var fs = freshnessStatus(dl);
-    html += '<div class="cooked-card ' + fs.cls + '">';
-    html += '<div class="cooked-card-main">';
-    html += '<span class="cooked-name">🍱 ' + escapeHtml(m.name) + '</span>';
-    if (fs.label) html += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
-    html += '</div>';
-    html += '<div class="cooked-card-meta">';
-    html += '<label class="cooked-field" title="Date cooked">👨‍🍳 <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
-    html += '<div class="cooked-storage-toggle">';
-    html += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">📅 Fridge ' + (m.fridgeLife || 0) + 'd</button>';
-    html += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">❄️ Freezer ' + (m.freezerLife || 0) + 'd</button>';
-    html += '</div>';
-    html += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">✓ Done</button>';
-    html += '</div>';
-    html += '</div>';
+    var h = '<div class="cooked-card ' + fs.cls + '">';
+    h += '<div class="cooked-card-main">';
+    h += '<span class="cooked-name">🍱 ' + escapeHtml(m.name) + '</span>';
+    if (fs.label) h += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
+    h += '</div>';
+    h += '<div class="cooked-card-meta">';
+    h += '<label class="cooked-field" title="Date cooked">👨‍🍳 <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
+    h += '<div class="cooked-storage-toggle">';
+    h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">📅 Fridge ' + (m.fridgeLife || 0) + 'd</button>';
+    h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">❄️ Freezer ' + (m.freezerLife || 0) + 'd</button>';
+    h += '</div>';
+    h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">✓ Done</button>';
+    h += '</div>';
+    h += '</div>';
+    return h;
+  }
+
+  var groups = [
+    { key: 'fridge', label: '📅 In the Fridge' },
+    { key: 'freezer', label: '❄️ In the Freezer' }
+  ];
+  var html = '';
+  groups.forEach(function(g) {
+    var items = meals.filter(function(m) { return (m.storage || 'fridge') === g.key; });
+    if (items.length === 0) return;
+    items.sort(function(a, b) {
+      var da = daysLeftFrom(a.cookedDate, cookedShelfLife(a));
+      var db = daysLeftFrom(b.cookedDate, cookedShelfLife(b));
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da - db;
+    });
+    html += '<div class="fridge-subsection-title">' + g.label +
+            ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
+    items.forEach(function(m) { html += buildCookedCard(m); });
   });
   list.innerHTML = html;
 }
@@ -4981,7 +5065,8 @@ function addToPantry() {
     name: name,
     category: category,
     purchaseDate: todayISO(),
-    shelfLifeDays: categoryShelfLife(category)
+    shelfLifeDays: categoryShelfLife(category),
+    storage: inferStorage(name, category)
   });
   input.value = '';
   input.focus();
@@ -5240,7 +5325,8 @@ function confirmAddIngredientToPantry(name, idx, unit) {
     unit: unit,
     category: category,
     purchaseDate: todayISO(),
-    shelfLifeDays: categoryShelfLife(category)
+    shelfLifeDays: categoryShelfLife(category),
+    storage: inferStorage(name, category)
   });
   saveData();
   renderIngredientsTab();
