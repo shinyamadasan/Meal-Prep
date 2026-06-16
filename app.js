@@ -2353,7 +2353,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 // Nutrition tracking functions
 function calculateRecipeNutrition(recipe) {
-  if (recipe.nutritionPerServing) {
+  if (recipe.nutritionPerServing && recipe.nutritionPerServing.calories > 0) {
     // If recipe already has nutrition data, scale it
     const scale = recipe.currentServings / recipe.baseServings;
     return {
