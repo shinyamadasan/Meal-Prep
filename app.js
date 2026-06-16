@@ -30,9 +30,64 @@ const AppState = {
   ingredientPrices: {},
   myStores: [],
   customStores: [],
+  cookedMeals: [],
   currentUser: null,
   isOnline: navigator.onLine
 };
+
+// ── Freshness tracking (pantry expiry + cooked-meal shelf life) ───────────────
+var FRESHNESS_WARN_DAYS = 2; // warn when this many days or fewer remain
+
+function todayISO() {
+  var d = new Date();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
+// Rough default shelf life (days) by ingredient category — editable per item.
+function categoryShelfLife(category) {
+  switch ((category || '').toLowerCase()) {
+    case 'protein': return 3;
+    case 'vegetable': return 7;
+    case 'fruit': return 7;
+    case 'dairy': return 7;
+    case 'grain': return 180;
+    case 'pantry': return 365;
+    default: return 7;
+  }
+}
+
+// Best-effort category for a free-typed ingredient name, via INGREDIENT_DB.
+function inferCategory(name) {
+  var n = (name || '').toLowerCase();
+  var exact = INGREDIENT_DB.find(function (i) { return i.name.toLowerCase() === n; });
+  if (exact) return exact.category;
+  var loose = INGREDIENT_DB.find(function (i) {
+    var x = i.name.toLowerCase();
+    return x.includes(n) || n.includes(x);
+  });
+  return loose ? loose.category : '';
+}
+
+// Whole days remaining until (startDate + shelfLifeDays). Negative = expired.
+function daysLeftFrom(startDateStr, shelfLifeDays) {
+  if (!startDateStr || shelfLifeDays == null || isNaN(shelfLifeDays)) return null;
+  var start = new Date(startDateStr + 'T00:00:00');
+  if (isNaN(start.getTime())) return null;
+  var expiry = start.getTime() + Number(shelfLifeDays) * 86400000;
+  var today = new Date(todayISO() + 'T00:00:00').getTime();
+  return Math.round((expiry - today) / 86400000);
+}
+
+// Visual status from days remaining. Threshold is FRESHNESS_WARN_DAYS.
+function freshnessStatus(daysLeft) {
+  if (daysLeft == null) return { cls: '', icon: '', label: '' };
+  if (daysLeft < 0) return { cls: 'fresh-expired', icon: '🔴', label: 'Expired ' + Math.abs(daysLeft) + 'd ago' };
+  if (daysLeft === 0) return { cls: 'fresh-warn', icon: '🟠', label: 'Use today!' };
+  if (daysLeft <= FRESHNESS_WARN_DAYS) return { cls: 'fresh-warn', icon: '🟠', label: daysLeft + 'd left' };
+  return { cls: 'fresh-ok', icon: '🟢', label: daysLeft + 'd left' };
+}
 
 // Local Storage Management
 const STORAGE_KEY = 'mealPrepAppData';
@@ -51,6 +106,7 @@ function saveToLocalStorage() {
       ingredientPrices: AppState.ingredientPrices,
       myStores: AppState.myStores,
       customStores: AppState.customStores,
+      cookedMeals: AppState.cookedMeals,
       lastSaved: new Date().toISOString()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -93,6 +149,7 @@ function loadFromLocalStorage() {
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
+      AppState.cookedMeals = data.cookedMeals || [];
 
       console.log('Data loaded from local storage');
       if (data.lastSaved) {
@@ -971,6 +1028,8 @@ function initApp() {
         renderWeeklyPlanner();
         renderStorageGuide();
         renderCookingHacks();
+        renderCookedMeals();
+        renderPantry();
         updateNutritionGoalsDisplay();
         initWeekTemplateButton();
         updateThemeToggleIcon();
@@ -998,6 +1057,7 @@ function initApp() {
     renderStorageGuide();
     renderCookingHacks();
     renderPantry();
+    renderCookedMeals();
   }
 
   initWeekTemplateButton();
@@ -1573,6 +1633,7 @@ function renderRecipes() {
       <p><strong>Instructions:</strong> ${recipe.instructions}</p>
       
       <div class="recipe-actions">
+        <button class="btn btn--primary btn--sm" onclick="markRecipeCooked('${recipe.id}')" title="Track this in your fridge/freezer">✓ Cooked</button>
         <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Edit</button>
         <button class="btn btn--outline btn--sm" onclick="deleteRecipe('${recipe.id}')">Delete</button>
       </div>
@@ -3035,6 +3096,13 @@ window.addToPantry = addToPantry;
 window.togglePantrySection = togglePantrySection;
 window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
+window.updatePantryDate = updatePantryDate;
+window.updatePantryShelf = updatePantryShelf;
+window.markRecipeCooked = markRecipeCooked;
+window.setCookedStorage = setCookedStorage;
+window.updateCookedDate = updateCookedDate;
+window.removeCookedMeal = removeCookedMeal;
+window.renderCookedMeals = renderCookedMeals;
 window.renderIngredientsTab = renderIngredientsTab;
 window.openAddUserIngredientModal = openAddUserIngredientModal;
 window.openEditUserIngredientModal = openEditUserIngredientModal;
@@ -3292,9 +3360,10 @@ async function saveToFirestore() {
       ingredientPrices: AppState.ingredientPrices,
       myStores: AppState.myStores,
       customStores: AppState.customStores,
+      cookedMeals: AppState.cookedMeals,
       lastUpdated: new Date().toISOString()
     };
-    
+
     await window.firebase.setDoc(userDocRef, dataToSave, { merge: true });
     console.log('Data saved to Firestore');
   } catch (error) {
@@ -3339,6 +3408,7 @@ async function loadFromFirestore() {
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
+      AppState.cookedMeals = data.cookedMeals || [];
 
       // If we patched nutrition into old data, write it back so Firebase stops sending stale data
       if (didPatch) { setTimeout(saveToFirestore, 500); }
@@ -3372,6 +3442,8 @@ async function loadUserData() {
   renderWeeklyPlanner();
   renderStorageGuide();
   renderCookingHacks();
+  renderCookedMeals();
+  renderPantry();
   updateNutritionGoalsDisplay();
 }
 
@@ -3402,14 +3474,17 @@ function setupRealtimeListeners() {
         AppState.pantry = data.pantry || [];
         AppState.ingredientPrices = data.ingredientPrices || {};
         AppState.customStores = data.customStores || [];
+        AppState.cookedMeals = data.cookedMeals || [];
 
         // Update UI
         renderRecipes();
         renderWeeklyPlanner();
         renderStorageGuide();
         renderCookingHacks();
+        renderCookedMeals();
+        renderPantry();
         updateNutritionGoalsDisplay();
-        
+
         showSuccessMessage('Data updated from cloud!');
       }
     }
@@ -4599,7 +4674,39 @@ function renderPantry() {
     return;
   }
 
-  var html = '<div class="pantry-cards">';
+  // Freshness summary banner (expired / expiring soon)
+  var expiredCount = 0, expiringCount = 0;
+  AppState.pantry.forEach(function(p) {
+    var dl = daysLeftFrom(p.purchaseDate, p.shelfLifeDays);
+    if (dl == null) return;
+    if (dl < 0) expiredCount++;
+    else if (dl <= FRESHNESS_WARN_DAYS) expiringCount++;
+  });
+  var banner = '';
+  if (expiredCount || expiringCount) {
+    var parts = [];
+    if (expiredCount) parts.push('🔴 ' + expiredCount + ' expired');
+    if (expiringCount) parts.push('🟠 ' + expiringCount + ' expiring soon');
+    banner = '<div class="pantry-fresh-summary ' + (expiredCount ? 'fresh-expired' : 'fresh-warn') + '">' +
+             parts.join(' • ') + '</div>';
+  }
+
+  // Builds the editable purchase-date + shelf-life + status row shared by both card styles.
+  function freshRow(p) {
+    var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
+    var dl = daysLeftFrom(p.purchaseDate, shelf);
+    var fs = freshnessStatus(dl);
+    var h = '<div class="pantry-fresh ' + fs.cls + '">';
+    if (fs.label) h += '<span class="pantry-fresh-badge">' + fs.icon + ' ' + fs.label + '</span>';
+    h += '<label class="pantry-fresh-field" title="Date you bought it">🛒 <input type="date" value="' +
+         (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></label>';
+    h += '<label class="pantry-fresh-field" title="Stays good for (days)">⏳ <input type="number" min="0" value="' +
+         shelf + '" onchange="updatePantryShelf(\'' + p.id + '\', this.value)"> days</label>';
+    h += '</div>';
+    return h;
+  }
+
+  var html = banner + '<div class="pantry-cards">';
   AppState.pantry.forEach(function(p) {
     var k = lookupPantryKnowledge(p.name);
     var safeId = String(p.id).replace('.', '_');
@@ -4610,6 +4717,7 @@ function renderPantry() {
       html += '<span class="pantry-card-title">' + k.icon + ' ' + qtyLabel + p.name + '</span>';
       html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
       html += '</div>';
+      html += freshRow(p);
       html += '<div class="pantry-card-meta">';
       html += '<span class="pantry-location-badge">' + k.locationIcon + ' ' + k.location + '</span>';
       html += '<span class="pantry-lasts">⏱️ ' + k.lasts + '</span>';
@@ -4625,12 +4733,127 @@ function renderPantry() {
     } else {
       var qtyLabelPlain = p.quantity ? p.quantity + ' ' + (p.unit || '') + ' ' : '';
       html += '<div class="pantry-card pantry-card--plain">';
+      html += '<div class="pantry-card-header">';
       html += '<span class="pantry-card-title">' + qtyLabelPlain + p.name + '</span>';
       html += '<button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button>';
+      html += '</div>';
+      html += freshRow(p);
       html += '</div>';
     }
   });
   html += '</div>';
+  list.innerHTML = html;
+}
+
+// Persist edits to a pantry item's purchase date / shelf life, then re-render.
+function updatePantryDate(id, value) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  p.purchaseDate = value || null;
+  if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
+  saveData();
+  renderPantry();
+}
+
+function updatePantryShelf(id, value) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  var days = parseInt(value, 10);
+  p.shelfLifeDays = isNaN(days) ? null : days;
+  saveData();
+  renderPantry();
+}
+
+// ── Cooked meal tracking ─────────────────────────────────────────────────────
+
+// Mark a recipe as cooked today → create a tracked batch (defaults to fridge).
+// Snapshots the recipe's fridge/freezer life so later recipe edits don't
+// retroactively change batches already in your fridge.
+function markRecipeCooked(recipeId) {
+  var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
+  if (!recipe) { showErrorMessage('Recipe not found'); return; }
+  AppState.cookedMeals = AppState.cookedMeals || [];
+  AppState.cookedMeals.push({
+    id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+    recipeId: String(recipe.id),
+    name: recipe.name,
+    cookedDate: todayISO(),
+    storage: 'fridge',
+    fridgeLife: recipe.fridgeLife || 0,
+    freezerLife: recipe.freezerLife || 0
+  });
+  saveData();
+  renderCookedMeals();
+  showSuccessMessage('Marked "' + recipe.name + '" as cooked — now tracking freshness.');
+}
+
+function cookedShelfLife(m) {
+  return m.storage === 'freezer' ? (m.freezerLife || 0) : (m.fridgeLife || 0);
+}
+
+function setCookedStorage(id, storage) {
+  var m = (AppState.cookedMeals || []).find(function(x) { return String(x.id) === String(id); });
+  if (!m) return;
+  m.storage = storage;
+  saveData();
+  renderCookedMeals();
+}
+
+function updateCookedDate(id, value) {
+  var m = (AppState.cookedMeals || []).find(function(x) { return String(x.id) === String(id); });
+  if (!m) return;
+  m.cookedDate = value || todayISO();
+  saveData();
+  renderCookedMeals();
+}
+
+function removeCookedMeal(id) {
+  AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return String(x.id) !== String(id); });
+  saveData();
+  renderCookedMeals();
+}
+
+function renderCookedMeals() {
+  var list = document.getElementById('cooked-meals-list');
+  if (!list) return;
+  var section = document.getElementById('cooked-meals-section');
+  var meals = AppState.cookedMeals || [];
+
+  if (meals.length === 0) {
+    if (section) section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  if (section) section.classList.remove('hidden');
+
+  // Most urgent (fewest days left) first.
+  var sorted = meals.slice().sort(function(a, b) {
+    var da = daysLeftFrom(a.cookedDate, cookedShelfLife(a));
+    var db = daysLeftFrom(b.cookedDate, cookedShelfLife(b));
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da - db;
+  });
+
+  var html = '';
+  sorted.forEach(function(m) {
+    var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
+    var fs = freshnessStatus(dl);
+    html += '<div class="cooked-card ' + fs.cls + '">';
+    html += '<div class="cooked-card-main">';
+    html += '<span class="cooked-name">🍱 ' + escapeHtml(m.name) + '</span>';
+    if (fs.label) html += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
+    html += '</div>';
+    html += '<div class="cooked-card-meta">';
+    html += '<label class="cooked-field" title="Date cooked">👨‍🍳 <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
+    html += '<div class="cooked-storage-toggle">';
+    html += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">📅 Fridge ' + (m.fridgeLife || 0) + 'd</button>';
+    html += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">❄️ Freezer ' + (m.freezerLife || 0) + 'd</button>';
+    html += '</div>';
+    html += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">✓ Done</button>';
+    html += '</div>';
+    html += '</div>';
+  });
   list.innerHTML = html;
 }
 
@@ -4661,7 +4884,14 @@ function addToPantry() {
     return;
   }
 
-  AppState.pantry.push({ id: Date.now() + Math.random(), name });
+  var category = inferCategory(name);
+  AppState.pantry.push({
+    id: Date.now() + Math.random(),
+    name: name,
+    category: category,
+    purchaseDate: todayISO(),
+    shelfLifeDays: categoryShelfLife(category)
+  });
   input.value = '';
   input.focus();
 
@@ -4912,7 +5142,15 @@ function confirmAddIngredientToPantry(name, idx, unit) {
   AppState.pantry = AppState.pantry.filter(function(p) {
     return p.name.toLowerCase() !== name.toLowerCase();
   });
-  AppState.pantry.push({ id: Date.now() + Math.random(), name: name, quantity: qty || null, unit: unit, category: category });
+  AppState.pantry.push({
+    id: Date.now() + Math.random(),
+    name: name,
+    quantity: qty || null,
+    unit: unit,
+    category: category,
+    purchaseDate: todayISO(),
+    shelfLifeDays: categoryShelfLife(category)
+  });
   saveData();
   renderIngredientsTab();
   renderPantry();

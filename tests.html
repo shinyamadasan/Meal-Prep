@@ -89,6 +89,19 @@
       check('normalizeRecipes does NOT overwrite existing name', kept.name === 'My Adobo');
       check('normalizeRecipes does NOT overwrite existing baseServings', kept.baseServings === 4);
 
+      // --- freshness tracking (pantry + cooked meals) ---
+      check('todayISO format YYYY-MM-DD', /^\d{4}-\d{2}-\d{2}$/.test(todayISO()));
+      check('categoryShelfLife protein = 3', categoryShelfLife('Protein') === 3);
+      check('categoryShelfLife pantry = 365', categoryShelfLife('Pantry') === 365);
+      check('categoryShelfLife unknown = 7', categoryShelfLife('zzz') === 7);
+      check('inferCategory "Chicken Breast" = Protein', inferCategory('Chicken Breast') === 'Protein');
+      check('daysLeftFrom today + 5 days = 5', daysLeftFrom(todayISO(), 5) === 5);
+      check('daysLeftFrom null date = null', daysLeftFrom(null, 5) === null);
+      check('freshnessStatus 5 = ok', freshnessStatus(5).cls === 'fresh-ok');
+      check('freshnessStatus 2 = warn', freshnessStatus(2).cls === 'fresh-warn');
+      check('freshnessStatus -1 = expired', freshnessStatus(-1).cls === 'fresh-expired');
+      check('freshnessStatus 0 = "Use today!"', freshnessStatus(0).label === 'Use today!');
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;
