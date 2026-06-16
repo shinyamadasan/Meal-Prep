@@ -109,7 +109,34 @@ function loadFromLocalStorage() {
 
 // Patches nutrition data into sample recipes that were saved before nutrition was added.
 // Returns true if anything was patched (caller should re-save to Firebase).
+// Defensively fills in any structural fields that old saved recipes may be
+// missing, so newer code never crashes on data saved by an earlier version.
+// Only fills ABSENT fields — never overwrites values the user already has.
+function normalizeRecipes(recipes) {
+  if (!Array.isArray(recipes)) return [];
+  recipes.forEach(function(recipe) {
+    if (recipe.name == null) recipe.name = 'Untitled Recipe';
+    if (!Array.isArray(recipe.baseIngredients)) recipe.baseIngredients = [];
+    if (recipe.baseServings == null) recipe.baseServings = recipe.currentServings || 1;
+    if (recipe.currentServings == null) recipe.currentServings = recipe.baseServings;
+    if (!recipe.nutritionPerServing || typeof recipe.nutritionPerServing !== 'object') {
+      recipe.nutritionPerServing = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 };
+    }
+    if (recipe.category == null) recipe.category = 'Main Dish';
+    if (recipe.instructions == null) recipe.instructions = '';
+    if (recipe.fridgeLife == null) recipe.fridgeLife = 0;
+    if (recipe.freezerLife == null) recipe.freezerLife = 0;
+    recipe.baseIngredients.forEach(function(ing) {
+      if (ing.unit == null) ing.unit = 'g';
+      if (ing.baseQuantity == null) ing.baseQuantity = 0;
+      if (ing.category == null) ing.category = '';
+    });
+  });
+  return recipes;
+}
+
 function patchMissingNutrition(recipes) {
+  normalizeRecipes(recipes);
   var patched = false;
   recipes.forEach(function(recipe) {
     if (!recipe.nutritionPerServing || recipe.nutritionPerServing.calories === 0) {
@@ -5341,6 +5368,9 @@ function searchLocalNutrition(query) {
 
 // ── Nutrition Search (local DB first, USDA as fallback) ────────────────────────
 
+// USDA FoodData Central API key. 'DEMO_KEY' is rate-limited to ~30 requests/hour
+// per IP and WILL fail for real users. Get a free key (instant) at:
+// https://fdc.nal.usda.gov/api-key-signup.html and paste it below.
 const USDA_KEY = 'DEMO_KEY';
 const USDA_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 

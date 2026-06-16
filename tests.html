@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Meal Prep — Tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 20px; }
+    #summary { font-size: 16px; font-weight: 600; padding: 8px 12px; border-radius: 6px; margin: 12px 0; }
+    .ok { background: #e6f5ea; color: #1a7f37; }
+    .bad { background: #fde8e8; color: #b42318; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    .pass::before { content: "✓ "; color: #1a7f37; font-weight: 700; }
+    .fail::before { content: "✗ "; color: #b42318; font-weight: 700; }
+    .fail { color: #b42318; }
+    code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Meal Prep — Unit Tests</h1>
+  <p>Open this file in a browser. Tests run against the pure functions in <code>app.js</code>.</p>
+  <div id="summary"></div>
+  <ul id="results"></ul>
+
+  <!-- Load the real app code; its globals (functions are on window, consts are
+       script-scoped and visible to the classic script below) become testable. -->
+  <script src="app.js"></script>
+  <script>
+    // Runs synchronously right after app.js parses — before DOMContentLoaded,
+    // so initApp() has not fired yet and won't add noise to these results.
+    (function () {
+      var results = [];
+      function check(name, cond) { results.push({ name: name, pass: !!cond }); }
+      function approx(a, b) { return Math.abs(a - b) < 0.001; }
+
+      // --- toGrams: unit conversion the nutrition math depends on ---
+      check('toGrams 1 kg = 1000 g', toGrams(1, 'kg') === 1000);
+      check('toGrams 2 g = 2 g', toGrams(2, 'g') === 2);
+      check('toGrams 1 tbsp = 15 g', toGrams(1, 'tbsp') === 15);
+      check('toGrams 1 tsp = 5 g', toGrams(1, 'tsp') === 5);
+      check('toGrams 1 cup = 240 g', toGrams(1, 'cup') === 240);
+      check('toGrams unknown unit falls back to x1', toGrams(7, 'zzz') === 7);
+      check('toGrams missing unit treated as grams', toGrams(3) === 3);
+
+      // --- normalizeIngredientName: the fix for parenthetical/adjective names ---
+      check("normalize 'Chicken (bone-in pieces)' -> 'chicken'",
+        normalizeIngredientName('Chicken (bone-in pieces)') === 'chicken');
+      check("normalize 'Garlic or shallots' -> 'garlic'",
+        normalizeIngredientName('Garlic or shallots') === 'garlic');
+      check("normalize 'Fresh Tomato' -> 'tomato'",
+        normalizeIngredientName('Fresh Tomato') === 'tomato');
+
+      // --- findIngredientNutrition: must match common + messy names ---
+      var chicken = findIngredientNutrition('Chicken Breast');
+      check('findIngredientNutrition matches "Chicken Breast"', chicken && chicken.calories > 0);
+      var messyChicken = findIngredientNutrition('Chicken (bone-in pieces)');
+      check('findIngredientNutrition matches messy "Chicken (bone-in pieces)"',
+        messyChicken && messyChicken.calories > 0);
+
+      // --- calculateRecipeNutrition: nutritionPerServing path scales by servings ---
+      var r = {
+        baseServings: 2, currentServings: 2,
+        nutritionPerServing: { calories: 100, protein: 10, carbs: 20, fat: 5, fiber: 3, sodium: 200 }
+      };
+      var n = calculateRecipeNutrition(r);
+      check('calculateRecipeNutrition total calories = perServing * currentServings',
+        approx(n.calories, 200));
+      check('calculateRecipeNutrition total protein scales too', approx(n.protein, 20));
+
+      // calories === 0 must fall through to ingredient lookup (not return zeros)
+      var r2 = {
+        baseServings: 1, currentServings: 1,
+        nutritionPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 },
+        baseIngredients: [{ name: 'Chicken Breast', baseQuantity: 200, unit: 'g' }]
+      };
+      var n2 = calculateRecipeNutrition(r2);
+      check('zero nutritionPerServing falls through to ingredient calc (calories > 0)',
+        n2.calories > 0);
+
+      // --- normalizeRecipes: defensive backfill of missing structural fields ---
+      var bare = normalizeRecipes([{ id: 1 }])[0];
+      check('normalizeRecipes fills baseIngredients []', Array.isArray(bare.baseIngredients));
+      check('normalizeRecipes fills baseServings = 1', bare.baseServings === 1);
+      check('normalizeRecipes fills category', bare.category === 'Main Dish');
+      check('normalizeRecipes fills nutritionPerServing object',
+        bare.nutritionPerServing && typeof bare.nutritionPerServing === 'object');
+      var kept = normalizeRecipes([{ name: 'My Adobo', baseServings: 4 }])[0];
+      check('normalizeRecipes does NOT overwrite existing name', kept.name === 'My Adobo');
+      check('normalizeRecipes does NOT overwrite existing baseServings', kept.baseServings === 4);
+
+      // --- render ---
+      var passed = results.filter(function (r) { return r.pass; }).length;
+      var total = results.length;
+      var summary = document.getElementById('summary');
+      summary.textContent = passed + ' / ' + total + ' passed';
+      summary.className = passed === total ? 'ok' : 'bad';
+
+      var ul = document.getElementById('results');
+      results.forEach(function (r) {
+        var li = document.createElement('li');
+        li.className = r.pass ? 'pass' : 'fail';
+        li.textContent = r.name;
+        ul.appendChild(li);
+      });
+
+      console.log('[tests] ' + passed + '/' + total + ' passed');
+      results.filter(function (r) { return !r.pass; })
+             .forEach(function (r) { console.error('[FAIL] ' + r.name); });
+    })();
+  </script>
+</body>
+</html>
