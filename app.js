@@ -5324,7 +5324,7 @@ function renderIngredientsTab() {
       // Price per store
       myStores.forEach(function(s) {
         var p = storePrices[s] || '';
-        rowsHtml += '<div class="ingcat-col-store">';
+        rowsHtml += '<div class="ingcat-col-store" data-store="' + escapeHtml(s) + '">';
         rowsHtml += '<input class="ingcat-price-input" value="' + escapeHtml(p) + '" placeholder="e.g. ₱150"';
         rowsHtml += ' onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)">';
         rowsHtml += '</div>';
@@ -5374,7 +5374,7 @@ function renderIngredientsTab() {
       userSection += '</select></div>';
       myStores.forEach(function(s) {
         var p = storePrices[s] || '';
-        userSection += '<div class="ingcat-col-store"><input class="ingcat-price-input" value="' + escapeHtml(p) + '" placeholder="e.g. ₱55" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)"></div>';
+        userSection += '<div class="ingcat-col-store" data-store="' + escapeHtml(s) + '"><input class="ingcat-price-input" value="' + escapeHtml(p) + '" placeholder="e.g. ₱55" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)"></div>';
       });
       userSection += '<div class="ingcat-col-pantry" id="ingpantry-' + uIdx + '">';
       if (pantryEntry) {

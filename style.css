@@ -4538,3 +4538,61 @@ select.form-control {
   background: var(--color-success);
   color: #fff;
 }
+
+/* Ingredients catalog: stacked cards on mobile instead of a side-scrolling table */
+@media (max-width: 768px) {
+  .ingcat-table { overflow-x: visible; border: none; }
+  .ingcat-header-row { display: none; }
+
+  .ingcat-row {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.6rem;
+    background: var(--color-surface);
+  }
+  .ingcat-row:hover { background: var(--color-surface); }
+
+  /* Each former table column becomes a full-width row inside the card */
+  .ingcat-row > div {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+  }
+
+  .ingcat-col-name {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .ingcat-col-unit,
+  .ingcat-col-store,
+  .ingcat-col-pantry,
+  .ingcat-col-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.22rem 0;
+  }
+
+  /* Labels for fields whose table header is now hidden */
+  .ingcat-col-unit::before { content: 'Unit'; }
+  .ingcat-col-store::before { content: attr(data-store); }
+  .ingcat-col-unit::before,
+  .ingcat-col-store::before {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .ingcat-unit-select,
+  .ingcat-price-input {
+    flex: 1;
+    max-width: 60%;
+  }
+
+  .ingcat-col-actions { justify-content: flex-end; gap: 0.4rem; }
+}
