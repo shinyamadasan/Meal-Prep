@@ -1031,6 +1031,8 @@ function initApp() {
         renderCookedMeals();
         renderPantry();
         updateNutritionGoalsDisplay();
+        updateFreshnessBadges();
+        renderFreshnessBanner();
         initWeekTemplateButton();
         updateThemeToggleIcon();
       }
@@ -1058,6 +1060,8 @@ function initApp() {
     renderCookingHacks();
     renderPantry();
     renderCookedMeals();
+    updateFreshnessBadges();
+    renderFreshnessBanner();
   }
 
   initWeekTemplateButton();
@@ -1246,6 +1250,8 @@ function showTab(tabId) {
     updateGrocerySummary();
     updateBudgetDisplay();
     renderGroceryList();
+  } else if (tabId === 'fridge') {
+    renderCookedMeals();
     renderPantry();
   } else if (tabId === 'hacks') {
     renderCookingHacks();
@@ -3103,6 +3109,8 @@ window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
 window.removeCookedMeal = removeCookedMeal;
 window.renderCookedMeals = renderCookedMeals;
+window.dismissFreshnessBanner = dismissFreshnessBanner;
+window.goToFreshnessTab = goToFreshnessTab;
 window.renderIngredientsTab = renderIngredientsTab;
 window.openAddUserIngredientModal = openAddUserIngredientModal;
 window.openEditUserIngredientModal = openEditUserIngredientModal;
@@ -3445,12 +3453,15 @@ async function loadUserData() {
   renderCookedMeals();
   renderPantry();
   updateNutritionGoalsDisplay();
+  updateFreshnessBadges();
+  renderFreshnessBanner();
 }
 
 // Enhanced save function that saves to both local storage and Firestore
 function saveData() {
   saveToLocalStorage();
   saveToFirestore();
+  updateFreshnessBadges();
 }
 
 // Setup real-time listeners
@@ -3484,6 +3495,8 @@ function setupRealtimeListeners() {
         renderCookedMeals();
         renderPantry();
         updateNutritionGoalsDisplay();
+        updateFreshnessBadges();
+        renderFreshnessBanner();
 
         showSuccessMessage('Data updated from cloud!');
       }
@@ -4784,7 +4797,7 @@ function markRecipeCooked(recipeId) {
   });
   saveData();
   renderCookedMeals();
-  showSuccessMessage('Marked "' + recipe.name + '" as cooked — now tracking freshness.');
+  showSuccessMessage('Added "' + recipe.name + '" to 🧊 My Fridge — now tracking freshness.');
 }
 
 function cookedShelfLife(m) {
@@ -4855,6 +4868,84 @@ function renderCookedMeals() {
     html += '</div>';
   });
   list.innerHTML = html;
+}
+
+// ── Freshness alerts (app-open banner + Fridge tab badge) ────────────────────
+
+// Counts of items needing attention across pantry + cooked meals.
+function getFreshnessAlerts() {
+  var pantry = { expired: 0, expiring: 0 };
+  AppState.pantry.forEach(function(p) {
+    var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
+    var dl = daysLeftFrom(p.purchaseDate, shelf);
+    if (dl == null) return;
+    if (dl < 0) pantry.expired++;
+    else if (dl <= FRESHNESS_WARN_DAYS) pantry.expiring++;
+  });
+  var cooked = { expired: 0, expiring: 0 };
+  (AppState.cookedMeals || []).forEach(function(m) {
+    var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
+    if (dl == null) return;
+    if (dl < 0) cooked.expired++;
+    else if (dl <= FRESHNESS_WARN_DAYS) cooked.expiring++;
+  });
+  return {
+    pantry: pantry,
+    cooked: cooked,
+    expired: pantry.expired + cooked.expired,
+    expiring: pantry.expiring + cooked.expiring
+  };
+}
+
+var _freshnessBannerDismissed = false;
+
+// On-open banner: appears above all tabs when something needs attention.
+function renderFreshnessBanner() {
+  var el = document.getElementById('freshness-alert-banner');
+  if (!el) return;
+  var a = getFreshnessAlerts();
+  if (_freshnessBannerDismissed || (a.expired + a.expiring) === 0) {
+    el.classList.add('hidden');
+    return;
+  }
+  var parts = [];
+  if (a.expired) parts.push('🔴 ' + a.expired + ' expired');
+  if (a.expiring) parts.push('🟠 ' + a.expiring + ' expiring soon');
+  el.className = 'freshness-banner ' + (a.expired ? 'fresh-expired' : 'fresh-warn');
+  el.innerHTML =
+    '<span class="freshness-banner-text">⚠️ ' + parts.join(' · ') + '</span>' +
+    '<span class="freshness-banner-actions">' +
+      '<button class="freshness-banner-view" onclick="goToFreshnessTab()">View</button>' +
+      '<button class="freshness-banner-close" onclick="dismissFreshnessBanner()" title="Dismiss">×</button>' +
+    '</span>';
+}
+
+function dismissFreshnessBanner() {
+  _freshnessBannerDismissed = true;
+  var el = document.getElementById('freshness-alert-banner');
+  if (el) el.classList.add('hidden');
+}
+
+function goToFreshnessTab() {
+  dismissFreshnessBanner();
+  showTab('fridge');
+}
+
+// Small count badge on the My Fridge tab.
+function updateFreshnessBadges() {
+  var a = getFreshnessAlerts();
+  var count = a.expired + a.expiring;
+  var btn = document.querySelector('.tab-btn[data-tab="fridge"]');
+  if (!btn) return;
+  var badge = btn.querySelector('.tab-badge');
+  if (count <= 0) { if (badge) badge.remove(); return; }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'tab-badge';
+    btn.appendChild(badge);
+  }
+  badge.textContent = count;
+  badge.classList.toggle('tab-badge--expired', a.expired > 0);
 }
 
 function togglePantryCard(safeId) {

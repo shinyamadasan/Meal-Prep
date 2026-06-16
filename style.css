@@ -4372,3 +4372,63 @@ select.form-control {
   cursor: pointer;
 }
 .cooked-remove:hover { background: var(--color-success); color: #fff; }
+
+/* On-open freshness banner */
+.freshness-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  color: var(--fresh-color, var(--color-text));
+  background: rgba(var(--color-warning-rgb), 0.15);
+  border: 1px solid var(--fresh-color, var(--color-border));
+}
+.freshness-banner.fresh-expired { background: rgba(var(--color-error-rgb), 0.15); }
+.freshness-banner.hidden { display: none; }
+.freshness-banner-actions { display: inline-flex; gap: 0.4rem; align-items: center; }
+.freshness-banner-view {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.25rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--fresh-color, var(--color-border));
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.freshness-banner-close {
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Count badge on the My Fridge tab */
+.tab-badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  margin-left: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+  border-radius: 999px;
+  background: var(--color-warning);
+  color: #fff;
+}
+.tab-badge--expired { background: var(--color-error); }
+
+.fridge-intro {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
