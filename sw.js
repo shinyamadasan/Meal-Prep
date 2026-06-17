@@ -1,5 +1,5 @@
-const CACHE = 'meal-prep-v2';
-const STATIC = ['./index.html', './app.js', './style.css', './icon.svg', './manifest.json'];
+const CACHE = 'meal-prep-v3';
+const STATIC = ['./index.html', './app.js', './style.css', './chart.min.js', './icon.svg', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
