@@ -4777,3 +4777,22 @@ select.form-control {
 }
 .fdot-red { --fresh-color: var(--color-error); }
 .fdot-amber { --fresh-color: var(--color-warning); }
+
+/* Community identity line in the Shared Recipes modal */
+.community-identity {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--color-secondary);
+  border-radius: 8px;
+}
+.community-identity .btn-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}

@@ -27,17 +27,24 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Public profiles (community display names). Anyone signed in can read a
+    // name; only the owner can write their own.
+    match /profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Shared recipes — a public community feed.
     //   Read   — any signed-in user can see every shared recipe.
-    //   Create — you may only share AS yourself (verified email, no spoofing).
-    //   Update / Delete — only the original sharer.
+    //   Create — you may only post AS yourself (verified email, authorId == uid).
+    //   Update / Delete — only the original author.
     match /sharedRecipes/{recipeId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
         request.auth.token.email_verified == true &&
-        request.resource.data.sharedBy == request.auth.token.email;
+        request.resource.data.authorId == request.auth.uid;
       allow update, delete: if request.auth != null &&
-        resource.data.sharedBy == request.auth.token.email;
+        resource.data.authorId == request.auth.uid;
     }
 
     // Family invitations — visible to the inviter and to the invited email.

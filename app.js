@@ -35,6 +35,7 @@ const AppState = {
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
+  profile: null,              // { displayName } — public identity for the community feed
   currentUser: null,
   isOnline: navigator.onLine
 };
@@ -3408,6 +3409,9 @@ window.closeSignupModal = closeSignupModal;
 window.signOut = signOut;
 window.resendVerification = resendVerification;
 window.recheckVerification = recheckVerification;
+window.saveUsername = saveUsername;
+window.openUsernameModal = openUsernameModal;
+window.closeUsernameModal = closeUsernameModal;
 window.importFromCSV = importFromCSV;
 window.saveWeekAsTemplate = saveWeekAsTemplate;
 window.loadWeekTemplate = loadWeekTemplate;
@@ -3907,6 +3911,65 @@ async function loadUserData() {
   updateNutritionGoalsDisplay();
   updateFreshnessBadges();
   renderFreshnessBanner();
+  loadProfile(); // load (or prompt for) the community display name
+}
+
+// ── Community profile / username ─────────────────────────────────────────────
+// Public identity for the shared feed. Stored at /profiles/{uid} so other users
+// can see a display name instead of an email.
+async function loadProfile() {
+  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return;
+  try {
+    var ref = window.firebase.doc(window.firebase.db, 'profiles', AppState.currentUser.uid);
+    var snap = await window.firebase.getDoc(ref);
+    if (snap.exists() && snap.data().displayName) {
+      AppState.profile = { displayName: snap.data().displayName };
+    } else {
+      AppState.profile = null;
+    }
+  } catch (e) {
+    console.error('Profile load failed:', e);
+  }
+}
+
+async function saveUsername() {
+  var input = document.getElementById('username-input');
+  var name = (input ? input.value : '').trim();
+  if (name.length < 2) { showErrorMessage('Please enter a name of at least 2 characters.'); return; }
+  if (name.length > 30) name = name.slice(0, 30);
+  name = name.replace(/[<>]/g, ''); // keep it safe for the public feed
+  try {
+    var ref = window.firebase.doc(window.firebase.db, 'profiles', AppState.currentUser.uid);
+    await window.firebase.setDoc(ref, { displayName: name, updatedAt: new Date().toISOString() }, { merge: true });
+    AppState.profile = { displayName: name };
+    closeUsernameModal();
+    showSuccessMessage('You\'re set up as "' + name + '" 🎉');
+  } catch (e) {
+    console.error('Username save failed:', e);
+    showErrorMessage('Could not save your name: ' + e.message);
+  }
+}
+
+function openUsernameModal() {
+  if (!AppState.currentUser) { showErrorMessage('Sign in first to set a display name.'); return; }
+  var input = document.getElementById('username-input');
+  if (input) input.value = (AppState.profile && AppState.profile.displayName) || '';
+  var modal = document.getElementById('username-modal');
+  if (modal) modal.classList.remove('hidden');
+  setTimeout(function () { if (input) input.focus(); }, 50);
+}
+
+function closeUsernameModal() {
+  var modal = document.getElementById('username-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Returns the user's display name, or prompts them to pick one. Used before
+// posting to the community feed so we never share as a raw email.
+function requireUsername() {
+  if (AppState.profile && AppState.profile.displayName) return AppState.profile.displayName;
+  openUsernameModal();
+  return null;
 }
 
 // Enhanced save function that saves to both local storage and Firestore
@@ -3983,8 +4046,18 @@ function openSharedRecipesModal() {
   }
   
   document.getElementById('shared-recipes-modal').classList.remove('hidden');
+  renderCommunityIdentity();
   populateShareRecipeSelect();
   loadSharedRecipes();
+}
+
+function renderCommunityIdentity() {
+  var el = document.getElementById('community-identity');
+  if (!el) return;
+  var name = AppState.profile && AppState.profile.displayName;
+  el.innerHTML = name
+    ? 'Posting as <strong>' + escapeHtml(name) + '</strong> · <button class="btn-link" onclick="openUsernameModal()">change</button>'
+    : '<button class="btn-link" onclick="openUsernameModal()">Set a display name</button> to post a recipe.';
 }
 
 function closeSharedRecipesModal() {
@@ -4057,9 +4130,9 @@ async function loadSharedRecipes() {
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
           <h4>${escapeHtml(recipe.name)}</h4>
-          <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
+          <p>by ${escapeHtml(recipe.authorName || 'A meal prepper')} • ${escapeHtml(recipe.category || '')} • ${Number(recipe.servings) || 0} servings</p>
         </div>
-        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
+        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Save</button>
       `;
       sharedRecipesList.appendChild(recipeItem);
     });
@@ -4096,19 +4169,23 @@ async function importSharedRecipe(sharedRecipeId) {
       const newRecipe = {
         ...sharedRecipe,
         id: generateId(),
-        name: sharedRecipe.name + ' (Shared)',
-        sharedBy: sharedRecipe.sharedBy
+        name: sharedRecipe.name + ' (Saved)'
       };
-      
-      // Remove the shared-specific fields
+
+      // Strip community/shared-specific fields — this is now your own recipe.
       delete newRecipe.sharedAt;
       delete newRecipe.originalId;
+      delete newRecipe.authorId;
+      delete newRecipe.authorName;
+      delete newRecipe.sharedBy;
+      delete newRecipe.privacy;
+      delete newRecipe.familyGroupId;
 
       // Sanitize all fields before storing — this recipe came from another user.
       AppState.recipes.push(stripTagsDeep(newRecipe));
       saveData();
       renderRecipes();
-      showSuccessMessage('Recipe imported successfully!');
+      showSuccessMessage('Saved to your recipes! 🎉');
       closeSharedRecipesModal();
     }
   } catch (error) {
@@ -4216,24 +4293,26 @@ async function shareRecipe() {
     showErrorMessage('Recipe not found');
     return;
   }
-  
-  const privacy = document.querySelector('input[name="share-privacy"]:checked').value;
-  
+
+  // Post to the community feed AS a display name, never the raw email.
+  const authorName = requireUsername();
+  if (!authorName) return; // username modal opened; they can share again after
+
   try {
     const sharedRecipe = {
       ...recipe,
-      sharedBy: AppState.currentUser.email,
+      authorId: AppState.currentUser.uid,
+      authorName: authorName,
       sharedAt: new Date().toISOString(),
-      originalId: recipe.id,
-      privacy: privacy,
-      familyGroupId: privacy === 'family' ? AppState.currentUser.uid : null
+      originalId: recipe.id
     };
-    
-    // Remove the original ID to avoid conflicts
+
+    // Don't leak the email or the local recipe id into the public feed.
     delete sharedRecipe.id;
-    
+    delete sharedRecipe.sharedBy;
+
     await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), JSON.parse(JSON.stringify(sharedRecipe)));
-    showSuccessMessage(`Recipe shared ${privacy === 'public' ? 'publicly' : 'with family'}!`);
+    showSuccessMessage('Recipe shared to the community! 🎉');
     loadSharedRecipes();
   } catch (error) {
     console.error('Error sharing recipe:', error);
@@ -4269,9 +4348,9 @@ async function loadSharedRecipes() {
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
           <h4>${escapeHtml(recipe.name)}</h4>
-          <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
+          <p>by ${escapeHtml(recipe.authorName || 'A meal prepper')} • ${escapeHtml(recipe.category || '')} • ${Number(recipe.servings) || 0} servings</p>
         </div>
-        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
+        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Save</button>
       `;
       sharedRecipesList.appendChild(recipeItem);
     });
