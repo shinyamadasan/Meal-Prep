@@ -1333,14 +1333,6 @@ function setupModalEventListeners() {
   
   // Modal close button
   document.querySelector('#recipe-selection-modal .modal-close').addEventListener('click', closeRecipeSelectionModal);
-  
-  // Copy/Clear day buttons
-  document.getElementById('copy-day-btn').addEventListener('click', pasteDay);
-  document.getElementById('clear-day-btn').addEventListener('click', () => {
-    if (AppState.selectedDay) {
-      clearDay(AppState.selectedDay);
-    }
-  });
 }
 
 function closeRecipeSelectionModal() {
@@ -1348,20 +1340,21 @@ function closeRecipeSelectionModal() {
   AppState.selectedMealSlot = null;
 }
 
-function pasteDay() {
-  if (!AppState.dayToCopy || !AppState.selectedDay) return;
-  
-  AppState.weeklyPlan[AppState.selectedDay] = { ...AppState.dayToCopy };
+// Paste the copied day's meals into a target day, then exit copy mode.
+function pasteDayInto(day) {
+  if (!AppState.dayToCopy) return;
+  AppState.weeklyPlan[day] = JSON.parse(JSON.stringify(AppState.dayToCopy.plan));
+  AppState.dayToCopy = null;
   renderWeeklyPlanner();
   updateWeeklyStats();
+  saveData();
   generateGroceryList();
+  showSuccessMessage('Meals pasted to ' + day + '!');
+}
 
-  showSuccessMessage(`Meals pasted to ${AppState.selectedDay}!`);
-  
-  // Reset copy state
+function cancelCopyDay() {
   AppState.dayToCopy = null;
-  document.getElementById('copy-day-btn').disabled = true;
-  document.getElementById('copy-day-btn').textContent = 'Copy Day';
+  renderWeeklyPlanner();
 }
 
 // Tab management
@@ -1830,7 +1823,11 @@ function renderWeeklyPlanner() {
       <div class="day-header">
         <span class="day-name">${day}</span>
         <div class="day-actions">
-          <button class="day-action-btn" onclick="copyDay('${day}')">Copy</button>
+          ${AppState.dayToCopy
+            ? (AppState.dayToCopy.from === day
+                ? `<button class="day-action-btn" onclick="cancelCopyDay()">Cancel</button>`
+                : `<button class="day-action-btn day-action-paste" onclick="pasteDayInto('${day}')">Paste</button>`)
+            : `<button class="day-action-btn" onclick="copyDay('${day}')">Copy</button>`}
           <button class="day-action-btn" onclick="clearDay('${day}')">Clear</button>
         </div>
       </div>
@@ -1925,13 +1922,9 @@ function removeRecipeFromSlot(day, meal) {
 }
 
 function copyDay(day) {
-  AppState.dayToCopy = { ...AppState.weeklyPlan[day] };
-  
-  // Enable paste buttons
-  document.getElementById('copy-day-btn').disabled = false;
-  document.getElementById('copy-day-btn').textContent = `Paste ${day}`;
-  
-  showSuccessMessage(`${day}'s meals copied. Click any day to paste.`);
+  AppState.dayToCopy = { from: day, plan: JSON.parse(JSON.stringify(AppState.weeklyPlan[day])) };
+  renderWeeklyPlanner(); // re-render so each other day shows a "Paste" button
+  showSuccessMessage('Copied ' + day + ' — tap "Paste" on another day.');
 }
 
 function clearDay(day) {
@@ -2236,9 +2229,19 @@ function addRecipeIngredients(recipeId, ingredients) {
   });
 }
 
+// Collapses repeated source strings into "Name ×N" so an ingredient used on
+// several days reads "Pork Ginataan (4 servings) ×4" instead of repeating it.
+function summarizeSources(sources) {
+  var counts = {};
+  (sources || []).forEach(function(s) { counts[s] = (counts[s] || 0) + 1; });
+  return Object.keys(counts).map(function(s) {
+    return counts[s] > 1 ? s + ' ×' + counts[s] : s;
+  }).join(', ');
+}
+
 function renderGroceryList() {
   const groceryListEl = document.getElementById('grocery-list');
-  
+
   if (AppState.groceryList.length === 0) {
     groceryListEl.innerHTML = '<p>No items in grocery list. Generate from weekly planner.</p>';
     return;
@@ -2264,7 +2267,7 @@ function renderGroceryList() {
     
     return `
     <div class="grocery-category">
-      <h3 class="category-header">${category} <span class="category-total">₱${formatQuantity(categoryTotal)}</span></h3>
+      <h3 class="category-header">${category}${categoryTotal > 0 ? ` <span class="category-total">₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
       ${categories[category].map(item => {
         const ingredient = findIngredientPrice(item.name);
         const itemCost = ingredient && ingredient.pricePerUnit ? 
@@ -2283,7 +2286,7 @@ function renderGroceryList() {
               ${inPantry ? '<span class="pantry-badge">🏠 In stock</span>' : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
-              <div class="grocery-item-source">From: ${item.sources.join(', ')}</div>
+              <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
             ` : ''}
             ${itemCost > 0 ? `<div class="ingredient-price">₱${formatQuantity(itemCost)}</div>` : ''}
           </div>
@@ -2629,8 +2632,7 @@ function renderWeeklyCostSummary() {
 
   if (totalCost === 0) { el.innerHTML = ''; return; }
 
-  const perDay   = totalCost / 7;
-  const perMeal  = mealCount > 0 ? totalCost / mealCount : 0;
+  const perMeal = mealCount > 0 ? totalCost / mealCount : 0;
 
   el.innerHTML = `
     <div class="cost-summary-bar">
@@ -2639,11 +2641,7 @@ function renderWeeklyCostSummary() {
         <span class="cost-summary-value">₱${Math.round(totalCost).toLocaleString()}</span>
       </div>
       <div class="cost-summary-card">
-        <span class="cost-summary-label">Per Day</span>
-        <span class="cost-summary-value">₱${Math.round(perDay).toLocaleString()}</span>
-      </div>
-      <div class="cost-summary-card">
-        <span class="cost-summary-label">Per Meal</span>
+        <span class="cost-summary-label">Avg per Meal</span>
         <span class="cost-summary-value">₱${Math.round(perMeal).toLocaleString()}</span>
       </div>
       <div class="cost-summary-card">
@@ -3281,6 +3279,8 @@ window.confirmQuickPlan = confirmQuickPlan;
 window.removeRecipeFromSlot = removeRecipeFromSlot;
 window.copyDay = copyDay;
 window.clearDay = clearDay;
+window.pasteDayInto = pasteDayInto;
+window.cancelCopyDay = cancelCopyDay;
 window.toggleGroceryItem = toggleGroceryItem;
 window.removeIngredientField = removeIngredientField;
 window.filterCookingHacks = filterCookingHacks;
