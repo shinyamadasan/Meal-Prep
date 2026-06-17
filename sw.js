@@ -1,4 +1,4 @@
-const CACHE = 'meal-prep-v3';
+const CACHE = 'meal-prep-v4';
 const STATIC = ['./index.html', './app.js', './style.css', './chart.min.js', './icon.svg', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -29,8 +29,10 @@ self.addEventListener('fetch', e => {
     /\.(?:js|css|html)$/.test(url.pathname);
 
   if (isAppShell) {
+    // `no-store` forces a fresh server fetch (bypasses the browser HTTP cache),
+    // so a new deploy is never masked by a stale cached app.js/style.css.
     e.respondWith(
-      fetch(e.request)
+      fetch(new Request(e.request, { cache: 'no-store' }))
         .then(res => {
           if (res.ok) {
             const clone = res.clone();
