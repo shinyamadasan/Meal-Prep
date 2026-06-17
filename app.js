@@ -2242,8 +2242,14 @@ function summarizeSources(sources) {
 function renderGroceryList() {
   const groceryListEl = document.getElementById('grocery-list');
 
-  if (AppState.groceryList.length === 0) {
-    groceryListEl.innerHTML = '<p>No items in grocery list. Generate from weekly planner.</p>';
+  // The summary (meal count + cost) reflects the weekly plan, so hide it when
+  // the list itself is empty/cleared — otherwise stale numbers linger.
+  const summaryEl = document.querySelector('.grocery-summary');
+  const isEmpty = AppState.groceryList.length === 0;
+  if (summaryEl) summaryEl.style.display = isEmpty ? 'none' : '';
+
+  if (isEmpty) {
+    groceryListEl.innerHTML = '<p class="grocery-empty-msg">Your grocery list is empty. Plan meals in the Weekly Planner to generate it.</p>';
     return;
   }
   
