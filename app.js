@@ -136,10 +136,10 @@ function daysLeftFrom(startDateStr, shelfLifeDays) {
 // Visual status from days remaining. Threshold is FRESHNESS_WARN_DAYS.
 function freshnessStatus(daysLeft) {
   if (daysLeft == null) return { cls: '', icon: '', label: '' };
-  if (daysLeft < 0) return { cls: 'fresh-expired', icon: '🔴', label: 'Expired ' + Math.abs(daysLeft) + 'd ago' };
-  if (daysLeft === 0) return { cls: 'fresh-warn', icon: '🟠', label: 'Use today!' };
-  if (daysLeft <= FRESHNESS_WARN_DAYS) return { cls: 'fresh-warn', icon: '🟠', label: daysLeft + 'd left' };
-  return { cls: 'fresh-ok', icon: '🟢', label: daysLeft + 'd left' };
+  if (daysLeft < 0) return { cls: 'fresh-expired', icon: '<span class="fresh-dot"></span>', label: 'Expired ' + Math.abs(daysLeft) + 'd ago' };
+  if (daysLeft === 0) return { cls: 'fresh-warn', icon: '<span class="fresh-dot"></span>', label: 'Use today!' };
+  if (daysLeft <= FRESHNESS_WARN_DAYS) return { cls: 'fresh-warn', icon: '<span class="fresh-dot"></span>', label: daysLeft + 'd left' };
+  return { cls: 'fresh-ok', icon: '<span class="fresh-dot"></span>', label: daysLeft + 'd left' };
 }
 
 // Local Storage Management
@@ -1918,7 +1918,7 @@ function renderWeeklyPlanner() {
                 <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
                 <div class="meal-slot-content">
                   <div class="recipe-details">
-                    <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">⚠️</span>' : ''}</div>
+                    <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">' + icon('triangle-alert') + '</span>' : ''}</div>
                     <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
                   </div>
                   <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${recipe.id}')" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
@@ -1971,7 +1971,7 @@ function renderStorageAlerts() {
 
   el.innerHTML = `
     <div class="storage-alert-banner">
-      <strong>⚠️ Storage Alert</strong> — ${issues.length} meal${issues.length > 1 ? 's' : ''} may expire before their planned day (assuming Sunday batch cook):
+      <strong>${icon('triangle-alert')} Storage Alert</strong> — ${issues.length} meal${issues.length > 1 ? 's' : ''} may expire before their planned day (assuming Sunday batch cook):
       <ul class="storage-alert-list">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
     </div>`;
 }
@@ -2113,7 +2113,7 @@ function renderRecipeSelectionGrid() {
       .filter(Boolean)
       .slice(0, 6);
     if (recents.length) {
-      html += '<div class="recipe-selection-group-label">⭐ Recent</div>';
+      html += '<div class="recipe-selection-group-label">' + icon('star') + ' Recent</div>';
       html += recents.map(recipeSelectionCard).join('');
       html += '<div class="recipe-selection-group-label">All recipes</div>';
     }
@@ -2357,7 +2357,7 @@ function renderGroceryList() {
           <div class="grocery-item-info">
             <div class="grocery-item-name">
               ${formatQuantity(item.quantity)} ${item.unit} ${item.name}
-              ${inPantry ? '<span class="pantry-badge">🏠 In stock</span>' : ''}
+              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span>' : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
               <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
@@ -2508,10 +2508,10 @@ function renderStorageGuide() {
         
         <div class="storage-duration">
           <div class="duration-item">
-            🧊 Fridge: ${ingredient.fridgeLife} day${ingredient.fridgeLife !== 1 ? 's' : ''}
+            ${icon('refrigerator')} Fridge: ${ingredient.fridgeLife} day${ingredient.fridgeLife !== 1 ? 's' : ''}
           </div>
           <div class="duration-item">
-            ❄️ Freezer: ${ingredient.freezerLife} day${ingredient.freezerLife !== 1 ? 's' : ''}
+            ${icon('snowflake')} Freezer: ${ingredient.freezerLife} day${ingredient.freezerLife !== 1 ? 's' : ''}
           </div>
         </div>
         
@@ -2577,8 +2577,8 @@ function renderCookingHacks() {
               </div>
               <div class="hack-item-content">${hack.description}</div>
               <div class="hack-benefits">
-                ${hack.timeSaved ? `<div class="hack-benefit">⏱️ Saves: ${hack.timeSaved}</div>` : ''}
-                ${hack.costSavings ? `<div class="hack-benefit">💰 Saves: ${hack.costSavings}</div>` : ''}
+                ${hack.timeSaved ? `<div class="hack-benefit">${icon('timer')} Saves: ${hack.timeSaved}</div>` : ''}
+                ${hack.costSavings ? `<div class="hack-benefit">${icon('piggy-bank')} Saves: ${hack.costSavings}</div>` : ''}
               </div>
             </div>
           `).join('')}
@@ -3677,7 +3677,7 @@ function renderVerificationBanner() {
   banner.id = 'email-verify-banner';
   banner.className = 'email-verify-banner';
   banner.innerHTML =
-    '<span>📧 Verify your email (' + escapeHtml(user.email) + ') to enable recipe sharing.</span>' +
+    '<span>' + icon('mail') + ' Verify your email (' + escapeHtml(user.email) + ') to enable recipe sharing.</span>' +
     '<span class="evb-actions">' +
     '<button type="button" onclick="resendVerification()">Resend email</button>' +
     '<button type="button" onclick="recheckVerification()">I\'ve verified</button>' +
@@ -4297,7 +4297,7 @@ async function loadSharedRecipes() {
       recipeItem.className = 'shared-recipe-item';
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
-          <h4>${escapeHtml(recipe.name)} ${recipe.privacy === 'family' ? '👨‍👩‍👧‍👦' : '🌐'}</h4>
+          <h4>${escapeHtml(recipe.name)} ${recipe.privacy === 'family' ? icon('users') : icon('globe')}</h4>
           <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
         </div>
         <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
@@ -5272,8 +5272,8 @@ function renderPantry() {
   var banner = '';
   if (expiredCount || expiringCount) {
     var parts = [];
-    if (expiredCount) parts.push('🔴 ' + expiredCount + ' expired');
-    if (expiringCount) parts.push('🟠 ' + expiringCount + ' expiring soon');
+    if (expiredCount) parts.push('<span class="fresh-dot fdot-red"></span> ' + expiredCount + ' expired');
+    if (expiringCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + expiringCount + ' expiring soon');
     banner = '<div class="pantry-fresh-summary ' + (expiredCount ? 'fresh-expired' : 'fresh-warn') + '">' +
              parts.join(' • ') + '</div>';
   }
@@ -5285,9 +5285,9 @@ function renderPantry() {
     var fs = freshnessStatus(dl);
     var h = '<div class="pantry-fresh ' + fs.cls + '">';
     if (fs.label) h += '<span class="pantry-fresh-badge">' + fs.icon + ' ' + fs.label + '</span>';
-    h += '<label class="pantry-fresh-field" title="Date you bought it">🛒 <input type="date" value="' +
+    h += '<label class="pantry-fresh-field" title="Date you bought it">' + icon('shopping-cart') + ' <input type="date" value="' +
          (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></label>';
-    h += '<label class="pantry-fresh-field" title="Stays good for (days)">⏳ <input type="number" min="0" value="' +
+    h += '<label class="pantry-fresh-field" title="Stays good for (days)">' + icon('hourglass') + ' <input type="number" min="0" value="' +
          shelf + '" onchange="updatePantryShelf(\'' + p.id + '\', this.value)"> days</label>';
     h += '</div>';
     return h;
@@ -5301,7 +5301,7 @@ function renderPantry() {
   // plus a "staple" checkbox (staples are never deducted when cooking).
   function storageToggle(p) {
     var cur = effStorage(p);
-    var opts = [['fridge', '📅 Fridge'], ['freezer', '❄️ Freezer'], ['counter', '🗄️ Counter']];
+    var opts = [['fridge', icon('refrigerator') + ' Fridge'], ['freezer', icon('snowflake') + ' Freezer'], ['counter', icon('archive') + ' Counter']];
     var h = '<div class="storage-toggle">';
     opts.forEach(function(o) {
       h += '<button class="' + (cur === o[0] ? 'active' : '') + '" onclick="setPantryStorage(\'' +
@@ -5329,13 +5329,13 @@ function renderPantry() {
       c += storageToggle(p);
       c += '<div class="pantry-card-meta">';
       c += '<span class="pantry-location-badge">' + k.locationIcon + ' ' + k.location + '</span>';
-      c += '<span class="pantry-lasts">⏱️ ' + k.lasts + '</span>';
+      c += '<span class="pantry-lasts">' + icon('clock') + ' ' + k.lasts + '</span>';
       c += '<button class="pantry-info-btn" onclick="togglePantryCard(\'' + safeId + '\')" title="Storage guide">ℹ️ Guide</button>';
       c += '</div>';
       c += '<div class="pantry-card-detail hidden" id="pdetail-' + safeId + '">';
-      c += '<div class="pantry-detail-row"><b>📦 How to store:</b> ' + k.store + '</div>';
-      c += '<div class="pantry-detail-row"><b>🚫 Signs it\'s bad:</b> ' + k.spoilage + '</div>';
-      c += '<div class="pantry-detail-row"><b>🔍 Freshness guide:</b> ' + k.freshness + '</div>';
+      c += '<div class="pantry-detail-row"><b>' + icon('package') + ' How to store:</b> ' + k.store + '</div>';
+      c += '<div class="pantry-detail-row"><b>' + icon('triangle-alert') + ' Signs it\'s bad:</b> ' + k.spoilage + '</div>';
+      c += '<div class="pantry-detail-row"><b>' + icon('search') + ' Freshness guide:</b> ' + k.freshness + '</div>';
       if (k.tip) c += '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>';
       c += '</div>';
       c += '</div>';
@@ -5354,9 +5354,9 @@ function renderPantry() {
   }
 
   var groups = [
-    { key: 'fridge', label: '📅 In the Fridge' },
-    { key: 'freezer', label: '❄️ In the Freezer' },
-    { key: 'counter', label: '🗄️ Counter / Pantry' }
+    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
+    { key: 'freezer', label: icon('snowflake') + ' In the Freezer' },
+    { key: 'counter', label: icon('archive') + ' Counter / Pantry' }
   ];
   var html = banner;
   groups.forEach(function(g) {
@@ -5531,24 +5531,24 @@ function renderCookedMeals() {
     var fs = freshnessStatus(dl);
     var h = '<div class="cooked-card ' + fs.cls + '">';
     h += '<div class="cooked-card-main">';
-    h += '<span class="cooked-name">🍱 ' + escapeHtml(m.name) + '</span>';
+    h += '<span class="cooked-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + '</span>';
     if (fs.label) h += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
     h += '</div>';
     h += '<div class="cooked-card-meta">';
-    h += '<label class="cooked-field" title="Date cooked">👨‍🍳 <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
+    h += '<label class="cooked-field" title="Date cooked">' + icon('chef-hat') + ' <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
     h += '<div class="cooked-storage-toggle">';
-    h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">📅 Fridge ' + (m.fridgeLife || 0) + 'd</button>';
-    h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">❄️ Freezer ' + (m.freezerLife || 0) + 'd</button>';
+    h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">' + icon('refrigerator') + ' Fridge ' + (m.fridgeLife || 0) + 'd</button>';
+    h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">' + icon('snowflake') + ' Freezer ' + (m.freezerLife || 0) + 'd</button>';
     h += '</div>';
-    h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">✓ Done</button>';
+    h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">' + icon('check') + ' Done</button>';
     h += '</div>';
     h += '</div>';
     return h;
   }
 
   var groups = [
-    { key: 'fridge', label: '📅 In the Fridge' },
-    { key: 'freezer', label: '❄️ In the Freezer' }
+    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
+    { key: 'freezer', label: icon('snowflake') + ' In the Freezer' }
   ];
   var html = '';
   groups.forEach(function(g) {
@@ -5607,11 +5607,11 @@ function renderFreshnessBanner() {
     return;
   }
   var parts = [];
-  if (a.expired) parts.push('🔴 ' + a.expired + ' expired');
-  if (a.expiring) parts.push('🟠 ' + a.expiring + ' expiring soon');
+  if (a.expired) parts.push('<span class="fresh-dot fdot-red"></span> ' + a.expired + ' expired');
+  if (a.expiring) parts.push('<span class="fresh-dot fdot-amber"></span> ' + a.expiring + ' expiring soon');
   el.className = 'freshness-banner ' + (a.expired ? 'fresh-expired' : 'fresh-warn');
   el.innerHTML =
-    '<span class="freshness-banner-text">⚠️ ' + parts.join(' · ') + '</span>' +
+    '<span class="freshness-banner-text">' + icon('triangle-alert') + ' ' + parts.join(' · ') + '</span>' +
     '<span class="freshness-banner-actions">' +
       '<button class="freshness-banner-view" onclick="goToFreshnessTab()">View</button>' +
       '<button class="freshness-banner-close" onclick="dismissFreshnessBanner()" title="Dismiss">×</button>' +
@@ -5713,7 +5713,7 @@ function escapeHtml(str) {
 }
 
 function getCatEmoji(cat) {
-  return { Protein: '🥩', Vegetable: '🥦', Fruit: '🍊', Grain: '🌾', Dairy: '🥛', Pantry: '🫙' }[cat] || '🥄';
+  return icon({ Protein: 'beef', Vegetable: 'carrot', Fruit: 'citrus', Grain: 'wheat', Dairy: 'milk', Pantry: 'archive' }[cat] || 'utensils');
 }
 
 function getMyStores() {
@@ -5801,7 +5801,7 @@ function renderIngredientsTab() {
       rowsHtml += '<div class="ingcat-col-pantry" id="ingpantry-' + idx + '">';
       if (pantryEntry) {
         var qtyStr = pantryEntry.quantity ? pantryEntry.quantity + ' ' + (pantryEntry.unit || '') : '';
-        rowsHtml += '<span class="ingcat-in-pantry">✓' + (qtyStr ? ' ' + qtyStr : '') + '</span>';
+        rowsHtml += '<span class="ingcat-in-pantry">' + icon('check') + (qtyStr ? ' ' + qtyStr : '') + '</span>';
         rowsHtml += '<button class="btn btn--xs btn--outline" onclick="removeIngredientFromPantry(\'' + escJ(String(pantryEntry.id)) + '\')">Remove</button>';
       } else {
         rowsHtml += '<button class="btn btn--xs btn--primary" onclick="showPantryAddRow(' + idx + ',\'' + escJ(item.name) + '\',\'' + escJ(unit) + '\')">+ Pantry</button>';
@@ -5846,7 +5846,7 @@ function renderIngredientsTab() {
       userSection += '<div class="ingcat-col-pantry" id="ingpantry-' + uIdx + '">';
       if (pantryEntry) {
         var qtyStr = pantryEntry.quantity ? pantryEntry.quantity + ' ' + (pantryEntry.unit || '') : '';
-        userSection += '<span class="ingcat-in-pantry">✓' + (qtyStr ? ' ' + qtyStr : '') + '</span>';
+        userSection += '<span class="ingcat-in-pantry">' + icon('check') + (qtyStr ? ' ' + qtyStr : '') + '</span>';
         userSection += '<button class="btn btn--xs btn--outline" onclick="removeIngredientFromPantry(\'' + escJ(String(pantryEntry.id)) + '\')">Remove</button>';
       } else {
         userSection += '<button class="btn btn--xs btn--primary" onclick="showPantryAddRow(\'' + uIdx + '\',\'' + escJ(item.name) + '\',\'' + escJ(unit) + '\')">+ Pantry</button>';
@@ -5918,7 +5918,7 @@ function showPantryAddRow(idx, name, unit) {
     '<input type="number" id="ingqty-' + idx + '" class="ingcat-qty-input" placeholder="Qty" min="0.1" step="any">' +
     '<span class="ingcat-qty-unit">' + unit + '</span>' +
     '<button class="btn btn--xs btn--primary" onclick="confirmAddIngredientToPantry(\'' + escJ(name) + '\',' + idx + ',\'' + escJ(unit) + '\')">Add</button>' +
-    '<button class="btn btn--xs btn--outline" onclick="renderIngredientsTab()">✕</button>';
+    '<button class="btn btn--xs btn--outline" onclick="renderIngredientsTab()">' + icon('x') + '</button>';
   var input = document.getElementById('ingqty-' + idx);
   if (input) input.focus();
 }
@@ -6448,7 +6448,7 @@ async function searchNutritionDB() {
 
 function renderLocalNutritionResults(items, query) {
   var resultsEl = document.getElementById('nutrition-db-results');
-  var html = '<div class="nutrition-db-source">📦 Local database (instant)</div>';
+  var html = '<div class="nutrition-db-source">' + icon('package') + ' Local database (instant)</div>';
 
   items.forEach(function(item) {
     html += '<div class="nutrition-db-item" onclick="applyNutritionResult(' + item.calories + ',' + item.protein + ',' + item.carbs + ',' + item.fat + ')">';

@@ -4764,3 +4764,16 @@ select.form-control {
 /* data-icon span wrapper (hydrated into an SVG) — keeps it inline with text */
 .ic { display: inline-flex; align-items: center; }
 .ic .lc-icon { width: 1em; height: 1em; }
+
+/* Freshness status dots (replaced the colored emoji) */
+.fresh-dot {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: var(--fresh-color, var(--color-text-secondary));
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.fdot-red { --fresh-color: var(--color-error); }
+.fdot-amber { --fresh-color: var(--color-warning); }
