@@ -3477,9 +3477,23 @@ function importData() {
   input.click();
 }
 
+// "⋯ Data" dropdown menu (declutters the My Recipes header).
+function toggleDataMenu(e) {
+  if (e) e.stopPropagation();
+  var panel = document.getElementById('data-menu-panel');
+  if (panel) panel.classList.toggle('hidden');
+}
+// Any click that reaches the document closes the menu. The toggle button calls
+// stopPropagation, so opening it doesn't immediately re-close.
+document.addEventListener('click', function () {
+  var panel = document.getElementById('data-menu-panel');
+  if (panel) panel.classList.add('hidden');
+});
+
 window.exportData = exportData;
 window.importData = importData;
 window.restoreBackup = restoreBackup;
+window.toggleDataMenu = toggleDataMenu;
 window.handlePhotoUpload = handlePhotoUpload;
 window.removePhoto = removePhoto;
 

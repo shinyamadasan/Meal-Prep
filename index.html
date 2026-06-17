@@ -76,13 +76,18 @@
                     <div class="section-header">
                         <h2>My Recipes</h2>
                         <div class="header-actions">
-                            <button class="btn btn--secondary" onclick="exportData()">📤 Export Data</button>
-                            <button class="btn btn--secondary" onclick="importData()">📥 Import Data</button>
-                            <button class="btn btn--secondary" onclick="importFromCSV()">📋 Import CSV</button>
+                            <div class="data-menu">
+                                <button class="btn btn--secondary" onclick="toggleDataMenu(event)">⋯ Data</button>
+                                <div class="data-menu-panel hidden" id="data-menu-panel">
+                                    <button onclick="exportData()">📤 Export Data</button>
+                                    <button onclick="importData()">📥 Import Data</button>
+                                    <button onclick="importFromCSV()">📋 Import CSV</button>
+                                    <button onclick="restoreBackup()">↩️ Restore Backup</button>
+                                    <button class="data-menu-danger" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
+                                </div>
+                            </div>
                             <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
                             <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
-                            <button class="btn btn--outline" onclick="restoreBackup()">↩️ Restore Backup</button>
-                            <button class="btn btn--outline" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
                             <button class="btn btn--secondary" onclick="openPasteRecipeModal()">📝 Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>
