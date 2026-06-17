@@ -79,16 +79,16 @@
                             <div class="data-menu">
                                 <button class="btn btn--secondary" onclick="toggleDataMenu(event)">⋯ Data</button>
                                 <div class="data-menu-panel hidden" id="data-menu-panel">
-                                    <button onclick="exportData()">📤 Export Data</button>
-                                    <button onclick="importData()">📥 Import Data</button>
-                                    <button onclick="importFromCSV()">📋 Import CSV</button>
-                                    <button onclick="restoreBackup()">↩️ Restore Backup</button>
-                                    <button class="data-menu-danger" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
+                                    <button onclick="exportData()"><span class="ic" data-icon="download"></span> Export Data</button>
+                                    <button onclick="importData()"><span class="ic" data-icon="upload"></span> Import Data</button>
+                                    <button onclick="importFromCSV()"><span class="ic" data-icon="clipboard-list"></span> Import CSV</button>
+                                    <button onclick="restoreBackup()"><span class="ic" data-icon="undo-2"></span> Restore Backup</button>
+                                    <button class="data-menu-danger" onclick="clearLocalStorage()"><span class="ic" data-icon="trash-2"></span> Clear All Data</button>
                                 </div>
                             </div>
-                            <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
-                            <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
-                            <button class="btn btn--secondary" onclick="openPasteRecipeModal()">📝 Paste Recipe</button>
+                            <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;"><span class="ic" data-icon="globe"></span> Shared Recipes</button>
+                            <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;"><span class="ic" data-icon="users"></span> Family Sharing</button>
+                            <button class="btn btn--secondary" onclick="openPasteRecipeModal()"><span class="ic" data-icon="square-pen"></span> Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>
                     </div>
@@ -190,7 +190,7 @@
 
                                 <div class="nutrition-db-search">
                                     <div class="nutrition-db-header">
-                                        <span>🔍 Look up nutrition data</span>
+                                        <span><span class="ic" data-icon="search"></span> Look up nutrition data</span>
                                         <small>USDA Food Database</small>
                                     </div>
                                     <div class="nutrition-db-input-row">
@@ -220,7 +220,7 @@
                                     <label class="form-label">Ingredients</label>
                                     <div class="ingredients-header">
                                         <button type="button" class="btn btn--outline btn--sm" id="add-ingredient-btn">Add Ingredient</button>
-                                        <button type="button" class="btn btn--secondary btn--sm" id="storage-guide-link">📚 Storage Guide</button>
+                                        <button type="button" class="btn btn--secondary btn--sm" id="storage-guide-link"><span class="ic" data-icon="book-open"></span> Storage Guide</button>
                                     </div>
                                     <div id="ingredients-list"></div>
                                 </div>
@@ -245,10 +245,10 @@
                         <h2>Weekly Meal Planner</h2>
                         <div class="planner-controls">
                             <button class="btn btn--outline" id="clear-week">Clear Week</button>
-                            <button class="btn btn--outline" onclick="saveWeekAsTemplate()">💾 Save Week</button>
-                            <button class="btn btn--outline" id="load-week-template-btn" onclick="loadWeekTemplate()" disabled>📋 Load Saved Week</button>
-                            <button class="btn btn--secondary" onclick="openPrepMode()">🍳 Prep Mode</button>
-                            <button class="btn btn--primary" id="generate-grocery">📋 View Grocery List</button>
+                            <button class="btn btn--outline" onclick="saveWeekAsTemplate()"><span class="ic" data-icon="save"></span> Save Week</button>
+                            <button class="btn btn--outline" id="load-week-template-btn" onclick="loadWeekTemplate()" disabled><span class="ic" data-icon="calendar-days"></span> Load Saved Week</button>
+                            <button class="btn btn--secondary" onclick="openPrepMode()"><span class="ic" data-icon="soup"></span> Prep Mode</button>
+                            <button class="btn btn--primary" id="generate-grocery"><span class="ic" data-icon="shopping-cart"></span> View Grocery List</button>
                         </div>
                     </div>
                     
@@ -287,8 +287,8 @@
                         <div class="grocery-controls">
                             <button class="btn btn--outline" id="clear-grocery">Clear All</button>
                             <button class="btn btn--secondary" id="add-custom-item">Add Custom Item</button>
-                            <button class="btn btn--secondary" onclick="printGroceryList()">🖨️ Print</button>
-                            <button class="btn btn--secondary" onclick="copyGroceryList()">📋 Copy List</button>
+                            <button class="btn btn--secondary" onclick="printGroceryList()"><span class="ic" data-icon="printer"></span> Print</button>
+                            <button class="btn btn--secondary" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy List</button>
                         </div>
                     </div>
                     
@@ -306,18 +306,18 @@
                     <div class="section-header">
                         <h2><svg class="lc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6Z"/><path d="M5 10h14"/><path d="M15 7v6"/></svg> What's in My Fridge &amp; Freezer</h2>
                     </div>
-                    <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong>✓ Cooked</strong> to add a prepped meal here.</p>
+                    <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> to add a prepped meal here.</p>
 
                     <!-- Cooked / prepped meals -->
                     <div id="cooked-meals-section" class="cooked-meals-section hidden">
-                        <div class="cooked-meals-header">🍱 Cooked &amp; Stored <span class="cooked-meals-hint">— prepped meals, with days left before they go bad</span></div>
+                        <div class="cooked-meals-header"><span class="ic" data-icon="utensils"></span> Cooked &amp; Stored <span class="cooked-meals-hint">— prepped meals, with days left before they go bad</span></div>
                         <div id="cooked-meals-list"></div>
                     </div>
 
                     <!-- Raw ingredients / pantry -->
                     <div id="pantry-section">
                         <div class="pantry-header" onclick="togglePantrySection()">
-                            <span>🥦 My Ingredients / Pantry <span id="pantry-count"></span></span>
+                            <span><span class="ic" data-icon="package"></span> My Ingredients / Pantry <span id="pantry-count"></span></span>
                             <span id="pantry-toggle-icon">▼</span>
                         </div>
                         <div id="pantry-body">
@@ -377,7 +377,7 @@
                 <!-- Nutrition Tab -->
                 <section id="nutrition" class="tab-content">
                     <div class="section-header">
-                        <h2>🥗 Nutrition Tracking</h2>
+                        <h2><span class="ic" data-icon="salad"></span> Nutrition Tracking</h2>
                         <button class="btn btn--primary" id="set-nutrition-goals">Set Goals</button>
                     </div>
                     
@@ -485,7 +485,7 @@
 
                 <section id="hacks" class="tab-content">
                     <div class="section-header">
-                        <h2>🍳 Cooking Hacks &amp; Meal Prep Tips</h2>
+                        <h2><span class="ic" data-icon="lightbulb"></span> Cooking Hacks &amp; Meal Prep Tips</h2>
                         <div class="hack-controls">
                             <button class="btn btn--primary" id="add-cooking-hack">Add New Hack</button>
                             <select class="form-control" id="hack-category-filter">
@@ -779,11 +779,11 @@
                     <div class="privacy-options" style="margin-top: 8px;">
                         <label class="checkbox-label">
                             <input type="radio" name="share-privacy" value="public" checked>
-                            <span>🌐 Public (Everyone can see)</span>
+                            <span><span class="ic" data-icon="globe"></span> Public (Everyone can see)</span>
                         </label>
                         <label class="checkbox-label">
                             <input type="radio" name="share-privacy" value="family">
-                            <span>👨‍👩‍👧‍👦 Family Only</span>
+                            <span><span class="ic" data-icon="users"></span> Family Only</span>
                         </label>
                     </div>
                     <button class="btn btn--primary btn--sm" onclick="shareRecipe()" style="margin-top: 8px;">Share Recipe</button>
@@ -823,8 +823,8 @@
                 <div class="form-group">
                     <label class="form-label">Account Management</label>
                     <div class="account-actions">
-                        <button class="btn btn--outline btn--sm" onclick="exportAllData()">📥 Export All Data</button>
-                        <button class="btn btn--danger btn--sm" onclick="openDeleteAccountModal()">🗑️ Delete Account</button>
+                        <button class="btn btn--outline btn--sm" onclick="exportAllData()"><span class="ic" data-icon="download"></span> Export All Data</button>
+                        <button class="btn btn--danger btn--sm" onclick="openDeleteAccountModal()"><span class="ic" data-icon="trash-2"></span> Delete Account</button>
                     </div>
                 </div>
             </div>
@@ -835,7 +835,7 @@
     <div id="delete-account-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>⚠️ Delete Account</h3>
+                <h3><span class="ic" data-icon="triangle-alert"></span> Delete Account</h3>
                 <button class="modal-close" onclick="closeDeleteAccountModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -865,7 +865,7 @@
     <div id="prep-mode-modal" class="modal hidden">
         <div class="modal-content" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;">
             <div class="modal-header">
-                <h3>🍳 Cook Day Checklist</h3>
+                <h3><span class="ic" data-icon="clipboard-list"></span> Cook Day Checklist</h3>
                 <button class="modal-close" onclick="closePrepMode()">&times;</button>
             </div>
             <div style="padding:0.75rem 1.5rem;border-bottom:1px solid var(--border-color,#e0e0e0);">
@@ -943,7 +943,7 @@
     <div id="paste-recipe-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 600px;">
             <div class="modal-header">
-                <h3>📝 Paste Recipe Text</h3>
+                <h3><span class="ic" data-icon="square-pen"></span> Paste Recipe Text</h3>
                 <button class="modal-close" onclick="closePasteRecipeModal()">&times;</button>
             </div>
             <div class="modal-body">
@@ -1035,7 +1035,7 @@
             </div>
             <div class="modal-body" id="csv-preview-body"></div>
             <div class="modal-footer">
-                <button class="btn btn--outline" onclick="downloadCSVTemplate()">📥 Download Template</button>
+                <button class="btn btn--outline" onclick="downloadCSVTemplate()"><span class="ic" data-icon="download"></span> Download Template</button>
                 <button class="btn btn--outline" onclick="closeCSVPreviewModal()">Cancel</button>
                 <button class="btn btn--primary" id="confirm-csv-import-btn" onclick="confirmCSVImport()">Import Recipes</button>
             </div>

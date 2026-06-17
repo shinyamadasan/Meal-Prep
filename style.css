@@ -4760,3 +4760,7 @@ select.form-control {
 [data-color-scheme="dark"] .storage-item {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 4px 14px rgba(0, 0, 0, 0.3);
 }
+
+/* data-icon span wrapper (hydrated into an SVG) — keeps it inline with text */
+.ic { display: inline-flex; align-items: center; }
+.ic .lc-icon { width: 1em; height: 1em; }
