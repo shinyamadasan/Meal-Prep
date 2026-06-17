@@ -33,6 +33,7 @@ const AppState = {
   cookedMeals: [],
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   selectedPlannerDays: [],    // transient: days the picker will assign to
+  dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   currentUser: null,
   isOnline: navigator.onLine
 };
@@ -147,6 +148,7 @@ function saveToLocalStorage() {
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
       recentRecipes: AppState.recentRecipes,
+      version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -191,6 +193,7 @@ function loadFromLocalStorage() {
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
 
       console.log('Data loaded from local storage');
@@ -3473,43 +3476,93 @@ function updateAuthUI() {
 }
 
 // Firestore Data Management
-async function saveToFirestore() {
-  if (!AppState.currentUser || !AppState.isOnline) return;
-  
-  try {
-    const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
-    const dataToSave = {
-      // Strip photos out of the main document — they're stored separately in the
-      // photos subcollection. Keeping them here would blow the 1 MiB doc limit
-      // and fail the whole write (silent total data loss).
-      recipes: AppState.recipes.map(function(r) {
-        if (!r.photo) return r;
-        var copy = Object.assign({}, r);
-        delete copy.photo;
-        return copy;
-      }),
-      weeklyPlan: AppState.weeklyPlan,
-      groceryList: AppState.groceryList,
-      nutritionGoals: AppState.nutritionGoals,
-      customIngredients: AppState.customIngredients,
-      customHacks: AppState.customHacks,
-      pantry: AppState.pantry,
-      userIngredients: AppState.userIngredients,
-      ingredientPrices: AppState.ingredientPrices,
-      myStores: AppState.myStores,
-      customStores: AppState.customStores,
-      cookedMeals: AppState.cookedMeals,
-      recentRecipes: AppState.recentRecipes,
-      lastUpdated: new Date().toISOString()
-    };
 
-    // Firestore rejects any `undefined` field value and fails the WHOLE write
-    // (localStorage tolerates undefined, which is why local worked but cloud
-    // didn't). Round-trip through JSON to strip undefined values + functions so
-    // the save can't silently fail and leave the cloud empty.
-    const clean = JSON.parse(JSON.stringify(dataToSave));
-    await window.firebase.setDoc(userDocRef, clean, { merge: true });
-    console.log('Data saved to Firestore');
+// Builds the cloud payload from AppState. Photos are stripped (they live in the
+// photos subcollection). Returns a plain object WITHOUT a version field.
+function buildFirestorePayload() {
+  return {
+    recipes: AppState.recipes.map(function(r) {
+      if (!r.photo) return r;
+      var copy = Object.assign({}, r);
+      delete copy.photo;
+      return copy;
+    }),
+    weeklyPlan: AppState.weeklyPlan,
+    groceryList: AppState.groceryList,
+    nutritionGoals: AppState.nutritionGoals,
+    customIngredients: AppState.customIngredients,
+    customHacks: AppState.customHacks,
+    pantry: AppState.pantry,
+    userIngredients: AppState.userIngredients,
+    ingredientPrices: AppState.ingredientPrices,
+    myStores: AppState.myStores,
+    customStores: AppState.customStores,
+    cookedMeals: AppState.cookedMeals,
+    recentRecipes: AppState.recentRecipes,
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+// Union two arrays of {id} items, preferring the local copy on id collisions and
+// KEEPING items that exist only remotely (e.g. added on another device).
+function unionById(localArr, remoteArr) {
+  var map = {};
+  (remoteArr || []).forEach(function(it) { if (it && it.id != null) map[String(it.id)] = it; });
+  (localArr || []).forEach(function(it) { if (it && it.id != null) map[String(it.id)] = it; });
+  return Object.keys(map).map(function(k) { return map[k]; });
+}
+
+// When the cloud changed since we loaded (another device wrote first), merge
+// instead of clobbering: union list-type fields by id so nothing added
+// elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
+function mergeCloudConflict(remote, local) {
+  var out = Object.assign({}, local);
+  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks'].forEach(function(key) {
+    out[key] = unionById(local[key] || [], remote[key] || []);
+  });
+  return out;
+}
+
+async function saveToFirestore() {
+  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return;
+
+  const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+
+  try {
+    // Fallback if the transaction API isn't loaded (e.g. an old cached HTML):
+    // plain write, no concurrency guard, but data still saves.
+    if (!window.firebase.runTransaction) {
+      var payload = buildFirestorePayload();
+      payload.version = (AppState.dataVersion || 0) + 1;
+      await window.firebase.setDoc(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
+      AppState.dataVersion = payload.version;
+      return;
+    }
+
+    // Optimistic concurrency: read the cloud version inside a transaction. If it
+    // advanced past what we loaded, another device wrote first → merge so we
+    // don't silently overwrite their changes. Firestore auto-retries on contention.
+    await window.firebase.runTransaction(window.firebase.db, async function(tx) {
+      const snap = await tx.get(userDocRef);
+      let payload = buildFirestorePayload();
+
+      if (snap.exists()) {
+        const remote = snap.data();
+        const remoteVersion = remote.version || 0;
+        if (remoteVersion > (AppState.dataVersion || 0)) {
+          payload = mergeCloudConflict(remote, payload);
+          console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
+        }
+        payload.version = remoteVersion + 1;
+      } else {
+        payload.version = 1;
+      }
+
+      // Firestore rejects `undefined`; round-trip strips undefined + functions.
+      tx.set(userDocRef, JSON.parse(JSON.stringify(payload)));
+      AppState.dataVersion = payload.version;
+    });
+    console.log('Data saved to Firestore (v' + AppState.dataVersion + ')');
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     showErrorMessage('Failed to sync data to cloud. Changes saved locally.');
@@ -3527,6 +3580,7 @@ async function loadFromFirestore() {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
+      AppState.dataVersion = data.version || 0;
       AppState.recipes = data.recipes || [];
       const didPatch = patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
@@ -3642,7 +3696,13 @@ function setupRealtimeListeners() {
         if (!r.photo) return r;
         var c = Object.assign({}, r); delete c.photo; return c;
       });
-      if (JSON.stringify(data.recipes || []) !== JSON.stringify(localStripped)) {
+      // Apply when the cloud version advanced (any field changed on another
+      // device) or, as a fallback for version-less legacy docs, when recipes
+      // differ. Our own writes echo back with version == dataVersion → skipped.
+      var remoteVersion = data.version || 0;
+      var recipesDiffer = JSON.stringify(data.recipes || []) !== JSON.stringify(localStripped);
+      if (remoteVersion > AppState.dataVersion || recipesDiffer) {
+        AppState.dataVersion = remoteVersion;
         AppState.recipes = data.recipes || [];
         patchMissingNutrition(AppState.recipes);
         attachPhotosFromCache();
@@ -3654,7 +3714,9 @@ function setupRealtimeListeners() {
         AppState.customIngredients = data.customIngredients || [];
         AppState.customHacks = data.customHacks || [];
         AppState.pantry = data.pantry || [];
+        AppState.userIngredients = data.userIngredients || [];
         AppState.ingredientPrices = data.ingredientPrices || {};
+        AppState.myStores = data.myStores || [];
         AppState.customStores = data.customStores || [];
         AppState.cookedMeals = data.cookedMeals || [];
         AppState.recentRecipes = data.recentRecipes || [];
@@ -3666,6 +3728,7 @@ function setupRealtimeListeners() {
         renderCookingHacks();
         renderCookedMeals();
         renderPantry();
+        renderIngredientsTab();
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();

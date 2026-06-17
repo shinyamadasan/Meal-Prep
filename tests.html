@@ -161,6 +161,23 @@
       AppState.recipes = [];
       recipePhotoCache = {};
 
+      // --- concurrent-edit conflict merge ---
+      var uLocal = [{ id: 1, name: 'A-local' }, { id: 3, name: 'C' }];
+      var uRemote = [{ id: 1, name: 'A-remote' }, { id: 2, name: 'B-remote' }];
+      var u = unionById(uLocal, uRemote);
+      var uById = {}; u.forEach(function (x) { uById[x.id] = x; });
+      check('union keeps all ids from both sides', u.length === 3);
+      check('union: local wins on id collision', uById[1].name === 'A-local');
+      check('union: remote-only item kept (no loss)', uById[2] && uById[2].name === 'B-remote');
+      var mRemote = { recipes: [{ id: 1, name: 'r1' }, { id: 9, name: 'added-elsewhere' }], weeklyPlan: { Monday: 'remote' }, pantry: [{ id: 5 }] };
+      var mLocal = { recipes: [{ id: 1, name: 'r1-edited' }], weeklyPlan: { Monday: 'local' }, pantry: [{ id: 6 }] };
+      var merged = mergeCloudConflict(mRemote, mLocal);
+      var mById = {}; merged.recipes.forEach(function (r) { mById[r.id] = r; });
+      check('merge keeps recipe added on other device', !!mById[9]);
+      check('merge: local edit wins for same recipe', mById[1].name === 'r1-edited');
+      check('merge unions pantry from both devices', merged.pantry.length === 2);
+      check('merge keeps local for scalar fields', merged.weeklyPlan.Monday === 'local');
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;
