@@ -191,6 +191,7 @@ function loadFromLocalStorage() {
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      cacheInlinePhotos(); // localStorage keeps photos inline; cache them
 
       console.log('Data loaded from local storage');
       if (data.lastSaved) {
@@ -1504,12 +1505,17 @@ function saveRecipe(e) {
   renderRecipeSelectionGrid();
   closeRecipeModal();
   saveData();
+
+  // Persist the photo to its own doc (or remove it if the photo was cleared).
+  if (recipe.photo) savePhotoDoc(recipe.id, recipe.photo);
+  else deletePhotoDoc(recipe.id);
 }
 
 function deleteRecipe(recipeId) {
   if (confirm('Are you sure you want to delete this recipe?')) {
     AppState.recipes = AppState.recipes.filter(r => r.id !== recipeId);
-    
+    deletePhotoDoc(recipeId);
+
     // Remove from weekly plan if assigned
     Object.keys(AppState.weeklyPlan).forEach(day => {
       Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
@@ -3473,7 +3479,15 @@ async function saveToFirestore() {
   try {
     const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
     const dataToSave = {
-      recipes: AppState.recipes,
+      // Strip photos out of the main document — they're stored separately in the
+      // photos subcollection. Keeping them here would blow the 1 MiB doc limit
+      // and fail the whole write (silent total data loss).
+      recipes: AppState.recipes.map(function(r) {
+        if (!r.photo) return r;
+        var copy = Object.assign({}, r);
+        delete copy.photo;
+        return copy;
+      }),
       weeklyPlan: AppState.weeklyPlan,
       groceryList: AppState.groceryList,
       nutritionGoals: AppState.nutritionGoals,
@@ -3543,8 +3557,26 @@ async function loadFromFirestore() {
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.recentRecipes = data.recentRecipes || [];
 
-      // If we patched nutrition into old data, write it back so Firebase stops sending stale data
-      if (didPatch) { setTimeout(saveToFirestore, 500); }
+      // Photos: legacy data may have them inline in this doc; new photos live in
+      // the photos subcollection. Cache both, attach to recipes, and migrate any
+      // legacy inline photos out so the main doc shrinks below the 1 MiB limit.
+      const inlinePhotoIds = [];
+      AppState.recipes.forEach(function(r) {
+        if (r.photo && typeof r.photo === 'string') {
+          recipePhotoCache[String(r.id)] = r.photo;
+          inlinePhotoIds.push(String(r.id));
+        }
+      });
+      const foundPhotoDocs = await loadPhotoDocsIntoCache();
+      inlinePhotoIds.forEach(function(id) {
+        if (!foundPhotoDocs[id]) savePhotoDoc(id, recipePhotoCache[id]); // migrate
+      });
+      attachPhotosFromCache();
+      const migratedAnyPhoto = inlinePhotoIds.some(function(id) { return !foundPhotoDocs[id]; });
+
+      // If we patched nutrition or migrated inline photos, re-save the main doc
+      // (now photo-stripped) so Firebase stops sending stale/oversized data.
+      if (didPatch || migratedAnyPhoto) { setTimeout(saveToFirestore, 800); }
 
       console.log('Data loaded from Firestore');
       showSuccessMessage('Data synced from cloud!');
@@ -3603,10 +3635,19 @@ function setupRealtimeListeners() {
   window.firebase.onSnapshot(userDocRef, (doc) => {
     if (doc.exists() && AppState.currentUser) {
       const data = doc.data();
-      // Only update if data is different to avoid infinite loops
-      if (JSON.stringify(data.recipes) !== JSON.stringify(AppState.recipes)) {
+      // Compare photo-stripped recipes: photos live in a subcollection, so
+      // AppState has them attached in memory but data.recipes never will —
+      // without stripping, this guard would think they always differ.
+      var localStripped = (AppState.recipes || []).map(function(r) {
+        if (!r.photo) return r;
+        var c = Object.assign({}, r); delete c.photo; return c;
+      });
+      if (JSON.stringify(data.recipes || []) !== JSON.stringify(localStripped)) {
         AppState.recipes = data.recipes || [];
         patchMissingNutrition(AppState.recipes);
+        attachPhotosFromCache();
+        // Pull any photos added on another device, then re-render.
+        loadPhotoDocsIntoCache().then(function() { attachPhotosFromCache(); renderRecipes(); });
         AppState.weeklyPlan = data.weeklyPlan || AppState.weeklyPlan;
         AppState.groceryList = data.groceryList || [];
         AppState.nutritionGoals = data.nutritionGoals || AppState.nutritionGoals;
@@ -4204,26 +4245,107 @@ document.addEventListener('DOMContentLoaded', function() {
 // Recipe Photo Management
 let currentRecipePhoto = null;
 
+// Photos are NOT stored in the main user document (that would blow Firestore's
+// 1 MiB doc limit and break ALL of a user's data). Instead each recipe's photo
+// lives in its own doc at users/{uid}/photos/{recipeId}. This cache holds the
+// data URLs in memory so rendering/editing code can keep using recipe.photo.
+var recipePhotoCache = {}; // { recipeIdString: dataUrl }
+
+// Shrink an image (max dimension + JPEG quality) so each photo doc stays well
+// under 1 MiB and storage/bandwidth stay small. Resolves to a data URL.
+function compressImage(dataUrl, maxDim, quality) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+      catch (e) { resolve(dataUrl); }
+    };
+    img.onerror = function() { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+// Re-attach cached photos to AppState.recipes (after a load or a snapshot that
+// replaced the recipes array with photo-less copies from the main doc).
+function attachPhotosFromCache() {
+  (AppState.recipes || []).forEach(function(r) {
+    var k = String(r.id);
+    if (recipePhotoCache[k]) r.photo = recipePhotoCache[k];
+  });
+}
+
+// Seed the cache from any inline photos already on recipes (localStorage/legacy).
+function cacheInlinePhotos() {
+  (AppState.recipes || []).forEach(function(r) {
+    if (r.photo && typeof r.photo === 'string') recipePhotoCache[String(r.id)] = r.photo;
+  });
+}
+
+function savePhotoDoc(recipeId, dataUrl) {
+  recipePhotoCache[String(recipeId)] = dataUrl;
+  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return;
+  try {
+    var ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid, 'photos', String(recipeId));
+    window.firebase.setDoc(ref, { data: dataUrl }).catch(function(e) { console.error('Photo save failed:', e); });
+  } catch (e) { console.error('Photo save failed:', e); }
+}
+
+function deletePhotoDoc(recipeId) {
+  delete recipePhotoCache[String(recipeId)];
+  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return;
+  try {
+    var ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid, 'photos', String(recipeId));
+    window.firebase.deleteDoc(ref).catch(function(e) { console.error('Photo delete failed:', e); });
+  } catch (e) { console.error('Photo delete failed:', e); }
+}
+
+// Loads all of the user's photo docs into the cache. Returns a set of ids found.
+async function loadPhotoDocsIntoCache() {
+  var found = {};
+  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return found;
+  try {
+    var snap = await window.firebase.getDocs(
+      window.firebase.collection(window.firebase.db, 'users', AppState.currentUser.uid, 'photos')
+    );
+    snap.forEach(function(d) {
+      var data = d.data();
+      if (data && data.data) { recipePhotoCache[d.id] = data.data; found[d.id] = true; }
+    });
+  } catch (e) { console.error('Photo load failed:', e); }
+  return found;
+}
+
 function handlePhotoUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-  
+
   // Validate file type
   if (!file.type.startsWith('image/')) {
     showErrorMessage('Please select a valid image file.');
     return;
   }
-  
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    showErrorMessage('Image file is too large. Please select an image smaller than 5MB.');
+
+  // Accept larger originals now — we compress before storing.
+  if (file.size > 15 * 1024 * 1024) {
+    showErrorMessage('Image file is too large. Please select an image smaller than 15MB.');
     return;
   }
-  
+
   const reader = new FileReader();
   reader.onload = function(e) {
-    currentRecipePhoto = e.target.result;
-    showPhotoPreview(e.target.result);
+    // Compress to ~1000px / JPEG 0.7 so the stored photo stays well under 1 MiB.
+    compressImage(e.target.result, 1000, 0.7).then(function(compressed) {
+      currentRecipePhoto = compressed;
+      showPhotoPreview(compressed);
+    });
   };
   reader.readAsDataURL(file);
 }

@@ -141,6 +141,26 @@
       check('stripTagsDeep removes tags from nested ingredient', cleaned.baseIngredients[0].name.indexOf('<') < 0);
       check('stripTagsDeep preserves non-strings', cleaned.servings === 4);
 
+      // --- photos kept out of the main document ---
+      AppState.recipes = [
+        { id: 1, name: 'Adobo', photo: 'data:image/jpeg;base64,AAAA' },
+        { id: 2, name: 'Sinigang' }
+      ];
+      var strippedRecipes = AppState.recipes.map(function (r) {
+        if (!r.photo) return r;
+        var c = Object.assign({}, r); delete c.photo; return c;
+      });
+      check('photo stripped from main-doc copy', strippedRecipes[0].photo === undefined);
+      check('original recipe keeps photo in memory', AppState.recipes[0].photo === 'data:image/jpeg;base64,AAAA');
+      recipePhotoCache = {};
+      cacheInlinePhotos();
+      check('inline photo cached by id', recipePhotoCache['1'] === 'data:image/jpeg;base64,AAAA');
+      AppState.recipes = [{ id: 1, name: 'Adobo' }, { id: 2, name: 'Sinigang' }]; // reload w/o photos
+      attachPhotosFromCache();
+      check('photo re-attached from cache after reload', AppState.recipes[0].photo === 'data:image/jpeg;base64,AAAA');
+      AppState.recipes = [];
+      recipePhotoCache = {};
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;
