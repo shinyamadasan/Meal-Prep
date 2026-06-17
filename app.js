@@ -3477,7 +3477,12 @@ async function saveToFirestore() {
       lastUpdated: new Date().toISOString()
     };
 
-    await window.firebase.setDoc(userDocRef, dataToSave, { merge: true });
+    // Firestore rejects any `undefined` field value and fails the WHOLE write
+    // (localStorage tolerates undefined, which is why local worked but cloud
+    // didn't). Round-trip through JSON to strip undefined values + functions so
+    // the save can't silently fail and leave the cloud empty.
+    const clean = JSON.parse(JSON.stringify(dataToSave));
+    await window.firebase.setDoc(userDocRef, clean, { merge: true });
     console.log('Data saved to Firestore');
   } catch (error) {
     console.error('Error saving to Firestore:', error);
@@ -3485,9 +3490,11 @@ async function saveToFirestore() {
   }
 }
 
+// Returns 'loaded' (cloud data applied), 'empty' (no cloud doc yet), or
+// 'error' (offline / read failed). The caller seeds the cloud only on 'empty'.
 async function loadFromFirestore() {
-  if (!AppState.currentUser || !AppState.isOnline) return false;
-  
+  if (!AppState.currentUser || !AppState.isOnline) return 'error';
+
   try {
     const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
     const docSnap = await window.firebase.getDoc(userDocRef);
@@ -3529,13 +3536,14 @@ async function loadFromFirestore() {
 
       console.log('Data loaded from Firestore');
       showSuccessMessage('Data synced from cloud!');
-      return true;
+      return 'loaded';
     }
+    return 'empty'; // signed in, but no data saved to the cloud yet
   } catch (error) {
     console.error('Error loading from Firestore:', error);
     showErrorMessage('Failed to load cloud data. Using local data.');
   }
-  return false;
+  return 'error';
 }
 
 async function initializeUserData() {
@@ -3546,11 +3554,15 @@ async function initializeUserData() {
 
 async function loadUserData() {
   // Try to load from Firestore first, fallback to local storage
-  const loadedFromCloud = await loadFromFirestore();
-  if (!loadedFromCloud) {
+  const status = await loadFromFirestore();
+  if (status !== 'loaded') {
     loadFromLocalStorage();
+    // First sign-in on an account that has no cloud data yet → push this
+    // device's local data up so it reaches your other devices. Only on a
+    // confirmed-empty doc (not a transient error) to avoid overwriting good data.
+    if (status === 'empty') saveToFirestore();
   }
-  
+
   // Update UI
   renderRecipes();
   renderWeeklyPlanner();
@@ -3670,7 +3682,7 @@ async function shareRecipe() {
     // Remove the original ID to avoid conflicts
     delete sharedRecipe.id;
     
-    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), sharedRecipe);
+    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), JSON.parse(JSON.stringify(sharedRecipe)));
     showSuccessMessage('Recipe shared successfully!');
     loadSharedRecipes();
   } catch (error) {
@@ -3859,7 +3871,7 @@ async function shareRecipe() {
     // Remove the original ID to avoid conflicts
     delete sharedRecipe.id;
     
-    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), sharedRecipe);
+    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), JSON.parse(JSON.stringify(sharedRecipe)));
     showSuccessMessage(`Recipe shared ${privacy === 'public' ? 'publicly' : 'with family'}!`);
     loadSharedRecipes();
   } catch (error) {
