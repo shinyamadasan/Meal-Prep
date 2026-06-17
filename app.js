@@ -143,6 +143,23 @@ function freshnessStatus(daysLeft) {
 }
 
 // Local Storage Management
+// ── Icon system (Lucide SVG) ─────────────────────────────────────────────────
+// Inline SVG icons replace emoji. They inherit text color (currentColor) and
+// scale with font-size, so they look crisp and match the theme in light/dark.
+var ICON_PATHS = {
+  'chef-hat': '<path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/>',
+  'clock': '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  'flame': '<path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/>',
+  'refrigerator': '<path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6Z"/><path d="M5 10h14"/><path d="M15 7v6"/>',
+  'snowflake': '<path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/>'
+};
+function icon(name) {
+  var p = ICON_PATHS[name];
+  if (!p) return '';
+  return '<svg class="lc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+}
+window.icon = icon;
+
 const STORAGE_KEY = 'mealPrepAppData';
 
 function saveToLocalStorage() {
@@ -1683,20 +1700,20 @@ function renderRecipes() {
       
       <div class="prep-time-info">
         <div class="time-item">
-          <span>⏲️</span>
+          ${icon('clock')}
           <span>Prep: ${Math.round(totalPrepTime)}m</span>
           ${isScaled ? `<span class="time-per-serving">(${recipe.basePrepTime || recipe.prepTime}m base)</span>` : ''}
         </div>
         <div class="time-item">
-          <span>🍳</span>
+          ${icon('flame')}
           <span>Cook: ${Math.round(totalCookTime)}m</span>
           ${isScaled ? `<span class="time-per-serving">(${recipe.baseCookTime || recipe.cookTime}m base)</span>` : ''}
         </div>
       </div>
-      
+
       <div class="recipe-storage">
-        <div class="storage-info">📅 Fridge: ${recipe.fridgeLife} days</div>
-        <div class="storage-info">❄️ Freezer: ${recipe.freezerLife} days</div>
+        <div class="storage-info">${icon('refrigerator')} Fridge: ${recipe.fridgeLife} days</div>
+        <div class="storage-info">${icon('snowflake')} Freezer: ${recipe.freezerLife} days</div>
       </div>
       
       <!-- Nutrition Information -->
