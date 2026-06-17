@@ -277,9 +277,6 @@ function loadFromLocalStorage() {
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
 
       console.log('Data loaded from local storage');
-      if (data.lastSaved) {
-        showSuccessMessage(`Data loaded (last saved: ${new Date(data.lastSaved).toLocaleString()})`);
-      }
       return true;
     }
   } catch (error) {
@@ -3873,7 +3870,6 @@ async function loadFromFirestore() {
       if (didPatch || migratedAnyPhoto) { setTimeout(saveToFirestore, 800); }
 
       console.log('Data loaded from Firestore');
-      showSuccessMessage('Data synced from cloud!');
       return 'loaded';
     }
     return 'empty'; // signed in, but no data saved to the cloud yet
@@ -3929,19 +3925,13 @@ function setupRealtimeListeners() {
   window.firebase.onSnapshot(userDocRef, (doc) => {
     if (doc.exists() && AppState.currentUser) {
       const data = doc.data();
-      // Compare photo-stripped recipes: photos live in a subcollection, so
-      // AppState has them attached in memory but data.recipes never will —
-      // without stripping, this guard would think they always differ.
-      var localStripped = (AppState.recipes || []).map(function(r) {
-        if (!r.photo) return r;
-        var c = Object.assign({}, r); delete c.photo; return c;
-      });
-      // Apply when the cloud version advanced (any field changed on another
-      // device) or, as a fallback for version-less legacy docs, when recipes
-      // differ. Our own writes echo back with version == dataVersion → skipped.
+      // Apply only when the cloud VERSION advanced — i.e. a real change from
+      // another device/tab. Our own writes bump dataVersion before the echo
+      // arrives, so they're skipped. (Comparing recipe contents was unreliable
+      // because local recipes are normalized/photo-attached and would look
+      // "different" forever, causing constant re-syncs.)
       var remoteVersion = data.version || 0;
-      var recipesDiffer = JSON.stringify(data.recipes || []) !== JSON.stringify(localStripped);
-      if (remoteVersion > AppState.dataVersion || recipesDiffer) {
+      if (remoteVersion > AppState.dataVersion) {
         AppState.dataVersion = remoteVersion;
         AppState.recipes = data.recipes || [];
         patchMissingNutrition(AppState.recipes);
@@ -3972,8 +3962,7 @@ function setupRealtimeListeners() {
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
-
-        showSuccessMessage('Data updated from cloud!');
+        // Silent — the ✓ Synced badge already conveys sync status.
       }
     }
   });
