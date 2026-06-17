@@ -211,6 +211,15 @@ function hydrateIcons() {
 window.icon = icon;
 window.hydrateIcons = hydrateIcons;
 
+// Friendly, instructive empty-state block (icon + title + hint).
+function emptyState(iconName, title, text) {
+  return '<div class="empty-state">' +
+    '<div class="empty-state-icon">' + icon(iconName) + '</div>' +
+    '<div class="empty-state-title">' + title + '</div>' +
+    '<div class="empty-state-text">' + text + '</div>' +
+    '</div>';
+}
+
 const STORAGE_KEY = 'mealPrepAppData';
 
 function saveToLocalStorage() {
@@ -1721,6 +1730,13 @@ function renderRecipes() {
     return matchesSearch && matchesCategory && matchesTime;
   });
   
+  if (filteredRecipes.length === 0) {
+    recipesGrid.innerHTML = AppState.recipes.length > 0
+      ? emptyState('search', 'No recipes match', 'Try a different search term or filter.')
+      : emptyState('square-pen', 'No recipes yet', 'Tap <b>Add New Recipe</b> to create your first — or <b>Paste Recipe</b> to add one from text you copied.');
+    return;
+  }
+
   recipesGrid.innerHTML = filteredRecipes.map(recipe => {
     const totalPrepTime = (recipe.basePrepTime || recipe.prepTime) * recipe.currentServings / recipe.baseServings;
     const totalCookTime = (recipe.baseCookTime || recipe.cookTime) * recipe.currentServings / recipe.baseServings;
@@ -1952,7 +1968,7 @@ function renderWeeklyPlanner() {
                onclick="openRecipeSelectionModal('${day}', '${meal}')">
             <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
             <div class="meal-slot-content">
-              <div class="meal-slot-empty">Click + to add recipe</div>
+              <div class="meal-slot-empty">+ Tap to add a recipe</div>
             </div>
           </div>`;
       }).join('')}
@@ -2335,7 +2351,7 @@ function renderGroceryList() {
   if (summaryEl) summaryEl.style.display = isEmpty ? 'none' : '';
 
   if (isEmpty) {
-    groceryListEl.innerHTML = '<p class="grocery-empty-msg">Your grocery list is empty. Plan meals in the Weekly Planner to generate it.</p>';
+    groceryListEl.innerHTML = emptyState('shopping-cart', 'Your grocery list is empty', 'Plan meals in the <b>Weekly Planner</b> — your shopping list builds itself from what you planned.');
     return;
   }
   
@@ -2550,7 +2566,9 @@ function renderStorageGuide() {
   }).join('');
   
   if (filteredIngredients.length === 0) {
-    storageGuideEl.innerHTML = '<p>No ingredients found matching your search criteria.</p>';
+    storageGuideEl.innerHTML = AppState.customIngredients.length > 0
+      ? '<p style="text-align:center;color:var(--color-text-secondary);">No ingredients match your search.</p>'
+      : emptyState('book-open', 'No storage tips yet', 'Tap <b>Import from Recipes</b> to pull in the ingredients you use, or <b>Add Ingredient</b> to add storage notes manually.');
   }
 }
 
@@ -5327,7 +5345,7 @@ function renderPantry() {
   count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
 
   if (n === 0) {
-    list.innerHTML = '<p class="pantry-empty">No items yet. Add ingredients you already have at home.</p>';
+    list.innerHTML = emptyState('package', 'Your pantry is empty', 'Add ingredients you already have at home — cooking a recipe then deducts from your stock and tracks freshness.');
     return;
   }
 
