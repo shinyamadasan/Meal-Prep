@@ -1503,7 +1503,7 @@ function saveRecipe(e) {
   renderRecipes();
   renderRecipeSelectionGrid();
   closeRecipeModal();
-  saveToLocalStorage();
+  saveData();
 }
 
 function deleteRecipe(recipeId) {
@@ -1525,7 +1525,7 @@ function deleteRecipe(recipeId) {
     renderWeeklyPlanner();
     renderRecipeSelectionGrid();
     updateWeeklyStats();
-    saveToLocalStorage();
+    saveData();
   }
 }
 
@@ -2683,7 +2683,7 @@ function saveNutritionGoals(e) {
   
   updateNutritionGoalsDisplay();
   closeNutritionGoalsModal();
-  saveToLocalStorage();
+  saveData();
 }
 
 function updateNutritionGoalsDisplay() {
@@ -3015,14 +3015,14 @@ function saveIngredient(e) {
   
   renderStorageGuide();
   closeIngredientModal();
-  saveToLocalStorage();
+  saveData();
 }
 
 function deleteIngredient(ingredientId) {
   if (confirm('Are you sure you want to delete this ingredient?')) {
     AppState.customIngredients = AppState.customIngredients.filter(i => i.id !== ingredientId);
     renderStorageGuide();
-    saveToLocalStorage();
+    saveData();
   }
 }
 
@@ -3121,14 +3121,14 @@ function saveHack(e) {
   
   renderCookingHacks();
   closeHackModal();
-  saveToLocalStorage();
+  saveData();
 }
 
 function deleteHack(hackId) {
   if (confirm('Are you sure you want to delete this cooking hack?')) {
     AppState.customHacks = AppState.customHacks.filter(h => h.id !== hackId);
     renderCookingHacks();
-    saveToLocalStorage();
+    saveData();
   }
 }
 
@@ -3280,8 +3280,15 @@ function exportData() {
       nutritionGoals: AppState.nutritionGoals,
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
+      pantry: AppState.pantry,
+      userIngredients: AppState.userIngredients,
+      ingredientPrices: AppState.ingredientPrices,
+      myStores: AppState.myStores,
+      customStores: AppState.customStores,
+      cookedMeals: AppState.cookedMeals,
+      recentRecipes: AppState.recentRecipes,
       exportedAt: new Date().toISOString(),
-      version: '1.0'
+      version: '1.1'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -3322,36 +3329,41 @@ function importData() {
         }
         
         if (confirm('This will replace all your current data. Are you sure you want to continue?')) {
-          AppState.recipes = importedData.recipes || [];
-          AppState.weeklyPlan = importedData.weeklyPlan || {
-            Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-            Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
-          };
-          AppState.groceryList = importedData.groceryList || [];
-          AppState.nutritionGoals = importedData.nutritionGoals || {
-            calories: 2000,
-            protein: 150,
-            carbs: 250,
-            fat: 67,
-            fiber: 25,
-            sodium: 2300
-          };
-          AppState.customIngredients = importedData.customIngredients || [];
-          AppState.customHacks = importedData.customHacks || [];
-          
-          // Save to local storage and refresh UI
-          saveToLocalStorage();
+          // For each field: use the imported value if present, otherwise KEEP
+          // the current data — so importing an older/partial backup can never
+          // silently wipe fields (e.g. pantry) that the file doesn't contain.
+          AppState.recipes = importedData.recipes || AppState.recipes;
+          patchMissingNutrition(AppState.recipes);
+          AppState.weeklyPlan = importedData.weeklyPlan || AppState.weeklyPlan;
+          AppState.groceryList = importedData.groceryList || AppState.groceryList;
+          AppState.nutritionGoals = importedData.nutritionGoals || AppState.nutritionGoals;
+          AppState.customIngredients = importedData.customIngredients || AppState.customIngredients;
+          AppState.customHacks = importedData.customHacks || AppState.customHacks;
+          AppState.pantry = importedData.pantry || AppState.pantry;
+          AppState.userIngredients = importedData.userIngredients || AppState.userIngredients;
+          AppState.ingredientPrices = importedData.ingredientPrices || AppState.ingredientPrices;
+          AppState.myStores = importedData.myStores || AppState.myStores;
+          AppState.customStores = importedData.customStores || AppState.customStores;
+          AppState.cookedMeals = importedData.cookedMeals || AppState.cookedMeals;
+          AppState.recentRecipes = importedData.recentRecipes || AppState.recentRecipes;
+
+          // Persist to BOTH localStorage AND Firestore. Using saveToLocalStorage
+          // alone meant a logged-in user's next refresh loaded the OLD cloud copy
+          // and the import "disappeared".
+          saveData();
+
+          // Refresh every view
           renderRecipes();
           renderWeeklyPlanner();
           renderStorageGuide();
           renderCookingHacks();
+          renderCookedMeals();
+          renderPantry();
+          renderIngredientsTab();
           updateNutritionGoalsDisplay();
-          
+          updateFreshnessBadges();
+          renderFreshnessBanner();
+
           showSuccessMessage('Data imported successfully!');
         }
       } catch (error) {
