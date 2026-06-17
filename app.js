@@ -3522,6 +3522,27 @@ function exportData() {
   }
 }
 
+function unionStrings(a, b) {
+  var out = (a || []).slice();
+  (b || []).forEach(function(s) { if (out.indexOf(s) < 0) out.push(s); });
+  return out;
+}
+
+// Fill only EMPTY plan slots from an imported plan — never overwrite a meal you
+// already planned. Snacks are unioned.
+function mergeWeeklyPlan(imported) {
+  ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(function(day) {
+    if (!imported[day]) return;
+    if (!AppState.weeklyPlan[day]) AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+    ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
+      if (!AppState.weeklyPlan[day][meal] && imported[day][meal]) AppState.weeklyPlan[day][meal] = imported[day][meal];
+    });
+    var cur = AppState.weeklyPlan[day].snacks || [];
+    (imported[day].snacks || []).forEach(function(id) { if (cur.indexOf(id) < 0) cur.push(id); });
+    AppState.weeklyPlan[day].snacks = cur;
+  });
+}
+
 function importData() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -3535,35 +3556,40 @@ function importData() {
       try {
         const importedData = JSON.parse(e.target.result);
         
-        // Validate the imported data structure
-        if (!importedData.recipes || !importedData.weeklyPlan) {
+        // Accept any meal-prep export that has at least one known field.
+        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'groceryList', 'cookedMeals'];
+        if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
           throw new Error('Invalid data format');
         }
-        
-        if (confirm('This will replace all your current data. Are you sure you want to continue?')) {
-          // Snapshot current data first so the import can be undone via "Restore Backup".
-          createBackup('Import');
-          // For each field: use the imported value if present, otherwise KEEP
-          // the current data — so importing an older/partial backup can never
-          // silently wipe fields (e.g. pantry) that the file doesn't contain.
-          AppState.recipes = importedData.recipes || AppState.recipes;
-          patchMissingNutrition(AppState.recipes);
-          AppState.weeklyPlan = importedData.weeklyPlan || AppState.weeklyPlan;
-          AppState.groceryList = importedData.groceryList || AppState.groceryList;
-          AppState.nutritionGoals = importedData.nutritionGoals || AppState.nutritionGoals;
-          AppState.customIngredients = importedData.customIngredients || AppState.customIngredients;
-          AppState.customHacks = importedData.customHacks || AppState.customHacks;
-          AppState.pantry = importedData.pantry || AppState.pantry;
-          AppState.userIngredients = importedData.userIngredients || AppState.userIngredients;
-          AppState.ingredientPrices = importedData.ingredientPrices || AppState.ingredientPrices;
-          AppState.myStores = importedData.myStores || AppState.myStores;
-          AppState.customStores = importedData.customStores || AppState.customStores;
-          AppState.cookedMeals = importedData.cookedMeals || AppState.cookedMeals;
-          AppState.recentRecipes = importedData.recentRecipes || AppState.recentRecipes;
 
-          // Persist to BOTH localStorage AND Firestore. Using saveToLocalStorage
-          // alone meant a logged-in user's next refresh loaded the OLD cloud copy
-          // and the import "disappeared".
+        var newRecipeCount = (importedData.recipes || []).filter(function(r) {
+          return r && r.id != null && !AppState.recipes.some(function(x) { return String(x.id) === String(r.id); });
+        }).length;
+
+        if (confirm('Add the recipes and data from this file to your collection?\n\nNothing is removed — imported items are merged into what you already have.')) {
+          // Snapshot current data first so this can be undone via "Restore Backup".
+          createBackup('Import');
+
+          // MERGE, don't replace — union list-type data by id (existing items
+          // win on a collision, so re-importing your own backup is a no-op).
+          AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
+          patchMissingNutrition(AppState.recipes);
+          AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
+          AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
+          AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
+          AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
+          AppState.cookedMeals = unionById(AppState.cookedMeals, importedData.cookedMeals || []);
+          AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
+
+          // Plan: fill empty slots only (never wipe a planned meal).
+          if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
+
+          // Maps + store lists: combine; current values win on conflicts.
+          AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
+          AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
+          AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
+          cacheInlinePhotos();
+
           saveData();
 
           // Refresh every view
@@ -3578,7 +3604,9 @@ function importData() {
           updateFreshnessBadges();
           renderFreshnessBanner();
 
-          showSuccessMessage('Data imported successfully!');
+          showSuccessMessage(newRecipeCount > 0
+            ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection. 🎉'
+            : 'Imported and merged into your data.');
         }
       } catch (error) {
         console.error('Error importing data:', error);
