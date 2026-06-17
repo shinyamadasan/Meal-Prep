@@ -548,7 +548,7 @@
       // App Check — protects Firestore/Auth from abuse and quota-drain by unauthorized clients.
       // SETUP: Firebase Console > App Check > register this web app with reCAPTCHA v3,
       // then paste the reCAPTCHA v3 site key below. Stays inert (no behavior change) until set.
-      const RECAPTCHA_V3_SITE_KEY = ""; // <-- paste your reCAPTCHA v3 site key here
+      const RECAPTCHA_V3_SITE_KEY = "6LcvDCUtAAAAAA6rnxwQixdC1V9JMpGb-BVRqFI3"; // reCAPTCHA v3 site key (public)
       if (RECAPTCHA_V3_SITE_KEY) {
         initializeAppCheck(app, {
           provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
