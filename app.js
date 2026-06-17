@@ -4250,43 +4250,25 @@ async function loadSharedRecipes() {
   try {
     const fb = window.firebase;
     const ref = fb.collection(fb.db, 'sharedRecipes');
-
-    const queries = [
-      fb.query(ref, fb.where('privacy', '==', 'public'), fb.orderBy('sharedAt', 'desc'))
-    ];
-    if (AppState.currentUser) {
-      queries.push(
-        fb.query(ref, fb.where('familyGroupId', '==', AppState.currentUser.uid), fb.orderBy('sharedAt', 'desc'))
-      );
-    }
-
-    const snaps = await Promise.all(queries.map(function (q) { return fb.getDocs(q); }));
-    const seen = {};
-    const docs = [];
-    snaps.forEach(function (snap) {
-      snap.forEach(function (d) {
-        if (!seen[d.id]) { seen[d.id] = true; docs.push(d); }
-      });
-    });
-    docs.sort(function (a, b) {
-      return (b.data().sharedAt || '').localeCompare(a.data().sharedAt || '');
-    });
+    // Everyone's shared recipes are public — one "newest first" query, which
+    // needs no composite index (a single orderBy uses the automatic index).
+    const snap = await fb.getDocs(fb.query(ref, fb.orderBy('sharedAt', 'desc')));
 
     const sharedRecipesList = document.getElementById('shared-recipes-list');
     sharedRecipesList.innerHTML = '';
 
-    if (docs.length === 0) {
-      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes available</p>';
+    if (snap.empty) {
+      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes yet — be the first to share one!</p>';
       return;
     }
 
-    docs.forEach((doc) => {
+    snap.forEach((doc) => {
       const recipe = doc.data();
       const recipeItem = document.createElement('div');
       recipeItem.className = 'shared-recipe-item';
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
-          <h4>${escapeHtml(recipe.name)} ${recipe.privacy === 'family' ? icon('users') : icon('globe')}</h4>
+          <h4>${escapeHtml(recipe.name)}</h4>
           <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
         </div>
         <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
