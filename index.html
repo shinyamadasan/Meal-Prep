@@ -42,6 +42,7 @@
                 <div class="header-top">
                     <h1 class="app-title"><svg class="lc-icon app-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg> Meal Prep Planner</h1>
                     <div class="auth-section">
+                        <button class="help-btn" onclick="openHelpModal()" title="How to use this app" aria-label="How to use this app">?</button>
                         <div id="user-info" class="user-info hidden">
                             <span id="sync-status" class="sync-status hidden"></span>
                             <span id="user-email"></span>
@@ -764,6 +765,49 @@
     </div>
 
     <!-- Shared Recipes Modal -->
+    <!-- How-to-Use guide -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <h3>How to use Meal Prep Planner</h3>
+                <button class="modal-close" onclick="closeHelpModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="help-intro">Your weekly meal-prep loop, in 6 steps:</p>
+                <ol class="help-steps">
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="square-pen"></span></span>
+                        <div><strong>1. Add your recipes</strong><span>My Recipes → <b>Add New Recipe</b> (or Paste / Import CSV). Each recipe holds ingredients, nutrition, cost, and fridge/freezer life.</span></div>
+                    </li>
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="calendar-days"></span></span>
+                        <div><strong>2. Plan your week</strong><span>Weekly Planner → tap a meal slot on any day → pick a recipe. Use the <b>“Add to”</b> day chips to fill several days at once.</span></div>
+                    </li>
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="shopping-cart"></span></span>
+                        <div><strong>3. Get your grocery list</strong><span>It’s built automatically from your plan, grouped by category with totals. Check items off as you shop.</span></div>
+                    </li>
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="flame"></span></span>
+                        <div><strong>4. Cook &amp; mark “✓ Cooked”</strong><span>After cooking, tap <b>✓ Cooked</b> on the recipe or planner. It deducts the ingredients from your pantry and saves the batch to your fridge.</span></div>
+                    </li>
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="refrigerator"></span></span>
+                        <div><strong>5. Track freshness</strong><span>My Fridge shows everything you’ve stored and how many days before it goes bad — with warnings when something’s about to expire.</span></div>
+                    </li>
+                    <li>
+                        <span class="help-step-icon"><span class="ic" data-icon="package"></span></span>
+                        <div><strong>6. Pantry &amp; prices</strong><span>Track what you already have and per-store prices in <b>Ingredients</b>, so “in stock” badges and costs stay accurate.</span></div>
+                    </li>
+                </ol>
+                <p class="help-foot">Also handy: <b>Storage Guide</b> (how to store each ingredient) and <b>Nutrition</b> (weekly totals vs your goals). Sign in to sync across your phone and PC.</p>
+                <div style="text-align:right; margin-top:1rem;">
+                    <button class="btn btn--primary" onclick="closeHelpModal()">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Username / display-name modal -->
     <div id="username-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 420px;">

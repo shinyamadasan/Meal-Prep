@@ -1208,8 +1208,28 @@ function getStorageIndicatorClass(fridgeLife) {
 }
 
 // Initialize app
+function openHelpModal() {
+  var m = document.getElementById('help-modal');
+  if (m) { hydrateIcons(); m.classList.remove('hidden'); }
+}
+function closeHelpModal() {
+  var m = document.getElementById('help-modal');
+  if (m) m.classList.add('hidden');
+}
+window.openHelpModal = openHelpModal;
+window.closeHelpModal = closeHelpModal;
+
 function initApp() {
   hydrateIcons(); // turn static data-icon placeholders into SVGs
+
+  // First-run: show the How-to-Use guide once.
+  try {
+    if (!localStorage.getItem('mealPrepHelpSeen')) {
+      localStorage.setItem('mealPrepHelpSeen', '1');
+      setTimeout(openHelpModal, 600);
+    }
+  } catch (e) { /* ignore storage errors */ }
+
   // Set up Firebase auth state listener
   if (window.firebase) {
     window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
