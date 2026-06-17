@@ -67,6 +67,16 @@
   --color-focus-ring: rgba(var(--color-teal-500-rgb), 0.4);
   --color-select-caret: rgba(var(--color-slate-900-rgb), 0.8);
 
+  /* Aliases — some components use these legacy names with hardcoded light
+     fallbacks (e.g. var(--text-secondary, #666)), which broke in dark mode.
+     Mapping them to the real semantic tokens makes them adapt automatically.
+     Defined once here; they re-resolve per theme since --color-* change. */
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --surface-secondary: var(--color-secondary);
+  --border-color: var(--color-border);
+  --primary: var(--color-primary);
+
   /* Common style patterns */
   --focus-ring: 0 0 0 3px var(--color-focus-ring);
   --focus-outline: 2px solid var(--color-primary);
@@ -3415,6 +3425,17 @@ select.form-control {
   background: #fffbeb !important;
 }
 .expiry-badge { font-size: 0.85em; cursor: help; }
+
+/* Dark mode: these force a light background, so swap to a translucent amber
+   tint — otherwise the theme's light text is unreadable on the pale yellow. */
+[data-color-scheme="dark"] .storage-alert-banner {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+[data-color-scheme="dark"] .meal-slot.expiry-warning {
+  background: rgba(245, 158, 11, 0.15) !important;
+}
 
 /* Weekly Cost Summary */
 .cost-summary-bar {
