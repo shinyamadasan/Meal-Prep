@@ -3247,6 +3247,8 @@ window.closeLoginModal = closeLoginModal;
 window.openSignupModal = openSignupModal;
 window.closeSignupModal = closeSignupModal;
 window.signOut = signOut;
+window.resendVerification = resendVerification;
+window.recheckVerification = recheckVerification;
 window.importFromCSV = importFromCSV;
 window.saveWeekAsTemplate = saveWeekAsTemplate;
 window.loadWeekTemplate = loadWeekTemplate;
@@ -3426,7 +3428,12 @@ async function signUp(email, password) {
   try {
     const userCredential = await window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password);
     AppState.currentUser = userCredential.user;
-    showSuccessMessage('Account created successfully!');
+    // Send a verification link so we can trust the email (needed for sharing).
+    if (window.firebase.sendEmailVerification) {
+      try { await window.firebase.sendEmailVerification(userCredential.user); }
+      catch (e) { console.error('Verification email failed:', e); }
+    }
+    showSuccessMessage('Account created! We emailed a verification link to ' + email + ' — verify it to enable recipe sharing.');
     closeSignupModal();
     // Initialize user data
     await initializeUserData();
@@ -3465,13 +3472,61 @@ function updateAuthUI() {
     userEmail.textContent = AppState.currentUser.email;
     userInfo.classList.remove('hidden');
     authButtons.classList.add('hidden');
-    if (sharedRecipesBtn) sharedRecipesBtn.style.display = 'inline-block';
-    if (familySharingBtn) familySharingBtn.style.display = 'inline-block';
+    // Sharing relies on a trusted email identity → only show once verified.
+    var verified = AppState.currentUser.emailVerified;
+    if (sharedRecipesBtn) sharedRecipesBtn.style.display = verified ? 'inline-block' : 'none';
+    if (familySharingBtn) familySharingBtn.style.display = verified ? 'inline-block' : 'none';
   } else {
     userInfo.classList.add('hidden');
     authButtons.classList.remove('hidden');
     if (sharedRecipesBtn) sharedRecipesBtn.style.display = 'none';
     if (familySharingBtn) familySharingBtn.style.display = 'none';
+  }
+  renderVerificationBanner();
+}
+
+// Shows a banner while signed in with an unverified email. Core app stays
+// usable; only sharing is gated (here + in the Firestore rules).
+function renderVerificationBanner() {
+  var existing = document.getElementById('email-verify-banner');
+  var user = AppState.currentUser;
+  var needsBanner = !!user && user.emailVerified === false;
+  if (!needsBanner) { if (existing) existing.remove(); return; }
+  if (existing) return;
+  var banner = document.createElement('div');
+  banner.id = 'email-verify-banner';
+  banner.className = 'email-verify-banner';
+  banner.innerHTML =
+    '<span>📧 Verify your email (' + escapeHtml(user.email) + ') to enable recipe sharing.</span>' +
+    '<span class="evb-actions">' +
+    '<button type="button" onclick="resendVerification()">Resend email</button>' +
+    '<button type="button" onclick="recheckVerification()">I\'ve verified</button>' +
+    '</span>';
+  var app = document.querySelector('.app') || document.body;
+  app.insertBefore(banner, app.firstChild);
+}
+
+async function resendVerification() {
+  if (!AppState.currentUser || !window.firebase || !window.firebase.sendEmailVerification) return;
+  try {
+    await window.firebase.sendEmailVerification(AppState.currentUser);
+    showSuccessMessage('Verification email sent to ' + AppState.currentUser.email + '. Check your inbox and spam folder.');
+  } catch (e) {
+    console.error('Resend verification failed:', e);
+    showErrorMessage('Could not send verification email: ' + e.message);
+  }
+}
+
+async function recheckVerification() {
+  if (!AppState.currentUser) return;
+  try {
+    await AppState.currentUser.reload();
+    AppState.currentUser = window.firebase.auth.currentUser || AppState.currentUser;
+    updateAuthUI();
+    if (AppState.currentUser.emailVerified) showSuccessMessage('Email verified — sharing is now enabled! 🎉');
+    else showErrorMessage('Not verified yet. Click the link in your email, then try again.');
+  } catch (e) {
+    console.error('Recheck verification failed:', e);
   }
 }
 

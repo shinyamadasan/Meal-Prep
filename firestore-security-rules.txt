@@ -40,6 +40,7 @@ service cloud.firestore {
         resource.data.familyGroupId == request.auth.uid
       );
       allow create: if request.auth != null &&
+        request.auth.token.email_verified == true &&
         request.resource.data.sharedBy == request.auth.token.email &&
         (request.resource.data.privacy != 'family' ||
          request.resource.data.familyGroupId == request.auth.uid);
@@ -55,6 +56,7 @@ service cloud.firestore {
         resource.data.toEmail == request.auth.token.email
       );
       allow create: if request.auth != null &&
+        request.auth.token.email_verified == true &&
         request.resource.data.familyGroupId == request.auth.uid;
       allow update, delete: if request.auth != null && (
         resource.data.familyGroupId == request.auth.uid ||
