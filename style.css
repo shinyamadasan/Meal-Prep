@@ -4562,6 +4562,24 @@ select.form-control {
   color: #fff;
 }
 
+/* Sync-status badge in the header */
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  white-space: nowrap;
+}
+.sync-synced { background: rgba(var(--color-success-rgb), 0.15); color: var(--color-success); }
+.sync-saving { background: rgba(var(--color-info-rgb), 0.15); color: var(--color-info); }
+.sync-local,
+.sync-offline { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+[data-color-scheme="dark"] .sync-local,
+[data-color-scheme="dark"] .sync-offline { color: #fbbf24; }
+
 /* Email-verification banner (shown while signed in but unverified) */
 .email-verify-banner {
   display: flex;

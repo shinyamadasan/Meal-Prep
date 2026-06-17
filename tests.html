@@ -178,6 +178,16 @@
       check('merge unions pantry from both devices', merged.pantry.length === 2);
       check('merge keeps local for scalar fields', merged.weeklyPlan.Monday === 'local');
 
+      // --- backup snapshot captures all data ---
+      AppState.recipes = [{ id: 1, name: 'Adobo' }];
+      AppState.pantry = [{ id: 2, name: 'Salt' }];
+      var snap = snapshotData();
+      check('snapshot includes recipes', snap.recipes[0].name === 'Adobo');
+      check('snapshot includes pantry', snap.pantry[0].name === 'Salt');
+      check('snapshot covers all 13 data fields', Object.keys(snap).length === 13);
+      AppState.recipes = [];
+      AppState.pantry = [];
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;

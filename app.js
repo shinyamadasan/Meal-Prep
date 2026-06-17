@@ -34,9 +34,22 @@ const AppState = {
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
+  syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
   currentUser: null,
   isOnline: navigator.onLine
 };
+
+// Header badge showing whether data made it to the cloud. Hidden when logged out
+// (data is local-only by design then).
+function updateSyncIndicator() {
+  var el = document.getElementById('sync-status');
+  if (!el) return;
+  if (!AppState.currentUser) { el.className = 'sync-status hidden'; return; }
+  if (!AppState.isOnline) { el.textContent = '⚠ Offline'; el.className = 'sync-status sync-offline'; return; }
+  if (AppState.syncStatus === 'saving') { el.textContent = '⏳ Saving…'; el.className = 'sync-status sync-saving'; }
+  else if (AppState.syncStatus === 'local') { el.textContent = '⚠ Saved on this device'; el.className = 'sync-status sync-local'; }
+  else { el.textContent = '✓ Synced'; el.className = 'sync-status sync-synced'; }
+}
 
 // Track a recipe as recently used (front of the list, deduped, capped).
 function recordRecentRecipe(recipeId) {
@@ -253,10 +266,85 @@ function patchMissingNutrition(recipes) {
   return patched;
 }
 
-async function clearLocalStorage() {
-  if (!confirm('Clear ALL saved data and reset to defaults? This cannot be undone.')) return;
+// ── Backup / Restore safety net ──────────────────────────────────────────────
+// Destructive actions (Clear All Data, Import-replace) snapshot the current data
+// first, so it can be restored with one click from the "Restore Backup" button.
+var BACKUP_KEY = 'mealPrepBackup';
 
-  // Wipe localStorage
+function snapshotData() {
+  return {
+    recipes: AppState.recipes,
+    weeklyPlan: AppState.weeklyPlan,
+    groceryList: AppState.groceryList,
+    nutritionGoals: AppState.nutritionGoals,
+    customIngredients: AppState.customIngredients,
+    customHacks: AppState.customHacks,
+    pantry: AppState.pantry,
+    userIngredients: AppState.userIngredients,
+    ingredientPrices: AppState.ingredientPrices,
+    myStores: AppState.myStores,
+    customStores: AppState.customStores,
+    cookedMeals: AppState.cookedMeals,
+    recentRecipes: AppState.recentRecipes
+  };
+}
+
+function createBackup(label) {
+  try {
+    var backup = { label: label || 'backup', at: new Date().toISOString(), data: snapshotData() };
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
+  } catch (e) { console.error('Backup failed:', e); }
+}
+
+function restoreBackup() {
+  var raw;
+  try { raw = localStorage.getItem(BACKUP_KEY); } catch (e) { raw = null; }
+  if (!raw) {
+    showErrorMessage('No backup yet. One is saved automatically before you Clear or Import data.');
+    return;
+  }
+  var backup;
+  try { backup = JSON.parse(raw); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
+  var when = backup.at ? new Date(backup.at).toLocaleString() : 'an earlier time';
+  if (!confirm('Restore your data from the backup taken ' + when + ' (before "' + (backup.label || 'change') + '")?\n\nThis replaces your current data.')) return;
+
+  var d = backup.data || {};
+  AppState.recipes = d.recipes || [];
+  patchMissingNutrition(AppState.recipes);
+  AppState.weeklyPlan = d.weeklyPlan || AppState.weeklyPlan;
+  AppState.groceryList = d.groceryList || [];
+  AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
+  AppState.customIngredients = d.customIngredients || [];
+  AppState.customHacks = d.customHacks || [];
+  AppState.pantry = d.pantry || [];
+  AppState.userIngredients = d.userIngredients || [];
+  AppState.ingredientPrices = d.ingredientPrices || {};
+  AppState.myStores = d.myStores || [];
+  AppState.customStores = d.customStores || [];
+  AppState.cookedMeals = d.cookedMeals || [];
+  AppState.recentRecipes = d.recentRecipes || [];
+  cacheInlinePhotos();
+  saveData();
+
+  renderRecipes();
+  renderWeeklyPlanner();
+  renderStorageGuide();
+  renderCookingHacks();
+  renderCookedMeals();
+  renderPantry();
+  renderIngredientsTab();
+  updateNutritionGoalsDisplay();
+  updateFreshnessBadges();
+  renderFreshnessBanner();
+  showSuccessMessage('Data restored from backup (' + when + ').');
+}
+
+async function clearLocalStorage() {
+  if (!confirm('Clear ALL saved data and reset to defaults?\n\nA backup is saved first — you can undo this with the "Restore Backup" button.')) return;
+
+  createBackup('Clear All Data');
+
+  // Wipe localStorage (the backup key is kept)
   localStorage.removeItem(STORAGE_KEY);
 
   // Delete the entire Firestore document so it can't sync old data back on reload
@@ -3340,6 +3428,8 @@ function importData() {
         }
         
         if (confirm('This will replace all your current data. Are you sure you want to continue?')) {
+          // Snapshot current data first so the import can be undone via "Restore Backup".
+          createBackup('Import');
           // For each field: use the imported value if present, otherwise KEEP
           // the current data — so importing an older/partial backup can never
           // silently wipe fields (e.g. pantry) that the file doesn't contain.
@@ -3389,6 +3479,7 @@ function importData() {
 
 window.exportData = exportData;
 window.importData = importData;
+window.restoreBackup = restoreBackup;
 window.handlePhotoUpload = handlePhotoUpload;
 window.removePhoto = removePhoto;
 
@@ -3483,6 +3574,7 @@ function updateAuthUI() {
     if (familySharingBtn) familySharingBtn.style.display = 'none';
   }
   renderVerificationBanner();
+  updateSyncIndicator();
 }
 
 // Shows a banner while signed in with an unverified email. Core app stays
@@ -3579,7 +3671,9 @@ function mergeCloudConflict(remote, local) {
 }
 
 async function saveToFirestore() {
-  if (!AppState.currentUser || !AppState.isOnline || !window.firebase) return;
+  if (!AppState.currentUser || !window.firebase) return;
+  if (!AppState.isOnline) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
+  AppState.syncStatus = 'saving'; updateSyncIndicator();
 
   const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
 
@@ -3591,6 +3685,7 @@ async function saveToFirestore() {
       payload.version = (AppState.dataVersion || 0) + 1;
       await window.firebase.setDoc(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
       AppState.dataVersion = payload.version;
+      AppState.syncStatus = 'synced'; updateSyncIndicator();
       return;
     }
 
@@ -3618,9 +3713,11 @@ async function saveToFirestore() {
       AppState.dataVersion = payload.version;
     });
     console.log('Data saved to Firestore (v' + AppState.dataVersion + ')');
+    AppState.syncStatus = 'synced'; updateSyncIndicator();
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     showErrorMessage('Failed to sync data to cloud. Changes saved locally.');
+    AppState.syncStatus = 'local'; updateSyncIndicator();
   }
 }
 
@@ -4275,15 +4372,17 @@ function setupOnlineOfflineListeners() {
   window.addEventListener('online', () => {
     AppState.isOnline = true;
     showSuccessMessage('Back online! Syncing data...');
+    updateSyncIndicator();
     if (AppState.currentUser) {
       saveToFirestore();
       setupRealtimeListeners();
     }
   });
-  
+
   window.addEventListener('offline', () => {
     AppState.isOnline = false;
     showErrorMessage('You are offline. Changes will be saved locally.');
+    updateSyncIndicator();
   });
 }
 

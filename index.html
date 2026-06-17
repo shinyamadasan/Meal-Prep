@@ -43,6 +43,7 @@
                     <h1 class="app-title">🍳 Meal Prep Planner</h1>
                     <div class="auth-section">
                         <div id="user-info" class="user-info hidden">
+                            <span id="sync-status" class="sync-status hidden"></span>
                             <span id="user-email"></span>
                             <button class="btn btn--outline btn--sm" onclick="signOut()">Sign Out</button>
                         </div>
@@ -80,6 +81,7 @@
                             <button class="btn btn--secondary" onclick="importFromCSV()">📋 Import CSV</button>
                             <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;">🌐 Shared Recipes</button>
                             <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;">👨‍👩‍👧‍👦 Family Sharing</button>
+                            <button class="btn btn--outline" onclick="restoreBackup()">↩️ Restore Backup</button>
                             <button class="btn btn--outline" onclick="clearLocalStorage()">🗑️ Clear All Data</button>
                             <button class="btn btn--secondary" onclick="openPasteRecipeModal()">📝 Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
