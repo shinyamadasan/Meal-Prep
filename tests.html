@@ -126,6 +126,21 @@
       check('deduct: 2 tracked items reported, salt skipped', ded.deducted.length === 2);
       AppState.pantry = [];
 
+      // --- XSS defenses for shared recipes ---
+      check('escapeHtml neutralizes <img onerror>',
+        escapeHtml('<img src=x onerror=alert(1)>') === '&lt;img src=x onerror=alert(1)&gt;');
+      var malicious = {
+        name: '<img src=x onerror=alert(1)>',
+        instructions: 'x</p><script>steal()</script>',
+        baseIngredients: [{ name: 'Pork<svg onload=evil>', unit: 'g' }],
+        servings: 4
+      };
+      var cleaned = stripTagsDeep(malicious);
+      check('stripTagsDeep removes tags from name', cleaned.name.indexOf('<') < 0 && cleaned.name.indexOf('>') < 0);
+      check('stripTagsDeep removes tags from instructions', cleaned.instructions.indexOf('<') < 0);
+      check('stripTagsDeep removes tags from nested ingredient', cleaned.baseIngredients[0].name.indexOf('<') < 0);
+      check('stripTagsDeep preserves non-strings', cleaned.servings === 4);
+
       // --- render ---
       var passed = results.filter(function (r) { return r.pass; }).length;
       var total = results.length;

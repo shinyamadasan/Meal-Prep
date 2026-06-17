@@ -3711,8 +3711,8 @@ async function loadSharedRecipes() {
       recipeItem.className = 'shared-recipe-item';
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
-          <h4>${recipe.name}</h4>
-          <p>Shared by ${recipe.sharedBy} • ${recipe.category} • ${recipe.servings} servings</p>
+          <h4>${escapeHtml(recipe.name)}</h4>
+          <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
         </div>
         <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
       `;
@@ -3722,6 +3722,21 @@ async function loadSharedRecipes() {
     console.error('Error loading shared recipes:', error);
     showErrorMessage('Failed to load shared recipes: ' + error.message);
   }
+}
+
+// Recursively remove HTML tag delimiters from every string in a value. Applied
+// to shared recipes on import so a malicious payload in ANY field (name,
+// instructions, ingredient names, etc.) can't persist into our own recipes,
+// which are rendered via innerHTML in many places.
+function stripTagsDeep(value) {
+  if (typeof value === 'string') return value.replace(/[<>]/g, '');
+  if (Array.isArray(value)) return value.map(stripTagsDeep);
+  if (value && typeof value === 'object') {
+    var out = {};
+    Object.keys(value).forEach(function(k) { out[k] = stripTagsDeep(value[k]); });
+    return out;
+  }
+  return value;
 }
 
 async function importSharedRecipe(sharedRecipeId) {
@@ -3743,8 +3758,9 @@ async function importSharedRecipe(sharedRecipeId) {
       // Remove the shared-specific fields
       delete newRecipe.sharedAt;
       delete newRecipe.originalId;
-      
-      AppState.recipes.push(newRecipe);
+
+      // Sanitize all fields before storing — this recipe came from another user.
+      AppState.recipes.push(stripTagsDeep(newRecipe));
       saveData();
       renderRecipes();
       showSuccessMessage('Recipe imported successfully!');
@@ -3925,8 +3941,8 @@ async function loadSharedRecipes() {
       recipeItem.className = 'shared-recipe-item';
       recipeItem.innerHTML = `
         <div class="shared-recipe-info">
-          <h4>${recipe.name} ${recipe.privacy === 'family' ? '👨‍👩‍👧‍👦' : '🌐'}</h4>
-          <p>Shared by ${recipe.sharedBy} • ${recipe.category} • ${recipe.servings} servings</p>
+          <h4>${escapeHtml(recipe.name)} ${recipe.privacy === 'family' ? '👨‍👩‍👧‍👦' : '🌐'}</h4>
+          <p>Shared by ${escapeHtml(recipe.sharedBy)} • ${escapeHtml(recipe.category)} • ${Number(recipe.servings) || 0} servings</p>
         </div>
         <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Import</button>
       `;
