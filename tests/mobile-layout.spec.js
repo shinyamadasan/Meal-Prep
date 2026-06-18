@@ -15,7 +15,7 @@ test('no horizontal overflow on any tab (mobile)', async ({ page }) => {
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
 
-  const tabs = ['recipes', 'planner', 'grocery', 'fridge', 'storage', 'hacks', 'nutrition', 'ingredients'];
+  const tabs = ['recipes', 'planner', 'grocery', 'fridge', 'hacks', 'nutrition', 'ingredients'];
   const bad = [];
   for (const t of tabs) {
     const btn = page.locator('.tab-btn[data-tab="' + t + '"]');

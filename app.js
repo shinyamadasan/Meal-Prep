@@ -1358,7 +1358,6 @@ function setupEventListeners() {
   document.getElementById('cancel-btn').addEventListener('click', closeRecipeModal);
   document.querySelector('.modal-close').addEventListener('click', closeRecipeModal);
   document.getElementById('add-ingredient-btn').addEventListener('click', addIngredientField);
-  document.getElementById('storage-guide-link').addEventListener('click', () => showTab('storage'));
   
   // Storage guide search and filter
   document.getElementById('storage-search').addEventListener('input', filterStorageGuide);

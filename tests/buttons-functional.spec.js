@@ -38,7 +38,6 @@ test.describe('Tab navigation', () => {
     ['planner', 'Weekly Planner'],
     ['grocery', 'Grocery List'],
     ['fridge', 'My Fridge'],
-    ['storage', 'Storage Guide'],
     ['hacks', 'Cooking Hacks'],
     ['nutrition', 'Nutrition'],
     ['ingredients', 'Ingredients'],
