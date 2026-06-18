@@ -3435,8 +3435,9 @@ window.updatePantryShelf = updatePantryShelf;
 window.updatePantryQty = updatePantryQty;
 window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
-window.updateStapleLevel = updateStapleLevel;
+window.cycleStapleLevel = cycleStapleLevel;
 window.togglePantryGuide = togglePantryGuide;
+window.addItemToSection = addItemToSection;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -5469,10 +5470,8 @@ function renderPantry() {
     var stockCell;
     if (staple) {
       var lvl = p.stockLevel || 'ok';
-      stockCell = '<select class="pt-level pt-level--' + lvl + '" onchange="updateStapleLevel(\'' + p.id + '\', this.value)">' +
-        [['full', 'Full'], ['ok', 'OK'], ['low', 'Low']].map(function(o) {
-          return '<option value="' + o[0] + '"' + (lvl === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
-        }).join('') + '</select>';
+      var lblMap = { full: 'Full', ok: 'OK', low: 'Low' };
+      stockCell = '<button class="pt-level pt-level--' + lvl + '" onclick="cycleStapleLevel(\'' + p.id + '\')" title="Tap to change: Full → OK → Low">' + lblMap[lvl] + '</button>';
     } else {
       stockCell = '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '');
     }
@@ -5503,20 +5502,28 @@ function renderPantry() {
   var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Bought</th><th>Status</th>' +
               '<th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>';
   var groups = [
-    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
-    { key: 'freezer', label: icon('snowflake') + ' In the Freezer' },
-    { key: 'counter', label: icon('archive') + ' Counter / Pantry' }
+    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge', plain: 'the fridge', eg: 'leftovers' },
+    { key: 'freezer', label: icon('snowflake') + ' In the Freezer', plain: 'the freezer', eg: 'ice cream' },
+    { key: 'counter', label: icon('archive') + ' Counter / Pantry', plain: 'the counter', eg: 'bread' }
   ];
 
+  // All three sections always render (even when empty) so you can drop a new
+  // item — takeout, ice cream — straight into the right place.
   var html = banner;
   groups.forEach(function(g) {
     var items = AppState.pantry.filter(function(p) { return effStorage(p) === g.key; })
       .sort(function(a, b) { return a.name.localeCompare(b.name); });
-    if (items.length === 0) return;
     html += '<div class="fridge-subsection-title">' + g.label +
             ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
-    html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
-            '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
+    if (items.length) {
+      html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
+              '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
+    }
+    html += '<div class="pantry-add-row">' +
+            '<input type="text" id="pantry-add-' + g.key + '" class="pantry-add-input" placeholder="Add to ' + g.plain + '… (e.g. ' + g.eg + ')" ' +
+            'onkeydown="if(event.key===\'Enter\')addItemToSection(\'' + g.key + '\')">' +
+            '<button class="pantry-add-btn" onclick="addItemToSection(\'' + g.key + '\')">+ Add</button>' +
+            '</div>';
   });
   list.innerHTML = html;
 }
@@ -5533,8 +5540,68 @@ function togglePantryStaple(id, checked) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
   p.staple = !!checked;
+  syncStapleToGrocery(p);   // un-stapling clears any auto "running low" entry
   saveData();
   renderPantry();
+  renderGroceryList();
+}
+
+// Keep the grocery list in sync with a staple's level: a "low" staple shows up
+// as a shopping item; raising it back to OK/Full removes that auto entry.
+function syncStapleToGrocery(p) {
+  AppState.groceryList = AppState.groceryList.filter(function(it) {
+    return !(it.fromStaple && it.name.toLowerCase() === p.name.toLowerCase());
+  });
+  if (isStaple(p) && p.stockLevel === 'low') {
+    AppState.groceryList.push({
+      id: Date.now() + Math.random(),
+      name: p.name,
+      category: p.category || 'Pantry',
+      quantity: null,
+      unit: p.unit || '',
+      sources: ['Running low'],
+      checked: false,
+      custom: true,
+      fromStaple: true
+    });
+  }
+}
+
+// Tap-to-cycle a staple's stock level: Full → OK → Low → Full.
+function cycleStapleLevel(id) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  var order = ['full', 'ok', 'low'];
+  p.stockLevel = order[(order.indexOf(p.stockLevel || 'ok') + 1) % order.length];
+  syncStapleToGrocery(p);
+  saveData();
+  renderPantry();
+  renderGroceryList();
+}
+
+// Add a free-text item straight into a chosen section (fridge/freezer/counter).
+function addItemToSection(storageKey) {
+  var input = document.getElementById('pantry-add-' + storageKey);
+  if (!input) return;
+  var name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  if (AppState.pantry.some(function(p) { return p.name.toLowerCase() === name.toLowerCase(); })) {
+    input.value = '';
+    input.focus();
+    return;
+  }
+  var category = inferCategory(name);
+  AppState.pantry.push({
+    id: Date.now() + Math.random(),
+    name: name,
+    category: category,
+    storage: storageKey,
+    purchaseDate: todayISO(),
+    shelfLifeDays: categoryShelfLife(category)
+  });
+  saveData();
+  renderPantry();
+  renderGroceryList();
 }
 
 // Persist edits to a pantry item's purchase date / shelf life, then re-render.
@@ -5561,15 +5628,6 @@ function updatePantryQty(id, value) {
   if (!p) return;
   var q = parseFloat(value);
   p.quantity = isNaN(q) ? null : q;
-  saveData();
-  renderPantry();
-}
-
-// Staples track a Low/OK/Full level instead of a countable quantity.
-function updateStapleLevel(id, value) {
-  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
-  if (!p) return;
-  p.stockLevel = value;
   saveData();
   renderPantry();
 }
