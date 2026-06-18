@@ -3446,7 +3446,6 @@ window.togglePantryStaple = togglePantryStaple;
 window.cycleStapleLevel = cycleStapleLevel;
 window.togglePantryGuide = togglePantryGuide;
 window.togglePantryDateMode = togglePantryDateMode;
-window.addItemToSection = addItemToSection;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -5515,28 +5514,20 @@ function renderPantry() {
   var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Date</th><th>Status</th>' +
               '<th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>';
   var groups = [
-    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge', plain: 'the fridge', eg: 'leftovers' },
-    { key: 'freezer', label: icon('snowflake') + ' In the Freezer', plain: 'the freezer', eg: 'ice cream' },
-    { key: 'counter', label: icon('archive') + ' Counter / Pantry', plain: 'the counter', eg: 'bread' }
+    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
+    { key: 'freezer', label: icon('snowflake') + ' In the Freezer' },
+    { key: 'counter', label: icon('archive') + ' Counter / Pantry' }
   ];
 
-  // All three sections always render (even when empty) so you can drop a new
-  // item — takeout, ice cream — straight into the right place.
   var html = banner;
   groups.forEach(function(g) {
     var items = AppState.pantry.filter(function(p) { return effStorage(p) === g.key; })
       .sort(function(a, b) { return a.name.localeCompare(b.name); });
+    if (items.length === 0) return;
     html += '<div class="fridge-subsection-title">' + g.label +
             ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
-    if (items.length) {
-      html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
-              '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
-    }
-    html += '<div class="pantry-add-row">' +
-            '<input type="text" id="pantry-add-' + g.key + '" class="pantry-add-input" placeholder="Add to ' + g.plain + '… (e.g. ' + g.eg + ')" ' +
-            'onkeydown="if(event.key===\'Enter\')addItemToSection(\'' + g.key + '\')">' +
-            '<button class="pantry-add-btn" onclick="addItemToSection(\'' + g.key + '\')">+ Add</button>' +
-            '</div>';
+    html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
+            '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
   });
   list.innerHTML = html;
 }
@@ -5592,30 +5583,6 @@ function cycleStapleLevel(id) {
   renderGroceryList();
 }
 
-// Add a free-text item straight into a chosen section (fridge/freezer/counter).
-function addItemToSection(storageKey) {
-  var input = document.getElementById('pantry-add-' + storageKey);
-  if (!input) return;
-  var name = input.value.trim();
-  if (!name) { input.focus(); return; }
-  if (AppState.pantry.some(function(p) { return p.name.toLowerCase() === name.toLowerCase(); })) {
-    input.value = '';
-    input.focus();
-    return;
-  }
-  var category = inferCategory(name);
-  AppState.pantry.push({
-    id: Date.now() + Math.random(),
-    name: name,
-    category: category,
-    storage: storageKey,
-    purchaseDate: todayISO(),
-    shelfLifeDays: categoryShelfLife(category)
-  });
-  saveData();
-  renderPantry();
-  renderGroceryList();
-}
 
 // Persist edits to a pantry item's purchase date / shelf life, then re-render.
 function updatePantryDate(id, value) {
@@ -5956,13 +5923,15 @@ function addToPantry() {
   }
 
   var category = inferCategory(name);
+  var whereSel = document.getElementById('pantry-add-where');
+  var storage = (whereSel && whereSel.value) ? whereSel.value : inferStorage(name, category);
   AppState.pantry.push({
     id: Date.now() + Math.random(),
     name: name,
     category: category,
     purchaseDate: todayISO(),
     shelfLifeDays: categoryShelfLife(category),
-    storage: inferStorage(name, category)
+    storage: storage
   });
   input.value = '';
   input.focus();

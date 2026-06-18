@@ -324,9 +324,15 @@
                         <div id="pantry-body">
                             <div class="pantry-add-row">
                                 <div class="ing-name-wrap" style="flex:1">
-                                    <input type="text" id="pantry-input" class="form-control" placeholder="e.g. Garlic, Soy sauce, Rice…" autocomplete="off">
+                                    <input type="text" id="pantry-input" class="form-control" placeholder="Add an item… (e.g. Ice cream, Soy sauce, Rice)" autocomplete="off">
                                     <div class="ing-suggestions hidden"></div>
                                 </div>
+                                <select id="pantry-add-where" class="form-control" style="max-width:120px" title="Which section to add it to">
+                                    <option value="">Auto</option>
+                                    <option value="fridge">Fridge</option>
+                                    <option value="freezer">Freezer</option>
+                                    <option value="counter">Counter</option>
+                                </select>
                                 <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
                             </div>
                             <div id="pantry-quick-add" class="pantry-quick-add"></div>
