@@ -5611,13 +5611,13 @@ function renderPantry() {
 
     var main = '<tr>' +
       '<td class="pt-name">' + escapeHtml(p.name) + guideBtn + '</td>' +
-      '<td>' + stockCell + '</td>' +
-      '<td><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
-      '<td class="pt-datecell"><input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
+      '<td data-label="Stock">' + stockCell + '</td>' +
+      '<td data-label="Where"><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
+      '<td class="pt-datecell" data-label="Date"><input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
         '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')" title="Switch between bought date (uses shelf life) and a printed expiry date">' + (expiryMode ? 'expires' : 'bought') + '</button></td>' +
-      '<td>' + (fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '<span class="pt-muted">—</span>') + '</td>' +
-      '<td class="pt-center"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
-      '<td class="pt-center"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
+      '<td data-label="Status">' + (fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '<span class="pt-muted">—</span>') + '</td>' +
+      '<td class="pt-center" data-label="Staple"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
+      '<td class="pt-center pt-remove-cell"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
       '</tr>';
 
     var detail = '';

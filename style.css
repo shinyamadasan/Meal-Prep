@@ -5029,3 +5029,72 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   text-decoration: underline dotted;
 }
 .pt-datemode:hover { color: var(--color-primary); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   MOBILE PASS — phone-first refinements (≤768px)
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Stop iOS auto-zoom on focus (inputs must be ≥16px) */
+  input, select, textarea, .form-control,
+  .pantry-table input, .pantry-table select { font-size: 16px; }
+
+  /* Roomier tap targets */
+  .btn { min-height: 44px; }
+  .grocery-item { padding: 12px 10px; }
+  .grocery-checkbox { width: 22px; height: 22px; }
+
+  /* Modals become bottom sheets — thumb-reachable, full width */
+  .modal { align-items: flex-end; padding: 0; }
+  .modal-content { max-width: 100% !important; max-height: 90vh; border-radius: 18px 18px 0 0; }
+
+  /* Respect notch / home-indicator safe areas */
+  body { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* ── Pantry table → stacked cards (kills the sideways scroll) ── */
+  .pantry-table-wrap { overflow: visible; }
+  .pantry-table thead { display: none; }
+  .pantry-table, .pantry-table tbody, .pantry-table tr, .pantry-table td { display: block; width: 100%; }
+  .pantry-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: var(--color-bg-1);
+    position: relative;
+  }
+  .pantry-table td {
+    border: none !important;
+    padding: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    white-space: normal;
+  }
+  .pantry-table td::before {
+    content: attr(data-label);
+    margin-right: auto;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-text-secondary);
+  }
+  .pantry-table td.pt-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    padding: 0 36px 8px 0;
+    border-bottom: 1px solid var(--color-border) !important;
+    margin-bottom: 4px;
+  }
+  .pantry-table td.pt-name::before { display: none; }
+  .pantry-table td.pt-remove-cell {
+    position: absolute;
+    top: 6px; right: 8px;
+    width: auto; padding: 0;
+  }
+  .pantry-table td.pt-remove-cell::before { display: none; }
+  /* The inline storage-guide detail row stays a normal block, no label */
+  .pantry-table tr.pt-detail td { display: block; }
+  .pantry-table tr.pt-detail td::before { display: none; }
+  .pt-stock, .pt-date { width: auto; }
+}
