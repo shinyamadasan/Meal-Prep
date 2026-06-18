@@ -4874,17 +4874,32 @@ function printGroceryList() {
       </div>`).join('')}
   `).join('');
 
-  const win = window.open('', '_blank', 'width=520,height=700');
-  win.document.write(`<!DOCTYPE html><html><head>
+  const html = `<!DOCTYPE html><html><head>
     <title>Grocery List</title>
     <style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:480px;margin:0 auto;}h1{font-size:1.3rem;margin-bottom:0.25rem;}p{color:#666;font-size:0.85rem;margin:0 0 1rem;}@media print{body{padding:1rem;}}</style>
   </head><body>
     <h1>🛒 Grocery List</h1>
     <p>${date}</p>
     ${rows}
-    <script>window.onload=function(){window.print();}<\/script>
-  </body></html>`);
-  win.document.close();
+  </body></html>`;
+
+  // Print through a hidden iframe. A popup window (window.open) gets killed by
+  // popup blockers — that's why the Print button appeared to do nothing.
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(frame);
+
+  const doc = frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  frame.contentWindow.focus();
+  setTimeout(function () {
+    frame.contentWindow.print();
+    setTimeout(function () { frame.remove(); }, 1000);
+  }, 250);
 }
 
 function copyGroceryList() {
