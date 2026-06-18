@@ -6596,6 +6596,116 @@ const PANTRY_KNOWLEDGE = [
     spoilage: 'Practically never spoils. A "mother" (dark floating strand) may develop but is harmless.',
     freshness: 'Check that the seal is tight and there\'s no debris.',
     tip: 'Vinegar is self-preserving. No expiry to worry about.'
+  },
+  {
+    names: ['salt', 'asin', 'table salt', 'sea salt'],
+    icon: '🧂',
+    location: 'Pantry (airtight)',
+    locationIcon: '🗄️',
+    lasts: 'Indefinite',
+    store: 'Cool, dry place in a sealed container. Humidity makes it clump but never spoils it.',
+    spoilage: 'Doesn\'t spoil — salt is a preservative itself. Only issue is hard clumps from moisture.',
+    freshness: '🟢 Always good. Clumped salt can be broken up and used normally.',
+    tip: 'Drop a few grains of rice in the shaker to absorb moisture and stop clumping.'
+  },
+  {
+    names: ['sugar', 'asukal', 'white sugar', 'brown sugar'],
+    icon: '🍬',
+    location: 'Pantry (airtight)',
+    locationIcon: '🗄️',
+    lasts: 'Indefinite',
+    store: 'Airtight container, cool and dry. Humidity hardens it into a block.',
+    spoilage: 'Doesn\'t spoil. Can harden or attract ants if left unsealed.',
+    freshness: '🟢 Always usable. Hardened sugar can be softened, not thrown out.',
+    tip: 'Keep a slice of bread in brown sugar to keep it soft.'
+  },
+  {
+    names: ['black pepper', 'pepper', 'peppercorn', 'paminta', 'ground pepper'],
+    icon: '⚫',
+    location: 'Pantry (cool & dark)',
+    locationIcon: '🗄️',
+    lasts: 'Whole: 3–4 yrs · Ground: ~1 yr',
+    store: 'Airtight, away from heat and light. Whole peppercorns keep far longer than pre-ground.',
+    spoilage: 'Doesn\'t rot, but slowly loses aroma and bite.',
+    freshness: '🟢 Fresh: strong sharp smell. 🟡 OK: mild. 🔴 Old: little to no aroma.',
+    tip: 'Grind whole peppercorns fresh — far more flavor than the pre-ground tin.'
+  },
+  {
+    names: ['ginger', 'luya'],
+    icon: '🫚',
+    location: 'Counter or Fridge',
+    locationIcon: '🗄️',
+    lasts: 'Counter: ~1 wk · Fridge: 3–4 wks',
+    store: 'Unpeeled root in a paper bag in the crisper, or on the counter if using within days. Freezes for months.',
+    spoilage: 'Soft, wrinkled, shriveled, or moldy spots.',
+    freshness: '🟢 Fresh: firm, smooth, taut skin. 🟡 OK: slightly wrinkled. 🔴 Old: soft, shriveled, mold.',
+    tip: 'Freeze it whole and grate from frozen — no peeling, no waste.'
+  },
+  {
+    names: ['bell pepper', 'capsicum', 'atsal', 'sweet pepper'],
+    icon: '🫑',
+    location: 'Fridge (crisper)',
+    locationIcon: '🧊',
+    lasts: '1–2 weeks',
+    store: 'Whole and unwashed in the crisper. Wash only right before using.',
+    spoilage: 'Wrinkled skin, soft sunken spots, mold near the stem, or a slimy inside.',
+    freshness: '🟢 Fresh: firm, glossy, taut. 🟡 OK: slight wrinkling. 🔴 Old: soft, wrinkled, moldy.',
+    tip: 'Red and yellow peppers spoil faster than green — use them first.'
+  },
+  {
+    names: ['green onion', 'scallion', 'scallions', 'spring onion', 'sibuyas dahon'],
+    icon: '🌿',
+    location: 'Fridge',
+    locationIcon: '🧊',
+    lasts: '1–2 weeks',
+    store: 'Wrap in a damp paper towel in the crisper, or stand roots-down in a glass with a little water.',
+    spoilage: 'Slimy or yellowing tops, mushy white bases.',
+    freshness: '🟢 Fresh: crisp, bright green. 🟡 OK: slightly limp. 🔴 Old: slimy, yellow.',
+    tip: 'Regrow them — put the white root ends in water on the windowsill.'
+  },
+  {
+    names: ['cheese', 'keso', 'cheddar'],
+    icon: '🧀',
+    location: 'Fridge',
+    locationIcon: '🧊',
+    lasts: 'Hard: 3–4 wks · Soft: 1–2 wks',
+    store: 'Wrap in wax or parchment paper (not plastic) so it can breathe.',
+    spoilage: 'Unexpected mold on soft cheese, ammonia smell, slimy surface, or off taste.',
+    freshness: '🟢 Fresh: clean smell, even color. 🟡 OK: dry edges (trim). 🔴 Old: fuzzy mold, sour ammonia smell.',
+    tip: 'On hard cheese you can cut away a mold spot (an inch around) and use the rest.'
+  },
+  {
+    names: ['flour', 'all-purpose flour', 'harina', 'bread flour'],
+    icon: '🌾',
+    location: 'Pantry (airtight)',
+    locationIcon: '🗄️',
+    lasts: 'White: ~1 yr · Whole wheat: ~3 mo',
+    store: 'Airtight container in a cool, dry spot. Whole-wheat goes rancid faster from its oils.',
+    spoilage: 'Musty or sour smell, clumping, or tiny bugs (weevils) and webbing.',
+    freshness: '🟢 Fresh: neutral smell, fine powder. 🔴 Old: sour/musty smell, bugs.',
+    tip: 'Freeze new flour for a few days to kill any weevil eggs, then store airtight.'
+  },
+  {
+    names: ['eggplant', 'talong', 'aubergine'],
+    icon: '🍆',
+    location: 'Fridge (crisper)',
+    locationIcon: '🧊',
+    lasts: '5–7 days',
+    store: 'Whole and uncut in the crisper. Use within a week — it dislikes long cold storage.',
+    spoilage: 'Soft, wrinkled skin, brown mushy spots, or spongy hollow flesh.',
+    freshness: '🟢 Fresh: firm, glossy, springs back. 🟡 OK: slight give. 🔴 Old: wrinkled, soft, brown.',
+    tip: 'Cut eggplant browns fast — cook soon after slicing or soak in salted water.'
+  },
+  {
+    names: ['cucumber', 'pipino'],
+    icon: '🥒',
+    location: 'Fridge (crisper)',
+    locationIcon: '🧊',
+    lasts: '~1 week',
+    store: 'In the crisper, wrapped in a paper towel to absorb moisture.',
+    spoilage: 'Soft mushy ends, wrinkled skin, or a slimy film.',
+    freshness: '🟢 Fresh: firm, dark green. 🟡 OK: soft ends (trim). 🔴 Old: mushy, wrinkled, slimy.',
+    tip: 'Keep away from bananas and tomatoes — their ethylene gas makes cucumbers go soft fast.'
   }
 ];
 
