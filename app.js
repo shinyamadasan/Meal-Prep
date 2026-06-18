@@ -5442,19 +5442,21 @@ function renderPantry() {
     return;
   }
 
-  // Freshness summary banner (expired / expiring soon)
-  var expiredCount = 0, expiringCount = 0;
+  // Summary banner: expired / expiring soon (freshness) + running-low staples (stock)
+  var expiredCount = 0, expiringCount = 0, lowCount = 0;
   AppState.pantry.forEach(function(p) {
+    if (isStaple(p) && p.stockLevel === 'low') lowCount++;
     var dl = pantryDaysLeft(p);
     if (dl == null) return;
     if (dl < 0) expiredCount++;
     else if (dl <= FRESHNESS_WARN_DAYS) expiringCount++;
   });
   var banner = '';
-  if (expiredCount || expiringCount) {
+  if (expiredCount || expiringCount || lowCount) {
     var parts = [];
     if (expiredCount) parts.push('<span class="fresh-dot fdot-red"></span> ' + expiredCount + ' expired');
     if (expiringCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + expiringCount + ' expiring soon');
+    if (lowCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + lowCount + ' running low');
     banner = '<div class="pantry-fresh-summary ' + (expiredCount ? 'fresh-expired' : 'fresh-warn') + '">' +
              parts.join(' • ') + '</div>';
   }
