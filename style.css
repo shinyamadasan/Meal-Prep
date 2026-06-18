@@ -4905,3 +4905,56 @@ select.form-control {
 /* Click-to-edit affordance on cards */
 .storage-ingredient-card,
 .hack-item { cursor: pointer; }
+
+/* Pantry inventory table (compact, replaces the bulky cards) */
+.pantry-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
+.pantry-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.pantry-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.pantry-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.pantry-table tbody tr:last-child td { border-bottom: none; }
+.pantry-table tbody tr:hover { background: var(--color-secondary); }
+.pt-name { font-weight: 600; }
+.pt-name .lc-icon { color: var(--color-text-secondary); }
+.pt-muted { color: var(--color-text-secondary); }
+.pt-center { text-align: center; }
+.pt-unit { color: var(--color-text-secondary); font-size: 0.8rem; }
+.pantry-table input[type="number"],
+.pantry-table input[type="date"],
+.pantry-table select {
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.pt-stock { width: 58px; }
+.pt-date { width: 138px; }
+.pantry-table .pantry-remove { font-size: 1.05rem; line-height: 1; }
+
+/* Freshness status badge (pantry table "Status" column) */
+.pantry-fresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--fresh-color, var(--color-text-secondary));
+}
