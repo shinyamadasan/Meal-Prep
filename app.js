@@ -2701,8 +2701,12 @@ function calculateGroceryTotal() {
 }
 
 function findIngredientPrice(name) {
+  // 0. Your own store prices (Ingredients tab) win over every estimate.
+  const userPrice = findUserStorePrice(name);
+  if (userPrice) return userPrice;
+
   // First check custom ingredients data
-  const storageItem = AppState.customIngredients.find(item => 
+  const storageItem = AppState.customIngredients.find(item =>
     item.name.toLowerCase().includes(name.toLowerCase()) || 
     name.toLowerCase().includes(item.name.toLowerCase())
   );
@@ -2724,19 +2728,8 @@ function findIngredientPrice(name) {
   }
 
   // Finally, the built-in ingredient database (prices stored as "₱200/kg").
-  // Match on a normalized key so DB names with Filipino annotations like
-  // "Carrot (Karot)" still match "Carrots", and a shared word ("Garlic cloves"
-  // ~ "Garlic") counts too.
-  const singular = w => (w.length > 3 && w.endsWith('s')) ? w.slice(0, -1) : w;
   const q = priceNameKey(name);
-  const qWords = q.split(' ').map(singular);
-  const dbItem = q && INGREDIENT_DB.find(it => {
-    const n = priceNameKey(it.name);
-    if (!n) return false;
-    if (n === q || n.includes(q) || q.includes(n)) return true;
-    const nWords = n.split(' ').map(singular);
-    return qWords.some(w => w.length >= 4 && nWords.includes(w));
-  });
+  const dbItem = q && INGREDIENT_DB.find(it => ingredientNameMatches(q, it.name));
   if (dbItem) {
     const parsed = parseDbPrice(dbItem.price);
     if (parsed) {
@@ -2745,6 +2738,29 @@ function findIngredientPrice(name) {
   }
 
   return null;
+}
+
+// Your own per-store prices from the Ingredients tab. These OVERRIDE the built-in
+// estimates — we average the stores you filled in for that ingredient.
+function findUserStorePrice(name) {
+  const up = AppState.ingredientPrices || {};
+  const q = priceNameKey(name);
+  if (!q) return null;
+  const matchKey = Object.keys(up).find(k => ingredientNameMatches(q, k));
+  if (!matchKey) return null;
+  const entry = up[matchKey] || {};
+  const vals = Object.values(entry.prices || {})
+    .map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+  if (!vals.length) return null;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const unit = String(entry.unit || '').toLowerCase();
+  return {
+    name: matchKey,
+    pricePerUnit: avg,
+    unit: unit,
+    priceLabel: '₱' + Math.round(avg) + (unit ? '/' + unit : '') + ' (your price)',
+    userPrice: true
+  };
 }
 
 // Normalized key for price matching: keep the words inside "(...)" (so the
@@ -2756,6 +2772,18 @@ function priceNameKey(s) {
     .replace(/[^a-z ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Do a query key and a candidate name refer to the same ingredient? Exact,
+// substring, or shared significant word (singularized so Carrots ~ Carrot).
+function ingredientNameMatches(queryKey, candidateName) {
+  const n = priceNameKey(candidateName);
+  if (!queryKey || !n) return false;
+  if (n === queryKey || n.includes(queryKey) || queryKey.includes(n)) return true;
+  const singular = w => (w.length > 3 && w.endsWith('s')) ? w.slice(0, -1) : w;
+  const qWords = queryKey.split(' ').map(singular);
+  const nWords = n.split(' ').map(singular);
+  return qWords.some(w => w.length >= 4 && nWords.includes(w));
 }
 
 // Parse a DB price string like "₱200/kg" or "₱80/100g" into { amount, unit }.
