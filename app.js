@@ -7222,6 +7222,21 @@ function filterIngredients(query) {
   return userMatches.concat(dbMatches).slice(0, 10);
 }
 
+// Unified ingredient lookup — the app's single answer for "what do we know about
+// this ingredient?", merging the separate price / nutrition / storage databases.
+// Each field is null when unknown, so callers can fall back gracefully.
+function getIngredientInfo(name) {
+  var priced = findIngredientPrice(name);
+  var nutrition = findIngredientNutrition(name);
+  var storage = lookupPantryKnowledge(name);
+  return {
+    name: name,
+    priceLabel: priced ? (priced.priceLabel || ('₱' + priced.pricePerUnit + (priced.unit ? '/' + priced.unit : ''))) : null,
+    nutrition: (nutrition && nutrition.calories != null) ? nutrition : null,
+    storage: storage // hand-written PK entry, or null (use genericStorageGuide for the long tail)
+  };
+}
+
 function attachIngredientAutocomplete(nameInput) {
   var wrap = nameInput.parentElement;
 
@@ -7235,6 +7250,11 @@ function attachIngredientAutocomplete(nameInput) {
 
     suggestBox.innerHTML = matches.map(function(item) {
       var priceStore = (item.price ? item.price : '') + (item.store ? ' &nbsp;📍 ' + item.store : '');
+      // Surface the merged nutrition + storage so all three show at a glance.
+      var info = getIngredientInfo(item.name);
+      var extra = [];
+      if (info.nutrition) extra.push('🔥 ' + Math.round(info.nutrition.calories) + ' cal/100g');
+      if (info.storage) extra.push(info.storage.locationIcon + ' ' + info.storage.location + (info.storage.lasts ? ' · ' + info.storage.lasts : ''));
       return '<div class="ing-suggestion-item" data-name="' + item.name +
         '" data-unit="' + item.unit + '" data-cat="' + item.category + '">' +
         '<div class="ing-sug-main">' +
@@ -7242,6 +7262,7 @@ function attachIngredientAutocomplete(nameInput) {
         '<span class="ing-sug-unit">' + item.unit + ' &bull; ' + item.category + '</span>' +
         '</div>' +
         (priceStore ? '<div class="ing-sug-price">' + priceStore + '</div>' : '') +
+        (extra.length ? '<div class="ing-sug-info">' + extra.join(' &nbsp; ') + '</div>' : '') +
         '</div>';
     }).join('');
     suggestBox.classList.remove('hidden');

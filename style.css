@@ -4039,6 +4039,13 @@ select.form-control {
   opacity: 0.85;
 }
 
+/* Merged nutrition + storage hint under each ingredient suggestion */
+.ing-sug-info {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-top: 1px;
+}
+
 .nutrition-db-source {
   padding: 0.35rem 0.75rem;
   font-size: 0.72rem;
