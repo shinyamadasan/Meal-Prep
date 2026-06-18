@@ -3435,6 +3435,7 @@ window.updatePantryShelf = updatePantryShelf;
 window.updatePantryQty = updatePantryQty;
 window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
+window.updateStapleLevel = updateStapleLevel;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -5461,18 +5462,31 @@ function renderPantry() {
   var rows = sorted.map(function(p) {
     var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
     var fs = freshnessStatus(daysLeftFrom(p.purchaseDate, shelf));
-    var k = lookupPantryKnowledge(p.name);
-    var itemIcon = k ? k.icon : icon('package');
+    var staple = isStaple(p);
     var where = WHERE.map(function(w) {
       return '<option value="' + w[0] + '"' + (effStorage(p) === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
     }).join('');
+
+    // Staples: a Low/OK/Full level (counting salt makes no sense).
+    // Countable items: a numeric stock + unit.
+    var stockCell;
+    if (staple) {
+      var lvl = p.stockLevel || 'ok';
+      stockCell = '<select class="pt-level pt-level--' + lvl + '" onchange="updateStapleLevel(\'' + p.id + '\', this.value)">' +
+        [['full', 'Full'], ['ok', 'OK'], ['low', 'Low']].map(function(o) {
+          return '<option value="' + o[0] + '"' + (lvl === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') + '</select>';
+    } else {
+      stockCell = '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '');
+    }
+
     return '<tr>' +
-      '<td class="pt-name">' + itemIcon + ' ' + escapeHtml(p.name) + '</td>' +
-      '<td><input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '') + '</td>' +
+      '<td class="pt-name">' + escapeHtml(p.name) + '</td>' +
+      '<td>' + stockCell + '</td>' +
       '<td><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
       '<td><input class="pt-date" type="date" value="' + (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></td>' +
       '<td>' + (fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '<span class="pt-muted">—</span>') + '</td>' +
-      '<td class="pt-center"><input type="checkbox" ' + (isStaple(p) ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — never deducted when cooking"></td>' +
+      '<td class="pt-center"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
       '<td class="pt-center"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
       '</tr>';
   }).join('');
@@ -5523,6 +5537,15 @@ function updatePantryQty(id, value) {
   if (!p) return;
   var q = parseFloat(value);
   p.quantity = isNaN(q) ? null : q;
+  saveData();
+  renderPantry();
+}
+
+// Staples track a Low/OK/Full level instead of a countable quantity.
+function updateStapleLevel(id, value) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  p.stockLevel = value;
   saveData();
   renderPantry();
 }

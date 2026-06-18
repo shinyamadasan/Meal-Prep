@@ -4958,3 +4958,9 @@ select.form-control {
   white-space: nowrap;
   color: var(--fresh-color, var(--color-text-secondary));
 }
+
+/* Staple Low/OK/Full level selector (pantry table) */
+.pt-level { font-weight: 600; }
+.pt-level--full { color: var(--color-success); }
+.pt-level--ok { color: var(--color-text); }
+.pt-level--low { color: var(--color-error); border-color: var(--color-error); }
