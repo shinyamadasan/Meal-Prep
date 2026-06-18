@@ -1,0 +1,25 @@
+{
+  "name": "meal-prep-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test tests/button-smoke.spec.js",
+    "test:functional": "playwright test tests/buttons-functional.spec.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shinyamadasan/Meal-Prep.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shinyamadasan/Meal-Prep/issues"
+  },
+  "homepage": "https://github.com/shinyamadasan/Meal-Prep#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.0"
+  }
+}
