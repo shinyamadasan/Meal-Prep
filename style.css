@@ -4964,3 +4964,21 @@ select.form-control {
 .pt-level--full { color: var(--color-success); }
 .pt-level--ok { color: var(--color-text); }
 .pt-level--low { color: var(--color-error); border-color: var(--color-error); }
+
+/* Inline storage-guide toggle + expandable detail row (pantry table) */
+.pt-guide-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 0 0.15rem;
+  vertical-align: middle;
+}
+.pt-guide-btn:hover { color: var(--color-primary); }
+.pt-guide-btn .lc-icon { width: 15px; height: 15px; }
+.pantry-table tr.pt-detail td {
+  background: var(--color-bg-1);
+  font-size: 0.82rem;
+  white-space: normal;
+  padding: 0.5rem 0.75rem;
+}

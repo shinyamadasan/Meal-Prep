@@ -3436,6 +3436,7 @@ window.updatePantryQty = updatePantryQty;
 window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
 window.updateStapleLevel = updateStapleLevel;
+window.togglePantryGuide = togglePantryGuide;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
@@ -5450,19 +5451,15 @@ function renderPantry() {
 
   function effStorage(p) { return p.storage || inferStorage(p.name, p.category); }
   var WHERE = [['fridge', 'Fridge'], ['freezer', 'Freezer'], ['counter', 'Counter']];
-  var ORDER = { fridge: 0, freezer: 1, counter: 2 };
 
-  // Compact inventory table (sorted by location, then name). Storage how-to
-  // details live in the Storage Guide tab, so they're not duplicated here.
-  var sorted = AppState.pantry.slice().sort(function(a, b) {
-    var la = ORDER[effStorage(a)] || 0, lb = ORDER[effStorage(b)] || 0;
-    return la !== lb ? la - lb : a.name.localeCompare(b.name);
-  });
-
-  var rows = sorted.map(function(p) {
+  // Build one item's table rows: the main row, plus a collapsed storage-guide
+  // detail row that expands inline (so you never have to leave the tab).
+  function buildRows(p) {
     var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
     var fs = freshnessStatus(daysLeftFrom(p.purchaseDate, shelf));
     var staple = isStaple(p);
+    var k = lookupPantryKnowledge(p.name);
+    var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
     var where = WHERE.map(function(w) {
       return '<option value="' + w[0] + '"' + (effStorage(p) === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
     }).join('');
@@ -5480,8 +5477,10 @@ function renderPantry() {
       stockCell = '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '');
     }
 
-    return '<tr>' +
-      '<td class="pt-name">' + escapeHtml(p.name) + '</td>' +
+    var guideBtn = k ? ' <button class="pt-guide-btn" onclick="togglePantryGuide(\'' + safeId + '\')" title="Storage guide">' + icon('book-open') + '</button>' : '';
+
+    var main = '<tr>' +
+      '<td class="pt-name">' + escapeHtml(p.name) + guideBtn + '</td>' +
       '<td>' + stockCell + '</td>' +
       '<td><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
       '<td><input class="pt-date" type="date" value="' + (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></td>' +
@@ -5489,12 +5488,37 @@ function renderPantry() {
       '<td class="pt-center"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
       '<td class="pt-center"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
       '</tr>';
-  }).join('');
 
-  list.innerHTML = banner +
-    '<div class="pantry-table-wrap"><table class="pantry-table">' +
-    '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Bought</th><th>Status</th><th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>' +
-    '<tbody>' + rows + '</tbody></table></div>';
+    var detail = '';
+    if (k) {
+      var d = '<div class="pantry-detail-row"><b>' + icon('package') + ' How to store:</b> ' + k.store + '</div>' +
+              '<div class="pantry-detail-row"><b>' + icon('triangle-alert') + ' Signs it\'s bad:</b> ' + k.spoilage + '</div>' +
+              '<div class="pantry-detail-row"><b>' + icon('search') + ' Freshness guide:</b> ' + k.freshness + '</div>' +
+              (k.tip ? '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>' : '');
+      detail = '<tr class="pt-detail hidden" id="ptdetail-' + safeId + '"><td colspan="7">' + d + '</td></tr>';
+    }
+    return main + detail;
+  }
+
+  var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Bought</th><th>Status</th>' +
+              '<th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>';
+  var groups = [
+    { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
+    { key: 'freezer', label: icon('snowflake') + ' In the Freezer' },
+    { key: 'counter', label: icon('archive') + ' Counter / Pantry' }
+  ];
+
+  var html = banner;
+  groups.forEach(function(g) {
+    var items = AppState.pantry.filter(function(p) { return effStorage(p) === g.key; })
+      .sort(function(a, b) { return a.name.localeCompare(b.name); });
+    if (items.length === 0) return;
+    html += '<div class="fridge-subsection-title">' + g.label +
+            ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
+    html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
+            '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
+  });
+  list.innerHTML = html;
 }
 
 function setPantryStorage(id, storage) {
@@ -5548,6 +5572,12 @@ function updateStapleLevel(id, value) {
   p.stockLevel = value;
   saveData();
   renderPantry();
+}
+
+// Expand/collapse an item's inline storage-guide row (no tab-switching needed).
+function togglePantryGuide(safeId) {
+  var el = document.getElementById('ptdetail-' + safeId);
+  if (el) el.classList.toggle('hidden');
 }
 
 // Seed an empty pantry with common household staples once, so a new user just
