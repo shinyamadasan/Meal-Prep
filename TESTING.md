@@ -89,6 +89,21 @@ Then run `npm run test:functional` to check it.
 
 ---
 
+## Auto-run on every push (GitHub Actions)
+
+Tests run **automatically** on GitHub whenever you push a change to `app.js`,
+`index.html`, `style.css`, or the tests. You don't have to do anything.
+
+- **Where to watch it:** repo → **Actions** tab → "Button tests".
+- ✅ green check = all buttons still work. ❌ red X = something broke (click in to
+  see which test + why; a report is attached on failure).
+- It waits ~90s first so GitHub Pages can redeploy your push before testing.
+- **Cost:** free (public repo) — and **no AI tokens**, it's just GitHub running
+  `npm test` on its own servers.
+- You can also trigger it by hand: Actions tab → "Button tests" → "Run workflow".
+
+---
+
 ## Files in this system
 
 | File | What it is |
@@ -96,5 +111,6 @@ Then run `npm run test:functional` to check it.
 | `tests/button-smoke.spec.js` | Clicks every button, catches crashes |
 | `tests/buttons-functional.spec.js` | Asserts buttons do their job |
 | `package.json` → `scripts` | The `npm test` shortcuts |
+| `.github/workflows/test.yml` | Auto-runs the tests on every push |
 | `.gitignore` | Keeps test junk (`test-results/`) out of git |
 | `TESTING.md` | This cheat sheet |
