@@ -5029,3 +5029,19 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   white-space: nowrap;
 }
 .pantry-add-btn:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+/* Date cell: date input + tiny bought/expires mode toggle underneath */
+.pt-datecell .pt-date { display: block; }
+.pt-datemode {
+  display: block;
+  margin-top: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.pt-datemode:hover { color: var(--color-primary); }

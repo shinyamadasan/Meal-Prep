@@ -134,6 +134,14 @@ function daysLeftFrom(startDateStr, shelfLifeDays) {
   return Math.round((expiry - today) / 86400000);
 }
 
+// Days left for a pantry item. Two modes: by printed expiry date (dateMode
+// 'expiry' — for canned/packaged staples), or bought date + shelf life.
+function pantryDaysLeft(p) {
+  if (p.dateMode === 'expiry') return daysLeftFrom(p.expiryDate, 0);
+  var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
+  return daysLeftFrom(p.purchaseDate, shelf);
+}
+
 // Visual status from days remaining. Threshold is FRESHNESS_WARN_DAYS.
 function freshnessStatus(daysLeft) {
   if (daysLeft == null) return { cls: '', icon: '', label: '' };
@@ -3437,6 +3445,7 @@ window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
 window.cycleStapleLevel = cycleStapleLevel;
 window.togglePantryGuide = togglePantryGuide;
+window.togglePantryDateMode = togglePantryDateMode;
 window.addItemToSection = addItemToSection;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
@@ -5436,7 +5445,7 @@ function renderPantry() {
   // Freshness summary banner (expired / expiring soon)
   var expiredCount = 0, expiringCount = 0;
   AppState.pantry.forEach(function(p) {
-    var dl = daysLeftFrom(p.purchaseDate, p.shelfLifeDays);
+    var dl = pantryDaysLeft(p);
     if (dl == null) return;
     if (dl < 0) expiredCount++;
     else if (dl <= FRESHNESS_WARN_DAYS) expiringCount++;
@@ -5456,11 +5465,12 @@ function renderPantry() {
   // Build one item's table rows: the main row, plus a collapsed storage-guide
   // detail row that expands inline (so you never have to leave the tab).
   function buildRows(p) {
-    var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
-    var fs = freshnessStatus(daysLeftFrom(p.purchaseDate, shelf));
+    var fs = freshnessStatus(pantryDaysLeft(p));
     var staple = isStaple(p);
     var k = lookupPantryKnowledge(p.name);
     var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+    var expiryMode = p.dateMode === 'expiry';
+    var dateVal = expiryMode ? (p.expiryDate || '') : (p.purchaseDate || '');
     var where = WHERE.map(function(w) {
       return '<option value="' + w[0] + '"' + (effStorage(p) === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
     }).join('');
@@ -5482,7 +5492,8 @@ function renderPantry() {
       '<td class="pt-name">' + escapeHtml(p.name) + guideBtn + '</td>' +
       '<td>' + stockCell + '</td>' +
       '<td><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
-      '<td><input class="pt-date" type="date" value="' + (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></td>' +
+      '<td class="pt-datecell"><input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
+        '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')" title="Switch between bought date (uses shelf life) and a printed expiry date">' + (expiryMode ? 'expires' : 'bought') + '</button></td>' +
       '<td>' + (fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '<span class="pt-muted">—</span>') + '</td>' +
       '<td class="pt-center"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
       '<td class="pt-center"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
@@ -5499,7 +5510,7 @@ function renderPantry() {
     return main + detail;
   }
 
-  var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Bought</th><th>Status</th>' +
+  var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Date</th><th>Status</th>' +
               '<th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>';
   var groups = [
     { key: 'fridge', label: icon('refrigerator') + ' In the Fridge', plain: 'the fridge', eg: 'leftovers' },
@@ -5608,8 +5619,21 @@ function addItemToSection(storageKey) {
 function updatePantryDate(id, value) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
-  p.purchaseDate = value || null;
-  if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
+  if (p.dateMode === 'expiry') {
+    p.expiryDate = value || null;
+  } else {
+    p.purchaseDate = value || null;
+    if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
+  }
+  saveData();
+  renderPantry();
+}
+
+// Flip an item between "bought date + shelf life" and a printed "expiry date".
+function togglePantryDateMode(id) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  p.dateMode = (p.dateMode === 'expiry') ? 'bought' : 'expiry';
   saveData();
   renderPantry();
 }
