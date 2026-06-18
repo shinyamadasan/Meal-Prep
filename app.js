@@ -5543,7 +5543,7 @@ function renderPantry() {
   function buildRows(p) {
     var fs = freshnessStatus(pantryDaysLeft(p));
     var staple = isStaple(p);
-    var k = lookupPantryKnowledge(p.name);
+    var k = lookupPantryKnowledge(p.name) || genericStorageGuide(p);
     var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
     var expiryMode = p.dateMode === 'expiry';
     var dateVal = expiryMode ? (p.expiryDate || '') : (p.purchaseDate || '');
@@ -6714,6 +6714,53 @@ function lookupPantryKnowledge(name) {
   return PANTRY_KNOWLEDGE.find(k =>
     k.names.some(kn => n.includes(kn) || kn.includes(n))
   ) || null;
+}
+
+// Code-generated fallback guide by category, so EVERY item gets sensible storage
+// advice even when it isn't in the hand-written PANTRY_KNOWLEDGE list. Specific
+// entries above always win; this just fills the long tail for free.
+function genericStorageGuide(p) {
+  const cat = String(p.category || inferCategory(p.name) || '').toLowerCase();
+  const byCat = {
+    protein: {
+      store: 'Keep cold in the coldest part of the fridge; freeze if not using within a day or two.',
+      spoilage: 'Slimy or sticky surface, gray/green tint, or a sour, "off" smell.',
+      freshness: '🟢 Fresh: firm, normal color, clean smell. 🔴 Off: slimy, dull, sour-smelling.'
+    },
+    vegetable: {
+      store: 'Crisper drawer of the fridge; keep most vegetables unwashed until you use them.',
+      spoilage: 'Wilting, sliminess, dark mushy spots, or mold.',
+      freshness: '🟢 Fresh: firm, vivid color. 🟡 OK: slightly limp. 🔴 Old: mushy, slimy, moldy.'
+    },
+    fruit: {
+      store: 'Ripen on the counter, then move to the fridge to slow it down.',
+      spoilage: 'Soft mushy spots, mold, leaking juice, or a fermented smell.',
+      freshness: '🟢 Fresh: firm, fragrant. 🟡 OK: very ripe — eat soon. 🔴 Old: mushy, moldy.'
+    },
+    dairy: {
+      store: 'Keep cold in the main body of the fridge (not the door — it\'s warmer).',
+      spoilage: 'Sour smell, mold, curdling, or a bloated container.',
+      freshness: '🟢 Fresh: clean smell, smooth. 🔴 Off: sour, lumpy, or moldy.'
+    },
+    grain: {
+      store: 'Cool, dry place in an airtight container.',
+      spoilage: 'Musty smell, clumping, or tiny bugs (weevils).',
+      freshness: '🟢 Fresh: dry, neutral smell. 🔴 Old: musty smell or bugs.'
+    }
+  };
+  const g = byCat[cat] || {
+    store: 'Cool, dry place in a sealed container, away from heat and light.',
+    spoilage: 'Off smell, change in color or texture, moisture, or bugs.',
+    freshness: '🟢 Good: normal look and smell. 🔴 Toss it if it looks or smells off.'
+  };
+  const days = categoryShelfLife(p.category);
+  return {
+    store: g.store,
+    spoilage: g.spoilage,
+    freshness: g.freshness,
+    tip: days ? 'Rough shelf life: about ' + days + ' day' + (days === 1 ? '' : 's') + ' when fresh — always trust what you see and smell.' : '',
+    generic: true
+  };
 }
 
 
