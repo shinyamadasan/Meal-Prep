@@ -5098,3 +5098,9 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .pantry-table tr.pt-detail td::before { display: none; }
   .pt-stock, .pt-date { width: auto; }
 }
+
+@media (max-width: 768px) {
+  /* Planner action buttons wrap instead of overflowing the screen */
+  .planner-controls { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .planner-controls .btn { flex: 1 1 45%; justify-content: center; }
+}
