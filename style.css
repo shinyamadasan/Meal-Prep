@@ -5104,3 +5104,28 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .planner-controls { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .planner-controls .btn { flex: 1 1 45%; justify-content: center; }
 }
+
+@media (max-width: 768px) {
+  /* Recipe picker: compact list rows so several show at once (not one giant card) */
+  .recipe-selection-grid { grid-template-columns: 1fr !important; gap: 8px; }
+  .recipe-selection-card {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "icon title" "icon stats";
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 12px !important;
+    min-height: 0 !important;
+    text-align: left !important;
+  }
+  .recipe-selection-card .recipe-icon { grid-area: icon; font-size: 1.7rem; margin: 0 !important; }
+  .recipe-selection-card .recipe-title { grid-area: title; text-align: left; font-size: 0.95rem; line-height: 1.25; }
+  .recipe-selection-card .recipe-meta { display: none; } /* fold category away for density */
+  .recipe-selection-card .recipe-stats {
+    grid-area: stats;
+    justify-content: flex-start;
+    gap: 10px;
+    font-size: 0.78rem;
+    margin-top: 2px;
+  }
+}
