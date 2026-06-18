@@ -28,7 +28,9 @@ async function loadApp(page) {
 }
 
 async function openTab(page, tab) {
-  await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
+  const inMore = ['ingredients', 'hacks'].includes(tab); // moved under the "More" menu
+  if (inMore) await page.locator('.tab-more-btn').click();
+  await page.locator(`${inMore ? '.tab-more-menu ' : ''}.tab-btn[data-tab="${tab}"]`).click();
   await expect(page.locator(`#${tab}`)).toHaveClass(/active/);
 }
 

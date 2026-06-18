@@ -18,7 +18,9 @@ test('no horizontal overflow on any tab (mobile)', async ({ page }) => {
   const tabs = ['recipes', 'planner', 'grocery', 'fridge', 'hacks', 'nutrition', 'ingredients'];
   const bad = [];
   for (const t of tabs) {
-    const btn = page.locator('.tab-btn[data-tab="' + t + '"]');
+    const inMore = ['ingredients', 'hacks'].includes(t); // under the "More" menu
+    if (inMore) await page.locator('.tab-more-btn').click();
+    const btn = page.locator((inMore ? '.tab-more-menu ' : '') + '.tab-btn[data-tab="' + t + '"]');
     if (await btn.count()) { await btn.click(); await page.waitForTimeout(300); }
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - window.innerWidth

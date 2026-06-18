@@ -1347,10 +1347,34 @@ function setupEventListeners() {
   // Tab navigation
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const tabId = e.target.dataset.tab;
+      const tabId = e.currentTarget.dataset.tab;
+      if (!tabId) return; // e.g. the "More" toggle button has no data-tab
       showTab(tabId);
     });
   });
+
+  // "More" overflow menu (Price Book, Cooking Hacks)
+  const moreBtn = document.querySelector('.tab-more-btn');
+  const moreMenu = document.querySelector('.tab-more-menu');
+  if (moreBtn && moreMenu) {
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nowHidden = moreMenu.classList.toggle('hidden');
+      moreBtn.setAttribute('aria-expanded', String(!nowHidden));
+      if (!nowHidden) {
+        // Position as a fixed dropdown so the nav's overflow can't clip it.
+        const r = moreBtn.getBoundingClientRect();
+        moreMenu.style.top = (r.bottom + 4) + 'px';
+        moreMenu.style.right = (window.innerWidth - r.right) + 'px';
+      }
+    });
+    document.addEventListener('click', (e) => {
+      if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
+        moreMenu.classList.add('hidden');
+        moreBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
   
   // Recipe management
   document.getElementById('add-recipe-btn').addEventListener('click', openAddRecipeModal);
@@ -1479,7 +1503,16 @@ function showTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
   });
-  
+
+  // Reflect "More" section state + close its menu after navigating
+  const moreBtn = document.querySelector('.tab-more-btn');
+  const moreMenu = document.querySelector('.tab-more-menu');
+  if (moreBtn) moreBtn.classList.toggle('active', tabId === 'ingredients' || tabId === 'hacks');
+  if (moreMenu) {
+    moreMenu.classList.add('hidden');
+    if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
+  }
+
   // Update tab content
   document.querySelectorAll('.tab-content').forEach(content => {
     content.classList.toggle('active', content.id === tabId);
