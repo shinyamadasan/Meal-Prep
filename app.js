@@ -2391,22 +2391,20 @@ function renderGroceryList() {
   });
   
   groceryListEl.innerHTML = Object.keys(categories).map(category => {
-    const categoryTotal = categories[category].reduce((total, item) => {
-      const ingredient = findIngredientPrice(item.name);
-      if (ingredient && ingredient.pricePerUnit) {
-        return total + (ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit));
-      }
-      return total;
-    }, 0);
-    
+    const categoryTotal = categories[category].reduce((total, item) => total + groceryItemCost(item), 0);
+
     return `
     <div class="grocery-category">
-      <h3 class="category-header">${category}${categoryTotal > 0 ? ` <span class="category-total">₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
+      <h3 class="category-header">${category}${categoryTotal > 0 ? ` <span class="category-total">≈ ₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
       ${categories[category].map(item => {
-        const ingredient = findIngredientPrice(item.name);
-        const itemCost = ingredient && ingredient.pricePerUnit ? 
-          ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit) : 0;
-        
+        // Show an exact line total when we can price it; otherwise fall back to
+        // the market reference price (e.g. "₱200/kg") so there's always a price.
+        const cost = groceryItemCost(item);
+        const priced = findIngredientPrice(item.name);
+        let priceHtml = '';
+        if (cost > 0) priceHtml = `<div class="ingredient-price">≈ ₱${formatQuantity(cost)}</div>`;
+        else if (priced && priced.priceLabel) priceHtml = `<div class="ingredient-price ingredient-price--ref">${priced.priceLabel}</div>`;
+
         // "Running low" staples are in the pantry by definition — don't let the
         // in-stock check hide them; the whole point is that you need to rebuy.
         const inPantry = item.fromStaple ? false : isInPantry(item.name);
@@ -2424,7 +2422,7 @@ function renderGroceryList() {
             ${item.sources && item.sources.length > 0 ? `
               <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
             ` : ''}
-            ${itemCost > 0 ? `<div class="ingredient-price">₱${formatQuantity(itemCost)}</div>` : ''}
+            ${priceHtml}
           </div>
         </div>
         `;
@@ -2688,13 +2686,7 @@ function calculateRecipeCost(recipe) {
 }
 
 function calculateGroceryTotal() {
-  return AppState.groceryList.reduce((total, item) => {
-    const ingredient = findIngredientPrice(item.name);
-    if (ingredient && ingredient.pricePerUnit) {
-      return total + (ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit));
-    }
-    return total;
-  }, 0);
+  return AppState.groceryList.reduce((total, item) => total + groceryItemCost(item), 0);
 }
 
 function findIngredientPrice(name) {
@@ -2710,8 +2702,8 @@ function findIngredientPrice(name) {
   // Then check recipe ingredients for pricing
   for (const recipe of AppState.recipes) {
     if (recipe.baseIngredients) {
-      const ingredient = recipe.baseIngredients.find(ing => 
-        ing.name.toLowerCase().includes(name.toLowerCase()) || 
+      const ingredient = recipe.baseIngredients.find(ing =>
+        ing.name.toLowerCase().includes(name.toLowerCase()) ||
         name.toLowerCase().includes(ing.name.toLowerCase())
       );
       if (ingredient && ingredient.pricePerUnit) {
@@ -2719,8 +2711,55 @@ function findIngredientPrice(name) {
       }
     }
   }
-  
+
+  // Finally, the built-in ingredient database (prices stored as "₱200/kg").
+  const lower = name.toLowerCase();
+  const dbItem = INGREDIENT_DB.find(it => {
+    const n = it.name.toLowerCase();
+    return n === lower || n.includes(lower) || lower.includes(n);
+  });
+  if (dbItem) {
+    const parsed = parseDbPrice(dbItem.price);
+    if (parsed) {
+      return { name: dbItem.name, pricePerUnit: parsed.amount, unit: parsed.unit, priceLabel: dbItem.price };
+    }
+  }
+
   return null;
+}
+
+// Parse a DB price string like "₱200/kg" or "₱80/100g" into { amount, unit }.
+function parseDbPrice(str) {
+  if (!str) return null;
+  const m = String(str).match(/([\d.,]+)\s*\/\s*(.+)/);
+  if (!m) return null;
+  const amount = parseFloat(m[1].replace(/,/g, ''));
+  if (isNaN(amount)) return null;
+  return { amount: amount, unit: m[2].trim().toLowerCase() };
+}
+
+// How many price-units fit in one item-unit (mass/volume aware). Returns null
+// when the units can't be converted (e.g. "piece" vs "kg") so we don't guess.
+function unitConvertFactor(itemUnit, priceUnit) {
+  if (itemUnit === priceUnit) return 1;
+  const MASS = { g: 1, gram: 1, grams: 1, kg: 1000, kilo: 1000, kilos: 1000 };
+  const VOL = { ml: 1, l: 1000, liter: 1000, litre: 1000, liters: 1000 };
+  if (MASS[itemUnit] && MASS[priceUnit]) return MASS[itemUnit] / MASS[priceUnit];
+  if (VOL[itemUnit] && VOL[priceUnit]) return VOL[itemUnit] / VOL[priceUnit];
+  return null;
+}
+
+// Estimated cost of a grocery line, or 0 when it can't be priced reliably
+// (unknown ingredient, no quantity, or incompatible units).
+function groceryItemCost(item) {
+  if (!item || !item.quantity) return 0;
+  const ing = findIngredientPrice(item.name);
+  if (!ing || !ing.pricePerUnit) return 0;
+  const itemUnit = String(item.unit || ing.unit || '').toLowerCase();
+  const priceUnit = String(ing.unit || '').toLowerCase();
+  const factor = unitConvertFactor(itemUnit, priceUnit);
+  if (factor == null) return 0;
+  return ing.pricePerUnit * item.quantity * factor;
 }
 
 function getUnitConversion(fromUnit, toUnit) {

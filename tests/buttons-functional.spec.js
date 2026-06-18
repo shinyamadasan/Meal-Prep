@@ -180,6 +180,20 @@ test.describe('Grocery list', () => {
     await addCustomItem(page, 'Olive Oil Test');
   });
 
+  test('grocery items show a price', async ({ page }) => {
+    await loadApp(page);
+    await openTab(page, 'grocery');
+    await page.locator('#add-custom-item').click();
+    await expect(page.locator('#custom-item-modal')).toBeVisible();
+    // A name that exists in INGREDIENT_DB (priced "₱200/kg").
+    await page.locator('#custom-item-name').fill('Chicken Breast');
+    await page.locator('#custom-item-qty').fill('1');
+    await page.locator('#custom-item-unit').fill('kg');
+    await page.locator('#custom-item-modal').getByRole('button', { name: /Add to List/ }).click();
+    // A peso price now appears for the item.
+    await expect(page.locator('#grocery-list .ingredient-price')).toContainText('₱');
+  });
+
   test('Print builds the printable grocery document', async ({ page }) => {
     await loadApp(page);
     await addCustomItem(page, 'Printable Test Item');

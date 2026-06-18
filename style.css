@@ -2326,6 +2326,12 @@ select.form-control {
   font-size: var(--font-size-sm);
 }
 
+/* Market reference price (shown when an exact line total can't be computed) */
+.ingredient-price--ref {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
 .ingredient-pricing {
   background: var(--color-bg-2);
   padding: var(--space-8);
