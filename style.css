@@ -5185,3 +5185,22 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .gs-step.done .gs-step-title { text-decoration: line-through; opacity: 0.7; }
 .gs-step-sub { font-size: 0.78rem; color: var(--color-text-secondary); }
 .gs-step .btn { flex-shrink: 0; white-space: nowrap; }
+
+/* Recipe cover placeholder — colored category tile when there's no photo */
+.recipe-photo--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--color-bg-1), var(--color-bg-2));
+}
+.recipe-ph-icon {
+  font-size: 3.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(28, 25, 23, 0.1));
+}
+.recipe-photo--ph.cat-breakfast { background: linear-gradient(135deg, #FFF3D6, #FAD79B); }
+.recipe-photo--ph.cat-main-dish { background: linear-gradient(135deg, #E1EEDA, #A9CF96); }
+.recipe-photo--ph.cat-snack     { background: linear-gradient(135deg, #FBE7C6, #F2C078); }
+.recipe-photo--ph.cat-dessert   { background: linear-gradient(135deg, #FBE0E6, #F2A7BB); }
+.recipe-photo--ph.cat-soup      { background: linear-gradient(135deg, #FCE3C9, #F0A868); }
+.recipe-photo--ph.cat-salad     { background: linear-gradient(135deg, #DFF0D5, #97C77F); }

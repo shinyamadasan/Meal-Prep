@@ -1892,7 +1892,11 @@ function renderRecipes() {
         <div class="recipe-photo">
           <img src="${recipe.photo}" alt="${recipe.name}" class="recipe-image">
         </div>
-      ` : ''}
+      ` : `
+        <div class="recipe-photo recipe-photo--ph cat-${catSlug(recipe.category)}">
+          <span class="recipe-ph-icon">${getCategoryIcon(recipe.category)}</span>
+        </div>
+      `}
       <div class="recipe-card-header">
         <h3 class="recipe-title">${recipe.name}</h3>
         <span class="recipe-category">${recipe.category}</span>
@@ -2305,6 +2309,11 @@ function getCategoryIcon(category) {
     'Salad': '🥗'
   };
   return icons[category] || '🍴';
+}
+
+// Category → CSS-safe slug for the colored recipe-cover gradients.
+function catSlug(category) {
+  return String(category || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
 function selectRecipeForPlanning(recipeId) {
@@ -2739,7 +2748,7 @@ function renderCookingHacks() {
     
     return `
       <div class="hack-category">
-        <h3 class="hack-category-title">${getCategoryIcon(category)} ${category}</h3>
+        <h3 class="hack-category-title">${getHackIcon(category)} ${category}</h3>
         <div class="hack-tips">
           ${hacks.map(hack => `
             <div class="hack-item" onclick="handleCardEdit(event, openEditHackModal, ${hack.id})" title="Click to edit">
@@ -2767,11 +2776,11 @@ function renderCookingHacks() {
   }
 }
 
-function getCategoryIcon(category) {
+function getHackIcon(category) {
   const icons = {
     'Batch Cooking': '🍱',
     'Storage': '🏪',
-    'Budget': '💰', 
+    'Budget': '💰',
     'Equipment': '⚡',
     'Time-Saving': '⏱️',
     'Safety': '🛡️'
