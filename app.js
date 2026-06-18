@@ -1534,6 +1534,8 @@ function showTab(tabId) {
     renderNutritionTab();
   } else if (tabId === 'ingredients') {
     renderIngredientsTab();
+  } else if (tabId === 'recipes') {
+    renderGettingStarted();
   }
 }
 
@@ -1783,7 +1785,69 @@ function handleCardEdit(e, editFn, id) {
 }
 window.handleCardEdit = handleCardEdit;
 
+// Count meals currently placed in the weekly plan (proxy for "started").
+function plannedMealCount() {
+  var n = 0;
+  var plan = AppState.weeklyPlan || {};
+  Object.keys(plan).forEach(function(day) {
+    var d = plan[day] || {};
+    ['breakfast', 'lunch', 'dinner'].forEach(function(m) { if (d[m]) n++; });
+    if (Array.isArray(d.snacks)) n += d.snacks.length;
+  });
+  return n;
+}
+
+// "Start here" card on the My Recipes tab: a tiny, self-updating checklist that
+// walks a first-time user through the core loop (plan a meal -> grocery list).
+// It retires itself once the loop is completed or the user dismisses it.
+function renderGettingStarted() {
+  var el = document.getElementById('getting-started');
+  if (!el) return;
+
+  if (localStorage.getItem('mealPrepStartDone')) {
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  var hasPlan = plannedMealCount() > 0;
+  var hasGrocery = (AppState.groceryList || []).length > 0;
+
+  // Completed the loop — retire the card for good.
+  if (hasGrocery) {
+    localStorage.setItem('mealPrepStartDone', '1');
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="gs-card">' +
+    '<button class="gs-dismiss" onclick="dismissGettingStarted()" aria-label="Dismiss">×</button>' +
+    '<div class="gs-title">👋 New here? Two steps to your first grocery list:</div>' +
+    '<div class="gs-step ' + (hasPlan ? 'done' : '') + '">' +
+    '<span class="gs-num">' + (hasPlan ? '✓' : '1') + '</span>' +
+    '<div class="gs-body"><div class="gs-step-title">Plan a meal</div>' +
+    '<div class="gs-step-sub">Open the Weekly Planner, tap a day, and add a recipe.</div></div>' +
+    (hasPlan ? '' : '<button class="btn btn--primary btn--sm" onclick="goToTab(\'planner\')">Open Planner →</button>') +
+    '</div>' +
+    '<div class="gs-step">' +
+    '<span class="gs-num">2</span>' +
+    '<div class="gs-body"><div class="gs-step-title">Get your grocery list</div>' +
+    '<div class="gs-step-sub">It builds automatically from your plan — with prices.</div></div>' +
+    '<button class="btn btn--secondary btn--sm" onclick="goToTab(\'grocery\')">View List →</button>' +
+    '</div>' +
+    '</div>';
+}
+
+function dismissGettingStarted() {
+  localStorage.setItem('mealPrepStartDone', '1');
+  renderGettingStarted();
+}
+
 function renderRecipes() {
+  renderGettingStarted();
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
   const categoryFilter = document.getElementById('category-filter').value;
@@ -3590,6 +3654,8 @@ window.removeCookedMeal = removeCookedMeal;
 window.renderCookedMeals = renderCookedMeals;
 window.dismissFreshnessBanner = dismissFreshnessBanner;
 window.goToFreshnessTab = goToFreshnessTab;
+window.goToTab = function (t) { showTab(t); };
+window.dismissGettingStarted = dismissGettingStarted;
 window.renderIngredientsTab = renderIngredientsTab;
 window.openAddUserIngredientModal = openAddUserIngredientModal;
 window.openEditUserIngredientModal = openEditUserIngredientModal;
