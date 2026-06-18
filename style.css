@@ -1574,6 +1574,7 @@ select.form-control {
   margin-bottom: var(--space-4);
   border-radius: var(--radius-base);
   transition: background-color var(--duration-normal) var(--ease-standard);
+  cursor: pointer; /* whole row toggles the item */
 }
 
 .grocery-item:hover {
@@ -1588,7 +1589,7 @@ select.form-control {
 .grocery-checkbox {
   width: 18px;
   height: 18px;
-  cursor: pointer;
+  pointer-events: none; /* clicks fall through to the row's handler */
 }
 
 /* Storage Guide */

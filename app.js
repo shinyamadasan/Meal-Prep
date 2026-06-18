@@ -2400,7 +2400,14 @@ function renderGroceryList() {
     }
     categories[item.category].push(item);
   });
-  
+
+  // Within each category, sink checked / already-in-stock items to the bottom so
+  // what you still need to buy stays on top.
+  const groceryDone = item => item.checked || (!item.fromStaple && isInPantry(item.name));
+  Object.keys(categories).forEach(cat => {
+    categories[cat].sort((a, b) => (groceryDone(a) ? 1 : 0) - (groceryDone(b) ? 1 : 0));
+  });
+
   groceryListEl.innerHTML = Object.keys(categories).map(category => {
     const categoryTotal = categories[category].reduce((total, item) => total + groceryItemCost(item), 0);
 
@@ -2421,10 +2428,9 @@ function renderGroceryList() {
         const inPantry = item.fromStaple ? false : isInPantry(item.name);
         const isChecked = item.checked || inPantry;
         return `
-        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}">
-          <input type="checkbox" class="grocery-checkbox"
-                 ${isChecked ? 'checked' : ''}
-                 onchange="toggleGroceryItem(${item.id})">
+        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" onclick="toggleGroceryItem(${item.id})">
+          <input type="checkbox" class="grocery-checkbox" tabindex="-1"
+                 ${isChecked ? 'checked' : ''}>
           <div class="grocery-item-info">
             <div class="grocery-item-name">
               ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
