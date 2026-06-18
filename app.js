@@ -1714,6 +1714,21 @@ function deleteRecipe(recipeId) {
   }
 }
 
+// Click anywhere on a recipe card to edit it — except on interactive controls
+// (serving steppers, quick-serve buttons, Cooked/Edit/Delete).
+function handleRecipeCardClick(e, id) {
+  if (e.target.closest('button, input, select, a, .serving-controls')) return;
+  openEditRecipeModal(id);
+}
+window.handleRecipeCardClick = handleRecipeCardClick;
+
+// Generic "click card to edit" — runs editFn(id) unless an inner control was clicked.
+function handleCardEdit(e, editFn, id) {
+  if (e.target.closest('button, input, select, a')) return;
+  if (typeof editFn === 'function') editFn(id);
+}
+window.handleCardEdit = handleCardEdit;
+
 function renderRecipes() {
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
@@ -1754,7 +1769,7 @@ function renderRecipes() {
     };
     
     return `
-    <div class="recipe-card">
+    <div class="recipe-card" onclick="handleRecipeCardClick(event, '${recipe.id}')" title="Click to edit">
       ${recipe.photo ? `
         <div class="recipe-photo">
           <img src="${recipe.photo}" alt="${recipe.name}" class="recipe-image">
@@ -2494,7 +2509,7 @@ function renderStorageGuide() {
     const indicatorClass = getStorageIndicatorClass(ingredient.fridgeLife);
     
     return `
-      <div class="storage-ingredient-card">
+      <div class="storage-ingredient-card" onclick="handleCardEdit(event, openEditIngredientModal, ${ingredient.id})" title="Click to edit">
         <div class="ingredient-header">
           <h4 class="ingredient-name">${ingredient.name}</h4>
           <span class="storage-indicator ${indicatorClass}"></span>
@@ -2603,7 +2618,7 @@ function renderCookingHacks() {
         <h3 class="hack-category-title">${getCategoryIcon(category)} ${category}</h3>
         <div class="hack-tips">
           ${hacks.map(hack => `
-            <div class="hack-item">
+            <div class="hack-item" onclick="handleCardEdit(event, openEditHackModal, ${hack.id})" title="Click to edit">
               <div class="hack-item-header">
                 <h4 class="hack-item-title">${hack.title}</h4>
                 <div class="hack-actions">

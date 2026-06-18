@@ -4905,3 +4905,7 @@ select.form-control {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/* Click-to-edit affordance on cards */
+.storage-ingredient-card,
+.hack-item { cursor: pointer; }
