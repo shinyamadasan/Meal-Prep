@@ -2713,10 +2713,18 @@ function findIngredientPrice(name) {
   }
 
   // Finally, the built-in ingredient database (prices stored as "₱200/kg").
-  const lower = name.toLowerCase();
-  const dbItem = INGREDIENT_DB.find(it => {
-    const n = it.name.toLowerCase();
-    return n === lower || n.includes(lower) || lower.includes(n);
+  // Match on a normalized key so DB names with Filipino annotations like
+  // "Carrot (Karot)" still match "Carrots", and a shared word ("Garlic cloves"
+  // ~ "Garlic") counts too.
+  const singular = w => (w.length > 3 && w.endsWith('s')) ? w.slice(0, -1) : w;
+  const q = priceNameKey(name);
+  const qWords = q.split(' ').map(singular);
+  const dbItem = q && INGREDIENT_DB.find(it => {
+    const n = priceNameKey(it.name);
+    if (!n) return false;
+    if (n === q || n.includes(q) || q.includes(n)) return true;
+    const nWords = n.split(' ').map(singular);
+    return qWords.some(w => w.length >= 4 && nWords.includes(w));
   });
   if (dbItem) {
     const parsed = parseDbPrice(dbItem.price);
@@ -2726,6 +2734,17 @@ function findIngredientPrice(name) {
   }
 
   return null;
+}
+
+// Normalized key for price matching: keep the words inside "(...)" (so the
+// Filipino name in "Chayote (Sayote)" is still matchable), drop punctuation.
+function priceNameKey(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[()]/g, ' ')
+    .replace(/[^a-z ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Parse a DB price string like "₱200/kg" or "₱80/100g" into { amount, unit }.
@@ -7019,6 +7038,22 @@ const INGREDIENT_DB = [
   { name: 'Baking Powder', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Any Store' },
   { name: 'Baking Soda', unit: 'g', category: 'Pantry', price: '₱20/pack', store: 'Any Store' },
   { name: 'Vanilla Extract', unit: 'ml', category: 'Pantry', price: '₱45/bottle', store: 'Supermarket / Grocery' },
+
+  // Added for fuller recipe coverage (estimated PH prices)
+  { name: 'Beef Sirloin', unit: 'kg', category: 'Protein', price: '₱450/kg', store: 'Wet Market / Supermarket' },
+  { name: 'Olive Oil', unit: 'ml', category: 'Pantry', price: '₱350/500ml', store: 'Supermarket' },
+  { name: 'Honey', unit: 'g', category: 'Pantry', price: '₱180/350g', store: 'Supermarket' },
+  { name: 'Rolled Oats', unit: 'g', category: 'Grain', price: '₱180/800g', store: 'Supermarket' },
+  { name: 'Granola', unit: 'g', category: 'Grain', price: '₱250/500g', store: 'Supermarket' },
+  { name: 'Chia Seeds', unit: 'g', category: 'Pantry', price: '₱150/250g', store: 'Supermarket / Health Store' },
+  { name: 'Red Lentils', unit: 'g', category: 'Pantry', price: '₱120/500g', store: 'Supermarket' },
+  { name: 'Mixed Berries', unit: 'g', category: 'Fruit', price: '₱280/500g', store: 'Supermarket (Frozen)' },
+  { name: 'Scallions', unit: 'kg', category: 'Vegetable', price: '₱120/kg', store: 'Wet Market' },
+  { name: 'Chayote (Sayote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market' },
+  { name: 'Kimchi', unit: 'g', category: 'Pantry', price: '₱200/500g', store: 'Supermarket / Korean Store' },
+  { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store' },
+  { name: 'Garam Masala', unit: 'g', category: 'Pantry', price: '₱45/pack', store: 'Supermarket' },
+  { name: 'Dried Herbs', unit: 'g', category: 'Pantry', price: '₱40/pack', store: 'Supermarket' },
 ];
 
 function filterIngredients(query) {
