@@ -1252,6 +1252,7 @@ function initApp() {
       } else {
         // User is signed out
         loadFromLocalStorage();
+        seedPantryIfEmpty();
         renderRecipes();
         renderWeeklyPlanner();
         renderStorageGuide();
@@ -1278,9 +1279,11 @@ function initApp() {
       saveToLocalStorage();
     }
     
+    seedPantryIfEmpty();
+
     // Initialize nutrition goals display
     updateNutritionGoalsDisplay();
-    
+
     // Render initial views
     renderRecipes();
     renderWeeklyPlanner();
@@ -3429,6 +3432,7 @@ window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
 window.updatePantryDate = updatePantryDate;
 window.updatePantryShelf = updatePantryShelf;
+window.updatePantryQty = updatePantryQty;
 window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
 window.markRecipeCooked = markRecipeCooked;
@@ -3982,6 +3986,8 @@ async function loadUserData() {
     // confirmed-empty doc (not a transient error) to avoid overwriting good data.
     if (status === 'empty') saveToFirestore();
   }
+
+  seedPantryIfEmpty(); // first-time: pre-fill common staples to set stock on
 
   // Update UI
   renderRecipes();
@@ -5452,6 +5458,9 @@ function renderPantry() {
          (p.purchaseDate || '') + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)"></label>';
     h += '<label class="pantry-fresh-field" title="Stays good for (days)">' + icon('hourglass') + ' <input type="number" min="0" value="' +
          shelf + '" onchange="updatePantryShelf(\'' + p.id + '\', this.value)"> days</label>';
+    h += '<label class="pantry-fresh-field" title="How much you have in stock">' + icon('package') +
+         ' <input type="number" min="0" step="0.01" placeholder="stock" value="' + (p.quantity != null ? p.quantity : '') +
+         '" onchange="updatePantryQty(\'' + p.id + '\', this.value)"> ' + escapeHtml(p.unit || '') + '</label>';
     h += '</div>';
     return h;
   }
@@ -5567,6 +5576,39 @@ function updatePantryShelf(id, value) {
   p.shelfLifeDays = isNaN(days) ? null : days;
   saveData();
   renderPantry();
+}
+
+function updatePantryQty(id, value) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  var q = parseFloat(value);
+  p.quantity = isNaN(q) ? null : q;
+  saveData();
+  renderPantry();
+}
+
+// Seed an empty pantry with common household staples once, so a new user just
+// sets the stock they have instead of typing each item. Deterministic ids mean
+// two devices seeding won't create duplicates (the cloud merge dedupes by id).
+function seedPantryIfEmpty() {
+  try { if (localStorage.getItem('mealPrepPantrySeeded')) return; } catch (e) {}
+  if ((AppState.pantry || []).length > 0) {
+    try { localStorage.setItem('mealPrepPantrySeeded', '1'); } catch (e) {}
+    return;
+  }
+  COMMON_PANTRY_STAPLES.forEach(function(name) {
+    var category = inferCategory(name);
+    AppState.pantry.push({
+      id: 'staple_' + name.toLowerCase().replace(/\s+/g, '_'),
+      name: name,
+      category: category,
+      purchaseDate: null,
+      shelfLifeDays: categoryShelfLife(category),
+      quantity: null
+    });
+  });
+  try { localStorage.setItem('mealPrepPantrySeeded', '1'); } catch (e) {}
+  saveData();
 }
 
 // ── Cooked meal tracking ─────────────────────────────────────────────────────
@@ -5854,8 +5896,7 @@ function addToPantry() {
 }
 
 function removeFromPantry(id) {
-  id = parseFloat(id);
-  AppState.pantry = AppState.pantry.filter(p => p.id !== id);
+  AppState.pantry = AppState.pantry.filter(p => String(p.id) !== String(id));
   saveData();
   renderPantry();
   renderGroceryList();
