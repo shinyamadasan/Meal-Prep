@@ -3633,12 +3633,8 @@ select.form-control {
   gap: 0.35rem;
 }
 
-.pantry-card--plain {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.75rem;
-}
+/* Plain cards (no storage-guide entry) carry the same fields now, so they keep
+   the vertical column layout from .pantry-card — no row override. */
 
 .pantry-card-header {
   display: flex;
