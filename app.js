@@ -2407,7 +2407,9 @@ function renderGroceryList() {
         const itemCost = ingredient && ingredient.pricePerUnit ? 
           ingredient.pricePerUnit * item.quantity / getUnitConversion(item.unit, ingredient.unit) : 0;
         
-        const inPantry = isInPantry(item.name);
+        // "Running low" staples are in the pantry by definition — don't let the
+        // in-stock check hide them; the whole point is that you need to rebuy.
+        const inPantry = item.fromStaple ? false : isInPantry(item.name);
         const isChecked = item.checked || inPantry;
         return `
         <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}">
@@ -2416,7 +2418,7 @@ function renderGroceryList() {
                  onchange="toggleGroceryItem(${item.id})">
           <div class="grocery-item-info">
             <div class="grocery-item-name">
-              ${formatQuantity(item.quantity)} ${item.unit} ${item.name}
+              ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
               ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span>' : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
