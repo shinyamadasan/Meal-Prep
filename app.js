@@ -1310,6 +1310,17 @@ function initApp() {
   var pantryInput = document.getElementById('pantry-input');
   if (pantryInput) attachIngredientAutocomplete(pantryInput);
 
+  // ...and to the custom grocery-item modal, filling its unit/category on pick.
+  var customItemInput = document.getElementById('custom-item-name');
+  if (customItemInput) attachIngredientAutocomplete(customItemInput, function(data) {
+    var unitEl = document.getElementById('custom-item-unit');
+    var catEl = document.getElementById('custom-item-category');
+    if (unitEl && data.unit) unitEl.value = data.unit;
+    if (catEl && data.cat) {
+      for (var o of catEl.options) { if (o.value === data.cat) { o.selected = true; break; } }
+    }
+  });
+
   // Setup event listeners
   setupEventListeners();
   
@@ -7237,7 +7248,7 @@ function getIngredientInfo(name) {
   };
 }
 
-function attachIngredientAutocomplete(nameInput) {
+function attachIngredientAutocomplete(nameInput, onSelect) {
   var wrap = nameInput.parentElement;
 
   nameInput.addEventListener('input', function() {
@@ -7270,19 +7281,22 @@ function attachIngredientAutocomplete(nameInput) {
     suggestBox.querySelectorAll('.ing-suggestion-item').forEach(function(el) {
       el.addEventListener('mousedown', function(e) {
         e.preventDefault(); // prevent blur before click
-        var row = nameInput.closest('.ingredient-item');
         nameInput.value = el.dataset.name;
+        suggestBox.classList.add('hidden');
 
+        // Custom contexts (e.g. the grocery custom-item modal) handle their own
+        // field filling via onSelect. Otherwise use the recipe-row layout.
+        if (typeof onSelect === 'function') { onSelect(el.dataset); return; }
+
+        var row = nameInput.closest('.ingredient-item');
+        if (!row) return; // e.g. the pantry box infers unit/category itself
         var selects = row.querySelectorAll('select');
-        // selects[0] = unit, selects[1] = category
-        for (var o of selects[0].options) {
+        if (selects[0]) for (var o of selects[0].options) {
           if (o.value === el.dataset.unit) { o.selected = true; break; }
         }
-        for (var o of selects[1].options) {
-          if (o.value === el.dataset.cat) { o.selected = true; break; }
+        if (selects[1]) for (var o2 of selects[1].options) {
+          if (o2.value === el.dataset.cat) { o2.selected = true; break; }
         }
-
-        suggestBox.classList.add('hidden');
         var qtyInput = row.querySelector('input[type="number"]');
         if (qtyInput) qtyInput.focus();
       });
