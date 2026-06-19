@@ -2147,7 +2147,7 @@ function renderStorageAlerts() {
     const check = id => {
       const recipe = AppState.recipes.find(r => String(r.id) === String(id));
       if (recipe && willExpire(recipe, day)) {
-        issues.push(`<strong>${recipe.name}</strong> on ${day} (fridge life: ${recipe.fridgeLife}d, stored ${DAY_FRIDGE_INDEX[day]}d by then)`);
+        issues.push(`<strong>${recipe.name}</strong> — planned ${day}, but only lasts ${recipe.fridgeLife}d`);
       }
     };
     ['breakfast', 'lunch', 'dinner'].forEach(meal => { if (plan[meal]) check(plan[meal]); });
@@ -2161,7 +2161,7 @@ function renderStorageAlerts() {
 
   el.innerHTML = `
     <div class="storage-alert-banner">
-      <strong>${icon('triangle-alert')} Storage Alert</strong> — ${issues.length} meal${issues.length > 1 ? 's' : ''} may expire before their planned day (assuming Sunday batch cook):
+      ${icon('triangle-alert')} <strong>${issues.length} recipe${issues.length > 1 ? 's' : ''} may not stay fresh until their planned day</strong>
       <ul class="storage-alert-list">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
     </div>`;
 }
