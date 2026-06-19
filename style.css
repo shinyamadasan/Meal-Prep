@@ -5215,3 +5215,30 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   outline-offset: -2px;
   border-radius: var(--radius-base);
 }
+
+@media (max-width: 768px) {
+  /* Reclaim header vertical space on phones */
+  .app-header { padding: 0.45rem 0; }
+  .header-top { margin-bottom: 0.45rem; }
+  .app-title { font-size: 1.25rem; }
+  #user-email { display: none; }            /* email not needed on mobile */
+
+  /* Float the help "?" out of the cramped header into a bottom-right bubble */
+  .help-btn {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    z-index: 90;
+    font-size: 1.25rem;
+    box-shadow: 0 4px 14px rgba(28, 25, 23, 0.2);
+  }
+
+  /* Compact grocery rows so the list isn't endless scrolling */
+  .grocery-item { padding: 6px 8px; gap: 8px; }
+  .grocery-item-name { font-size: 0.9rem; margin-bottom: 0; }
+  .grocery-item-source { display: none; }   /* the "From: …" line — drop it on mobile */
+  .ingredient-price { font-size: 0.8rem; }
+}
