@@ -1336,7 +1336,7 @@ function initApp() {
   setupModalEventListeners();
   
   // Show initial tab
-  showTab('recipes');
+  showTab('dashboard');
   
   // Setup auto-save (save every 30 seconds if there are changes)
   setInterval(() => {
@@ -1525,7 +1525,9 @@ function showTab(tabId) {
   });
   
   // Special handling for different tabs
-  if (tabId === 'planner') {
+  if (tabId === 'dashboard') {
+    renderDashboard();
+  } else if (tabId === 'planner') {
     updateWeeklyStats();
   } else if (tabId === 'grocery') {
     updateGrocerySummary();
@@ -2424,6 +2426,106 @@ function updateWeeklyStats() {
   document.getElementById('total-prep-time').textContent = `${Math.round(totalPrepTime)} min`;
   document.getElementById('total-cook-time').textContent = `${Math.round(totalCookTime)} min`;
   document.getElementById('planned-meals').textContent = plannedMeals;
+}
+
+function renderDashboard() {
+  const el = document.getElementById('dashboard');
+  if (!el) return;
+
+  const hour = new Date().getHours();
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  let name = '';
+  if (AppState.currentUser) {
+    const dn = AppState.currentUser.displayName;
+    const em = AppState.currentUser.email || '';
+    const raw = dn || em.split('@')[0] || '';
+    name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+  }
+  const greeting = name ? `Good ${timeOfDay}, ${name}` : `Good ${timeOfDay}`;
+
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = dayNames[new Date().getDay()];
+  const todayPlan = AppState.weeklyPlan[today] || {};
+
+  const mealEmojis = { breakfast: '🍳', lunch: '🥗', dinner: '🍱', snacks: '🥜' };
+  const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snack' };
+  const todayRows = ['breakfast','lunch','dinner','snacks'].map(meal => {
+    const id = meal === 'snacks' ? (todayPlan.snacks || [])[0] : todayPlan[meal];
+    const recipe = id ? AppState.recipes.find(r => String(r.id) === String(id)) : null;
+    return `<div class="dash-meal-row">
+      <span class="dash-meal-emoji">${mealEmojis[meal]}</span>
+      <span class="dash-meal-label">${mealLabels[meal]}</span>
+      <span class="dash-meal-name${recipe ? '' : ' dash-meal-empty'}">${recipe ? recipe.name : '—'}</span>
+    </div>`;
+  }).join('');
+
+  const weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  let totalMeals = 0, expiringSoon = 0, weeklyCost = 0, totalProtein = 0, proteinDays = 0;
+  weekDays.forEach(day => {
+    const plan = AppState.weeklyPlan[day] || {};
+    let dayProtein = 0, hasProtein = false;
+    const process = id => {
+      const r = AppState.recipes.find(r => String(r.id) === String(id));
+      if (!r) return;
+      totalMeals++;
+      if (willExpire(r, day)) expiringSoon++;
+      weeklyCost += calculateRecipeCost(r);
+      const p = r.nutritionPerServing && r.nutritionPerServing.protein;
+      if (p) { dayProtein += p * (r.currentServings || 1); hasProtein = true; }
+    };
+    ['breakfast','lunch','dinner'].forEach(m => { if (plan[m]) process(plan[m]); });
+    (plan.snacks || []).forEach(process);
+    if (hasProtein) { totalProtein += dayProtein; proteinDays++; }
+  });
+  const avgProtein = proteinDays > 0 ? Math.round(totalProtein / proteinDays) : null;
+
+  const statCards = [
+    `<div class="dash-stat">
+      <span class="dash-stat-value">${totalMeals}</span>
+      <span class="dash-stat-label">meals planned</span>
+    </div>`,
+    expiringSoon > 0
+      ? `<div class="dash-stat dash-stat--warn">
+          <span class="dash-stat-value">⚠️ ${expiringSoon}</span>
+          <span class="dash-stat-label">expiring soon</span>
+        </div>`
+      : `<div class="dash-stat dash-stat--ok">
+          <span class="dash-stat-value">✅</span>
+          <span class="dash-stat-label">nothing expiring</span>
+        </div>`,
+    weeklyCost > 0 ? `<div class="dash-stat">
+      <span class="dash-stat-value">₱${Math.round(weeklyCost)}</span>
+      <span class="dash-stat-label">est. this week</span>
+    </div>` : '',
+    avgProtein ? `<div class="dash-stat">
+      <span class="dash-stat-value">${avgProtein}g</span>
+      <span class="dash-stat-label">avg protein/day</span>
+    </div>` : ''
+  ].filter(Boolean).join('');
+
+  el.innerHTML = `
+    <div class="dashboard">
+      <div class="dash-greeting">Good ${timeOfDay}${name ? ', ' + name : ''} 👋</div>
+
+      <div class="dash-card">
+        <div class="dash-card-label">Today — ${today}</div>
+        <div class="dash-today-meals">${todayRows}</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-label">This Week</div>
+        <div class="dash-stats">${statCards}</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-label">Quick Actions</div>
+        <div class="dash-actions">
+          <button class="dash-action-btn" onclick="openAddRecipeModal()">${icon('plus')} Add Recipe</button>
+          <button class="dash-action-btn" onclick="showTab('planner')">${icon('calendar-days')} Plan Week</button>
+          <button class="dash-action-btn" onclick="showTab('grocery')">${icon('shopping-cart')} Grocery List</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 // Grocery list functions
