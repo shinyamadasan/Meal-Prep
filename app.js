@@ -5080,41 +5080,34 @@ function printGroceryList() {
   const categories = getGroceryByCategory();
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  const rows = Object.keys(categories).map(cat => `
-    <h3 style="margin:1.25rem 0 0.4rem;font-size:0.95rem;text-transform:uppercase;letter-spacing:0.05em;color:#555;border-bottom:1px solid #ddd;padding-bottom:0.3rem;">${cat}</h3>
-    ${categories[cat].map(item => `
-      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0;font-size:0.95rem;">
-        <span style="display:inline-block;width:16px;height:16px;border:1.5px solid #999;border-radius:3px;flex-shrink:0;"></span>
-        <span>${formatQuantity(item.quantity)} ${item.unit} <strong>${item.name}</strong></span>
-      </div>`).join('')}
-  `).join('');
+  const rows = Object.keys(categories).map(cat =>
+    '<h3>' + cat + '</h3>' +
+    categories[cat].map(item =>
+      '<div class="gp-item"><span class="gp-box"></span><span>' +
+      (item.quantity ? formatQuantity(item.quantity) + ' ' + (item.unit || '') + ' ' : '') +
+      '<strong>' + escapeHtml(item.name) + '</strong></span></div>'
+    ).join('')
+  ).join('');
 
-  const html = `<!DOCTYPE html><html><head>
-    <title>Grocery List</title>
-    <style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:480px;margin:0 auto;}h1{font-size:1.3rem;margin-bottom:0.25rem;}p{color:#666;font-size:0.85rem;margin:0 0 1rem;}@media print{body{padding:1rem;}}</style>
-  </head><body>
-    <h1>🛒 Grocery List</h1>
-    <p>${date}</p>
-    ${rows}
-  </body></html>`;
+  // Print the MAIN window (reliable on mobile — iframe/popup printing is flaky on
+  // iOS Safari). We drop a print-only area into the page; @media print hides
+  // everything else and shows just this.
+  let area = document.getElementById('grocery-print-area');
+  if (!area) {
+    area = document.createElement('div');
+    area.id = 'grocery-print-area';
+    document.body.appendChild(area);
+  }
+  area.innerHTML = '<h1>🛒 Grocery List</h1><p class="gp-date">' + date + '</p>' + rows;
 
-  // Print through a hidden iframe. A popup window (window.open) gets killed by
-  // popup blockers — that's why the Print button appeared to do nothing.
-  const frame = document.createElement('iframe');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-  document.body.appendChild(frame);
-
-  const doc = frame.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  frame.contentWindow.focus();
-  setTimeout(function () {
-    frame.contentWindow.print();
-    setTimeout(function () { frame.remove(); }, 1000);
-  }, 250);
+  document.body.classList.add('printing-grocery');
+  const cleanup = function () {
+    document.body.classList.remove('printing-grocery');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(cleanup, 60000); // safety net if afterprint never fires
+  setTimeout(function () { window.print(); }, 80);
 }
 
 function copyGroceryList() {
@@ -5135,11 +5128,37 @@ function copyGroceryList() {
     lines.push('');
   });
 
-  navigator.clipboard.writeText(lines.join('\n')).then(() => {
-    showSuccessMessage('Grocery list copied! Paste it into WhatsApp or Notes.');
-  }).catch(() => {
-    showErrorMessage('Could not copy — try selecting and copying the list manually.');
-  });
+  copyTextToClipboard(lines.join('\n'),
+    () => showSuccessMessage('Grocery list copied! Paste it into WhatsApp or Notes.'),
+    () => showErrorMessage('Could not copy — try selecting and copying the list manually.'));
+}
+
+// Clipboard with a fallback: navigator.clipboard isn't available in every mobile
+// browser/context, so fall back to a hidden textarea + execCommand.
+function copyTextToClipboard(text, onOk, onErr) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onOk, () => fallbackCopyText(text, onOk, onErr));
+  } else {
+    fallbackCopyText(text, onOk, onErr);
+  }
+}
+
+function fallbackCopyText(text, onOk, onErr) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    ok ? onOk() : onErr();
+  } catch (e) {
+    onErr();
+  }
 }
 
 // ── Cook Day / Prep Mode ──────────────────────────────────────────────────────

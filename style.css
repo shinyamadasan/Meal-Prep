@@ -5242,3 +5242,43 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .grocery-item-source { display: none; }   /* the "From: …" line — drop it on mobile */
   .ingredient-price { font-size: 0.8rem; }
 }
+
+/* Grocery print: a print-only area that replaces the page when printing.
+   Uses the main window's print (reliable on mobile, unlike iframe printing). */
+#grocery-print-area { display: none; }
+@media print {
+  body.printing-grocery > *:not(#grocery-print-area) { display: none !important; }
+  #grocery-print-area {
+    display: block !important;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #000;
+    padding: 0;
+  }
+  #grocery-print-area h1 { font-size: 1.4rem; margin: 0 0 0.2rem; }
+  #grocery-print-area .gp-date { color: #555; font-size: 0.85rem; margin: 0 0 1rem; }
+  #grocery-print-area h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.3rem;
+    margin: 1.2rem 0 0.4rem;
+  }
+  #grocery-print-area .gp-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0;
+    font-size: 0.95rem;
+    break-inside: avoid;
+  }
+  #grocery-print-area .gp-box {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border: 1.5px solid #999;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+}

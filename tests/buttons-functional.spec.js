@@ -201,21 +201,10 @@ test.describe('Grocery list', () => {
 
     await page.getByRole('button', { name: /Print/ }).click();
 
-    // The fix prints via a hidden iframe — assert a frame with the grocery
-    // document actually gets created (the old popup version built nothing).
-    await expect
-      .poll(
-        async () => {
-          for (const f of page.frames()) {
-            try {
-              if (await f.locator('h1', { hasText: 'Grocery List' }).count()) return true;
-            } catch (e) {}
-          }
-          return false;
-        },
-        { timeout: 5000 }
-      )
-      .toBe(true);
+    // Print now uses the main window + a print-only #grocery-print-area (reliable
+    // on mobile). Assert that area gets populated with the list.
+    await expect(page.locator('#grocery-print-area')).toContainText('Printable Test Item');
+    await expect(page.locator('#grocery-print-area')).toContainText('Grocery List');
   });
 
   test('Copy List copies without error', async ({ page, context }) => {
