@@ -43,7 +43,6 @@
                     <h1 class="app-title"><svg class="lc-icon app-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg> Meal Prep Planner</h1>
                     <div class="auth-section">
                         <span id="sync-status" class="sync-status hidden"></span>
-                        <button class="help-btn" onclick="openHelpModal()" title="How to use this app" aria-label="How to use this app">?</button>
                         <!-- Hidden elements kept for updateAuthUI compatibility -->
                         <div id="user-info" class="hidden" style="display:none" aria-hidden="true"><span id="user-email"></span></div>
                         <div id="auth-buttons" class="hidden" style="display:none" aria-hidden="true"></div>
@@ -1134,6 +1133,11 @@
                         Create a free account
                     </button>
                 </div>
+
+                <p class="settings-section-label">App</p>
+                <button class="settings-row" onclick="openHelpModal(); closeSettingsModal()">
+                    <span class="ic" data-icon="lightbulb"></span> How to use this app
+                </button>
 
                 <p class="settings-section-label">Data</p>
                 <button class="settings-row" onclick="exportData()">
