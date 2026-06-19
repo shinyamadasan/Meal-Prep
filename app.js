@@ -1376,6 +1376,11 @@ function setupEventListeners() {
     });
   }
   
+  // Accessibility: give icon-only "×" close buttons a screen-reader label
+  document.querySelectorAll('.modal-close').forEach(b => {
+    if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', 'Close');
+  });
+
   // Recipe management
   document.getElementById('add-recipe-btn').addEventListener('click', openAddRecipeModal);
   document.getElementById('recipe-form').addEventListener('submit', saveRecipe);
@@ -2533,8 +2538,8 @@ function renderGroceryList() {
         const inPantry = item.fromStaple ? false : isInPantry(item.name);
         const isChecked = item.checked || inPantry;
         return `
-        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" onclick="toggleGroceryItem(${item.id})">
-          <input type="checkbox" class="grocery-checkbox" tabindex="-1"
+        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${item.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${item.id})}">
+          <input type="checkbox" class="grocery-checkbox" tabindex="-1" aria-hidden="true"
                  ${isChecked ? 'checked' : ''}>
           <div class="grocery-item-info">
             <div class="grocery-item-name">

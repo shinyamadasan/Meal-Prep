@@ -7,7 +7,7 @@
   --color-gray-200: rgba(245, 245, 245, 1);
   --color-gray-300: rgba(167, 169, 169, 1);
   --color-gray-400: rgba(119, 124, 124, 1);
-  --color-slate-500: rgba(120, 113, 108, 1);  /* warm secondary text (stone) */
+  --color-slate-500: rgba(107, 100, 95, 1);   /* warm secondary text (stone) — darkened for AA contrast on cream */
   --color-brown-600: rgba(94, 82, 64, 1);
   --color-charcoal-700: rgba(31, 33, 33, 1);
   --color-charcoal-800: rgba(38, 40, 40, 1);
@@ -5204,3 +5204,14 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .recipe-photo--ph.cat-dessert   { background: linear-gradient(135deg, #FBE0E6, #F2A7BB); }
 .recipe-photo--ph.cat-soup      { background: linear-gradient(135deg, #FCE3C9, #F0A868); }
 .recipe-photo--ph.cat-salad     { background: linear-gradient(135deg, #DFF0D5, #97C77F); }
+
+/* Accessibility: visible keyboard-focus ring for elements that lack their own */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.grocery-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-base);
+}
