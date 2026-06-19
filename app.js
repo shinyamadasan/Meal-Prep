@@ -1438,7 +1438,6 @@ function setupEventListeners() {
   
   // Weekly planner
   document.getElementById('clear-week').addEventListener('click', clearWeeklyPlan);
-  document.getElementById('generate-grocery').addEventListener('click', () => showTab('grocery'));
   
   // Grocery list
   document.getElementById('clear-grocery').addEventListener('click', clearGroceryList);

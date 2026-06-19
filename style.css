@@ -5282,3 +5282,19 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
     flex-shrink: 0;
   }
 }
+
+/* Weekly Planner stats — minimized and moved below the grid */
+.week-stats--compact {
+  margin-top: var(--space-16);
+  gap: var(--space-8);
+}
+.week-stats--compact .stat-card {
+  padding: 0.45rem 0.7rem;
+  min-width: 0;
+}
+.week-stats--compact .stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.week-stats--compact .stat-value { font-size: 1rem; }

@@ -254,22 +254,6 @@
                             <button class="btn btn--outline" onclick="saveWeekAsTemplate()"><span class="ic" data-icon="save"></span> Save Week</button>
                             <button class="btn btn--outline" id="load-week-template-btn" onclick="loadWeekTemplate()" disabled><span class="ic" data-icon="calendar-days"></span> Load Saved Week</button>
                             <button class="btn btn--secondary" onclick="openPrepMode()"><span class="ic" data-icon="soup"></span> Prep Mode</button>
-                            <button class="btn btn--primary" id="generate-grocery"><span class="ic" data-icon="shopping-cart"></span> View Grocery List</button>
-                        </div>
-                    </div>
-                    
-                    <div class="week-stats">
-                        <div class="stat-card">
-                            <span class="stat-label">Total Prep Time</span>
-                            <span class="stat-value" id="total-prep-time">0 min</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Total Cook Time</span>
-                            <span class="stat-value" id="total-cook-time">0 min</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Planned Meals</span>
-                            <span class="stat-value" id="planned-meals">0</span>
                         </div>
                     </div>
 
@@ -283,6 +267,21 @@
 
                     <div class="weekly-planner-container">
                         <div class="meal-planner-grid" id="meal-planner"></div>
+                    </div>
+
+                    <div class="week-stats week-stats--compact">
+                        <div class="stat-card">
+                            <span class="stat-label">Prep</span>
+                            <span class="stat-value" id="total-prep-time">0 min</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Cook</span>
+                            <span class="stat-value" id="total-cook-time">0 min</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Meals</span>
+                            <span class="stat-value" id="planned-meals">0</span>
+                        </div>
                     </div>
                 </section>
 
