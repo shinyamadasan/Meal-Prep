@@ -82,13 +82,13 @@
   --focus-outline: 2px solid var(--color-primary);
   --status-bg-opacity: 0.15;
   --status-border-opacity: 0.25;
-  --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a7c4e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 
   /* RGB versions for opacity control */
-  --color-success-rgb: 21, 128, 61;
+  --color-success-rgb: 123, 174, 127;
   --color-error-rgb: 192, 21, 47;
-  --color-warning-rgb: 180, 83, 9;
+  --color-warning-rgb: 214, 118, 48;
   --color-info-rgb: 120, 113, 108;
 
   /* Typography */
@@ -167,8 +167,8 @@
 
     /* Background color tokens (Dark Mode) */
     --color-bg-1: rgba(29, 78, 216, 0.15); /* Dark blue */
-    --color-bg-2: rgba(180, 83, 9, 0.15); /* Dark yellow */
-    --color-bg-3: rgba(21, 128, 61, 0.15); /* Dark green */
+    --color-bg-2: rgba(214, 118, 48, 0.15); /* Warm orange */
+    --color-bg-3: rgba(123, 174, 127, 0.15); /* Sage green */
     --color-bg-4: rgba(185, 28, 28, 0.15); /* Dark red */
     --color-bg-5: rgba(107, 33, 168, 0.15); /* Dark purple */
     --color-bg-6: rgba(194, 65, 12, 0.15); /* Dark orange */
@@ -206,7 +206,7 @@
     --focus-outline: 2px solid var(--color-primary);
     --status-bg-opacity: 0.15;
     --status-border-opacity: 0.25;
-    --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a7c4e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 
     /* RGB versions for dark mode */
@@ -227,8 +227,8 @@
 
   /* Colorful background palette - Dark Mode */
   --color-bg-1: rgba(29, 78, 216, 0.15); /* Dark blue */
-  --color-bg-2: rgba(180, 83, 9, 0.15); /* Dark yellow */
-  --color-bg-3: rgba(21, 128, 61, 0.15); /* Dark green */
+  --color-bg-2: rgba(214, 118, 48, 0.15); /* Warm orange */
+  --color-bg-3: rgba(123, 174, 127, 0.15); /* Sage green */
   --color-bg-4: rgba(185, 28, 28, 0.15); /* Dark red */
   --color-bg-5: rgba(107, 33, 168, 0.15); /* Dark purple */
   --color-bg-6: rgba(194, 65, 12, 0.15); /* Dark orange */
@@ -265,7 +265,7 @@
   --focus-outline: 2px solid var(--color-primary);
   --status-bg-opacity: 0.15;
   --status-border-opacity: 0.25;
-  --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234a7c4e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 
   /* RGB versions for dark mode */
@@ -581,12 +581,12 @@ select.form-control {
 
 .status--success {
   background-color: rgba(
-    var(--color-success-rgb, 33, 128, 141),
+    var(--color-success-rgb, 123, 174, 127),
     var(--status-bg-opacity)
   );
   color: var(--color-success);
   border: 1px solid
-    rgba(var(--color-success-rgb, 33, 128, 141), var(--status-border-opacity));
+    rgba(var(--color-success-rgb, 123, 174, 127), var(--status-border-opacity));
 }
 
 .status--error {
@@ -3342,7 +3342,7 @@ select.form-control {
 .prep-usage-badge {
   font-size: 0.75rem;
   background: var(--primary-light, #e0f4f5);
-  color: var(--primary, #21808D);
+  color: var(--primary, #7BAE7F);
   border-radius: 99px;
   padding: 0.2rem 0.6rem;
   font-weight: 600;
@@ -3368,7 +3368,7 @@ select.form-control {
 .prep-check-row input[type="checkbox"] {
   margin-top: 0.15rem;
   flex-shrink: 0;
-  accent-color: var(--primary, #21808D);
+  accent-color: var(--primary, #7BAE7F);
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -3477,7 +3477,7 @@ select.form-control {
 .cost-summary-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--primary, #21808D);
+  color: var(--primary, #7BAE7F);
 }
 @media (max-width: 600px) {
   .cost-summary-bar { grid-template-columns: repeat(2, 1fr); }
@@ -3564,7 +3564,7 @@ select.form-control {
   font-size: 1.75rem;
   line-height: 1;
   cursor: pointer;
-  color: var(--color-primary, #21808D);
+  color: var(--color-primary, #7BAE7F);
   padding: 0 0.5rem;
   touch-action: manipulation;
 }
@@ -5218,7 +5218,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 /* "Start here" getting-started card (My Recipes tab, first-time users) */
 .gs-card {
   position: relative;
-  background: linear-gradient(135deg, rgba(var(--color-teal-500-rgb, 21,128,61), 0.08), rgba(var(--color-orange-500-rgb, 180,83,9), 0.06));
+  background: linear-gradient(135deg, rgba(var(--color-teal-500-rgb, 123,174,127), 0.08), rgba(var(--color-orange-500-rgb, 214,118,48), 0.06));
   border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 1rem 1.1rem;
