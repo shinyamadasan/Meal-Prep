@@ -3446,12 +3446,7 @@ function filterRecipesByNutrition() {
     });
   }
   
-  const missingCount = filteredRecipes.filter(r => !r.nutritionPerServing || r.nutritionPerServing.calories === 0).length;
-  const bulkBtn = missingCount > 0
-    ? `<div class="nutrition-bulk-action"><span>${missingCount} recipe${missingCount > 1 ? 's' : ''} missing nutrition data.</span> <button class="btn btn--secondary btn--sm" onclick="openMissingNutritionHelp()">How to add nutrition?</button></div>`
-    : '';
-
-  resultsContainer.innerHTML = bulkBtn + filteredRecipes.map(recipe => {
+  resultsContainer.innerHTML = filteredRecipes.map(recipe => {
     const nutrition = calculateRecipeNutrition(recipe);
     const perServing = {
       calories: Math.round(nutrition.calories / recipe.currentServings),
