@@ -2523,6 +2523,7 @@ function renderDashboard() {
           <button class="dash-action-btn" onclick="showTab('recipes'); setTimeout(openAddRecipeModal, 50)">${icon('plus')} Add Recipe</button>
           <button class="dash-action-btn" onclick="showTab('planner')">${icon('calendar-days')} Plan Week</button>
           <button class="dash-action-btn" onclick="showTab('grocery')">${icon('shopping-cart')} Grocery List</button>
+          <button class="dash-action-btn" onclick="showTab('fridge')">${icon('refrigerator')} My Fridge</button>
         </div>
       </div>
     </div>`;
