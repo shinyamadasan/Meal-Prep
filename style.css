@@ -5296,21 +5296,29 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .section-header { margin-bottom: 0.75rem; }
 
   /* Grocery list: dense layout so more items fit on screen */
-  .grocery-summary { padding: 0.5rem 1rem; margin-bottom: 0.75rem; }
-  .grocery-summary p { font-size: 0.8rem; margin: 0; }
   .cost-summary-bar { gap: 0.4rem; margin-bottom: 0.75rem; }
   .cost-summary-card { padding: 0.45rem 0.65rem; gap: 0.05rem; }
   .cost-summary-value { font-size: 0.95rem; }
   .cost-summary-label { font-size: 0.68rem; }
   .grocery-categories { gap: 0.6rem; }
   .grocery-category { padding: 0.6rem 0.75rem; }
-  .category-header { font-size: 0.875rem; margin-bottom: 0.4rem; padding-bottom: 0.35rem; }
-  .grocery-item { padding: 5px 6px; gap: 8px; }
+  /* Reset stacked flex back to inline row for category header */
+  .category-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.35rem;
+  }
+  .category-total { align-self: auto; }
+  /* Reset stacked flex back to inline row for grocery items */
+  .grocery-item { flex-direction: row; align-items: center; padding: 5px 6px; gap: 8px; }
+  .grocery-checkbox { width: 15px; height: 15px; flex-shrink: 0; transform: none; align-self: center; }
   .grocery-item-info { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .grocery-item-name { font-size: 0.875rem; margin-bottom: 0; flex: 1; }
   .ingredient-price { flex-shrink: 0; font-size: 0.8rem; }
   .grocery-item-source { display: none; }
-  .grocery-checkbox { width: 16px; height: 16px; }
 }
 
 /* Grocery print: a print-only area that replaces the page when printing.
