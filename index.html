@@ -46,7 +46,6 @@
                         <div id="user-info" class="user-info hidden">
                             <span id="sync-status" class="sync-status hidden"></span>
                             <span id="user-email"></span>
-                            <button class="btn btn--outline btn--sm" onclick="signOut()">Sign Out</button>
                         </div>
                         <div id="auth-buttons" class="auth-buttons">
                             <button class="btn btn--outline btn--sm" onclick="openLoginModal()">Sign In</button>
@@ -89,10 +88,10 @@
                                     <button onclick="importFromCSV()"><span class="ic" data-icon="clipboard-list"></span> Import CSV</button>
                                     <button onclick="restoreBackup()"><span class="ic" data-icon="undo-2"></span> Restore Backup</button>
                                     <button class="data-menu-danger" onclick="clearLocalStorage()"><span class="ic" data-icon="trash-2"></span> Clear All Data</button>
+                                    <div class="data-menu-sep"></div>
+                                    <button onclick="signOut()"><span class="ic" data-icon="log-out"></span> Sign Out</button>
                                 </div>
                             </div>
-                            <button class="btn btn--secondary" onclick="openSharedRecipesModal()" id="shared-recipes-btn" style="display: none;"><span class="ic" data-icon="globe"></span> Shared Recipes</button>
-                            <button class="btn btn--secondary" onclick="openFamilySharingModal()" id="family-sharing-btn" style="display: none;"><span class="ic" data-icon="users"></span> Family Sharing</button>
                             <button class="btn btn--secondary" onclick="openPasteRecipeModal()"><span class="ic" data-icon="square-pen"></span> Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>

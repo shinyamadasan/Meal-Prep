@@ -4587,7 +4587,7 @@ select.form-control {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  z-index: 50;
+  z-index: 200;
   min-width: 200px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -4614,6 +4614,7 @@ select.form-control {
 .data-menu-panel button:hover { background: var(--color-secondary); }
 .data-menu-panel .data-menu-danger { color: var(--color-error); }
 .data-menu-panel .data-menu-danger:hover { background: rgba(var(--color-error-rgb), 0.12); }
+.data-menu-sep { height: 1px; background: var(--color-border); margin: 0.25rem 0.35rem; }
 
 /* Sync-status badge in the header */
 .sync-status {
@@ -5220,7 +5221,8 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   /* Reclaim header vertical space on phones */
   .app-header { padding: 0.45rem 0; }
   .header-top { margin-bottom: 0.45rem; }
-  .app-title { font-size: 1.25rem; }
+  .app-title { display: none; }             /* name + logo hidden on mobile — saves ~40px */
+  #sync-status { display: none !important; } /* always-syncing badge irrelevant on mobile */
   #user-email { display: none; }            /* email not needed on mobile */
 
   /* Float the help "?" out of the cramped header into a bottom-right bubble */

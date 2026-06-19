@@ -202,6 +202,7 @@ var ICON_PATHS = {
   'banana': '<path d="M4 13c3.5-2 8-2 10 2a5.5 5.5 0 0 1 8 5" /> <path d="M5.15 17.89c5.52-1.52 8.65-6.89 7-12C11.55 4 11.5 2 13 2c3.22 0 5 5.5 5 8 0 6.5-4.2 12-10.49 12C5.11 22 2 22 2 20c0-1.5 1.14-1.55 3.15-2.11Z" />',
   'drumstick': '<path d="M15.4 15.63a7.875 6 135 1 1 6.23-6.23 4.5 3.43 135 0 0-6.23 6.23" /> <path d="m8.29 12.71-2.6 2.6a2.5 2.5 0 1 0-1.65 4.65A2.5 2.5 0 1 0 8.7 18.3l2.59-2.59" />',
   'citrus': '<path d="M21.66 17.67a1.08 1.08 0 0 1-.04 1.6A12 12 0 0 1 4.73 2.38a1.1 1.1 0 0 1 1.61-.04z" /> <path d="M19.65 15.66A8 8 0 0 1 8.35 4.34" /> <path d="m14 10-5.5 5.5" /> <path d="M14 17.85V10H6.15" />',
+  'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
 };
 function icon(name) {
   var p = ICON_PATHS[name];
@@ -3883,7 +3884,18 @@ function importData() {
 function toggleDataMenu(e) {
   if (e) e.stopPropagation();
   var panel = document.getElementById('data-menu-panel');
-  if (panel) panel.classList.toggle('hidden');
+  if (!panel) return;
+  var nowHidden = panel.classList.toggle('hidden');
+  if (!nowHidden) {
+    var btn = e && (e.currentTarget || e.target);
+    if (btn) {
+      var r = btn.getBoundingClientRect();
+      panel.style.position = 'fixed';
+      panel.style.top = (r.bottom + 4) + 'px';
+      panel.style.left = r.left + 'px';
+      panel.style.right = 'auto';
+    }
+  }
 }
 // Any click that reaches the document closes the menu. The toggle button calls
 // stopPropagation, so opening it doesn't immediately re-close.
