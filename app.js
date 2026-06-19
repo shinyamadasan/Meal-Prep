@@ -3907,6 +3907,10 @@ document.addEventListener('click', function () {
 
 // Settings modal
 function openSettingsModal() {
+  var moreMenu = document.querySelector('.tab-more-menu');
+  var moreBtn = document.querySelector('.tab-more-btn');
+  if (moreMenu) moreMenu.classList.add('hidden');
+  if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
   updateSettingsModal();
   document.getElementById('settings-modal').classList.remove('hidden');
 }

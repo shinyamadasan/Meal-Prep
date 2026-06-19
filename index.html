@@ -44,7 +44,6 @@
                     <div class="auth-section">
                         <span id="sync-status" class="sync-status hidden"></span>
                         <button class="help-btn" onclick="openHelpModal()" title="How to use this app" aria-label="How to use this app">?</button>
-                        <button class="settings-btn" onclick="openSettingsModal()" title="Settings" aria-label="Settings"><span class="ic" data-icon="settings"></span></button>
                         <!-- Hidden elements kept for updateAuthUI compatibility -->
                         <div id="user-info" class="hidden" style="display:none" aria-hidden="true"><span id="user-email"></span></div>
                         <div id="auth-buttons" class="hidden" style="display:none" aria-hidden="true"></div>
@@ -61,6 +60,8 @@
                         <div class="tab-more-menu hidden">
                             <button class="tab-btn" data-tab="ingredients">Price Book</button>
                             <button class="tab-btn" data-tab="hacks">Cooking Hacks</button>
+                            <div class="tab-more-sep"></div>
+                            <button class="tab-btn" onclick="openSettingsModal()"><span class="ic" data-icon="settings"></span> Settings</button>
                         </div>
                     </div>
                 </nav>

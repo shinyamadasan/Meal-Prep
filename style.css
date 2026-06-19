@@ -3569,19 +3569,10 @@ select.form-control {
 }
 
 @media (max-width: 768px) {
-  .mobile-day-nav { display: flex; }
-
-  /* Nav already shows the day name — hide it from the day header to avoid repetition */
-  .day-column.mobile-active .day-name { display: none; }
-
-  /* Hide all day columns except the active one */
-  .day-column { display: none; }
-  .day-column.mobile-active { display: block; }
-
-  /* Make the single visible day column full-width */
-  .meal-planner-grid {
-    grid-template-columns: 1fr !important;
-  }
+  /* All 7 days stacked vertically — users scroll the week instead of sliding */
+  .mobile-day-nav { display: none; }
+  .day-column { display: block; }
+  .meal-planner-grid { grid-template-columns: 1fr !important; }
 }
 
 /* â”€â”€ Pantry Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -5221,6 +5212,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .tab-more-menu.hidden { display: none; }
 .tab-more-menu .tab-btn { text-align: left; width: 100%; white-space: nowrap; }
+.tab-more-sep { height: 1px; background: var(--color-border); margin: 0.25rem 0; }
 
 /* "Start here" getting-started card (My Recipes tab, first-time users) */
 .gs-card {
@@ -5413,13 +5405,11 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* Planner: single-day view (with ‹ › nav) up to 1100px. The 7-day grid only fits
-   comfortably on wider screens; below that it overflowed in landscape. */
+/* Planner: single-column scroll view below 1100px (7-day grid only fits on wide screens) */
 @media (max-width: 1100px) {
-  .mobile-day-nav { display: flex; }
+  .mobile-day-nav { display: none; }
   .meal-planner-grid { grid-template-columns: 1fr; }
-  .day-column { display: none; }
-  .day-column.mobile-active { display: block; }
+  .day-column { display: block; }
 }
 
 /* Skeleton loading placeholders (shown until data renders) */
