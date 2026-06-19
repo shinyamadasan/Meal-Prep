@@ -4495,6 +4495,7 @@ function setupRealtimeListeners() {
         // Update UI
         renderRecipes();
         renderWeeklyPlanner();
+        renderGroceryList();
         renderStorageGuide();
         renderCookingHacks();
         renderCookedMeals();
