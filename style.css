@@ -1899,23 +1899,23 @@ select.form-control {
 }
 
 .meal-slot[data-meal="breakfast"] {
-  background: #FFF9E6;
-  border-color: #F4D03F;
+  background: rgba(244, 162, 97, 0.08);
+  border-color: rgba(244, 162, 97, 0.4);
 }
 
 .meal-slot[data-meal="lunch"] {
-  background: #E6F3FF;
-  border-color: #5DADE2;
+  background: rgba(123, 174, 127, 0.08);
+  border-color: rgba(123, 174, 127, 0.4);
 }
 
 .meal-slot[data-meal="dinner"] {
-  background: #FFE6CC;
-  border-color: #F39C12;
+  background: rgba(214, 118, 48, 0.08);
+  border-color: rgba(214, 118, 48, 0.4);
 }
 
 .meal-slot[data-meal="snacks"] {
-  background: #E8F5E8;
-  border-color: #58D68D;
+  background: rgba(123, 174, 127, 0.05);
+  border-color: rgba(123, 174, 127, 0.3);
 }
 
 .meal-slot:hover {
@@ -1932,27 +1932,27 @@ select.form-control {
 }
 
 .meal-slot.has-recipe[data-meal="breakfast"] {
-  background: linear-gradient(135deg, #F7DC6F, #F4D03F);
+  background: linear-gradient(135deg, rgba(244,162,97,0.22), rgba(214,118,48,0.18));
   color: var(--color-text);
-  border-color: #D4AC0D;
+  border-color: rgba(214, 118, 48, 0.55);
 }
 
 .meal-slot.has-recipe[data-meal="lunch"] {
-  background: linear-gradient(135deg, #85C1E9, #5DADE2);
+  background: linear-gradient(135deg, rgba(163,208,167,0.28), rgba(123,174,127,0.22));
   color: var(--color-text);
-  border-color: #2E86AB;
+  border-color: rgba(100, 149, 104, 0.55);
 }
 
 .meal-slot.has-recipe[data-meal="dinner"] {
-  background: linear-gradient(135deg, #F8C471, #F39C12);
+  background: linear-gradient(135deg, rgba(244,162,97,0.25), rgba(214,118,48,0.2));
   color: var(--color-text);
-  border-color: #D68910;
+  border-color: rgba(214, 118, 48, 0.6);
 }
 
 .meal-slot.has-recipe[data-meal="snacks"] {
-  background: linear-gradient(135deg, #82E0AA, #58D68D);
+  background: linear-gradient(135deg, rgba(163,208,167,0.22), rgba(123,174,127,0.18));
   color: var(--color-text);
-  border-color: #28B463;
+  border-color: rgba(123, 174, 127, 0.5);
 }
 
 .meal-slot-label {

@@ -2520,7 +2520,7 @@ function renderDashboard() {
       <div class="dash-card">
         <div class="dash-card-label">Quick Actions</div>
         <div class="dash-actions">
-          <button class="dash-action-btn" onclick="openAddRecipeModal()">${icon('plus')} Add Recipe</button>
+          <button class="dash-action-btn" onclick="showTab('recipes'); setTimeout(openAddRecipeModal, 50)">${icon('plus')} Add Recipe</button>
           <button class="dash-action-btn" onclick="showTab('planner')">${icon('calendar-days')} Plan Week</button>
           <button class="dash-action-btn" onclick="showTab('grocery')">${icon('shopping-cart')} Grocery List</button>
         </div>
