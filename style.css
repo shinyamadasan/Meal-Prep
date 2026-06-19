@@ -2,7 +2,7 @@
   /* Primitive Color Tokens */
   --color-white: rgba(255, 255, 255, 1);
   --color-black: rgba(0, 0, 0, 1);
-  --color-cream-50: rgba(247, 245, 240, 1);   /* warm off-white page bg */
+  --color-cream-50: rgba(250, 247, 242, 1);   /* warm off-white page bg #FAF7F2 */
   --color-cream-100: rgba(255, 255, 255, 1);  /* white card surface */
   --color-gray-200: rgba(245, 245, 245, 1);
   --color-gray-300: rgba(167, 169, 169, 1);
@@ -16,10 +16,10 @@
   --color-slate-900: rgba(28, 25, 23, 1);     /* near-black warm text */
   --color-teal-300: rgba(163, 208, 167, 1);   /* light sage (dark-mode primary) */
   --color-teal-400: rgba(123, 174, 127, 1);   /* medium sage */
-  --color-teal-500: rgba(77, 124, 82, 1);     /* sage green — primary */
-  --color-teal-600: rgba(61, 99, 65, 1);
-  --color-teal-700: rgba(47, 77, 51, 1);
-  --color-teal-800: rgba(61, 99, 65, 1);
+  --color-teal-500: rgba(123, 174, 127, 1);   /* sage green #7BAE7F — primary */
+  --color-teal-600: rgba(100, 149, 104, 1);   /* sage hover */
+  --color-teal-700: rgba(80, 120, 84, 1);     /* sage active */
+  --color-teal-800: rgba(100, 149, 104, 1);
   --color-red-400: rgba(255, 84, 89, 1);
   --color-red-500: rgba(192, 21, 47, 1);
   --color-orange-400: rgba(244, 162, 97, 1);  /* warm orange */
@@ -27,7 +27,7 @@
 
   /* RGB versions for opacity control */
   --color-brown-600-rgb: 94, 82, 64;
-  --color-teal-500-rgb: 77, 124, 82;
+  --color-teal-500-rgb: 123, 174, 127;
   --color-slate-900-rgb: 28, 25, 23;
   --color-slate-500-rgb: 120, 113, 108;
   --color-red-500-rgb: 192, 21, 47;
@@ -57,7 +57,7 @@
   --color-secondary-hover: rgba(var(--color-brown-600-rgb), 0.2);
   --color-secondary-active: rgba(var(--color-brown-600-rgb), 0.25);
   --color-border: rgba(var(--color-brown-600-rgb), 0.2);
-  --color-btn-primary-text: var(--color-cream-50);
+  --color-btn-primary-text: var(--color-charcoal-700);
   --color-card-border: rgba(var(--color-brown-600-rgb), 0.12);
   --color-card-border-inner: rgba(var(--color-brown-600-rgb), 0.12);
   --color-error: var(--color-red-500);
@@ -278,7 +278,7 @@
 [data-color-scheme="light"] {
   /* RGB versions for opacity control (light mode) */
   --color-brown-600-rgb: 94, 82, 64;
-  --color-teal-500-rgb: 33, 128, 141;
+  --color-teal-500-rgb: 123, 174, 127;
   --color-slate-900-rgb: 19, 52, 59;
 
   /* Semantic Color Tokens (Light Mode) */
@@ -293,7 +293,7 @@
   --color-secondary-hover: rgba(var(--color-brown-600-rgb), 0.2);
   --color-secondary-active: rgba(var(--color-brown-600-rgb), 0.25);
   --color-border: rgba(var(--color-brown-600-rgb), 0.2);
-  --color-btn-primary-text: var(--color-cream-50);
+  --color-btn-primary-text: var(--color-charcoal-700);
   --color-card-border: rgba(var(--color-brown-600-rgb), 0.12);
   --color-card-border-inner: rgba(var(--color-brown-600-rgb), 0.12);
   --color-error: var(--color-red-500);
