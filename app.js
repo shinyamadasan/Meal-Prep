@@ -1554,7 +1554,7 @@ function openAddRecipeModal() {
 }
 
 function updateServingSize(recipeId, newServings) {
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe || newServings < 1) return;
   
   recipe.currentServings = newServings;
@@ -1564,7 +1564,7 @@ function updateServingSize(recipeId, newServings) {
 }
 
 function resetServingSize(recipeId) {
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
   
   recipe.currentServings = recipe.baseServings;
@@ -1574,7 +1574,7 @@ function resetServingSize(recipeId) {
 }
 
 function openEditRecipeModal(recipeId) {
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
   
   AppState.currentEditingRecipe = recipeId;
@@ -2081,7 +2081,7 @@ function renderWeeklyPlanner() {
 
         if (hasRecipe) {
           const recipeId = meal === 'snacks' ? mealData[0] : mealData;
-          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
           if (recipe) {
             const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
             const expired = willExpire(recipe, day);
@@ -2131,7 +2131,7 @@ function renderStorageAlerts() {
   days.forEach(day => {
     const plan = AppState.weeklyPlan[day];
     const check = id => {
-      const recipe = AppState.recipes.find(r => r.id === id);
+      const recipe = AppState.recipes.find(r => String(r.id) === String(id));
       if (recipe && willExpire(recipe, day)) {
         issues.push(`<strong>${recipe.name}</strong> on ${day} (fridge life: ${recipe.fridgeLife}d, stored ${DAY_FRIDGE_INDEX[day]}d by then)`);
       }
@@ -2360,7 +2360,7 @@ function selectRecipeForPlanning(recipeId) {
 }
 
 function getRecipeName(recipeId) {
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   return recipe ? recipe.name : 'Unknown Recipe';
 }
 
@@ -2386,7 +2386,7 @@ function updateWeeklyStats() {
       
       if (meal === 'snacks') {
         mealData.forEach(recipeId => {
-          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
           if (recipe) {
             const scale = recipe.currentServings / recipe.baseServings;
             totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
@@ -2395,7 +2395,7 @@ function updateWeeklyStats() {
           }
         });
       } else if (mealData) {
-        const recipe = AppState.recipes.find(r => r.id === mealData);
+        const recipe = AppState.recipes.find(r => String(r.id) === String(mealData));
         if (recipe) {
           const scale = recipe.currentServings / recipe.baseServings;
           totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
@@ -2452,7 +2452,7 @@ function generateGroceryList() {
 }
 
 function addRecipeIngredients(recipeId, ingredients) {
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
   
   const recipeIngredients = recipe.baseIngredients || recipe.ingredients;
@@ -2971,12 +2971,12 @@ function renderWeeklyCostSummary() {
   Object.values(AppState.weeklyPlan).forEach(day => {
     ['breakfast', 'lunch', 'dinner'].forEach(meal => {
       if (day[meal]) {
-        const recipe = AppState.recipes.find(r => r.id === day[meal]);
+        const recipe = AppState.recipes.find(r => String(r.id) === String(day[meal]));
         if (recipe) { totalCost += calculateRecipeCost(recipe); mealCount++; }
       }
     });
     (day.snacks || []).forEach(id => {
-      const recipe = AppState.recipes.find(r => r.id === id);
+      const recipe = AppState.recipes.find(r => String(r.id) === String(id));
       if (recipe) { totalCost += calculateRecipeCost(recipe); mealCount++; }
     });
   });
@@ -3152,7 +3152,7 @@ function openMissingNutritionHelp() {
 function calculateDayNutrition(dayPlan) {
   const totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
   const addRecipe = id => {
-    const recipe = AppState.recipes.find(r => r.id === id);
+    const recipe = AppState.recipes.find(r => String(r.id) === String(id));
     if (!recipe) return;
     const n = calculateRecipeNutrition(recipe);
     totals.calories += n.calories;
@@ -3271,7 +3271,7 @@ function calculateWeeklyNutrition() {
       
       if (meal === 'snacks') {
         mealData.forEach(recipeId => {
-          const recipe = AppState.recipes.find(r => r.id === recipeId);
+          const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
           if (recipe) {
             const nutrition = calculateRecipeNutrition(recipe);
             weeklyTotal.calories += nutrition.calories;
@@ -3283,7 +3283,7 @@ function calculateWeeklyNutrition() {
           }
         });
       } else if (mealData) {
-        const recipe = AppState.recipes.find(r => r.id === mealData);
+        const recipe = AppState.recipes.find(r => String(r.id) === String(mealData));
         if (recipe) {
           const nutrition = calculateRecipeNutrition(recipe);
           weeklyTotal.calories += nutrition.calories;
@@ -4399,7 +4399,7 @@ async function shareRecipe() {
     return;
   }
   
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) {
     showErrorMessage('Recipe not found');
     return;
@@ -4604,7 +4604,7 @@ async function shareRecipe() {
     return;
   }
   
-  const recipe = AppState.recipes.find(r => r.id === recipeId);
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) {
     showErrorMessage('Recipe not found');
     return;
