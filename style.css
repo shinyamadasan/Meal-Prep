@@ -2347,7 +2347,8 @@ select.form-control {
   color: var(--color-primary);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-base);
-  float: right;
+  float: none;
+  flex-shrink: 0;
 }
 
 .recipe-highlights {
@@ -5289,6 +5290,10 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .app-title { display: none; }             /* name + logo hidden on mobile — saves ~40px */
   #sync-status { display: none !important; } /* always-syncing badge irrelevant on mobile */
   #user-email { display: none; }            /* email not needed on mobile */
+
+  /* Reduce the 32px top gap below the nav on phones */
+  .app-main { padding: 0.6rem 0 1.5rem; }
+  .section-header { margin-bottom: 0.75rem; }
 
   /* Grocery list: dense layout so more items fit on screen */
   .grocery-summary { padding: 0.5rem 1rem; margin-bottom: 0.75rem; }

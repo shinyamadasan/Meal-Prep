@@ -3010,10 +3010,6 @@ function renderWeeklyCostSummary() {
         <span class="cost-summary-label">Avg per Meal</span>
         <span class="cost-summary-value">₱${Math.round(perMeal).toLocaleString()}</span>
       </div>
-      <div class="cost-summary-card">
-        <span class="cost-summary-label">Meals Planned</span>
-        <span class="cost-summary-value">${mealCount}</span>
-      </div>
     </div>`;
 }
 
