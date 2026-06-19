@@ -5316,3 +5316,33 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .recipe-details-toggle:hover { background: var(--color-bg-1); }
 .recipe-details.hidden { display: none; }
+
+/* ── Micro-animations: subtle motion for a more premium feel ─────────────── */
+@keyframes mp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mp-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Tab switch: gentle fade of the newly-active panel */
+.tab-content.active { animation: mp-fade-in 0.22s ease; }
+
+/* Modals: backdrop fade + content rises in */
+.modal:not(.hidden) { animation: mp-fade-in 0.16s ease; }
+.modal:not(.hidden) .modal-content { animation: mp-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Reveals (recipe details, pantry guide, More menu) */
+.recipe-details:not(.hidden),
+.pt-detail:not(.hidden) { animation: mp-fade-in 0.18s ease; }
+.tab-more-menu:not(.hidden) { animation: mp-rise 0.14s ease; }
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* Planner: single-day view (with ‹ › nav) up to 1100px. The 7-day grid only fits
+   comfortably on wider screens; below that it overflowed in landscape. */
+@media (max-width: 1100px) {
+  .mobile-day-nav { display: flex; }
+  .meal-planner-grid { grid-template-columns: 1fr; }
+  .day-column { display: none; }
+  .day-column.mobile-active { display: block; }
+}
