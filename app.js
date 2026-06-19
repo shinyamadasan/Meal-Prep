@@ -3763,7 +3763,6 @@ window.clearLocalStorage = clearLocalStorage;
 // These were missing — caused dark mode, pantry, auth, and export buttons to silently do nothing
 window.toggleDarkMode = toggleDarkMode;
 window.addToPantry = addToPantry;
-window.quickAddPantry = quickAddPantry;
 window.togglePantrySection = togglePantrySection;
 window.togglePantryCard = togglePantryCard;
 window.removeFromPantry = removeFromPantry;
@@ -5819,37 +5818,10 @@ function isInPantry(name) {
 // Common household staples for one-tap pantry adding (PH context).
 var COMMON_PANTRY_STAPLES = ['Rice', 'Garlic', 'Onion', 'Cooking Oil', 'Soy Sauce', 'Fish Sauce', 'Vinegar', 'Salt', 'Sugar', 'Black Pepper', 'Eggs', 'Ginger'];
 
-function renderPantryQuickAdd() {
-  var el = document.getElementById('pantry-quick-add');
-  if (!el) return;
-  var have = {};
-  (AppState.pantry || []).forEach(function(p) { have[p.name.toLowerCase()] = true; });
-  var chips = COMMON_PANTRY_STAPLES.filter(function(n) { return !have[n.toLowerCase()]; });
-  el.innerHTML = chips.length === 0 ? '' :
-    '<span class="pantry-quick-label">Quick add:</span>' +
-    chips.map(function(n) {
-      return '<button class="pantry-quick-chip" onclick="quickAddPantry(\'' + escJ(n) + '\')">+ ' + escapeHtml(n) + '</button>';
-    }).join('');
-}
-
-function quickAddPantry(name) {
-  if (AppState.pantry.some(function(p) { return p.name.toLowerCase() === name.toLowerCase(); })) return;
-  var category = inferCategory(name);
-  AppState.pantry.push({
-    id: Date.now() + Math.random(),
-    name: name,
-    category: category,
-    purchaseDate: todayISO(),
-    shelfLifeDays: categoryShelfLife(category)
-  });
-  saveData();
-  renderPantry();
-}
 
 function renderPantry() {
   const list = document.getElementById('pantry-list');
   const count = document.getElementById('pantry-count');
-  renderPantryQuickAdd();
   if (!list) return;
 
   const n = AppState.pantry.length;
@@ -6054,11 +6026,7 @@ function togglePantryGuide(safeId) {
 // sets the stock they have instead of typing each item. Deterministic ids mean
 // two devices seeding won't create duplicates (the cloud merge dedupes by id).
 function seedPantryIfEmpty() {
-  try { if (localStorage.getItem('mealPrepPantrySeeded')) return; } catch (e) {}
-  if ((AppState.pantry || []).length > 0) {
-    try { localStorage.setItem('mealPrepPantrySeeded', '1'); } catch (e) {}
-    return;
-  }
+  if ((AppState.pantry || []).length > 0) return;
   COMMON_PANTRY_STAPLES.forEach(function(name) {
     var category = inferCategory(name);
     AppState.pantry.push({
@@ -6070,7 +6038,6 @@ function seedPantryIfEmpty() {
       quantity: null
     });
   });
-  try { localStorage.setItem('mealPrepPantrySeeded', '1'); } catch (e) {}
   saveData();
 }
 
