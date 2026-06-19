@@ -42,15 +42,12 @@
                 <div class="header-top">
                     <h1 class="app-title"><svg class="lc-icon app-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/></svg> Meal Prep Planner</h1>
                     <div class="auth-section">
+                        <span id="sync-status" class="sync-status hidden"></span>
                         <button class="help-btn" onclick="openHelpModal()" title="How to use this app" aria-label="How to use this app">?</button>
-                        <div id="user-info" class="user-info hidden">
-                            <span id="sync-status" class="sync-status hidden"></span>
-                            <span id="user-email"></span>
-                        </div>
-                        <div id="auth-buttons" class="auth-buttons">
-                            <button class="btn btn--outline btn--sm" onclick="openLoginModal()">Sign In</button>
-                            <button class="btn btn--primary btn--sm" onclick="openSignupModal()">Sign Up</button>
-                        </div>
+                        <button class="settings-btn" onclick="openSettingsModal()" title="Settings" aria-label="Settings"><span class="ic" data-icon="settings"></span></button>
+                        <!-- Hidden elements kept for updateAuthUI compatibility -->
+                        <div id="user-info" class="hidden" style="display:none" aria-hidden="true"><span id="user-email"></span></div>
+                        <div id="auth-buttons" class="hidden" style="display:none" aria-hidden="true"></div>
                     </div>
                 </div>
                 <nav class="tab-nav">
@@ -80,18 +77,6 @@
                     <div class="section-header">
                         <h2>My Recipes</h2>
                         <div class="header-actions">
-                            <div class="data-menu">
-                                <button class="btn btn--secondary" onclick="toggleDataMenu(event)">⋯ Data</button>
-                                <div class="data-menu-panel hidden" id="data-menu-panel">
-                                    <button onclick="exportData()"><span class="ic" data-icon="download"></span> Export Data</button>
-                                    <button onclick="importData()"><span class="ic" data-icon="upload"></span> Import Data</button>
-                                    <button onclick="importFromCSV()"><span class="ic" data-icon="clipboard-list"></span> Import CSV</button>
-                                    <button onclick="restoreBackup()"><span class="ic" data-icon="undo-2"></span> Restore Backup</button>
-                                    <button class="data-menu-danger" onclick="clearLocalStorage()"><span class="ic" data-icon="trash-2"></span> Clear All Data</button>
-                                    <div class="data-menu-sep"></div>
-                                    <button onclick="signOut()"><span class="ic" data-icon="log-out"></span> Sign Out</button>
-                                </div>
-                            </div>
                             <button class="btn btn--secondary" onclick="openPasteRecipeModal()"><span class="ic" data-icon="square-pen"></span> Paste Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>
@@ -1122,6 +1107,54 @@
             </div>
         </div>
     </div>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-section-label">Account</p>
+                <div id="settings-signed-in" class="hidden">
+                    <div class="settings-row settings-row--info">
+                        <span class="ic" data-icon="mail"></span>
+                        <span id="settings-user-email"></span>
+                    </div>
+                    <button class="settings-row settings-row--danger" onclick="signOut(); closeSettingsModal()">
+                        <span class="ic" data-icon="log-out"></span> Sign Out
+                    </button>
+                </div>
+                <div id="settings-signed-out">
+                    <button class="settings-row" onclick="closeSettingsModal(); setTimeout(openLoginModal, 80)">
+                        Sign in to sync your data across devices
+                    </button>
+                    <button class="settings-row settings-row--primary" onclick="closeSettingsModal(); setTimeout(openSignupModal, 80)">
+                        Create a free account
+                    </button>
+                </div>
+
+                <p class="settings-section-label">Data</p>
+                <button class="settings-row" onclick="exportData()">
+                    <span class="ic" data-icon="download"></span> Export Data
+                </button>
+                <button class="settings-row" onclick="importData()">
+                    <span class="ic" data-icon="upload"></span> Import Data
+                </button>
+                <button class="settings-row" onclick="importFromCSV()">
+                    <span class="ic" data-icon="clipboard-list"></span> Import CSV
+                </button>
+                <button class="settings-row" onclick="restoreBackup()">
+                    <span class="ic" data-icon="undo-2"></span> Restore Backup
+                </button>
+                <div class="settings-sep"></div>
+                <button class="settings-row settings-row--danger" onclick="clearLocalStorage()">
+                    <span class="ic" data-icon="trash-2"></span> Clear All Data
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {});

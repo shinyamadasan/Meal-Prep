@@ -203,6 +203,7 @@ var ICON_PATHS = {
   'drumstick': '<path d="M15.4 15.63a7.875 6 135 1 1 6.23-6.23 4.5 3.43 135 0 0-6.23 6.23" /> <path d="m8.29 12.71-2.6 2.6a2.5 2.5 0 1 0-1.65 4.65A2.5 2.5 0 1 0 8.7 18.3l2.59-2.59" />',
   'citrus': '<path d="M21.66 17.67a1.08 1.08 0 0 1-.04 1.6A12 12 0 0 1 4.73 2.38a1.1 1.1 0 0 1 1.61-.04z" /> <path d="M19.65 15.66A8 8 0 0 1 8.35 4.34" /> <path d="m14 10-5.5 5.5" /> <path d="M14 17.85V10H6.15" />',
   'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  'settings': '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
 };
 function icon(name) {
   var p = ICON_PATHS[name];
@@ -3904,6 +3905,31 @@ document.addEventListener('click', function () {
   if (panel) panel.classList.add('hidden');
 });
 
+// Settings modal
+function openSettingsModal() {
+  updateSettingsModal();
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function closeSettingsModal() {
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+function updateSettingsModal() {
+  var signedIn = document.getElementById('settings-signed-in');
+  var signedOut = document.getElementById('settings-signed-out');
+  var emailEl = document.getElementById('settings-user-email');
+  if (!signedIn || !signedOut) return;
+  if (AppState.currentUser) {
+    if (emailEl) emailEl.textContent = AppState.currentUser.email;
+    signedIn.classList.remove('hidden');
+    signedOut.classList.add('hidden');
+  } else {
+    signedIn.classList.add('hidden');
+    signedOut.classList.remove('hidden');
+  }
+}
+
+window.openSettingsModal = openSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
 window.exportData = exportData;
 window.importData = importData;
 window.restoreBackup = restoreBackup;
@@ -4003,6 +4029,7 @@ function updateAuthUI() {
   }
   renderVerificationBanner();
   updateSyncIndicator();
+  updateSettingsModal();
 }
 
 // Shows a banner while signed in with an unverified email. Core app stays
