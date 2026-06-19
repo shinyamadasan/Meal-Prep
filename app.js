@@ -1782,6 +1782,18 @@ function handleRecipeCardClick(e, id) {
 }
 window.handleRecipeCardClick = handleRecipeCardClick;
 
+// Expand/collapse a recipe card's ingredients + instructions.
+function toggleRecipeDetails(e) {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  const details = btn.nextElementSibling;
+  if (!details) return;
+  const nowHidden = details.classList.toggle('hidden');
+  btn.setAttribute('aria-expanded', String(!nowHidden));
+  btn.innerHTML = nowHidden ? 'Ingredients &amp; steps ▾' : 'Hide details ▴';
+}
+window.toggleRecipeDetails = toggleRecipeDetails;
+
 // Generic "click card to edit" — runs editFn(id) unless an inner control was clicked.
 function handleCardEdit(e, editFn, id) {
   if (e.target.closest('button, input, select, a')) return;
@@ -1988,30 +2000,32 @@ function renderRecipes() {
       </div>
       ` : ''}
       
-      <!-- Scaled Ingredients -->
-      <div class="recipe-ingredients">
-        <h4>Ingredients:</h4>
-        <ul>
-          ${(recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
-            const scaledQty = calculateScaledQuantity(recipe, ingredient);
-            const baseQty = ingredient.baseQuantity || ingredient.quantity;
-            
-            return `
-              <li class="ingredient-quantity">
-                ${isScaled ? `
-                  <span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
-                  <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>
-                ` : `
-                  <span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>
-                `}
-              </li>
-            `;
-          }).join('')}
-        </ul>
+      <!-- Ingredients + instructions: collapsed by default so the grid stays scannable -->
+      <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false">Ingredients &amp; steps ▾</button>
+      <div class="recipe-details hidden">
+        <div class="recipe-ingredients">
+          <h4>Ingredients:</h4>
+          <ul>
+            ${(recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
+              const scaledQty = calculateScaledQuantity(recipe, ingredient);
+              const baseQty = ingredient.baseQuantity || ingredient.quantity;
+
+              return `
+                <li class="ingredient-quantity">
+                  ${isScaled ? `
+                    <span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
+                    <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>
+                  ` : `
+                    <span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>
+                  `}
+                </li>
+              `;
+            }).join('')}
+          </ul>
+        </div>
+        <p><strong>Instructions:</strong> ${recipe.instructions}</p>
       </div>
-      
-      <p><strong>Instructions:</strong> ${recipe.instructions}</p>
-      
+
       <div class="recipe-actions">
         <button class="btn btn--primary btn--sm" onclick="markRecipeCooked('${recipe.id}')" title="Track this in your fridge/freezer">✓ Cooked</button>
         <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Edit</button>

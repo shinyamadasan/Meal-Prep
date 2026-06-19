@@ -5298,3 +5298,21 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   letter-spacing: 0.03em;
 }
 .week-stats--compact .stat-value { font-size: 1rem; }
+
+/* Collapsible ingredients/instructions on recipe cards (keeps the grid short) */
+.recipe-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.4rem 0;
+  padding: 0.35rem 0.6rem;
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recipe-details-toggle:hover { background: var(--color-bg-1); }
+.recipe-details.hidden { display: none; }
