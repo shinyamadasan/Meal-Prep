@@ -2434,8 +2434,8 @@ function renderDashboard() {
 
   const hour = new Date().getHours();
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  let name = '';
-  if (AppState.currentUser) {
+  let name = getDisplayName();
+  if (!name && AppState.currentUser) {
     const dn = AppState.currentUser.displayName;
     const em = AppState.currentUser.email || '';
     const raw = dn || em.split('@')[0] || '';
@@ -4016,11 +4016,23 @@ function openSettingsModal() {
 function closeSettingsModal() {
   document.getElementById('settings-modal').classList.add('hidden');
 }
+function saveDisplayName(value) {
+  var name = value.trim();
+  if (name) localStorage.setItem('mealPrepDisplayName', name);
+  else localStorage.removeItem('mealPrepDisplayName');
+}
+
+function getDisplayName() {
+  return localStorage.getItem('mealPrepDisplayName') || '';
+}
+
 function updateSettingsModal() {
   var signedIn = document.getElementById('settings-signed-in');
   var signedOut = document.getElementById('settings-signed-out');
   var emailEl = document.getElementById('settings-user-email');
+  var nameInput = document.getElementById('settings-display-name');
   if (!signedIn || !signedOut) return;
+  if (nameInput) nameInput.value = getDisplayName();
   if (AppState.currentUser) {
     if (emailEl) emailEl.textContent = AppState.currentUser.email;
     signedIn.classList.remove('hidden');
@@ -4033,6 +4045,7 @@ function updateSettingsModal() {
 
 window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
+window.saveDisplayName = saveDisplayName;
 window.exportData = exportData;
 window.importData = importData;
 window.restoreBackup = restoreBackup;

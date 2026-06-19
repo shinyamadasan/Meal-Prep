@@ -1115,6 +1115,11 @@
                 <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
             </div>
             <div class="modal-body">
+                <p class="settings-section-label">Your Name</p>
+                <div class="settings-name-row">
+                    <input type="text" id="settings-display-name" class="settings-name-input" placeholder="e.g. Hashin" maxlength="40" oninput="saveDisplayName(this.value)">
+                </div>
+
                 <p class="settings-section-label">Account</p>
                 <div id="settings-signed-in" class="hidden">
                     <div class="settings-row settings-row--info">
