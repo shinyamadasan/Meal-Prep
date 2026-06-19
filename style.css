@@ -5346,3 +5346,23 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .day-column { display: none; }
   .day-column.mobile-active { display: block; }
 }
+
+/* Skeleton loading placeholders (shown until data renders) */
+.skeleton-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border, var(--color-border));
+  border-radius: var(--radius-lg);
+  padding: var(--space-20);
+}
+.sk {
+  background: linear-gradient(90deg, var(--color-bg-1) 25%, var(--color-secondary) 37%, var(--color-bg-1) 63%);
+  background-size: 400% 100%;
+  animation: sk-shimmer 1.4s ease infinite;
+  border-radius: 8px;
+}
+.sk-photo { height: 160px; margin-bottom: 1rem; }
+.sk-line { height: 14px; margin: 0.5rem 0; }
+.sk-line--lg { height: 20px; width: 70%; }
+.sk-line--sm { width: 40%; }
+@keyframes sk-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }

@@ -119,7 +119,12 @@
                         </select>
                     </div>
 
-                    <div id="recipes-grid" class="recipes-grid"></div>
+                    <div id="recipes-grid" class="recipes-grid">
+                        <!-- Skeleton placeholders shown until recipes load (replaced by renderRecipes) -->
+                        <div class="skeleton-card"><div class="sk sk-photo"></div><div class="sk sk-line sk-line--lg"></div><div class="sk sk-line"></div><div class="sk sk-line sk-line--sm"></div></div>
+                        <div class="skeleton-card"><div class="sk sk-photo"></div><div class="sk sk-line sk-line--lg"></div><div class="sk sk-line"></div><div class="sk sk-line sk-line--sm"></div></div>
+                        <div class="skeleton-card"><div class="sk sk-photo"></div><div class="sk sk-line sk-line--lg"></div><div class="sk sk-line"></div><div class="sk sk-line sk-line--sm"></div></div>
+                    </div>
 
                     <!-- Add Recipe Modal -->
                     <div id="recipe-modal" class="modal hidden">
