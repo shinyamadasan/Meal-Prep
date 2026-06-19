@@ -5866,8 +5866,8 @@ function renderPantry() {
     // Countable items: a numeric stock + unit.
     var stockCell;
     if (staple) {
-      var lvl = p.stockLevel || 'ok';
-      var lblMap = { full: 'Full', ok: 'OK', low: 'Low' };
+      var lvl = p.stockLevel || 'empty';
+      var lblMap = { empty: '—', full: 'Full', ok: 'OK', low: 'Low' };
       stockCell = '<button class="pt-level pt-level--' + lvl + '" onclick="cycleStapleLevel(\'' + p.id + '\')" title="Tap to change: Full → OK → Low">' + lblMap[lvl] + '</button>';
     } else {
       stockCell = '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '');
@@ -5961,8 +5961,8 @@ function syncStapleToGrocery(p) {
 function cycleStapleLevel(id) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
-  var order = ['full', 'ok', 'low'];
-  p.stockLevel = order[(order.indexOf(p.stockLevel || 'ok') + 1) % order.length];
+  var order = ['empty', 'full', 'ok', 'low'];
+  p.stockLevel = order[(order.indexOf(p.stockLevel || 'empty') + 1) % order.length];
   syncStapleToGrocery(p);
   saveData();
   renderPantry();
@@ -6030,7 +6030,8 @@ function seedPantryIfEmpty() {
       category: category,
       purchaseDate: null,
       shelfLifeDays: categoryShelfLife(category),
-      quantity: null
+      quantity: null,
+      stockLevel: 'empty'
     });
   });
   saveData();

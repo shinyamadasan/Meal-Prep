@@ -5043,6 +5043,7 @@ select.form-control {
 
 /* Staple Low/OK/Full level selector (pantry table) */
 .pt-level { font-weight: 600; }
+.pt-level--empty { color: var(--color-text-secondary); border-color: var(--color-border); }
 .pt-level--full { color: var(--color-success); }
 .pt-level--ok { color: var(--color-text); }
 .pt-level--low { color: var(--color-error); border-color: var(--color-error); }
@@ -5078,6 +5079,7 @@ button.pt-level {
   background: var(--color-surface);
 }
 button.pt-level:hover { filter: brightness(0.97); }
+button.pt-level.pt-level--empty { color: var(--color-text-secondary); border-color: var(--color-border); }
 button.pt-level.pt-level--full { color: var(--color-success); border-color: var(--color-success); }
 button.pt-level.pt-level--ok { color: var(--color-text); }
 button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--color-error); }
