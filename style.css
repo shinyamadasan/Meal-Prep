@@ -5801,6 +5801,12 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .dash-cook-name { font-size: 0.88rem; font-weight: 500; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cook-meta { font-size: 0.7rem; color: var(--color-text-secondary); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 .dash-cook-full { font-size: 0.7rem; color: var(--color-primary); font-weight: 650; white-space: nowrap; flex-shrink: 0; }
+.dash-cook-tier { margin-top: 0.5rem; }
+.dash-cook-tier:first-child { margin-top: 0; }
+.dash-cook-tier-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.2rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--color-border); }
+.dash-cook-tier--ready .dash-cook-tier-label { color: var(--color-primary); }
+.dash-cook-tier--one .dash-cook-tier-label { color: #b45309; }
+.dash-cook-tier--two .dash-cook-tier-label { color: var(--color-text-secondary); }
 .dash-buy-row {
   display: flex;
   align-items: center;
@@ -5938,6 +5944,19 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   background: rgba(var(--color-teal-500-rgb, 45, 157, 120), 0.12);
   color: var(--color-primary);
 }
+.cs-badge--one {
+  background: rgba(180, 83, 9, 0.1);
+  color: #b45309;
+}
+.cs-badge--two {
+  background: var(--color-surface-2, #f3f4f6);
+  color: var(--color-text-secondary);
+}
+.cs-tier { margin-bottom: 0.75rem; }
+.cs-tier:last-child { margin-bottom: 0; }
+.cs-tier-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-secondary); margin-bottom: 0.4rem; }
+.cs-tier--ready .cs-tier-label { color: var(--color-primary); }
+.cs-tier--one .cs-tier-label { color: #b45309; }
 
 @media (max-width: 768px) {
   .cs-cards { gap: 0.4rem; }

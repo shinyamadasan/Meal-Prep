@@ -1873,27 +1873,33 @@ function renderCookSuggestions() {
   if (!el) return;
 
   var cookable = getCookableRecipes();
-  if (cookable.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
+  if (cookable.length === 0) { el.innerHTML = ''; return; }
 
-  var cards = cookable.map(function(s) {
-    var missing = s.total - s.matched;
-    var badge = missing === 0
-      ? '<span class="cs-badge cs-badge--full">All ingredients ✓</span>'
-      : '<span class="cs-badge">Missing ' + missing + '</span>';
-    return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
-      escapeHtml(s.recipe.name).replace(/'/g, "\\'") + '\';renderRecipes()">' +
-      '<span class="cs-name">' + escapeHtml(s.recipe.name) + '</span>' +
-      badge +
-      '</button>';
+  var csTiers = [
+    { key: 0, label: 'Can cook now', tierCls: 'cs-tier--ready', badgeCls: 'cs-badge--full', badgeText: 'All ingredients ✓' },
+    { key: 1, label: 'Missing 1 ingredient', tierCls: 'cs-tier--one', badgeCls: 'cs-badge--one', badgeText: 'Missing 1' },
+    { key: 2, label: 'Missing 2 ingredients', tierCls: 'cs-tier--two', badgeCls: 'cs-badge--two', badgeText: 'Missing 2' }
+  ];
+
+  var sections = csTiers.map(function(tier) {
+    var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 4);
+    if (!items.length) return '';
+    var cards = items.map(function(s) {
+      return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
+        escapeHtml(s.recipe.name).replace(/'/g, "\\'") + '\';renderRecipes()">' +
+        '<span class="cs-name">' + escapeHtml(s.recipe.name) + '</span>' +
+        '<span class="cs-badge ' + tier.badgeCls + '">' + tier.badgeText + '</span>' +
+        '</button>';
+    }).join('');
+    return '<div class="cs-tier ' + tier.tierCls + '">' +
+      '<div class="cs-tier-label">' + tier.label + '</div>' +
+      '<div class="cs-cards">' + cards + '</div>' +
+      '</div>';
   }).join('');
 
   el.innerHTML = '<div class="cook-suggestions">' +
     '<div class="cs-label">' + icon('chef-hat') + ' Based on what\'s in your kitchen</div>' +
-    '<div class="cs-cards">' + cards + '</div>' +
-    '</div>';
+    sections + '</div>';
 }
 
 function renderRecipes() {
@@ -2458,8 +2464,9 @@ function updateWeeklyStats() {
   document.getElementById('planned-meals').textContent = plannedMeals;
 }
 
-// Returns up to 3 recipes the user can cook based on current pantry contents.
-// A recipe qualifies if ≥50% of its ingredients are in the pantry (min 2 matches).
+// Returns recipes grouped by how many ingredients are missing from the pantry.
+// Tiers: missing 0 (can cook now), missing 1, missing 2. Requires ≥2 ingredients
+// and at least 1 pantry match so noise recipes don't appear.
 function getCookableRecipes() {
   if (!AppState.pantry.length || !AppState.recipes.length) return [];
   var pantryNames = AppState.pantry.map(function(p) { return p.name.toLowerCase().trim(); });
@@ -2469,19 +2476,19 @@ function getCookableRecipes() {
     return pantryNames.some(function(pn) { return n.includes(pn) || pn.includes(n); });
   }
 
-  var scored = [];
+  var results = [];
   AppState.recipes.forEach(function(recipe) {
     var ings = recipe.baseIngredients || [];
-    if (ings.length === 0) return;
+    if (ings.length < 2) return;
     var matched = 0;
     ings.forEach(function(ing) { if (pantryHas(ing.name)) matched++; });
-    scored.push({ recipe: recipe, matched: matched, total: ings.length, pct: matched / ings.length });
+    var missing = ings.length - matched;
+    if (missing <= 2 && matched >= 1) {
+      results.push({ recipe: recipe, matched: matched, total: ings.length, missing: missing });
+    }
   });
 
-  return scored
-    .filter(function(s) { return s.pct >= 0.5 && s.matched >= 2; })
-    .sort(function(a, b) { return b.pct - a.pct || b.matched - a.matched; })
-    .slice(0, 3);
+  return results.sort(function(a, b) { return a.missing - b.missing || b.matched - a.matched; });
 }
 
 function renderDashboard() {
@@ -2581,15 +2588,25 @@ function renderDashboard() {
   } else if (cookable.length === 0) {
     cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Cook →</button></div>';
   } else {
-    cookPane = cookable.map(function(s) {
-      var missing = s.total - s.matched;
-      var meta = missing === 0
-        ? '<span class="dash-cook-full">All ingredients ✓</span>'
-        : '<span class="dash-cook-meta">' + s.matched + '/' + s.total + ' · missing ' + missing + '</span>';
-      return '<div class="dash-cook-row">' +
-        '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
-          '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
-        '</button></div>';
+    var cookTiers = [
+      { key: 0, label: 'Can cook now', cls: 'dash-cook-tier--ready' },
+      { key: 1, label: 'Missing 1 ingredient', cls: 'dash-cook-tier--one' },
+      { key: 2, label: 'Missing 2 ingredients', cls: 'dash-cook-tier--two' }
+    ];
+    cookPane = cookTiers.map(function(tier) {
+      var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 3);
+      if (!items.length) return '';
+      var rows = items.map(function(s) {
+        var meta = tier.key === 0
+          ? '<span class="dash-cook-full">All ingredients ✓</span>'
+          : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
+        return '<div class="dash-cook-row">' +
+          '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
+            '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
+          '</button></div>';
+      }).join('');
+      return '<div class="dash-cook-tier ' + tier.cls + '">' +
+        '<div class="dash-cook-tier-label">' + tier.label + '</div>' + rows + '</div>';
     }).join('');
   }
 
