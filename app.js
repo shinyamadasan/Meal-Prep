@@ -2501,134 +2501,132 @@ function renderDashboard() {
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   var today = dayNames[new Date().getDay()];
-  var todayPlan = AppState.weeklyPlan[today] || {};
 
-  // ── Pantry analysis ────────────────────────────────────────────
+  // ── Pantry scan ────────────────────────────────────────────────
   var expiringItems = [];
-  var fridgeCount = 0, freezerCount = 0, counterCount = 0, lowCount = 0;
+  var lowStaples = [];
+  var totalPantryItems = AppState.pantry.length;
   AppState.pantry.forEach(function(p) {
-    var storage = p.storage || inferStorage(p.name, p.category);
-    if (storage === 'fridge') fridgeCount++;
-    else if (storage === 'freezer') freezerCount++;
-    else counterCount++;
-    if (isStaple(p) && p.stockLevel === 'low') lowCount++;
+    if (isStaple(p) && p.stockLevel === 'low') lowStaples.push(p.name);
     var dl = pantryDaysLeft(p);
     if (dl != null && dl <= FRESHNESS_WARN_DAYS) {
       expiringItems.push({ name: p.name, daysLeft: dl });
     }
   });
   expiringItems.sort(function(a, b) { return a.daysLeft - b.daysLeft; });
-  var totalPantryItems = AppState.pantry.length;
-
-  // ── What can I cook? ───────────────────────────────────────────
-  var cookable = getCookableRecipes();
 
   // ── Week analysis ──────────────────────────────────────────────
   var dayMealCounts = {};
   weekDays.forEach(function(day) {
     var plan = AppState.weeklyPlan[day] || {};
     var count = 0;
-    var processId = function(id) {
+    var countId = function(id) {
       if (AppState.recipes.find(function(r) { return String(r.id) === String(id); })) count++;
     };
-    ['breakfast','lunch','dinner'].forEach(function(m) { if (plan[m]) processId(plan[m]); });
-    (plan.snacks || []).forEach(processId);
+    ['breakfast','lunch','dinner'].forEach(function(m) { if (plan[m]) countId(plan[m]); });
+    (plan.snacks || []).forEach(countId);
     dayMealCounts[day] = count;
   });
   var daysPlanned = weekDays.filter(function(d) { return dayMealCounts[d] > 0; }).length;
 
-  // ── 1. Expiry card (only shown when items are expiring/expired) ──
-  var expiryCard = '';
-  if (expiringItems.length > 0) {
-    var itemLines = expiringItems.slice(0, 3).map(function(item) {
-      var tag = item.daysLeft < 0 ? 'Expired' : item.daysLeft === 0 ? 'Use today' : item.daysLeft + 'd left';
-      return '<div class="dash-expiry-row"><span class="dash-expiry-name">' + escapeHtml(item.name) + '</span>' +
-             '<span class="dash-expiry-tag">' + tag + '</span></div>';
-    }).join('');
-    var moreText = expiringItems.length > 3 ? '<div class="dash-expiry-more">+ ' + (expiringItems.length - 3) + ' more</div>' : '';
-    expiryCard = '<div class="dash-card dash-card--warn">' +
-      '<div class="dash-card-header">' +
-        '<span class="dash-card-label">' + icon('triangle-alert') + ' Use soon</span>' +
-        '<button class="dash-inline-btn" onclick="showTab(\'fridge\')">View fridge →</button>' +
-      '</div>' +
-      itemLines + moreText +
+  // ══════════════════════════════════════════════════════════════
+  // LEVEL 1 — What needs attention?
+  // Only rendered when there is something to flag.
+  // ══════════════════════════════════════════════════════════════
+  var level1Card = '';
+  var hasExpiring = expiringItems.length > 0;
+  var hasLow = lowStaples.length > 0;
+  if (hasExpiring || hasLow) {
+    var expirySection = '';
+    if (hasExpiring) {
+      var expRows = expiringItems.slice(0, 3).map(function(item) {
+        var tag = item.daysLeft < 0 ? 'Expired' : item.daysLeft === 0 ? 'Use today' : item.daysLeft + 'd left';
+        return '<div class="dash-attn-row">' +
+          '<span class="dash-attn-name">' + escapeHtml(item.name) + '</span>' +
+          '<span class="dash-expiry-tag">' + tag + '</span>' +
+          '</div>';
+      }).join('') + (expiringItems.length > 3 ? '<div class="dash-expiry-more">+ ' + (expiringItems.length - 3) + ' more</div>' : '');
+      expirySection = '<div class="dash-l1-block">' +
+        '<div class="dash-l1-sublabel">' + icon('triangle-alert') + ' Expiring soon</div>' +
+        expRows +
+        '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'fridge\')">View in Inventory →</button>' +
+        '</div>';
+    }
+    var lowSection = '';
+    if (hasLow) {
+      var lowRows = lowStaples.slice(0, 3).map(function(n) {
+        return '<div class="dash-attn-row"><span class="dash-attn-name">' + escapeHtml(n) + '</span>' +
+          '<span class="dash-low-tag">Running low</span></div>';
+      }).join('') + (lowStaples.length > 3 ? '<div class="dash-expiry-more">+ ' + (lowStaples.length - 3) + ' more</div>' : '');
+      lowSection = '<div class="dash-l1-block' + (hasExpiring ? ' dash-l1-block--sep' : '') + '">' +
+        '<div class="dash-l1-sublabel">' + icon('package') + ' Running low</div>' +
+        lowRows +
+        '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'grocery\')">Add to Shop →</button>' +
+        '</div>';
+    }
+    level1Card = '<div class="dash-card dash-card--warn">' +
+      '<div class="dash-level-header">' + icon('triangle-alert') + ' What needs attention?</div>' +
+      expirySection + lowSection +
       '</div>';
   }
 
-  // ── 2. What can you cook? card ─────────────────────────────────
-  var cookCard;
+  // ══════════════════════════════════════════════════════════════
+  // LEVEL 2 — What can I do?
+  // Always shown. Cook this | Buy this in a split layout.
+  // ══════════════════════════════════════════════════════════════
+  var cookable = getCookableRecipes();
+  var cookPane;
   if (totalPantryItems === 0) {
-    cookCard = '<div class="dash-card">' +
-      '<div class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</div>' +
-      '<div class="dash-cook-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">My Fridge</button> to see what you can make.</div>' +
-      '</div>';
+    cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Inventory</button> to see what you can make.</div>';
   } else if (cookable.length === 0) {
-    cookCard = '<div class="dash-card">' +
-      '<div class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</div>' +
-      '<div class="dash-cook-empty">No recipes match what\'s in your kitchen yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse recipes →</button></div>' +
-      '</div>';
+    cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Cook →</button></div>';
   } else {
-    var recipeRows = cookable.map(function(s) {
+    cookPane = cookable.map(function(s) {
       var missing = s.total - s.matched;
-      var meta = s.matched === s.total
+      var meta = missing === 0
         ? '<span class="dash-cook-full">All ingredients ✓</span>'
         : '<span class="dash-cook-meta">' + s.matched + '/' + s.total + ' · missing ' + missing + '</span>';
       return '<div class="dash-cook-row">' +
         '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
-          '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' +
-          meta +
-        '</button>' +
-        '</div>';
+          '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
+        '</button></div>';
     }).join('');
-    cookCard = '<div class="dash-card">' +
-      '<div class="dash-card-header">' +
-        '<span class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</span>' +
-        '<button class="dash-inline-btn" onclick="showTab(\'recipes\')">All recipes →</button>' +
-      '</div>' +
-      recipeRows +
-      '</div>';
   }
 
-  // ── 3. Kitchen inventory card ──────────────────────────────────
-  var invHtml;
-  if (totalPantryItems === 0) {
-    invHtml = '<div class="dash-cook-empty">Nothing tracked yet. <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Add to My Fridge →</button></div>';
+  var groceryCount = (AppState.groceryList || []).length;
+  var buyPane;
+  if (lowStaples.length > 0) {
+    buyPane = lowStaples.slice(0, 3).map(function(n) {
+      return '<div class="dash-buy-row">' + icon('shopping-cart') + ' <span>' + escapeHtml(n) + '</span></div>';
+    }).join('') +
+    (lowStaples.length > 3 ? '<div class="dash-expiry-more">+ ' + (lowStaples.length - 3) + ' more</div>' : '') +
+    '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'grocery\')">Open Shop →</button>';
+  } else if (groceryCount > 0) {
+    buyPane = '<div class="dash-l2-empty">' + groceryCount + ' item' + (groceryCount > 1 ? 's' : '') + ' in your list. ' +
+      '<button class="dash-inline-btn" onclick="showTab(\'grocery\')">Open Shop →</button></div>';
   } else {
-    var invParts = [];
-    if (fridgeCount > 0) invParts.push(icon('refrigerator') + ' ' + fridgeCount + ' in fridge');
-    if (freezerCount > 0) invParts.push(icon('snowflake') + ' ' + freezerCount + ' frozen');
-    if (counterCount > 0) invParts.push(icon('archive') + ' ' + counterCount + ' on counter');
-    invHtml = '<div class="dash-inv-row">' + invParts.map(function(p) { return '<span>' + p + '</span>'; }).join('') + '</div>' +
-      (lowCount > 0 ? '<div class="dash-inv-low">' + icon('triangle-alert') + ' ' + lowCount + ' staple' + (lowCount > 1 ? 's' : '') + ' running low</div>' : '');
+    buyPane = '<div class="dash-l2-empty">Nothing flagged. <button class="dash-inline-btn" onclick="showTab(\'grocery\')">Shop →</button></div>';
   }
-  var invCard = '<div class="dash-card">' +
-    '<div class="dash-card-header">' +
-      '<span class="dash-card-label">' + icon('package') + ' Your kitchen</span>' +
-      '<button class="dash-inline-btn" onclick="showTab(\'fridge\')">' + (totalPantryItems > 0 ? totalPantryItems + ' items →' : 'Open →') + '</button>' +
+
+  var level2Card = '<div class="dash-card">' +
+    '<div class="dash-level-header">What can I do?</div>' +
+    '<div class="dash-l2-split">' +
+      '<div class="dash-l2-pane">' +
+        '<div class="dash-l2-sublabel">' + icon('chef-hat') + ' Cook this</div>' +
+        cookPane +
+      '</div>' +
+      '<div class="dash-l2-divider"></div>' +
+      '<div class="dash-l2-pane">' +
+        '<div class="dash-l2-sublabel">' + icon('shopping-cart') + ' Buy this</div>' +
+        buyPane +
+      '</div>' +
     '</div>' +
-    invHtml +
     '</div>';
 
-  // ── 4. Today + week strip (combined, secondary) ────────────────
-  var mealEmojis = { breakfast: '🍳', lunch: '🥗', dinner: '🍱', snacks: '🥜' };
-  var mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snack' };
-  var todayHasAny = todayPlan.breakfast || todayPlan.lunch || todayPlan.dinner || (todayPlan.snacks && todayPlan.snacks.length);
-  var todayMealsHtml;
-  if (!todayHasAny) {
-    todayMealsHtml = '<div class="dash-today-empty">Nothing planned. <button class="dash-inline-btn" onclick="showTab(\'planner\')">Plan today →</button></div>';
-  } else {
-    todayMealsHtml = '<div class="dash-today-meals">' +
-      ['breakfast','lunch','dinner','snacks'].map(function(meal) {
-        var id = meal === 'snacks' ? (todayPlan.snacks || [])[0] : todayPlan[meal];
-        var recipe = id ? AppState.recipes.find(function(r) { return String(r.id) === String(id); }) : null;
-        return '<div class="dash-meal-row">' +
-          '<span class="dash-meal-emoji">' + mealEmojis[meal] + '</span>' +
-          '<span class="dash-meal-label">' + mealLabels[meal] + '</span>' +
-          '<span class="dash-meal-name' + (recipe ? '' : ' dash-meal-empty') + '">' + (recipe ? escapeHtml(recipe.name) : '—') + '</span>' +
-          '</div>';
-      }).join('') +
-      '</div>';
-  }
+  // ══════════════════════════════════════════════════════════════
+  // LEVEL 3 — Planning
+  // Always shown at the bottom. Week strip + navigation links.
+  // ══════════════════════════════════════════════════════════════
   var dayAbbr = { Monday:'M', Tuesday:'T', Wednesday:'W', Thursday:'T', Friday:'F', Saturday:'S', Sunday:'S' };
   var weekStrip = weekDays.map(function(day) {
     var count = dayMealCounts[day];
@@ -2637,24 +2635,25 @@ function renderDashboard() {
     return '<div class="' + cls + '" title="' + day + ': ' + count + ' meal' + (count !== 1 ? 's' : '') + '">' + dayAbbr[day] + '</div>';
   }).join('');
   var planLabel = daysPlanned === 0 ? 'Nothing planned' : daysPlanned === 7 ? 'Week fully planned' : daysPlanned + '/7 days planned';
-  var todayCard = '<div class="dash-card">' +
-    '<div class="dash-card-header">' +
-      '<span class="dash-card-label">Today — ' + today + '</span>' +
-      '<button class="dash-inline-btn" onclick="showTab(\'planner\')">Planner →</button>' +
-    '</div>' +
-    todayMealsHtml +
-    '<div class="dash-week-row">' +
+
+  var level3Card = '<div class="dash-card dash-card--planning">' +
+    '<div class="dash-level-header">Planning</div>' +
+    '<div class="dash-l3-week">' +
       '<div class="dash-week-strip">' + weekStrip + '</div>' +
       '<span class="dash-week-label">' + planLabel + '</span>' +
+    '</div>' +
+    '<div class="dash-l3-links">' +
+      '<button class="dash-l3-link" onclick="showTab(\'planner\')">' + icon('calendar-days') + ' Weekly plan</button>' +
+      '<button class="dash-l3-link" onclick="showTab(\'nutrition\')">' + icon('salad') + ' Nutrition</button>' +
+      '<button class="dash-l3-link" onclick="showTab(\'nutrition\')">' + icon('lightbulb') + ' Goals</button>' +
     '</div>' +
     '</div>';
 
   el.innerHTML = '<div class="dashboard">' +
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
-    expiryCard +
-    cookCard +
-    invCard +
-    todayCard +
+    level1Card +
+    level2Card +
+    level3Card +
     '</div>';
 }
 
