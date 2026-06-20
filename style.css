@@ -5459,6 +5459,21 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .sk-line--sm { width: 40%; }
 @keyframes sk-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
+/* ── Recipe import/export row ── */
+.recipe-io-btns {
+  display: flex;
+  gap: var(--space-8);
+}
+@media (max-width: 768px) {
+  .recipe-io-btns {
+    width: 100%;
+  }
+  .recipe-io-btns .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 /* ── Dashboard ── */
 .dashboard {
   max-width: 560px;
