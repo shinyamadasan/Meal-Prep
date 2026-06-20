@@ -2448,26 +2448,21 @@ function renderDashboard() {
   const todayPlan = AppState.weeklyPlan[today] || {};
 
   // ── Week analysis ──────────────────────────────────────────────
-  let totalMeals = 0, expiringSoon = 0, weeklyCost = 0, totalProtein = 0, proteinDays = 0;
+  let totalMeals = 0, expiringSoon = 0;
   const dayMealCounts = {};
   weekDays.forEach(day => {
     const plan = AppState.weeklyPlan[day] || {};
-    let count = 0, dayProtein = 0, hasProtein = false;
+    let count = 0;
     const processId = id => {
       const r = AppState.recipes.find(r => String(r.id) === String(id));
       if (!r) return;
       totalMeals++; count++;
       if (willExpire(r, day)) expiringSoon++;
-      weeklyCost += calculateRecipeCost(r);
-      const p = r.nutritionPerServing && r.nutritionPerServing.protein;
-      if (p) { dayProtein += p * (r.currentServings || 1); hasProtein = true; }
     };
     ['breakfast','lunch','dinner'].forEach(m => { if (plan[m]) processId(plan[m]); });
     (plan.snacks || []).forEach(processId);
     dayMealCounts[day] = count;
-    if (hasProtein) { totalProtein += dayProtein; proteinDays++; }
   });
-  const avgProtein = proteinDays > 0 ? Math.round(totalProtein / proteinDays) : null;
   const daysPlanned = weekDays.filter(d => dayMealCounts[d] > 0).length;
 
   // ── Contextual greeting sub-line ───────────────────────────────
@@ -2517,26 +2512,22 @@ function renderDashboard() {
     }</div>`;
   }
 
-  // ── Stats row ──────────────────────────────────────────────────
-  const statCards = [
-    expiringSoon > 0
-      ? `<div class="dash-stat dash-stat--warn">
-          <span class="dash-stat-value">⚠️ ${expiringSoon}</span>
-          <span class="dash-stat-label">expiring soon</span>
-        </div>`
-      : `<div class="dash-stat dash-stat--ok">
-          <span class="dash-stat-value">✓</span>
-          <span class="dash-stat-label">nothing expiring</span>
-        </div>`,
-    weeklyCost > 0 ? `<div class="dash-stat">
-      <span class="dash-stat-value">₱${Math.round(weeklyCost)}</span>
-      <span class="dash-stat-label">est. cost</span>
-    </div>` : '',
-    avgProtein ? `<div class="dash-stat">
-      <span class="dash-stat-value">${avgProtein}g</span>
-      <span class="dash-stat-label">avg protein/day</span>
-    </div>` : ''
-  ].filter(Boolean).join('');
+  // ── Smart insight (one actionable signal, priority-ordered) ───
+  const groceryHasItems = (AppState.groceryList || []).length > 0;
+  let insight = '';
+  if (expiringSoon > 0) {
+    insight = `<div class="dash-insight dash-insight--warn">
+      ${icon('triangle-alert')} ${expiringSoon} meal${expiringSoon > 1 ? 's' : ''} in your plan may expire — <button class="dash-inline-btn" onclick="showTab('fridge')">check your fridge</button>
+    </div>`;
+  } else if (totalMeals > 0 && !groceryHasItems) {
+    insight = `<div class="dash-insight">
+      ${icon('shopping-cart')} Meals planned but no grocery list yet — <button class="dash-inline-btn" onclick="showTab('grocery')">generate it</button>
+    </div>`;
+  } else if (daysPlanned === 7 && groceryHasItems) {
+    insight = `<div class="dash-insight dash-insight--ok">
+      ${icon('check')} Week fully planned and grocery list is ready
+    </div>`;
+  }
 
   el.innerHTML = `
     <div class="dashboard">
@@ -2550,7 +2541,7 @@ function renderDashboard() {
           <span class="dash-card-label">This Week</span>
           <div class="dash-week-strip">${weekStrip}</div>
         </div>
-        ${statCards ? `<div class="dash-stats">${statCards}</div>` : ''}
+        ${insight}
       </div>
 
       <div class="dash-card">
