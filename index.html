@@ -326,6 +326,7 @@
                                     <input type="text" id="pantry-input" class="form-control" placeholder="Add an item… (e.g. Ice cream, Soy sauce, Rice)" autocomplete="off">
                                     <div class="ing-suggestions hidden"></div>
                                 </div>
+                                <input type="number" id="pantry-qty-input" class="form-control" placeholder="Qty" min="0" step="any" style="max-width:70px" title="Optional quantity">
                                 <select id="pantry-add-where" class="form-control" style="max-width:120px" title="Which section to add it to">
                                     <option value="">Auto</option>
                                     <option value="fridge">Fridge</option>
@@ -1166,6 +1167,53 @@
                 <button class="settings-row settings-row--danger" onclick="clearLocalStorage()">
                     <span class="ic" data-icon="trash-2"></span> Clear All Data
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kitchen Setup Wizard Modal -->
+    <div id="kitchen-setup-modal" class="modal hidden">
+        <div class="modal-content ks-modal-content">
+            <!-- Step 1: Choose kitchen type -->
+            <div id="kitchen-step-1">
+                <div class="modal-header">
+                    <h3>What kind of kitchen do you have?</h3>
+                </div>
+                <div class="modal-body">
+                    <p class="ks-intro">We'll pre-fill your pantry so you can start planning meals right away.</p>
+                    <div class="ks-options">
+                        <button class="ks-type-btn" onclick="selectKitchenType('bare')">
+                            <span class="ks-type-name">Bare Essentials</span>
+                            <span class="ks-type-desc">Rice, garlic, onion, condiments, eggs — the basics</span>
+                        </button>
+                        <button class="ks-type-btn ks-type-btn--highlight" onclick="selectKitchenType('average')">
+                            <span class="ks-type-name">Average Household</span>
+                            <span class="ks-type-desc">Everything above plus chicken, vegetables, and common sauces</span>
+                        </button>
+                        <button class="ks-type-btn" onclick="selectKitchenType('full')">
+                            <span class="ks-type-name">Fully Stocked</span>
+                            <span class="ks-type-desc">Wide variety — proteins, produce, specialty pantry items</span>
+                        </button>
+                    </div>
+                    <div class="ks-actions">
+                        <button class="btn btn--ghost btn--sm" onclick="skipKitchenSetup()">Skip — I'll add items manually</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Step 2: Review and remove -->
+            <div id="kitchen-step-2" class="hidden">
+                <div class="modal-header">
+                    <h3>Review your pantry</h3>
+                    <button class="modal-close" onclick="skipKitchenSetup()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="ks-intro">Uncheck anything you don't actually have.</p>
+                    <div id="kitchen-review-list" class="ks-review"></div>
+                    <div class="ks-actions">
+                        <button class="btn btn--ghost btn--sm" onclick="showKitchenStep1()">&#8592; Back</button>
+                        <button class="btn btn--primary btn--sm" onclick="confirmKitchenSetup()">Add to my pantry</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

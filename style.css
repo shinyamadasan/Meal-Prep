@@ -5964,3 +5964,24 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+/* ── Kitchen Setup Wizard ──────────────────────────────────────────────────── */
+.ks-modal-content { max-width: 440px; }
+.ks-intro { font-size: 0.88rem; color: var(--color-text-secondary); margin: 0 0 1rem; }
+.ks-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.ks-type-btn {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  padding: 0.75rem 1rem; border-radius: 0.5rem;
+  border: 1.5px solid var(--color-border); background: var(--color-surface);
+  cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s;
+}
+.ks-type-btn:hover { border-color: var(--color-primary); background: var(--color-surface-2); }
+.ks-type-btn--highlight { border-color: var(--color-primary); }
+.ks-type-name { font-size: 0.95rem; font-weight: 600; color: var(--color-text-primary); }
+.ks-type-desc { font-size: 0.78rem; color: var(--color-text-secondary); }
+.ks-review { max-height: 320px; overflow-y: auto; margin-bottom: 0.75rem; }
+.ks-group { margin-bottom: 0.75rem; }
+.ks-group-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); margin-bottom: 0.35rem; }
+.ks-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.88rem; cursor: pointer; }
+.ks-cb { accent-color: var(--color-primary); cursor: pointer; }
+.ks-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; gap: 0.5rem; }
