@@ -2429,137 +2429,204 @@ function updateWeeklyStats() {
   document.getElementById('planned-meals').textContent = plannedMeals;
 }
 
+// Returns up to 3 recipes the user can cook based on current pantry contents.
+// A recipe qualifies if ≥50% of its ingredients are in the pantry (min 2 matches).
+function getCookableRecipes() {
+  if (!AppState.pantry.length || !AppState.recipes.length) return [];
+  var pantryNames = AppState.pantry.map(function(p) { return p.name.toLowerCase().trim(); });
+
+  function pantryHas(ingName) {
+    var n = ingName.toLowerCase().trim();
+    return pantryNames.some(function(pn) { return n.includes(pn) || pn.includes(n); });
+  }
+
+  var scored = [];
+  AppState.recipes.forEach(function(recipe) {
+    var ings = recipe.baseIngredients || [];
+    if (ings.length === 0) return;
+    var matched = 0;
+    ings.forEach(function(ing) { if (pantryHas(ing.name)) matched++; });
+    scored.push({ recipe: recipe, matched: matched, total: ings.length, pct: matched / ings.length });
+  });
+
+  return scored
+    .filter(function(s) { return s.pct >= 0.5 && s.matched >= 2; })
+    .sort(function(a, b) { return b.pct - a.pct || b.matched - a.matched; })
+    .slice(0, 3);
+}
+
 function renderDashboard() {
-  const el = document.getElementById('dashboard');
+  var el = document.getElementById('dashboard');
   if (!el) return;
 
-  const hour = new Date().getHours();
-  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  let name = getDisplayName();
+  var hour = new Date().getHours();
+  var timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  var name = getDisplayName();
   if (!name && AppState.currentUser) {
-    const dn = AppState.currentUser.displayName;
-    const em = AppState.currentUser.email || '';
-    const raw = dn || em.split('@')[0] || '';
+    var dn = AppState.currentUser.displayName;
+    var em = AppState.currentUser.email || '';
+    var raw = dn || em.split('@')[0] || '';
     name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
   }
 
-  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const today = dayNames[new Date().getDay()];
-  const todayPlan = AppState.weeklyPlan[today] || {};
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  var today = dayNames[new Date().getDay()];
+  var todayPlan = AppState.weeklyPlan[today] || {};
+
+  // ── Pantry analysis ────────────────────────────────────────────
+  var expiringItems = [];
+  var fridgeCount = 0, freezerCount = 0, counterCount = 0, lowCount = 0;
+  AppState.pantry.forEach(function(p) {
+    var storage = p.storage || inferStorage(p.name, p.category);
+    if (storage === 'fridge') fridgeCount++;
+    else if (storage === 'freezer') freezerCount++;
+    else counterCount++;
+    if (isStaple(p) && p.stockLevel === 'low') lowCount++;
+    var dl = pantryDaysLeft(p);
+    if (dl != null && dl <= FRESHNESS_WARN_DAYS) {
+      expiringItems.push({ name: p.name, daysLeft: dl });
+    }
+  });
+  expiringItems.sort(function(a, b) { return a.daysLeft - b.daysLeft; });
+  var totalPantryItems = AppState.pantry.length;
+
+  // ── What can I cook? ───────────────────────────────────────────
+  var cookable = getCookableRecipes();
 
   // ── Week analysis ──────────────────────────────────────────────
-  let totalMeals = 0, expiringSoon = 0;
-  const dayMealCounts = {};
-  weekDays.forEach(day => {
-    const plan = AppState.weeklyPlan[day] || {};
-    let count = 0;
-    const processId = id => {
-      const r = AppState.recipes.find(r => String(r.id) === String(id));
-      if (!r) return;
-      totalMeals++; count++;
-      if (willExpire(r, day)) expiringSoon++;
+  var dayMealCounts = {};
+  weekDays.forEach(function(day) {
+    var plan = AppState.weeklyPlan[day] || {};
+    var count = 0;
+    var processId = function(id) {
+      if (AppState.recipes.find(function(r) { return String(r.id) === String(id); })) count++;
     };
-    ['breakfast','lunch','dinner'].forEach(m => { if (plan[m]) processId(plan[m]); });
+    ['breakfast','lunch','dinner'].forEach(function(m) { if (plan[m]) processId(plan[m]); });
     (plan.snacks || []).forEach(processId);
     dayMealCounts[day] = count;
   });
-  const daysPlanned = weekDays.filter(d => dayMealCounts[d] > 0).length;
+  var daysPlanned = weekDays.filter(function(d) { return dayMealCounts[d] > 0; }).length;
 
-  // ── Contextual greeting sub-line ───────────────────────────────
-  let subLine;
-  if (daysPlanned === 0) {
-    subLine = `Nothing planned yet — <button class="dash-inline-btn" onclick="showTab('planner')">start planning your week</button>`;
-  } else if (daysPlanned === 7) {
-    subLine = `Your week is fully planned 🎉`;
-  } else {
-    const remaining = 7 - daysPlanned;
-    subLine = `${daysPlanned} of 7 days planned — ${remaining} day${remaining > 1 ? 's' : ''} to fill`;
+  // ── 1. Expiry card (only shown when items are expiring/expired) ──
+  var expiryCard = '';
+  if (expiringItems.length > 0) {
+    var itemLines = expiringItems.slice(0, 3).map(function(item) {
+      var tag = item.daysLeft < 0 ? 'Expired' : item.daysLeft === 0 ? 'Use today' : item.daysLeft + 'd left';
+      return '<div class="dash-expiry-row"><span class="dash-expiry-name">' + escapeHtml(item.name) + '</span>' +
+             '<span class="dash-expiry-tag">' + tag + '</span></div>';
+    }).join('');
+    var moreText = expiringItems.length > 3 ? '<div class="dash-expiry-more">+ ' + (expiringItems.length - 3) + ' more</div>' : '';
+    expiryCard = '<div class="dash-card dash-card--warn">' +
+      '<div class="dash-card-header">' +
+        '<span class="dash-card-label">' + icon('triangle-alert') + ' Use soon</span>' +
+        '<button class="dash-inline-btn" onclick="showTab(\'fridge\')">View fridge →</button>' +
+      '</div>' +
+      itemLines + moreText +
+      '</div>';
   }
 
-  // ── 7-day strip ────────────────────────────────────────────────
-  const dayAbbr = { Monday:'M', Tuesday:'T', Wednesday:'W', Thursday:'T', Friday:'F', Saturday:'S', Sunday:'S' };
-  const weekStrip = weekDays.map(day => {
-    const count = dayMealCounts[day];
-    const isToday = day === today;
-    const cls = ['dash-day-dot', count > 0 ? 'dash-day-dot--filled' : '', isToday ? 'dash-day-dot--today' : ''].filter(Boolean).join(' ');
-    return `<div class="${cls}" title="${day}: ${count} meal${count !== 1 ? 's' : ''}">${dayAbbr[day]}</div>`;
+  // ── 2. What can you cook? card ─────────────────────────────────
+  var cookCard;
+  if (totalPantryItems === 0) {
+    cookCard = '<div class="dash-card">' +
+      '<div class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</div>' +
+      '<div class="dash-cook-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">My Fridge</button> to see what you can make.</div>' +
+      '</div>';
+  } else if (cookable.length === 0) {
+    cookCard = '<div class="dash-card">' +
+      '<div class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</div>' +
+      '<div class="dash-cook-empty">No recipes match what\'s in your kitchen yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse recipes →</button></div>' +
+      '</div>';
+  } else {
+    var recipeRows = cookable.map(function(s) {
+      var missing = s.total - s.matched;
+      var meta = s.matched === s.total
+        ? '<span class="dash-cook-full">All ingredients ✓</span>'
+        : '<span class="dash-cook-meta">' + s.matched + '/' + s.total + ' · missing ' + missing + '</span>';
+      return '<div class="dash-cook-row">' +
+        '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
+          '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' +
+          meta +
+        '</button>' +
+        '</div>';
+    }).join('');
+    cookCard = '<div class="dash-card">' +
+      '<div class="dash-card-header">' +
+        '<span class="dash-card-label">' + icon('chef-hat') + ' What can you cook?</span>' +
+        '<button class="dash-inline-btn" onclick="showTab(\'recipes\')">All recipes →</button>' +
+      '</div>' +
+      recipeRows +
+      '</div>';
+  }
+
+  // ── 3. Kitchen inventory card ──────────────────────────────────
+  var invHtml;
+  if (totalPantryItems === 0) {
+    invHtml = '<div class="dash-cook-empty">Nothing tracked yet. <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Add to My Fridge →</button></div>';
+  } else {
+    var invParts = [];
+    if (fridgeCount > 0) invParts.push(icon('refrigerator') + ' ' + fridgeCount + ' in fridge');
+    if (freezerCount > 0) invParts.push(icon('snowflake') + ' ' + freezerCount + ' frozen');
+    if (counterCount > 0) invParts.push(icon('archive') + ' ' + counterCount + ' on counter');
+    invHtml = '<div class="dash-inv-row">' + invParts.map(function(p) { return '<span>' + p + '</span>'; }).join('') + '</div>' +
+      (lowCount > 0 ? '<div class="dash-inv-low">' + icon('triangle-alert') + ' ' + lowCount + ' staple' + (lowCount > 1 ? 's' : '') + ' running low</div>' : '');
+  }
+  var invCard = '<div class="dash-card">' +
+    '<div class="dash-card-header">' +
+      '<span class="dash-card-label">' + icon('package') + ' Your kitchen</span>' +
+      '<button class="dash-inline-btn" onclick="showTab(\'fridge\')">' + (totalPantryItems > 0 ? totalPantryItems + ' items →' : 'Open →') + '</button>' +
+    '</div>' +
+    invHtml +
+    '</div>';
+
+  // ── 4. Today + week strip (combined, secondary) ────────────────
+  var mealEmojis = { breakfast: '🍳', lunch: '🥗', dinner: '🍱', snacks: '🥜' };
+  var mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snack' };
+  var todayHasAny = todayPlan.breakfast || todayPlan.lunch || todayPlan.dinner || (todayPlan.snacks && todayPlan.snacks.length);
+  var todayMealsHtml;
+  if (!todayHasAny) {
+    todayMealsHtml = '<div class="dash-today-empty">Nothing planned. <button class="dash-inline-btn" onclick="showTab(\'planner\')">Plan today →</button></div>';
+  } else {
+    todayMealsHtml = '<div class="dash-today-meals">' +
+      ['breakfast','lunch','dinner','snacks'].map(function(meal) {
+        var id = meal === 'snacks' ? (todayPlan.snacks || [])[0] : todayPlan[meal];
+        var recipe = id ? AppState.recipes.find(function(r) { return String(r.id) === String(id); }) : null;
+        return '<div class="dash-meal-row">' +
+          '<span class="dash-meal-emoji">' + mealEmojis[meal] + '</span>' +
+          '<span class="dash-meal-label">' + mealLabels[meal] + '</span>' +
+          '<span class="dash-meal-name' + (recipe ? '' : ' dash-meal-empty') + '">' + (recipe ? escapeHtml(recipe.name) : '—') + '</span>' +
+          '</div>';
+      }).join('') +
+      '</div>';
+  }
+  var dayAbbr = { Monday:'M', Tuesday:'T', Wednesday:'W', Thursday:'T', Friday:'F', Saturday:'S', Sunday:'S' };
+  var weekStrip = weekDays.map(function(day) {
+    var count = dayMealCounts[day];
+    var isToday = day === today;
+    var cls = ['dash-day-dot', count > 0 ? 'dash-day-dot--filled' : '', isToday ? 'dash-day-dot--today' : ''].filter(Boolean).join(' ');
+    return '<div class="' + cls + '" title="' + day + ': ' + count + ' meal' + (count !== 1 ? 's' : '') + '">' + dayAbbr[day] + '</div>';
   }).join('');
+  var planLabel = daysPlanned === 0 ? 'Nothing planned' : daysPlanned === 7 ? 'Week fully planned' : daysPlanned + '/7 days planned';
+  var todayCard = '<div class="dash-card">' +
+    '<div class="dash-card-header">' +
+      '<span class="dash-card-label">Today — ' + today + '</span>' +
+      '<button class="dash-inline-btn" onclick="showTab(\'planner\')">Planner →</button>' +
+    '</div>' +
+    todayMealsHtml +
+    '<div class="dash-week-row">' +
+      '<div class="dash-week-strip">' + weekStrip + '</div>' +
+      '<span class="dash-week-label">' + planLabel + '</span>' +
+    '</div>' +
+    '</div>';
 
-  // ── Today's meals ──────────────────────────────────────────────
-  const mealEmojis = { breakfast: '🍳', lunch: '🥗', dinner: '🍱', snacks: '🥜' };
-  const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snack' };
-  const todayMealIds = ['breakfast','lunch','dinner','snacks'].map(m =>
-    m === 'snacks' ? (todayPlan.snacks || [])[0] : todayPlan[m]
-  ).filter(Boolean);
-
-  let todayContent;
-  if (todayMealIds.length === 0) {
-    todayContent = `<div class="dash-today-empty">
-      Nothing planned for today.
-      <button class="dash-inline-btn" onclick="showTab('planner')">Add meals →</button>
-    </div>`;
-  } else {
-    todayContent = `<div class="dash-today-meals">${
-      ['breakfast','lunch','dinner','snacks'].map(meal => {
-        const id = meal === 'snacks' ? (todayPlan.snacks || [])[0] : todayPlan[meal];
-        const recipe = id ? AppState.recipes.find(r => String(r.id) === String(id)) : null;
-        return `<div class="dash-meal-row">
-          <span class="dash-meal-emoji">${mealEmojis[meal]}</span>
-          <span class="dash-meal-label">${mealLabels[meal]}</span>
-          <span class="dash-meal-name${recipe ? '' : ' dash-meal-empty'}">${recipe ? recipe.name : '—'}</span>
-        </div>`;
-      }).join('')
-    }</div>`;
-  }
-
-  // ── Smart insight (one actionable signal, priority-ordered) ───
-  const groceryHasItems = (AppState.groceryList || []).length > 0;
-  let insight = '';
-  if (expiringSoon > 0) {
-    insight = `<div class="dash-insight dash-insight--warn">
-      ${icon('triangle-alert')} ${expiringSoon} meal${expiringSoon > 1 ? 's' : ''} in your plan may expire — <button class="dash-inline-btn" onclick="showTab('fridge')">check your fridge</button>
-    </div>`;
-  } else if (totalMeals > 0 && !groceryHasItems) {
-    insight = `<div class="dash-insight">
-      ${icon('shopping-cart')} Meals planned but no grocery list yet — <button class="dash-inline-btn" onclick="showTab('grocery')">generate it</button>
-    </div>`;
-  } else if (daysPlanned === 7 && groceryHasItems) {
-    insight = `<div class="dash-insight dash-insight--ok">
-      ${icon('check')} Week fully planned and grocery list is ready
-    </div>`;
-  }
-
-  el.innerHTML = `
-    <div class="dashboard">
-      <div class="dash-greeting-block">
-        <div class="dash-greeting">Good ${timeOfDay}${name ? ', ' + name : ''} 👋</div>
-        <div class="dash-subline">${subLine}</div>
-      </div>
-
-      <div class="dash-card">
-        <div class="dash-card-header">
-          <span class="dash-card-label">This Week</span>
-          <div class="dash-week-strip">${weekStrip}</div>
-        </div>
-        ${insight}
-      </div>
-
-      <div class="dash-card">
-        <div class="dash-card-label">Today — ${today}</div>
-        ${todayContent}
-      </div>
-
-      <div class="dash-card">
-        <div class="dash-card-label">Quick Actions</div>
-        <div class="dash-actions">
-          <button class="dash-action-btn" onclick="showTab('recipes'); setTimeout(openAddRecipeModal, 50)">${icon('plus')} Add Recipe</button>
-          <button class="dash-action-btn" onclick="showTab('planner')">${icon('calendar-days')} Plan Week</button>
-          <button class="dash-action-btn" onclick="showTab('grocery')">${icon('shopping-cart')} Grocery List</button>
-          <button class="dash-action-btn" onclick="showTab('fridge')">${icon('refrigerator')} My Fridge</button>
-        </div>
-      </div>
-    </div>`;
+  el.innerHTML = '<div class="dashboard">' +
+    '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
+    expiryCard +
+    cookCard +
+    invCard +
+    todayCard +
+    '</div>';
 }
 
 // Grocery list functions
@@ -2669,7 +2736,19 @@ function renderGroceryList() {
     categories[cat].sort((a, b) => (groceryDone(a) ? 1 : 0) - (groceryDone(b) ? 1 : 0));
   });
 
-  groceryListEl.innerHTML = Object.keys(categories).map(category => {
+  // ── Stock summary bar: show what's already at home ─────────────
+  const totalItems = AppState.groceryList.length;
+  const inStockItems = AppState.groceryList.filter(item => !item.fromStaple && isInPantry(item.name)).length;
+  const needToBuyCount = totalItems - inStockItems;
+  const stockBar = inStockItems > 0
+    ? `<div class="grocery-stock-bar">
+        <span class="gstock-have">${icon('check')} ${inStockItems} already in your kitchen</span>
+        <span class="gstock-sep">·</span>
+        <span class="gstock-need">${needToBuyCount} to buy</span>
+      </div>`
+    : '';
+
+  groceryListEl.innerHTML = stockBar + Object.keys(categories).map(category => {
     const categoryTotal = categories[category].reduce((total, item) => total + groceryItemCost(item), 0);
 
     return `

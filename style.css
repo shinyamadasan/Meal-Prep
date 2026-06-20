@@ -5672,4 +5672,119 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 
 .dash-action-btn .lc-icon { width: 14px; height: 14px; }
+
+/* ── Dashboard: icon in card labels ─────────────────────────────────────────── */
+.dash-card-label .lc-icon { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+
+/* ── Dashboard: expiry card ─────────────────────────────────────────────────── */
+.dash-card--warn {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: rgba(254, 243, 199, 0.45);
+}
+[data-color-scheme="dark"] .dash-card--warn {
+  background: rgba(120, 53, 15, 0.18);
+  border-color: rgba(217, 119, 6, 0.3);
+}
+.dash-expiry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+.dash-expiry-row:last-of-type { border-bottom: none; }
+.dash-expiry-name { font-weight: 500; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.5rem; }
+.dash-expiry-tag {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.12);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+[data-color-scheme="dark"] .dash-expiry-tag { color: #fbbf24; background: rgba(217, 119, 6, 0.2); }
+.dash-expiry-more { font-size: 0.78rem; color: var(--color-text-secondary); padding-top: 0.3rem; }
+
+/* ── Dashboard: cook card ───────────────────────────────────────────────────── */
+.dash-cook-empty {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  padding: 0.15rem 0;
+  line-height: 1.5;
+}
+.dash-cook-row {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.dash-cook-row:last-child { border-bottom: none; }
+.dash-cook-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  gap: 0.75rem;
+}
+.dash-cook-item:hover .dash-cook-name { color: var(--color-primary); }
+.dash-cook-name { font-size: 0.9rem; font-weight: 500; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cook-meta { font-size: 0.72rem; color: var(--color-text-secondary); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.dash-cook-full { font-size: 0.72rem; color: var(--color-primary); font-weight: 650; white-space: nowrap; flex-shrink: 0; }
+
+/* ── Dashboard: kitchen inventory card ─────────────────────────────────────── */
+.dash-inv-row {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  align-items: center;
+}
+.dash-inv-row .lc-icon { width: 13px; height: 13px; vertical-align: -1px; margin-right: 3px; }
+.dash-inv-low {
+  font-size: 0.8rem;
+  color: var(--color-warning, #d97706);
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.dash-inv-low .lc-icon { width: 12px; height: 12px; }
+
+/* ── Dashboard: week row inside today card ──────────────────────────────────── */
+.dash-week-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-border);
+}
+.dash-week-label { font-size: 0.78rem; color: var(--color-text-secondary); }
+
+/* ── Grocery: stock summary bar ─────────────────────────────────────────────── */
+.grocery-stock-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  background: rgba(var(--color-teal-500-rgb, 45, 157, 120), 0.08);
+  border: 1px solid rgba(var(--color-teal-500-rgb, 45, 157, 120), 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  font-size: 0.84rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.gstock-have { color: var(--color-primary); font-weight: 650; display: flex; align-items: center; gap: 0.3rem; }
+.gstock-have .lc-icon { width: 13px; height: 13px; }
+.gstock-sep { color: var(--color-text-secondary); }
+.gstock-need { color: var(--color-text); font-weight: 500; }
+
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
