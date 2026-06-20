@@ -1868,8 +1868,37 @@ function dismissGettingStarted() {
   renderGettingStarted();
 }
 
+function renderCookSuggestions() {
+  var el = document.getElementById('cook-suggestions');
+  if (!el) return;
+
+  var cookable = getCookableRecipes();
+  if (cookable.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  var cards = cookable.map(function(s) {
+    var missing = s.total - s.matched;
+    var badge = missing === 0
+      ? '<span class="cs-badge cs-badge--full">All ingredients ✓</span>'
+      : '<span class="cs-badge">Missing ' + missing + '</span>';
+    return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
+      escapeHtml(s.recipe.name).replace(/'/g, "\\'") + '\';renderRecipes()">' +
+      '<span class="cs-name">' + escapeHtml(s.recipe.name) + '</span>' +
+      badge +
+      '</button>';
+  }).join('');
+
+  el.innerHTML = '<div class="cook-suggestions">' +
+    '<div class="cs-label">' + icon('chef-hat') + ' Based on what\'s in your kitchen</div>' +
+    '<div class="cs-cards">' + cards + '</div>' +
+    '</div>';
+}
+
 function renderRecipes() {
   renderGettingStarted();
+  renderCookSuggestions();
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
   const categoryFilter = document.getElementById('category-filter').value;

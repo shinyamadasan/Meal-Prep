@@ -50,10 +50,10 @@
                 </div>
                 <nav class="tab-nav">
                     <button class="tab-btn active" data-tab="dashboard">Home</button>
-                    <button class="tab-btn" data-tab="fridge"><svg class="lc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6Z"/><path d="M5 10h14"/><path d="M15 7v6"/></svg> My Fridge</button>
-                    <button class="tab-btn" data-tab="grocery">Grocery</button>
-                    <button class="tab-btn" data-tab="planner">Planner</button>
-                    <button class="tab-btn" data-tab="recipes">Recipes</button>
+                    <button class="tab-btn" data-tab="fridge">Inventory</button>
+                    <button class="tab-btn" data-tab="grocery">Shop</button>
+                    <button class="tab-btn" data-tab="planner">Plan</button>
+                    <button class="tab-btn" data-tab="recipes">Cook</button>
                     <div class="tab-more">
                         <button type="button" class="tab-btn tab-more-btn" aria-haspopup="true" aria-expanded="false">⋯ More</button>
                         <div class="tab-more-menu hidden">
@@ -79,7 +79,7 @@
                 <!-- Recipes Tab -->
                 <section id="recipes" class="tab-content">
                     <div class="section-header">
-                        <h2>My Recipes</h2>
+                        <h2>Cook</h2>
                         <div class="header-actions">
                             <div class="recipe-io-btns">
                                 <button class="btn btn--outline btn--sm" onclick="importData()"><span class="ic" data-icon="upload"></span> Import</button>
@@ -91,6 +91,8 @@
                     </div>
 
                     <div id="getting-started" class="hidden"></div>
+
+                    <div id="cook-suggestions"></div>
 
                     <div class="search-filter">
                         <input type="text" class="form-control" id="recipe-search" placeholder="Search recipes...">
@@ -245,7 +247,7 @@
                 <!-- Weekly Planner Tab -->
                 <section id="planner" class="tab-content">
                     <div class="section-header">
-                        <h2>Weekly Meal Planner</h2>
+                        <h2>Plan</h2>
                         <div class="planner-controls">
                             <button class="btn btn--outline" id="clear-week">Clear Week</button>
                             <button class="btn btn--outline" onclick="saveWeekAsTemplate()"><span class="ic" data-icon="save"></span> Save Week</button>
@@ -285,12 +287,12 @@
                 <!-- Grocery List Tab -->
                 <section id="grocery" class="tab-content">
                     <div class="section-header">
-                        <h2>Grocery List</h2>
+                        <h2>Shop</h2>
                         <div class="grocery-controls">
                             <button class="btn btn--outline" id="clear-grocery">Clear All</button>
-                            <button class="btn btn--secondary" id="add-custom-item">Add Custom Item</button>
-                            <button class="btn btn--secondary" onclick="printGroceryList()"><span class="ic" data-icon="printer"></span> Print</button>
-                            <button class="btn btn--secondary" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy List</button>
+                            <button class="btn btn--secondary" id="add-custom-item">Add Item</button>
+                            <button class="btn btn--outline" onclick="showTab('ingredients')" title="Compare prices by store"><span class="ic" data-icon="piggy-bank"></span> Prices</button>
+                            <button class="btn btn--secondary" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy</button>
                         </div>
                     </div>
                     
@@ -302,7 +304,7 @@
                 <!-- My Fridge / Freezer Tab -->
                 <section id="fridge" class="tab-content">
                     <div class="section-header">
-                        <h2><svg class="lc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6Z"/><path d="M5 10h14"/><path d="M15 7v6"/></svg> What's in My Fridge &amp; Freezer</h2>
+                        <h2>Inventory</h2>
                     </div>
                     <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> to add a prepped meal here.</p>
 
