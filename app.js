@@ -251,6 +251,7 @@ function saveToLocalStorage() {
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
+    AppState.localSavedAt = dataToSave.lastSaved;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     console.log('Data saved to local storage');
   } catch (error) {
@@ -4211,7 +4212,8 @@ function buildFirestorePayload() {
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
     recentRecipes: AppState.recentRecipes,
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
+    lastSaved: new Date().toISOString()
   };
 }
 
@@ -4298,6 +4300,7 @@ async function loadFromFirestore() {
     if (docSnap.exists()) {
       const data = docSnap.data();
       AppState.dataVersion = data.version || 0;
+      AppState.cloudSavedAt = data.lastSaved || data.lastUpdated || null;
       AppState.recipes = data.recipes || [];
       const didPatch = patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
@@ -4375,6 +4378,26 @@ async function loadUserData() {
     // device's local data up so it reaches your other devices. Only on a
     // confirmed-empty doc (not a transient error) to avoid overwriting good data.
     if (status === 'empty') saveToFirestore();
+  } else {
+    // Firestore loaded, but check if localStorage has newer data that didn't
+    // finish syncing (e.g. import followed by a SW-triggered page reload before
+    // the async Firestore write completed).
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const local = JSON.parse(raw);
+        const localTime = local.lastSaved ? new Date(local.lastSaved).getTime() : 0;
+        const cloudTime = AppState.cloudSavedAt ? new Date(AppState.cloudSavedAt).getTime() : 0;
+        if (localTime > cloudTime + 3000) {
+          // localStorage is more than 3 seconds newer — it has an unsynchronised save
+          console.log('loadUserData: localStorage is newer than Firestore — restoring and re-syncing');
+          loadFromLocalStorage();
+          saveToFirestore();
+        }
+      }
+    } catch (e) {
+      console.warn('loadUserData: staleness check failed', e);
+    }
   }
 
   seedPantryIfEmpty(); // first-time: pre-fill common staples to set stock on
