@@ -4988,47 +4988,113 @@ select.form-control {
 .storage-ingredient-card,
 .hack-item { cursor: pointer; }
 
-/* Pantry inventory table (compact, replaces the bulky cards) */
-.pantry-table-wrap { overflow-x: auto; margin-top: 0.5rem; }
-.pantry-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-.pantry-table th {
-  text-align: left;
+/* ── Compact pantry list ── */
+.pi-list { display: flex; flex-direction: column; gap: 6px; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+
+.pi-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.pi-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 48px;
+}
+
+.pi-row:hover { background: var(--color-secondary); }
+
+.pi-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pi-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pi-qty { font-size: 0.82rem; color: var(--color-text-secondary); }
+.pi-qty--empty { opacity: 0.45; }
+
+.pi-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  transition: transform 0.18s ease;
+  display: flex;
+}
+.pi-chevron .lc-icon { width: 15px; height: 15px; }
+.pi-row--open .pi-chevron { transform: rotate(90deg); }
+
+/* Expanded edit panel */
+.pi-expand {
+  border-top: 1px solid var(--color-border);
+  padding: 0.8rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: var(--color-bg-1);
+}
+
+.pi-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.pi-field-label {
+  width: 3.5rem;
   font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-secondary);
-  font-weight: 600;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  flex-shrink: 0;
 }
-.pantry-table td {
-  padding: 0.3rem 0.6rem;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-  white-space: nowrap;
+
+.pi-staple-label { cursor: pointer; }
+
+.pi-guide { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.pi-footer {
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
 }
-.pantry-table tbody tr:last-child td { border-bottom: none; }
-.pantry-table tbody tr:hover { background: var(--color-secondary); }
-.pt-name { font-weight: 600; }
-.pt-name .lc-icon { color: var(--color-text-secondary); }
-.pt-muted { color: var(--color-text-secondary); }
-.pt-center { text-align: center; }
-.pt-unit { color: var(--color-text-secondary); font-size: 0.8rem; }
-.pantry-table input[type="number"],
-.pantry-table input[type="date"],
-.pantry-table select {
-  padding: 0.2rem 0.4rem;
+
+.pi-remove-btn { color: var(--color-error) !important; border-color: var(--color-error) !important; }
+
+/* Shared input styles inside the expand panel */
+.pi-expand input[type="number"],
+.pi-expand input[type="date"],
+.pi-expand select {
+  padding: 0.25rem 0.5rem;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-surface);
   color: var(--color-text);
 }
-.pt-stock { width: 58px; }
-.pt-date { width: 138px; }
-.pantry-table .pantry-remove { font-size: 1.05rem; line-height: 1; }
+.pt-stock { width: 70px; }
+.pt-date { width: 150px; }
+.pt-unit { color: var(--color-text-secondary); font-size: 0.8rem; }
 
 /* Freshness status badge (pantry table "Status" column) */
 .pantry-fresh-badge {
@@ -5106,7 +5172,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 @media (max-width: 768px) {
   /* Stop iOS auto-zoom on focus (inputs must be ≥16px) */
   input, select, textarea, .form-control,
-  .pantry-table input, .pantry-table select { font-size: 16px; }
+  .pi-expand input, .pi-expand select { font-size: 16px; }
 
   /* Roomier tap targets */
   .btn { min-height: 44px; }
@@ -5120,53 +5186,8 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   /* Respect notch / home-indicator safe areas */
   body { padding-bottom: env(safe-area-inset-bottom); }
 
-  /* ── Pantry table → stacked cards (kills the sideways scroll) ── */
-  .pantry-table-wrap { overflow: visible; }
-  .pantry-table thead { display: none; }
-  .pantry-table, .pantry-table tbody, .pantry-table tr, .pantry-table td { display: block; width: 100%; }
-  .pantry-table tr {
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    margin-bottom: 10px;
-    padding: 8px 12px;
-    background: var(--color-bg-1);
-    position: relative;
-  }
-  .pantry-table td {
-    border: none !important;
-    padding: 5px 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    white-space: normal;
-  }
-  .pantry-table td::before {
-    content: attr(data-label);
-    margin-right: auto;
-    font-weight: 600;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-secondary);
-  }
-  .pantry-table td.pt-name {
-    font-size: 1.05rem;
-    font-weight: 700;
-    padding: 0 36px 8px 0;
-    border-bottom: 1px solid var(--color-border) !important;
-    margin-bottom: 4px;
-  }
-  .pantry-table td.pt-name::before { display: none; }
-  .pantry-table td.pt-remove-cell {
-    position: absolute;
-    top: 6px; right: 8px;
-    width: auto; padding: 0;
-  }
-  .pantry-table td.pt-remove-cell::before { display: none; }
-  /* The inline storage-guide detail row stays a normal block, no label */
-  .pantry-table tr.pt-detail td { display: block; }
-  .pantry-table tr.pt-detail td::before { display: none; }
-  .pt-stock, .pt-date { width: auto; }
+  /* Pantry expand panel: full-width inputs on mobile */
+  .pt-date { width: 100%; max-width: 180px; }
 }
 
 @media (max-width: 768px) {

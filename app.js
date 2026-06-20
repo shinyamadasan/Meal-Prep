@@ -204,6 +204,7 @@ var ICON_PATHS = {
   'citrus': '<path d="M21.66 17.67a1.08 1.08 0 0 1-.04 1.6A12 12 0 0 1 4.73 2.38a1.1 1.1 0 0 1 1.61-.04z" /> <path d="M19.65 15.66A8 8 0 0 1 8.35 4.34" /> <path d="m14 10-5.5 5.5" /> <path d="M14 17.85V10H6.15" />',
   'log-out': '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
   'settings': '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
 };
 function icon(name) {
   var p = ICON_PATHS[name];
@@ -3800,6 +3801,7 @@ window.setPantryStorage = setPantryStorage;
 window.togglePantryStaple = togglePantryStaple;
 window.cycleStapleLevel = cycleStapleLevel;
 window.togglePantryGuide = togglePantryGuide;
+window.togglePantryExpand = togglePantryExpand;
 window.togglePantryDateMode = togglePantryDateMode;
 window.markRecipeCooked = markRecipeCooked;
 window.setCookedStorage = setCookedStorage;
@@ -5904,56 +5906,75 @@ function renderPantry() {
   function effStorage(p) { return p.storage || inferStorage(p.name, p.category); }
   var WHERE = [['fridge', 'Fridge'], ['freezer', 'Freezer'], ['counter', 'Counter']];
 
-  // Build one item's table rows: the main row, plus a collapsed storage-guide
-  // detail row that expands inline (so you never have to leave the tab).
-  function buildRows(p) {
+  // Build a compact row + collapsible edit panel per item.
+  function buildPantryItem(p) {
     var fs = freshnessStatus(pantryDaysLeft(p));
     var staple = isStaple(p);
     var k = lookupPantryKnowledge(p.name) || genericStorageGuide(p);
     var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
     var expiryMode = p.dateMode === 'expiry';
     var dateVal = expiryMode ? (p.expiryDate || '') : (p.purchaseDate || '');
-    var where = WHERE.map(function(w) {
-      return '<option value="' + w[0] + '"' + (effStorage(p) === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
-    }).join('');
+    var storage = effStorage(p);
 
-    // Staples: a Low/OK/Full level (counting salt makes no sense).
-    // Countable items: a numeric stock + unit.
-    var stockCell;
+    // Stock badge — staples cycle on tap; countables show qty read-only in row
+    var stockBadge;
     if (staple) {
       var lvl = p.stockLevel || 'empty';
       var lblMap = { empty: '—', full: 'Full', ok: 'OK', low: 'Low' };
-      stockCell = '<button class="pt-level pt-level--' + lvl + '" onclick="cycleStapleLevel(\'' + p.id + '\')" title="Tap to change: Full → OK → Low">' + lblMap[lvl] + '</button>';
+      stockBadge = '<button class="pt-level pt-level--' + lvl + '" onclick="event.stopPropagation();cycleStapleLevel(\'' + p.id + '\')" title="Tap to cycle">' + lblMap[lvl] + '</button>';
     } else {
-      stockCell = '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' + (p.unit ? ' <span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '');
+      var qty = p.quantity != null ? p.quantity : null;
+      stockBadge = qty !== null
+        ? '<span class="pi-qty">' + qty + (p.unit ? ' ' + escapeHtml(p.unit) : '') + '</span>'
+        : '<span class="pi-qty pi-qty--empty">—</span>';
     }
 
-    var guideBtn = k ? ' <button class="pt-guide-btn" onclick="togglePantryGuide(\'' + safeId + '\')" title="Storage guide">' + icon('book-open') + '</button>' : '';
+    var freshBadge = fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '';
 
-    var main = '<tr>' +
-      '<td class="pt-name">' + escapeHtml(p.name) + guideBtn + '</td>' +
-      '<td data-label="Stock">' + stockCell + '</td>' +
-      '<td data-label="Where"><select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + where + '</select></td>' +
-      '<td class="pt-datecell" data-label="Date"><input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
-        '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')" title="Switch between bought date (uses shelf life) and a printed expiry date">' + (expiryMode ? 'expires' : 'bought') + '</button></td>' +
-      '<td data-label="Status">' + (fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '<span class="pt-muted">—</span>') + '</td>' +
-      '<td class="pt-center" data-label="Staple"><input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)" title="Staple — tracked as Low/OK/Full, never deducted when cooking"></td>' +
-      '<td class="pt-center pt-remove-cell"><button class="pantry-remove" onclick="removeFromPantry(\'' + p.id + '\')" title="Remove">×</button></td>' +
-      '</tr>';
+    var whereOpts = WHERE.map(function(w) {
+      return '<option value="' + w[0] + '"' + (storage === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
+    }).join('');
 
-    var detail = '';
-    if (k) {
-      var d = '<div class="pantry-detail-row"><b>' + icon('package') + ' How to store:</b> ' + k.store + '</div>' +
-              '<div class="pantry-detail-row"><b>' + icon('triangle-alert') + ' Signs it\'s bad:</b> ' + k.spoilage + '</div>' +
-              '<div class="pantry-detail-row"><b>' + icon('search') + ' Freshness guide:</b> ' + k.freshness + '</div>' +
-              (k.tip ? '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>' : '');
-      detail = '<tr class="pt-detail hidden" id="ptdetail-' + safeId + '"><td colspan="7">' + d + '</td></tr>';
-    }
-    return main + detail;
+    var stockEdit = !staple
+      ? '<div class="pi-field"><span class="pi-field-label">Qty</span>' +
+        '<input class="pt-stock" type="number" min="0" step="0.01" placeholder="—" value="' + (p.quantity != null ? p.quantity : '') + '" onchange="updatePantryQty(\'' + p.id + '\', this.value)">' +
+        (p.unit ? '<span class="pt-unit">' + escapeHtml(p.unit) + '</span>' : '') + '</div>'
+      : '';
+
+    var guideHtml = k
+      ? '<div class="pi-guide">' +
+        '<button class="pt-guide-btn" onclick="togglePantryGuide(\'' + safeId + '\')">' + icon('book-open') + ' Storage guide</button>' +
+        '<div class="pantry-detail-rows hidden" id="ptdetail-' + safeId + '">' +
+        '<div class="pantry-detail-row"><b>' + icon('package') + ' How to store:</b> ' + k.store + '</div>' +
+        '<div class="pantry-detail-row"><b>' + icon('triangle-alert') + ' Signs it\'s bad:</b> ' + k.spoilage + '</div>' +
+        (k.tip ? '<div class="pantry-detail-row pantry-tip">' + k.tip + '</div>' : '') +
+        '</div></div>'
+      : '';
+
+    return '<div class="pi-item">' +
+      '<div class="pi-row" onclick="togglePantryExpand(\'' + safeId + '\')">' +
+        '<span class="pi-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="pi-badges">' + stockBadge + freshBadge + '</div>' +
+        '<span class="pi-chevron">' + icon('chevron-right') + '</span>' +
+      '</div>' +
+      '<div class="pi-expand hidden" id="piexp-' + safeId + '">' +
+        stockEdit +
+        '<div class="pi-field"><span class="pi-field-label">Where</span>' +
+          '<select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + whereOpts + '</select></div>' +
+        '<div class="pi-field"><span class="pi-field-label">Date</span>' +
+          '<input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
+          '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')">' + (expiryMode ? 'expires' : 'bought') + '</button></div>' +
+        '<label class="pi-field pi-staple-label"><span class="pi-field-label">Staple</span>' +
+          '<input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)">' +
+          '<span class="pt-unit">not deducted when cooking</span></label>' +
+        guideHtml +
+        '<div class="pi-footer">' +
+          '<button class="btn btn--outline btn--sm pi-remove-btn" onclick="removeFromPantry(\'' + p.id + '\')">Remove</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
-  var THEAD = '<thead><tr><th>Item</th><th>Stock</th><th>Where</th><th>Date</th><th>Status</th>' +
-              '<th title="Staples are never deducted when you cook">Staple</th><th></th></tr></thead>';
   var groups = [
     { key: 'fridge', label: icon('refrigerator') + ' In the Fridge' },
     { key: 'freezer', label: icon('snowflake') + ' In the Freezer' },
@@ -5967,8 +5988,7 @@ function renderPantry() {
     if (items.length === 0) return;
     html += '<div class="fridge-subsection-title">' + g.label +
             ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
-    html += '<div class="pantry-table-wrap"><table class="pantry-table">' + THEAD +
-            '<tbody>' + items.map(buildRows).join('') + '</tbody></table></div>';
+    html += '<div class="pi-list">' + items.map(buildPantryItem).join('') + '</div>';
   });
   list.innerHTML = html;
 }
@@ -6064,6 +6084,14 @@ function updatePantryQty(id, value) {
   p.quantity = isNaN(q) ? null : q;
   saveData();
   renderPantry();
+}
+
+function togglePantryExpand(safeId) {
+  var expand = document.getElementById('piexp-' + safeId);
+  if (!expand) return;
+  var open = expand.classList.toggle('hidden') === false;
+  var row = expand.previousElementSibling;
+  if (row) row.classList.toggle('pi-row--open', open);
 }
 
 // Expand/collapse an item's inline storage-guide row (no tab-switching needed).
