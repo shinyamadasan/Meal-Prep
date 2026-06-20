@@ -1359,7 +1359,6 @@ function initApp() {
         updateFreshnessBadges();
         renderFreshnessBanner();
         initWeekTemplateButton();
-        updateThemeToggleIcon();
       }
     });
   } else {
@@ -1392,7 +1391,6 @@ function initApp() {
   }
 
   initWeekTemplateButton();
-  updateThemeToggleIcon();
 
   // Attach ingredient autocomplete to pantry input
   var pantryInput = document.getElementById('pantry-input');
@@ -3997,7 +3995,6 @@ window.getCategoryIcon = getCategoryIcon;
 window.showSuccessMessage = showSuccessMessage;
 window.clearLocalStorage = clearLocalStorage;
 // These were missing — caused dark mode, pantry, auth, and export buttons to silently do nothing
-window.toggleDarkMode = toggleDarkMode;
 window.addToPantry = addToPantry;
 window.togglePantrySection = togglePantrySection;
 window.togglePantryCard = togglePantryCard;
@@ -4057,13 +4054,6 @@ window.prevPlannerDay = prevPlannerDay;
 window.nextPlannerDay = nextPlannerDay;
 window.printGroceryList = printGroceryList;
 window.copyGroceryList = copyGroceryList;
-window.openSharedRecipesModal = openSharedRecipesModal;
-window.closeSharedRecipesModal = closeSharedRecipesModal;
-window.shareRecipe = shareRecipe;
-window.openFamilySharingModal = openFamilySharingModal;
-window.closeFamilySharingModal = closeFamilySharingModal;
-window.inviteFamilyMember = inviteFamilyMember;
-window.exportAllData = exportAllData;
 window.openDeleteAccountModal = openDeleteAccountModal;
 window.closeDeleteAccountModal = closeDeleteAccountModal;
 window.deleteAccount = deleteAccount;
@@ -4362,22 +4352,14 @@ function updateAuthUI() {
   const userInfo = document.getElementById('user-info');
   const authButtons = document.getElementById('auth-buttons');
   const userEmail = document.getElementById('user-email');
-  const sharedRecipesBtn = document.getElementById('shared-recipes-btn');
-  const familySharingBtn = document.getElementById('family-sharing-btn');
-  
+
   if (AppState.currentUser) {
     userEmail.textContent = AppState.currentUser.email;
     userInfo.classList.remove('hidden');
     authButtons.classList.add('hidden');
-    // Sharing relies on a trusted email identity → only show once verified.
-    var verified = AppState.currentUser.emailVerified;
-    if (sharedRecipesBtn) sharedRecipesBtn.style.display = verified ? 'inline-block' : 'none';
-    if (familySharingBtn) familySharingBtn.style.display = verified ? 'inline-block' : 'none';
   } else {
     userInfo.classList.add('hidden');
     authButtons.classList.remove('hidden');
-    if (sharedRecipesBtn) sharedRecipesBtn.style.display = 'none';
-    if (familySharingBtn) familySharingBtn.style.display = 'none';
   }
   renderVerificationBanner();
   updateSyncIndicator();
@@ -4708,12 +4690,6 @@ function closeUsernameModal() {
 
 // Returns the user's display name, or prompts them to pick one. Used before
 // posting to the community feed so we never share as a raw email.
-function requireUsername() {
-  if (AppState.profile && AppState.profile.displayName) return AppState.profile.displayName;
-  openUsernameModal();
-  return null;
-}
-
 // Enhanced save function that saves to both local storage and Firestore
 function saveData() {
   saveToLocalStorage();
@@ -4780,364 +4756,6 @@ window.closeLoginModal = closeLoginModal;
 window.openSignupModal = openSignupModal;
 window.closeSignupModal = closeSignupModal;
 window.signOut = signOut;
-
-// Shared Recipes Functions
-function openSharedRecipesModal() {
-  if (!AppState.currentUser) {
-    showErrorMessage('Please sign in to access shared recipes');
-    return;
-  }
-  
-  document.getElementById('shared-recipes-modal').classList.remove('hidden');
-  renderCommunityIdentity();
-  populateShareRecipeSelect();
-  loadSharedRecipes();
-}
-
-function renderCommunityIdentity() {
-  var el = document.getElementById('community-identity');
-  if (!el) return;
-  var name = AppState.profile && AppState.profile.displayName;
-  el.innerHTML = name
-    ? 'Posting as <strong>' + escapeHtml(name) + '</strong> · <button class="btn-link" onclick="openUsernameModal()">change</button>'
-    : '<button class="btn-link" onclick="openUsernameModal()">Set a display name</button> to post a recipe.';
-}
-
-function closeSharedRecipesModal() {
-  document.getElementById('shared-recipes-modal').classList.add('hidden');
-}
-
-function populateShareRecipeSelect() {
-  const select = document.getElementById('share-recipe-select');
-  select.innerHTML = '<option value="">Select a recipe to share...</option>';
-  
-  AppState.recipes.forEach(recipe => {
-    const option = document.createElement('option');
-    option.value = recipe.id;
-    option.textContent = recipe.name;
-    select.appendChild(option);
-  });
-}
-
-async function shareRecipe() {
-  const recipeId = document.getElementById('share-recipe-select').value;
-  if (!recipeId) {
-    showErrorMessage('Please select a recipe to share');
-    return;
-  }
-  
-  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
-  if (!recipe) {
-    showErrorMessage('Recipe not found');
-    return;
-  }
-  
-  try {
-    const sharedRecipe = {
-      ...recipe,
-      sharedBy: AppState.currentUser.email,
-      sharedAt: new Date().toISOString(),
-      originalId: recipe.id
-    };
-    
-    // Remove the original ID to avoid conflicts
-    delete sharedRecipe.id;
-    
-    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), JSON.parse(JSON.stringify(sharedRecipe)));
-    showSuccessMessage('Recipe shared successfully!');
-    loadSharedRecipes();
-  } catch (error) {
-    console.error('Error sharing recipe:', error);
-    showErrorMessage('Failed to share recipe: ' + error.message);
-  }
-}
-
-async function loadSharedRecipes() {
-  try {
-    const sharedRecipesRef = window.firebase.collection(window.firebase.db, 'sharedRecipes');
-    const q = window.firebase.query(sharedRecipesRef, window.firebase.orderBy('sharedAt', 'desc'));
-    const querySnapshot = await window.firebase.getDocs(q);
-    
-    const sharedRecipesList = document.getElementById('shared-recipes-list');
-    sharedRecipesList.innerHTML = '';
-    
-    if (querySnapshot.empty) {
-      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes available</p>';
-      return;
-    }
-    
-    querySnapshot.forEach((doc) => {
-      const recipe = doc.data();
-      const recipeItem = document.createElement('div');
-      recipeItem.className = 'shared-recipe-item';
-      recipeItem.innerHTML = `
-        <div class="shared-recipe-info">
-          <h4>${escapeHtml(recipe.name)}</h4>
-          <p>by ${escapeHtml(recipe.authorName || 'A meal prepper')} • ${escapeHtml(recipe.category || '')} • ${Number(recipe.servings) || 0} servings</p>
-        </div>
-        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Save</button>
-      `;
-      sharedRecipesList.appendChild(recipeItem);
-    });
-  } catch (error) {
-    console.error('Error loading shared recipes:', error);
-    showErrorMessage('Failed to load shared recipes: ' + error.message);
-  }
-}
-
-// Recursively remove HTML tag delimiters from every string in a value. Applied
-// to shared recipes on import so a malicious payload in ANY field (name,
-// instructions, ingredient names, etc.) can't persist into our own recipes,
-// which are rendered via innerHTML in many places.
-function stripTagsDeep(value) {
-  if (typeof value === 'string') return value.replace(/[<>]/g, '');
-  if (Array.isArray(value)) return value.map(stripTagsDeep);
-  if (value && typeof value === 'object') {
-    var out = {};
-    Object.keys(value).forEach(function(k) { out[k] = stripTagsDeep(value[k]); });
-    return out;
-  }
-  return value;
-}
-
-async function importSharedRecipe(sharedRecipeId) {
-  try {
-    const docRef = window.firebase.doc(window.firebase.db, 'sharedRecipes', sharedRecipeId);
-    const docSnap = await window.firebase.getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const sharedRecipe = docSnap.data();
-      
-      // Create a new recipe with a unique ID
-      const newRecipe = {
-        ...sharedRecipe,
-        id: generateId(),
-        name: sharedRecipe.name + ' (Saved)'
-      };
-
-      // Strip community/shared-specific fields — this is now your own recipe.
-      delete newRecipe.sharedAt;
-      delete newRecipe.originalId;
-      delete newRecipe.authorId;
-      delete newRecipe.authorName;
-      delete newRecipe.sharedBy;
-      delete newRecipe.privacy;
-      delete newRecipe.familyGroupId;
-
-      // Sanitize all fields before storing — this recipe came from another user.
-      AppState.recipes.push(stripTagsDeep(newRecipe));
-      saveData();
-      renderRecipes();
-      showSuccessMessage('Saved to your recipes! 🎉');
-      closeSharedRecipesModal();
-    }
-  } catch (error) {
-    console.error('Error importing shared recipe:', error);
-    showErrorMessage('Failed to import recipe: ' + error.message);
-  }
-}
-
-// Global functions for shared recipes
-window.openSharedRecipesModal = openSharedRecipesModal;
-window.closeSharedRecipesModal = closeSharedRecipesModal;
-window.shareRecipe = shareRecipe;
-window.importSharedRecipe = importSharedRecipe;
-
-// Family Sharing Functions
-function openFamilySharingModal() {
-  if (!AppState.currentUser) {
-    showErrorMessage('Please sign in to access family sharing');
-    return;
-  }
-  
-  document.getElementById('family-sharing-modal').classList.remove('hidden');
-  loadFamilyMembers();
-}
-
-function closeFamilySharingModal() {
-  document.getElementById('family-sharing-modal').classList.add('hidden');
-}
-
-async function inviteFamilyMember() {
-  const email = document.getElementById('family-email').value.trim();
-  if (!email) {
-    showErrorMessage('Please enter an email address');
-    return;
-  }
-  
-  if (email === AppState.currentUser.email) {
-    showErrorMessage('You cannot invite yourself');
-    return;
-  }
-  
-  try {
-    const invitation = {
-      fromUser: AppState.currentUser.email,
-      toEmail: email,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      familyGroupId: AppState.currentUser.uid
-    };
-    
-    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'familyInvitations'), invitation);
-    showSuccessMessage('Invitation sent successfully!');
-    document.getElementById('family-email').value = '';
-    loadFamilyMembers();
-  } catch (error) {
-    console.error('Error sending invitation:', error);
-    showErrorMessage('Failed to send invitation: ' + error.message);
-  }
-}
-
-async function loadFamilyMembers() {
-  try {
-    const invitationsRef = window.firebase.collection(window.firebase.db, 'familyInvitations');
-    const q = window.firebase.query(invitationsRef, 
-      window.firebase.where('familyGroupId', '==', AppState.currentUser.uid));
-    const querySnapshot = await window.firebase.getDocs(q);
-    
-    const familyMembersList = document.getElementById('family-members-list');
-    familyMembersList.innerHTML = '';
-    
-    if (querySnapshot.empty) {
-      familyMembersList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No family members yet</p>';
-      return;
-    }
-    
-    querySnapshot.forEach((doc) => {
-      const invitation = doc.data();
-      const memberItem = document.createElement('div');
-      memberItem.className = 'family-member-item';
-      memberItem.innerHTML = `
-        <div class="family-member-info">
-          <h4>${invitation.toEmail}</h4>
-          <p>Invited ${new Date(invitation.createdAt).toLocaleDateString()}</p>
-        </div>
-        <div class="member-status ${invitation.status}">${invitation.status}</div>
-      `;
-      familyMembersList.appendChild(memberItem);
-    });
-  } catch (error) {
-    console.error('Error loading family members:', error);
-    showErrorMessage('Failed to load family members: ' + error.message);
-  }
-}
-
-// Enhanced share recipe function with privacy options
-async function shareRecipe() {
-  const recipeId = document.getElementById('share-recipe-select').value;
-  if (!recipeId) {
-    showErrorMessage('Please select a recipe to share');
-    return;
-  }
-  
-  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
-  if (!recipe) {
-    showErrorMessage('Recipe not found');
-    return;
-  }
-
-  // Post to the community feed AS a display name, never the raw email.
-  const authorName = requireUsername();
-  if (!authorName) return; // username modal opened; they can share again after
-
-  try {
-    const sharedRecipe = {
-      ...recipe,
-      authorId: AppState.currentUser.uid,
-      authorName: authorName,
-      sharedAt: new Date().toISOString(),
-      originalId: recipe.id
-    };
-
-    // Don't leak the email or the local recipe id into the public feed.
-    delete sharedRecipe.id;
-    delete sharedRecipe.sharedBy;
-
-    await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'sharedRecipes'), JSON.parse(JSON.stringify(sharedRecipe)));
-    showSuccessMessage('Recipe shared to the community! 🎉');
-    loadSharedRecipes();
-  } catch (error) {
-    console.error('Error sharing recipe:', error);
-    showErrorMessage('Failed to share recipe: ' + error.message);
-  }
-}
-
-// Load shared recipes the user is allowed to see: all public recipes plus
-// their OWN family recipes. Uses two separate queries that the Firestore
-// security rules can verify, then merges them. A single
-// where('privacy','in',['public','family']) query would be rejected by the
-// secure rules because it could return other users' family recipes.
-async function loadSharedRecipes() {
-  try {
-    const fb = window.firebase;
-    const ref = fb.collection(fb.db, 'sharedRecipes');
-    // Everyone's shared recipes are public — one "newest first" query, which
-    // needs no composite index (a single orderBy uses the automatic index).
-    const snap = await fb.getDocs(fb.query(ref, fb.orderBy('sharedAt', 'desc')));
-
-    const sharedRecipesList = document.getElementById('shared-recipes-list');
-    sharedRecipesList.innerHTML = '';
-
-    if (snap.empty) {
-      sharedRecipesList.innerHTML = '<p style="text-align: center; color: var(--color-text-secondary);">No shared recipes yet — be the first to share one!</p>';
-      return;
-    }
-
-    snap.forEach((doc) => {
-      const recipe = doc.data();
-      const recipeItem = document.createElement('div');
-      recipeItem.className = 'shared-recipe-item';
-      recipeItem.innerHTML = `
-        <div class="shared-recipe-info">
-          <h4>${escapeHtml(recipe.name)}</h4>
-          <p>by ${escapeHtml(recipe.authorName || 'A meal prepper')} • ${escapeHtml(recipe.category || '')} • ${Number(recipe.servings) || 0} servings</p>
-        </div>
-        <button class="btn btn--primary btn--sm" onclick="importSharedRecipe('${doc.id}')">Save</button>
-      `;
-      sharedRecipesList.appendChild(recipeItem);
-    });
-  } catch (error) {
-    console.error('Error loading shared recipes:', error);
-    showErrorMessage('Failed to load shared recipes: ' + error.message);
-  }
-}
-
-// Data Export Functions
-async function exportAllData() {
-  try {
-    const allData = {
-      user: {
-        email: AppState.currentUser.email,
-        uid: AppState.currentUser.uid,
-        exportDate: new Date().toISOString()
-      },
-      recipes: AppState.recipes,
-      weeklyPlan: AppState.weeklyPlan,
-      groceryList: AppState.groceryList,
-      nutritionGoals: AppState.nutritionGoals,
-      customIngredients: AppState.customIngredients,
-      customHacks: AppState.customHacks
-    };
-    
-    const dataStr = JSON.stringify(allData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `meal-prep-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    showSuccessMessage('All data exported successfully!');
-  } catch (error) {
-    console.error('Error exporting data:', error);
-    showErrorMessage('Failed to export data: ' + error.message);
-  }
-}
 
 // Account Deletion Functions
 function openDeleteAccountModal() {
@@ -5212,15 +4830,6 @@ async function deleteAccount() {
     showErrorMessage('Failed to delete account: ' + error.message);
   }
 }
-
-// Global functions for new security features
-window.openFamilySharingModal = openFamilySharingModal;
-window.closeFamilySharingModal = closeFamilySharingModal;
-window.inviteFamilyMember = inviteFamilyMember;
-window.exportAllData = exportAllData;
-window.openDeleteAccountModal = openDeleteAccountModal;
-window.closeDeleteAccountModal = closeDeleteAccountModal;
-window.deleteAccount = deleteAccount;
 
 // Setup authentication form handlers
 function setupAuthFormHandlers() {
@@ -5467,24 +5076,6 @@ function clearRecipeForm() {
   document.getElementById('ingredients-list').innerHTML = '';
   removePhoto();
   AppState.currentEditingRecipe = null;
-}
-
-// ── Dark Mode ─────────────────────────────────────────────────────────────────
-
-function toggleDarkMode() {
-  const current = document.documentElement.getAttribute('data-color-scheme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-color-scheme', next);
-  localStorage.setItem('colorScheme', next);
-  updateThemeToggleIcon();
-}
-
-function updateThemeToggleIcon() {
-  const btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  const isDark = document.documentElement.getAttribute('data-color-scheme') === 'dark';
-  btn.textContent = isDark ? '☀️' : '🌙';
-  btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
 }
 
 // ── Grocery List — Print & Copy ───────────────────────────────────────────────
@@ -7735,179 +7326,179 @@ function applyNutritionResult(cal, pro, carb, fat) {
 
 const INGREDIENT_DB = [
   // Proteins
-  { name: 'Chicken Breast', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Chicken Thigh', unit: 'kg', category: 'Protein', price: '₱180/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Chicken Leg', unit: 'kg', category: 'Protein', price: '₱160/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Ground Chicken', unit: 'kg', category: 'Protein', price: '₱220/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Whole Chicken', unit: 'kg', category: 'Protein', price: '₱160/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Pork Belly (Liempo)', unit: 'kg', category: 'Protein', price: '₱280/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Ground Pork', unit: 'kg', category: 'Protein', price: '₱230/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Pork Chop', unit: 'kg', category: 'Protein', price: '₱260/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Pork Ribs', unit: 'kg', category: 'Protein', price: '₱300/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Pork Shoulder', unit: 'kg', category: 'Protein', price: '₱220/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Pork Liver', unit: 'kg', category: 'Protein', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1 },
-  { name: 'Ground Beef', unit: 'kg', category: 'Protein', price: '₱320/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Beef', unit: 'kg', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Beef Brisket', unit: 'kg', category: 'Protein', price: '₱380/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Beef Sirloin', unit: 'kg', category: 'Protein', price: '₱450/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Shrimp', unit: 'kg', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Seafood Market', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Bangus (Milkfish)', unit: 'kg', category: 'Protein', price: '₱140/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Tilapia', unit: 'kg', category: 'Protein', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Salmon', unit: 'kg', category: 'Protein', price: '₱600/kg', store: 'Supermarket / S&R', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Tuna', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Galunggong', unit: 'kg', category: 'Protein', price: '₱90/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Squid (Pusit)', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2 },
-  { name: 'Crab', unit: 'kg', category: 'Protein', price: '₱250/kg', store: 'Wet Market / Seafood Market', storage: 'fridge', shelfLifeDays: 1 },
-  { name: 'Mussels (Tahong)', unit: 'kg', category: 'Protein', price: '₱60/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1 },
-  { name: 'Clams (Halaan)', unit: 'kg', category: 'Protein', price: '₱80/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1 },
-  { name: 'Eggs', unit: 'pieces', category: 'Protein', price: '₱10/pc', store: 'Grocery / Supermarket', storage: 'fridge', shelfLifeDays: 35 },
-  { name: 'Tofu (Tokwa)', unit: 'g', category: 'Protein', price: '₱35/block', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Longganisa', unit: 'pack', category: 'Protein', price: '₱80/pack', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Hotdog', unit: 'pack', category: 'Protein', price: '₱60/pack', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Bacon', unit: 'g', category: 'Protein', price: '₱250/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Ham', unit: 'kg', category: 'Protein', price: '₱300/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Sardines (Canned)', unit: 'can', category: 'Protein', price: '₱30/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true },
-  { name: 'Tuna (Canned)', unit: 'can', category: 'Protein', price: '₱55/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true },
-  { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein', price: '₱75/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true },
+  { name: 'Chicken Breast', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['chicken', 'manok', 'raw chicken', 'chicken fillet'], fridgeDays: 2, freezerDays: 270, trackExpiry: true },
+  { name: 'Chicken Thigh', unit: 'kg', category: 'Protein', price: '₱180/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['chicken thigh', 'manok', 'dark meat chicken'], fridgeDays: 2, freezerDays: 270, trackExpiry: true },
+  { name: 'Chicken Leg', unit: 'kg', category: 'Protein', price: '₱160/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['chicken leg', 'drumstick', 'chicken drumstick', 'manok'], fridgeDays: 2, freezerDays: 270, trackExpiry: true },
+  { name: 'Ground Chicken', unit: 'kg', category: 'Protein', price: '₱220/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['ground chicken', 'minced chicken', 'chicken giniling'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Whole Chicken', unit: 'kg', category: 'Protein', price: '₱160/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['whole chicken', 'buong manok', 'manok'], fridgeDays: 2, freezerDays: 270, trackExpiry: true },
+  { name: 'Pork Belly (Liempo)', unit: 'kg', category: 'Protein', price: '₱280/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['liempo', 'pork belly', 'baboy', 'pork'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Ground Pork', unit: 'kg', category: 'Protein', price: '₱230/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['ground pork', 'minced pork', 'pork giniling', 'giniling na baboy'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Pork Chop', unit: 'kg', category: 'Protein', price: '₱260/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['pork chop', 'pork chops', 'baboy'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Pork Ribs', unit: 'kg', category: 'Protein', price: '₱300/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['pork ribs', 'ribs', 'baby back ribs', 'baboy'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Pork Shoulder', unit: 'kg', category: 'Protein', price: '₱220/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['pork shoulder', 'kasim', 'baboy', 'pork kasim'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Pork Liver', unit: 'kg', category: 'Protein', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1, aliases: ['pork liver', 'liver', 'atay', 'atay ng baboy'], fridgeDays: 1, freezerDays: 90, trackExpiry: true },
+  { name: 'Ground Beef', unit: 'kg', category: 'Protein', price: '₱320/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['ground beef', 'minced beef', 'beef giniling', 'giniling na baka'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Beef', unit: 'kg', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['beef', 'baka', 'karne', 'beef steak'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Beef Brisket', unit: 'kg', category: 'Protein', price: '₱380/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['beef brisket', 'brisket', 'baka'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Beef Sirloin', unit: 'kg', category: 'Protein', price: '₱450/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 3, aliases: ['beef sirloin', 'sirloin', 'sirloin steak', 'baka'], fridgeDays: 3, freezerDays: 180, trackExpiry: true },
+  { name: 'Shrimp', unit: 'kg', category: 'Protein', price: '₱350/kg', store: 'Wet Market / Seafood Market', storage: 'fridge', shelfLifeDays: 2, aliases: ['shrimp', 'hipon', 'prawns', 'sugpo'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Bangus (Milkfish)', unit: 'kg', category: 'Protein', price: '₱140/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['bangus', 'milkfish', 'isda'], fridgeDays: 2, freezerDays: 180, trackExpiry: true },
+  { name: 'Tilapia', unit: 'kg', category: 'Protein', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2, aliases: ['tilapia', 'isda'], fridgeDays: 2, freezerDays: 180, trackExpiry: true },
+  { name: 'Salmon', unit: 'kg', category: 'Protein', price: '₱600/kg', store: 'Supermarket / S&R', storage: 'fridge', shelfLifeDays: 2, aliases: ['salmon', 'salmon fillet', 'isda'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Tuna', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 2, aliases: ['tuna', 'fresh tuna', 'isda', 'yellowfin tuna'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Galunggong', unit: 'kg', category: 'Protein', price: '₱90/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2, aliases: ['galunggong', 'round scad', 'mackerel scad', 'isda'], fridgeDays: 2, freezerDays: 180, trackExpiry: true },
+  { name: 'Squid (Pusit)', unit: 'kg', category: 'Protein', price: '₱200/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 2, aliases: ['pusit', 'squid', 'calamari', 'calamares'], fridgeDays: 2, freezerDays: 90, trackExpiry: true },
+  { name: 'Crab', unit: 'kg', category: 'Protein', price: '₱250/kg', store: 'Wet Market / Seafood Market', storage: 'fridge', shelfLifeDays: 1, aliases: ['crab', 'alimango', 'alimasag', 'blue crab'], fridgeDays: 1, freezerDays: 90, trackExpiry: true },
+  { name: 'Mussels (Tahong)', unit: 'kg', category: 'Protein', price: '₱60/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1, aliases: ['tahong', 'mussels', 'green mussels'], fridgeDays: 1, freezerDays: 90, trackExpiry: true },
+  { name: 'Clams (Halaan)', unit: 'kg', category: 'Protein', price: '₱80/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 1, aliases: ['halaan', 'clams', 'tulya', 'manila clams'], fridgeDays: 1, freezerDays: 90, trackExpiry: true },
+  { name: 'Eggs', unit: 'pieces', category: 'Protein', price: '₱10/pc', store: 'Grocery / Supermarket', storage: 'fridge', shelfLifeDays: 35, aliases: ['egg', 'itlog', 'eggs', 'chicken egg'], fridgeDays: 35, freezerDays: null, trackExpiry: true },
+  { name: 'Tofu (Tokwa)', unit: 'g', category: 'Protein', price: '₱35/block', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 5, aliases: ['tokwa', 'tofu', 'bean curd', 'firm tofu'], fridgeDays: 5, freezerDays: 90, trackExpiry: true },
+  { name: 'Longganisa', unit: 'pack', category: 'Protein', price: '₱80/pack', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['longganisa', 'longanisa', 'Filipino sausage', 'sweet sausage'], fridgeDays: 7, freezerDays: 60, trackExpiry: true },
+  { name: 'Hotdog', unit: 'pack', category: 'Protein', price: '₱60/pack', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['hotdog', 'hot dog', 'franks', 'sausage'], fridgeDays: 7, freezerDays: 60, trackExpiry: true },
+  { name: 'Bacon', unit: 'g', category: 'Protein', price: '₱250/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['bacon', 'bakon', 'crispy bacon', 'streaky bacon'], fridgeDays: 7, freezerDays: 30, trackExpiry: true },
+  { name: 'Ham', unit: 'kg', category: 'Protein', price: '₱300/kg', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['ham', 'jamon', 'cooked ham'], fridgeDays: 7, freezerDays: 60, trackExpiry: true },
+  { name: 'Sardines (Canned)', unit: 'can', category: 'Protein', price: '₱30/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true, aliases: ['sardines', 'canned sardines', 'ligo', 'sardinas'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Tuna (Canned)', unit: 'can', category: 'Protein', price: '₱55/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true, aliases: ['canned tuna', 'tuna flakes', 'tuna in oil', 'tuna in water'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein', price: '₱75/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true, aliases: ['corned beef', 'cornbeef', 'karne norte', 'palm corned beef'], fridgeDays: null, freezerDays: null, trackExpiry: false },
 
   // Vegetables
-  { name: 'Garlic (Bawang)', unit: 'g', category: 'Vegetable', price: '₱80/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 180 },
-  { name: 'Onion (Sibuyas)', unit: 'kg', category: 'Vegetable', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60 },
-  { name: 'Red Onion', unit: 'kg', category: 'Vegetable', price: '₱90/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60 },
-  { name: 'Shallots', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 30 },
-  { name: 'Tomato (Kamatis)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5 },
-  { name: 'Potato (Patatas)', unit: 'kg', category: 'Vegetable', price: '₱70/kg', store: 'Wet Market / Supermarket', storage: 'counter', shelfLifeDays: 28 },
-  { name: 'Sweet Potato (Kamote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 21 },
-  { name: 'Carrot (Karot)', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 21 },
-  { name: 'Cabbage (Repolyo)', unit: 'kg', category: 'Vegetable', price: '₱40/kg', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 14 },
-  { name: 'Kangkong', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Pechay', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Spinach', unit: 'g', category: 'Vegetable', price: '₱80/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Ampalaya (Bitter Melon)', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Talong (Eggplant)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5 },
-  { name: 'Sitaw (String Beans)', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Okra', unit: 'g', category: 'Vegetable', price: '₱40/250g', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Malunggay (Moringa)', unit: 'bunches', category: 'Vegetable', price: '₱10/bunch', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Kalabasa (Squash)', unit: 'kg', category: 'Vegetable', price: '₱30/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 28 },
-  { name: 'Upo (Bottle Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Patola (Sponge Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Green Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱25/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱35/pc', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable', price: '₱20/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 14 },
-  { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable', price: '₱15/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable', price: '₱60/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30 },
-  { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable', price: '₱10/bundle', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 14 },
-  { name: 'Mushroom', unit: 'g', category: 'Vegetable', price: '₱150/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Cucumber', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Lettuce', unit: 'g', category: 'Vegetable', price: '₱50/head', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Broccoli', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Cauliflower', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Chili (Siling Labuyo)', unit: 'g', category: 'Vegetable', price: '₱30/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Siling Haba (Long Green Chili)', unit: 'g', category: 'Vegetable', price: '₱20/100g', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Bean Sprouts (Toge)', unit: 'g', category: 'Vegetable', price: '₱20/200g', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Bok Choy', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Scallions', unit: 'kg', category: 'Vegetable', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Chayote (Sayote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 14 },
+  { name: 'Garlic (Bawang)', unit: 'g', category: 'Vegetable', price: '₱80/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 180, aliases: ['bawang', 'garlic', 'garlic cloves', 'garlic clove', 'minced garlic'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Onion (Sibuyas)', unit: 'kg', category: 'Vegetable', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, aliases: ['sibuyas', 'onion', 'onions', 'white onion', 'yellow onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: true },
+  { name: 'Red Onion', unit: 'kg', category: 'Vegetable', price: '₱90/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, aliases: ['red onion', 'sibuyas pula', 'bombay onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: true },
+  { name: 'Shallots', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 30, aliases: ['shallots', 'sibuyas tagalog', 'echalotes', 'eschalots'], fridgeDays: 30, freezerDays: 365, trackExpiry: true },
+  { name: 'Tomato (Kamatis)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5, aliases: ['kamatis', 'tomato', 'tomatoes', 'fresh tomato'], fridgeDays: 10, freezerDays: 365, trackExpiry: true },
+  { name: 'Potato (Patatas)', unit: 'kg', category: 'Vegetable', price: '₱70/kg', store: 'Wet Market / Supermarket', storage: 'counter', shelfLifeDays: 28, aliases: ['patatas', 'potato', 'potatoes', 'white potato'], fridgeDays: null, freezerDays: 365, trackExpiry: true },
+  { name: 'Sweet Potato (Kamote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 21, aliases: ['kamote', 'sweet potato', 'camote', 'yam'], fridgeDays: null, freezerDays: 365, trackExpiry: true },
+  { name: 'Carrot (Karot)', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 21, aliases: ['karot', 'carrot', 'carrots'], fridgeDays: 21, freezerDays: 365, trackExpiry: true },
+  { name: 'Cabbage (Repolyo)', unit: 'kg', category: 'Vegetable', price: '₱40/kg', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 14, aliases: ['repolyo', 'cabbage', 'green cabbage'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Kangkong', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 3, aliases: ['kangkong', 'water spinach', 'swamp cabbage', 'morning glory'], fridgeDays: 3, freezerDays: null, trackExpiry: true },
+  { name: 'Pechay', unit: 'bunches', category: 'Vegetable', price: '₱15/bunch', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['pechay', 'bok choy', 'Chinese cabbage', 'petsay'], fridgeDays: 3, freezerDays: null, trackExpiry: true },
+  { name: 'Spinach', unit: 'g', category: 'Vegetable', price: '₱80/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['spinach', 'espinaka', 'baby spinach'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
+  { name: 'Ampalaya (Bitter Melon)', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 7, aliases: ['ampalaya', 'bitter melon', 'bitter gourd', 'amplaya', 'amargoso'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Talong (Eggplant)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5, aliases: ['talong', 'eggplant', 'aubergine', 'brinjal'], fridgeDays: 10, freezerDays: 365, trackExpiry: true },
+  { name: 'Sitaw (String Beans)', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 5, aliases: ['sitaw', 'string beans', 'green beans', 'habichuelas', 'yard long beans'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
+  { name: 'Okra', unit: 'g', category: 'Vegetable', price: '₱40/250g', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['okra', 'ladyfinger', 'lady finger', 'ladies fingers'], fridgeDays: 3, freezerDays: 365, trackExpiry: true },
+  { name: 'Malunggay (Moringa)', unit: 'bunches', category: 'Vegetable', price: '₱10/bunch', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 3, aliases: ['malunggay', 'moringa', 'drumstick leaves', 'malungay'], fridgeDays: 3, freezerDays: null, trackExpiry: true },
+  { name: 'Kalabasa (Squash)', unit: 'kg', category: 'Vegetable', price: '₱30/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 28, aliases: ['kalabasa', 'squash', 'pumpkin', 'kalabasa squash'], fridgeDays: 90, freezerDays: 365, trackExpiry: true },
+  { name: 'Upo (Bottle Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7, aliases: ['upo', 'bottle gourd', 'calabash', 'opo squash'], fridgeDays: 14, freezerDays: null, trackExpiry: true },
+  { name: 'Patola (Sponge Gourd)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7, aliases: ['patola', 'sponge gourd', 'luffa', 'ridge gourd'], fridgeDays: 14, freezerDays: null, trackExpiry: true },
+  { name: 'Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱30/pc', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['bell pepper', 'capsicum', 'kampanilya', 'sweet pepper'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Green Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱25/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['green bell pepper', 'green capsicum', 'green pepper'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱35/pc', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['red bell pepper', 'red capsicum', 'red pepper'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable', price: '₱20/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 14, aliases: ['kintsay', 'celery', 'kinchay', 'celery stalk'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable', price: '₱15/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['sibuyas dahon', 'green onion', 'spring onion', 'scallion', 'dahon ng sibuyas'], fridgeDays: 7, freezerDays: 180, trackExpiry: true },
+  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable', price: '₱60/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30, aliases: ['luya', 'ginger', 'gengibre', 'fresh ginger'], fridgeDays: 30, freezerDays: 180, trackExpiry: true },
+  { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable', price: '₱10/bundle', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 14, aliases: ['tanglad', 'lemongrass', 'salay', 'lemon grass'], fridgeDays: 14, freezerDays: 90, trackExpiry: true },
+  { name: 'Mushroom', unit: 'g', category: 'Vegetable', price: '₱150/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['mushroom', 'kabute', 'button mushroom', 'shiitake'], fridgeDays: 7, freezerDays: 90, trackExpiry: true },
+  { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['mais', 'corn', 'maize', 'sweet corn', 'corn on the cob'], fridgeDays: 3, freezerDays: 365, trackExpiry: true },
+  { name: 'Cucumber', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['cucumber', 'pipino', 'English cucumber'], fridgeDays: 7, freezerDays: null, trackExpiry: true },
+  { name: 'Lettuce', unit: 'g', category: 'Vegetable', price: '₱50/head', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['lettuce', 'litsugas', 'iceberg lettuce', 'romaine'], fridgeDays: 7, freezerDays: null, trackExpiry: true },
+  { name: 'Broccoli', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['broccoli', 'brokoli', 'brocolli'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
+  { name: 'Cauliflower', unit: 'g', category: 'Vegetable', price: '₱80/head', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['cauliflower', 'coliflor', 'califlower'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
+  { name: 'Chili (Siling Labuyo)', unit: 'g', category: 'Vegetable', price: '₱30/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 7, aliases: ['siling labuyo', 'chili', 'sili', 'bird eye chili', 'labuyo', 'hot chili'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Siling Haba (Long Green Chili)', unit: 'g', category: 'Vegetable', price: '₱20/100g', store: 'Wet Market', storage: 'counter', shelfLifeDays: 7, aliases: ['siling haba', 'long chili', 'long green chili', 'sili haba', 'finger chili'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Bean Sprouts (Toge)', unit: 'g', category: 'Vegetable', price: '₱20/200g', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['toge', 'bean sprouts', 'togue', 'mung bean sprouts'], fridgeDays: 3, freezerDays: null, trackExpiry: true },
+  { name: 'Bok Choy', unit: 'g', category: 'Vegetable', price: '₱40/bundle', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['bok choy', 'pechay baguio', 'pak choi', 'Chinese white cabbage'], fridgeDays: 5, freezerDays: null, trackExpiry: true },
+  { name: 'Scallions', unit: 'kg', category: 'Vegetable', price: '₱120/kg', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 7, aliases: ['scallions', 'green onion', 'spring onion', 'dahon ng sibuyas'], fridgeDays: 7, freezerDays: 180, trackExpiry: true },
+  { name: 'Chayote (Sayote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 14, aliases: ['sayote', 'chayote', 'vegetable pear', 'mirliton'], fridgeDays: 28, freezerDays: null, trackExpiry: true },
 
   // Fruits
-  { name: 'Banana (Saging)', unit: 'kg', category: 'Fruit', price: '₱50/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 5 },
-  { name: 'Mango (Mangga)', unit: 'kg', category: 'Fruit', price: '₱120/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5 },
-  { name: 'Pineapple (Pinya)', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 3 },
-  { name: 'Calamansi', unit: 'kg', category: 'Fruit', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Lemon', unit: 'pieces', category: 'Fruit', price: '₱25/pc', store: 'Supermarket', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Lime', unit: 'pieces', category: 'Fruit', price: '₱20/pc', store: 'Supermarket', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Papaya', unit: 'kg', category: 'Fruit', price: '₱40/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 3 },
-  { name: 'Coconut (Niyog)', unit: 'pieces', category: 'Fruit', price: '₱30/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 14 },
-  { name: 'Apple', unit: 'pieces', category: 'Fruit', price: '₱35/pc', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 7 },
-  { name: 'Avocado', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Supermarket', storage: 'counter', shelfLifeDays: 3 },
-  { name: 'Mixed Berries', unit: 'g', category: 'Fruit', price: '₱280/500g', store: 'Supermarket (Frozen)', storage: 'freezer', shelfLifeDays: 365 },
+  { name: 'Banana (Saging)', unit: 'kg', category: 'Fruit', price: '₱50/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 5, aliases: ['saging', 'banana', 'bananas', 'lakatan', 'latundan'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Mango (Mangga)', unit: 'kg', category: 'Fruit', price: '₱120/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5, aliases: ['mangga', 'mango', 'Philippine mango', 'Carabao mango'], fridgeDays: 14, freezerDays: 365, trackExpiry: true },
+  { name: 'Pineapple (Pinya)', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 3, aliases: ['pinya', 'pineapple', 'pineapple chunks'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
+  { name: 'Calamansi', unit: 'kg', category: 'Fruit', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 7, aliases: ['calamansi', 'calamondin', 'Philippine lime', 'kalamansi'], fridgeDays: 14, freezerDays: 90, trackExpiry: true },
+  { name: 'Lemon', unit: 'pieces', category: 'Fruit', price: '₱25/pc', store: 'Supermarket', storage: 'counter', shelfLifeDays: 7, aliases: ['lemon', 'limon', 'lemon juice'], fridgeDays: 21, freezerDays: 90, trackExpiry: true },
+  { name: 'Lime', unit: 'pieces', category: 'Fruit', price: '₱20/pc', store: 'Supermarket', storage: 'counter', shelfLifeDays: 7, aliases: ['lime', 'dayap', 'key lime'], fridgeDays: 21, freezerDays: 90, trackExpiry: true },
+  { name: 'Papaya', unit: 'kg', category: 'Fruit', price: '₱40/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 3, aliases: ['papaya', 'papaw', 'green papaya'], fridgeDays: 7, freezerDays: 365, trackExpiry: true },
+  { name: 'Coconut (Niyog)', unit: 'pieces', category: 'Fruit', price: '₱30/pc', store: 'Wet Market', storage: 'counter', shelfLifeDays: 14, aliases: ['niyog', 'coconut', 'buko', 'young coconut'], fridgeDays: 30, freezerDays: 90, trackExpiry: true },
+  { name: 'Apple', unit: 'pieces', category: 'Fruit', price: '₱35/pc', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 7, aliases: ['apple', 'mansanas', 'red apple', 'green apple'], fridgeDays: 42, freezerDays: null, trackExpiry: true },
+  { name: 'Avocado', unit: 'pieces', category: 'Fruit', price: '₱50/pc', store: 'Wet Market / Supermarket', storage: 'counter', shelfLifeDays: 3, aliases: ['avocado', 'abokado', 'avo', 'butter fruit'], fridgeDays: 5, freezerDays: 90, trackExpiry: true },
+  { name: 'Mixed Berries', unit: 'g', category: 'Fruit', price: '₱280/500g', store: 'Supermarket (Frozen)', storage: 'freezer', shelfLifeDays: 365, aliases: ['berries', 'mixed berries', 'frozen berries', 'blueberries', 'strawberries'], fridgeDays: 5, freezerDays: 365, trackExpiry: true },
 
   // Grains & Starches
-  { name: 'White Rice (Bigas)', unit: 'kg', category: 'Grain', price: '₱55/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Brown Rice', unit: 'kg', category: 'Grain', price: '₱80/kg', store: 'Supermarket / Health Store', storage: 'counter', shelfLifeDays: 180, isStaple: true },
-  { name: 'Glutinous Rice (Malagkit)', unit: 'kg', category: 'Grain', price: '₱75/kg', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Cornstarch', unit: 'g', category: 'Grain', price: '₱25/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'All-Purpose Flour', unit: 'g', category: 'Grain', price: '₱55/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Breadcrumbs', unit: 'g', category: 'Grain', price: '₱45/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 180, isStaple: true },
-  { name: 'Pasta', unit: 'g', category: 'Grain', price: '₱55/500g', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Bihon Noodles', unit: 'g', category: 'Grain', price: '₱35/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Canton Noodles', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Sotanghon (Glass Noodles)', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Miki Noodles', unit: 'g', category: 'Grain', price: '₱20/pack', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3 },
-  { name: 'Bread (Tinapay)', unit: 'pieces', category: 'Grain', price: '₱60/loaf', store: 'Bakery / Grocery', storage: 'counter', shelfLifeDays: 5 },
-  { name: 'Pandesal', unit: 'pieces', category: 'Grain', price: '₱4/pc', store: 'Any Bakery', storage: 'counter', shelfLifeDays: 2 },
-  { name: 'Rolled Oats', unit: 'g', category: 'Grain', price: '₱180/800g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Granola', unit: 'g', category: 'Grain', price: '₱250/500g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 180 },
+  { name: 'White Rice (Bigas)', unit: 'kg', category: 'Grain', price: '₱55/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['bigas', 'rice', 'white rice', 'kanin', 'regular rice'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Brown Rice', unit: 'kg', category: 'Grain', price: '₱80/kg', store: 'Supermarket / Health Store', storage: 'counter', shelfLifeDays: 180, isStaple: true, aliases: ['brown rice', 'kayumanggi bigas', 'whole grain rice'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Glutinous Rice (Malagkit)', unit: 'kg', category: 'Grain', price: '₱75/kg', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['malagkit', 'glutinous rice', 'sticky rice', 'sweet rice'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Cornstarch', unit: 'g', category: 'Grain', price: '₱25/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['cornstarch', 'corn starch', 'gawgaw', 'maizena', 'cornflour'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'All-Purpose Flour', unit: 'g', category: 'Grain', price: '₱55/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['flour', 'all purpose flour', 'harina', 'AP flour', 'plain flour'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Breadcrumbs', unit: 'g', category: 'Grain', price: '₱45/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 180, isStaple: true, aliases: ['breadcrumbs', 'bread crumbs', 'panko', 'Panko breadcrumbs'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Pasta', unit: 'g', category: 'Grain', price: '₱55/500g', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['pasta', 'spaghetti', 'penne', 'macaroni', 'noodles'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Bihon Noodles', unit: 'g', category: 'Grain', price: '₱35/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['bihon', 'rice noodles', 'bihon noodles', 'thin rice noodles'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Canton Noodles', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['canton', 'canton noodles', 'egg noodles', 'miki noodles dry'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Sotanghon (Glass Noodles)', unit: 'g', category: 'Grain', price: '₱30/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['sotanghon', 'glass noodles', 'bean thread noodles', 'cellophane noodles', 'vermicelli'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Miki Noodles', unit: 'g', category: 'Grain', price: '₱20/pack', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['miki', 'fresh noodles', 'fresh egg noodles', 'miki noodles'], fridgeDays: 3, freezerDays: null, trackExpiry: true },
+  { name: 'Bread (Tinapay)', unit: 'pieces', category: 'Grain', price: '₱60/loaf', store: 'Bakery / Grocery', storage: 'counter', shelfLifeDays: 5, aliases: ['tinapay', 'bread', 'loaf bread', 'white bread', 'loaf'], fridgeDays: 14, freezerDays: 90, trackExpiry: true },
+  { name: 'Pandesal', unit: 'pieces', category: 'Grain', price: '₱4/pc', store: 'Any Bakery', storage: 'counter', shelfLifeDays: 2, aliases: ['pandesal', 'pan de sal', 'bread roll', 'Filipino bread roll'], fridgeDays: 5, freezerDays: 90, trackExpiry: true },
+  { name: 'Rolled Oats', unit: 'g', category: 'Grain', price: '₱180/800g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['oats', 'rolled oats', 'oatmeal', 'quick oats', 'old fashioned oats'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Granola', unit: 'g', category: 'Grain', price: '₱250/500g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 180, aliases: ['granola', 'muesli', 'granola bar'], fridgeDays: null, freezerDays: null, trackExpiry: false },
 
   // Dairy
-  { name: 'Milk (Gatas)', unit: 'ml', category: 'Dairy', price: '₱90/1L', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7 },
-  { name: 'Evaporated Milk', unit: 'ml', category: 'Dairy', price: '₱40/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Condensed Milk', unit: 'ml', category: 'Dairy', price: '₱45/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Cheese', unit: 'g', category: 'Dairy', price: '₱120/165g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 30 },
-  { name: 'Cream', unit: 'ml', category: 'Dairy', price: '₱75/250ml', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Cream Cheese', unit: 'g', category: 'Dairy', price: '₱150/250g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 14 },
-  { name: 'Butter', unit: 'g', category: 'Dairy', price: '₱130/200g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 30 },
-  { name: 'Margarine', unit: 'g', category: 'Dairy', price: '₱80/250g', store: 'Any Store', storage: 'counter', shelfLifeDays: 60 },
-  { name: 'Yogurt', unit: 'ml', category: 'Dairy', price: '₱80/150g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 14 },
+  { name: 'Milk (Gatas)', unit: 'ml', category: 'Dairy', price: '₱90/1L', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['gatas', 'milk', 'fresh milk', 'whole milk', 'dairy milk'], fridgeDays: 7, freezerDays: 90, trackExpiry: true },
+  { name: 'Evaporated Milk', unit: 'ml', category: 'Dairy', price: '₱40/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['evap', 'evaporated milk', 'carnation', 'Alaska evap', 'evap milk'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Condensed Milk', unit: 'ml', category: 'Dairy', price: '₱45/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['condensed milk', 'condensada', 'sweet condensed milk', 'eagle brand'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Cheese', unit: 'g', category: 'Dairy', price: '₱120/165g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 30, aliases: ['cheese', 'keso', 'queso', 'Eden cheese', 'Quickmelt cheese'], fridgeDays: 30, freezerDays: 180, trackExpiry: true },
+  { name: 'Cream', unit: 'ml', category: 'Dairy', price: '₱75/250ml', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['cream', 'all purpose cream', 'whipping cream', 'heavy cream', 'nestle cream'], fridgeDays: 5, freezerDays: 90, trackExpiry: true },
+  { name: 'Cream Cheese', unit: 'g', category: 'Dairy', price: '₱150/250g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 14, aliases: ['cream cheese', 'kesong puti', 'Philadelphia cream cheese', 'soft cheese'], fridgeDays: 14, freezerDays: 90, trackExpiry: true },
+  { name: 'Butter', unit: 'g', category: 'Dairy', price: '₱130/200g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 30, aliases: ['butter', 'mantequilla', 'mantekilya', 'unsalted butter', 'salted butter'], fridgeDays: 30, freezerDays: 365, trackExpiry: true },
+  { name: 'Margarine', unit: 'g', category: 'Dairy', price: '₱80/250g', store: 'Any Store', storage: 'counter', shelfLifeDays: 60, aliases: ['margarine', 'mantekilya', 'butter spread', 'Magnolia margarine'], fridgeDays: 60, freezerDays: null, trackExpiry: false },
+  { name: 'Yogurt', unit: 'ml', category: 'Dairy', price: '₱80/150g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 14, aliases: ['yogurt', 'yoghurt', 'Greek yogurt', 'plain yogurt'], fridgeDays: 14, freezerDays: 90, trackExpiry: true },
 
   // Pantry
-  { name: 'Soy Sauce (Toyo)', unit: 'ml', category: 'Pantry', price: '₱25/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Fish Sauce (Patis)', unit: 'ml', category: 'Pantry', price: '₱25/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Vinegar (Suka)', unit: 'ml', category: 'Pantry', price: '₱20/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 1825, isStaple: true },
-  { name: 'Oyster Sauce', unit: 'g', category: 'Pantry', price: '₱50/230g', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Coconut Milk', unit: 'ml', category: 'Pantry', price: '₱45/400ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Coconut Cream', unit: 'ml', category: 'Pantry', price: '₱50/400ml', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Tomato Paste', unit: 'g', category: 'Pantry', price: '₱30/small can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Tomato Sauce', unit: 'ml', category: 'Pantry', price: '₱30/250ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Cooking Oil', unit: 'ml', category: 'Pantry', price: '₱80/1L', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Sesame Oil', unit: 'ml', category: 'Pantry', price: '₱120/200ml', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Olive Oil', unit: 'ml', category: 'Pantry', price: '₱350/500ml', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Salt', unit: 'g', category: 'Pantry', price: '₱15/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true },
-  { name: 'Sugar', unit: 'g', category: 'Pantry', price: '₱65/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true },
-  { name: 'Brown Sugar', unit: 'g', category: 'Pantry', price: '₱70/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true },
-  { name: 'Honey', unit: 'g', category: 'Pantry', price: '₱180/350g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 36500, isStaple: true },
-  { name: 'Black Pepper', unit: 'g', category: 'Pantry', price: '₱20/small pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'White Pepper', unit: 'g', category: 'Pantry', price: '₱20/small pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Peppercorn', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 1095, isStaple: true },
-  { name: 'Bay Leaves', unit: 'pieces', category: 'Pantry', price: '₱15/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Chili Flakes', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Paprika', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Cumin', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Turmeric', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Oregano', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Thyme', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Basil', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Parsley', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Garlic Powder', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Onion Powder', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Garam Masala', unit: 'g', category: 'Pantry', price: '₱45/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Dried Herbs', unit: 'g', category: 'Pantry', price: '₱40/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Worcestershire Sauce', unit: 'ml', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Ketchup', unit: 'g', category: 'Pantry', price: '₱40/320g', store: 'Any Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Banana Ketchup', unit: 'g', category: 'Pantry', price: '₱35/320g', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Mayonnaise', unit: 'g', category: 'Pantry', price: '₱70/470g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 180 },
-  { name: 'Peanut Butter', unit: 'g', category: 'Pantry', price: '₱120/480g', store: 'Any Store', storage: 'counter', shelfLifeDays: 180 },
-  { name: 'Hoisin Sauce', unit: 'g', category: 'Pantry', price: '₱90/240g', store: 'Supermarket / Asian Store', storage: 'fridge', shelfLifeDays: 365 },
-  { name: 'Chili Sauce', unit: 'ml', category: 'Pantry', price: '₱55/bottle', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Cooking Wine', unit: 'ml', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Beef Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Chicken Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Water', unit: 'ml', category: 'Pantry', price: '₱0', store: 'Any', storage: 'counter', shelfLifeDays: 36500, isStaple: true },
-  { name: 'Annatto (Atsuete)', unit: 'g', category: 'Pantry', price: '₱20/pack', store: 'Wet Market / Asian Store', storage: 'counter', shelfLifeDays: 730 },
-  { name: 'Tamarind (Sampalok)', unit: 'g', category: 'Pantry', price: '₱30/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30 },
-  { name: 'Tamarind Paste', unit: 'g', category: 'Pantry', price: '₱50/jar', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Bagoong', unit: 'g', category: 'Pantry', price: '₱40/small jar', store: 'Any Store', storage: 'fridge', shelfLifeDays: 365 },
-  { name: 'Shrimp Paste', unit: 'g', category: 'Pantry', price: '₱35/small jar', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 180 },
-  { name: 'Cooking Cream', unit: 'ml', category: 'Pantry', price: '₱75/250ml', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5 },
-  { name: 'Baking Powder', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true },
-  { name: 'Baking Soda', unit: 'g', category: 'Pantry', price: '₱20/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true },
-  { name: 'Vanilla Extract', unit: 'ml', category: 'Pantry', price: '₱45/bottle', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 1825 },
-  { name: 'Chia Seeds', unit: 'g', category: 'Pantry', price: '₱150/250g', store: 'Supermarket / Health Store', storage: 'counter', shelfLifeDays: 365 },
-  { name: 'Red Lentils', unit: 'g', category: 'Pantry', price: '₱120/500g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730 },
-  { name: 'Kimchi', unit: 'g', category: 'Pantry', price: '₱200/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 180 },
-  { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 365 },
+  { name: 'Soy Sauce (Toyo)', unit: 'ml', category: 'Pantry', price: '₱25/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['toyo', 'soy sauce', 'toyomansi', 'dark soy sauce', 'light soy sauce'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Fish Sauce (Patis)', unit: 'ml', category: 'Pantry', price: '₱25/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['patis', 'fish sauce', 'fish patis', 'nam pla'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Vinegar (Suka)', unit: 'ml', category: 'Pantry', price: '₱20/200ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 1825, isStaple: true, aliases: ['suka', 'vinegar', 'sukang paombong', 'cane vinegar', 'white vinegar', 'coconut vinegar'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Oyster Sauce', unit: 'g', category: 'Pantry', price: '₱50/230g', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['oyster sauce', 'oyster gravy', 'Lee Kum Kee oyster sauce'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Coconut Milk', unit: 'ml', category: 'Pantry', price: '₱45/400ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['coconut milk', 'gata', 'kakang gata', 'thin coconut milk', 'canned coconut milk'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Coconut Cream', unit: 'ml', category: 'Pantry', price: '₱50/400ml', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['coconut cream', 'kakang gata', 'thick coconut milk', 'coconut cream canned'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Tomato Paste', unit: 'g', category: 'Pantry', price: '₱30/small can', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['tomato paste', 'tomato puree', 'tomato concentrate', 'del Monte tomato paste'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Tomato Sauce', unit: 'ml', category: 'Pantry', price: '₱30/250ml', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['tomato sauce', 'salsa de tomate', 'pasta sauce', 'del Monte tomato sauce'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Cooking Oil', unit: 'ml', category: 'Pantry', price: '₱80/1L', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['cooking oil', 'vegetable oil', 'mantika', 'palm oil', 'canola oil', 'Baguio oil'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Sesame Oil', unit: 'ml', category: 'Pantry', price: '₱120/200ml', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365, aliases: ['sesame oil', 'sesame seed oil', 'toasted sesame oil', 'Chinese sesame oil'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Olive Oil', unit: 'ml', category: 'Pantry', price: '₱350/500ml', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['olive oil', 'aceite de oliva', 'extra virgin olive oil', 'EVOO'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Salt', unit: 'g', category: 'Pantry', price: '₱15/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true, aliases: ['salt', 'asin', 'table salt', 'iodized salt', 'sea salt', 'rock salt'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Sugar', unit: 'g', category: 'Pantry', price: '₱65/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true, aliases: ['sugar', 'asukal', 'white sugar', 'granulated sugar', 'refined sugar'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Brown Sugar', unit: 'g', category: 'Pantry', price: '₱70/kg', store: 'Any Store', storage: 'counter', shelfLifeDays: 36500, isStaple: true, aliases: ['brown sugar', 'asukal pula', 'muscovado', 'dark brown sugar'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Honey', unit: 'g', category: 'Pantry', price: '₱180/350g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 36500, isStaple: true, aliases: ['honey', 'pulot', 'natural honey', 'raw honey', 'pure honey'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Black Pepper', unit: 'g', category: 'Pantry', price: '₱20/small pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['black pepper', 'paminta', 'ground pepper', 'ground black pepper', 'freshly ground pepper'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'White Pepper', unit: 'g', category: 'Pantry', price: '₱20/small pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['white pepper', 'paminta puti', 'ground white pepper'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Peppercorn', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 1095, isStaple: true, aliases: ['peppercorn', 'whole pepper', 'buo na paminta', 'whole peppercorn', 'black peppercorn'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Bay Leaves', unit: 'pieces', category: 'Pantry', price: '₱15/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['bay leaves', 'laurel', 'dahon ng laurel', 'bay leaf', 'dried bay leaves'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Chili Flakes', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['chili flakes', 'red pepper flakes', 'dried chili', 'crushed chili', 'chilli flakes'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Paprika', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['paprika', 'smoked paprika', 'sweet paprika', 'Spanish paprika'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Cumin', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['cumin', 'comino', 'ground cumin', 'cumin powder', 'jeera'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Turmeric', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['turmeric', 'luyang dilaw', 'yellow ginger', 'turmeric powder', 'kunyit'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Oregano', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['oregano', 'dried oregano', 'Italian oregano'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Thyme', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['thyme', 'timo', 'dried thyme'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Basil', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['basil', 'sweet basil', 'dried basil', 'Italian basil'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Parsley', unit: 'g', category: 'Pantry', price: '₱30/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['parsley', 'dried parsley', 'Italian parsley', 'flat leaf parsley'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Garlic Powder', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['garlic powder', 'bawang powder', 'garlic granules'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Onion Powder', unit: 'g', category: 'Pantry', price: '₱35/pack', store: 'Grocery / Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['onion powder', 'sibuyas powder', 'onion granules'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Garam Masala', unit: 'g', category: 'Pantry', price: '₱45/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['garam masala', 'Indian spice blend', 'masala'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Dried Herbs', unit: 'g', category: 'Pantry', price: '₱40/pack', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['dried herbs', 'mixed herbs', 'Italian seasoning', 'herbs de Provence'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Worcestershire Sauce', unit: 'ml', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket', storage: 'counter', shelfLifeDays: 365, aliases: ['worcestershire', 'worcestershire sauce', 'Lea and Perrins', 'HP sauce'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Ketchup', unit: 'g', category: 'Pantry', price: '₱40/320g', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, aliases: ['ketchup', 'catsup', 'tomato ketchup', 'Jufran ketchup'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Banana Ketchup', unit: 'g', category: 'Pantry', price: '₱35/320g', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['banana ketchup', 'banana catsup', 'Filipino ketchup', 'Jufran banana ketchup'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Mayonnaise', unit: 'g', category: 'Pantry', price: '₱70/470g', store: 'Supermarket / Grocery', storage: 'fridge', shelfLifeDays: 180, aliases: ['mayo', 'mayonnaise', 'Best Foods mayo', 'Lady\'s Choice'], fridgeDays: 180, freezerDays: null, trackExpiry: true },
+  { name: 'Peanut Butter', unit: 'g', category: 'Pantry', price: '₱120/480g', store: 'Any Store', storage: 'counter', shelfLifeDays: 180, aliases: ['peanut butter', 'peanut spread', 'mantikilyang mani', 'smooth peanut butter', 'crunchy peanut butter'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Hoisin Sauce', unit: 'g', category: 'Pantry', price: '₱90/240g', store: 'Supermarket / Asian Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['hoisin', 'hoisin sauce', 'Chinese barbecue sauce', 'Peking duck sauce'], fridgeDays: 365, freezerDays: null, trackExpiry: true },
+  { name: 'Chili Sauce', unit: 'ml', category: 'Pantry', price: '₱55/bottle', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365, aliases: ['chili sauce', 'sweet chili sauce', 'sriracha', 'hot sauce'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Cooking Wine', unit: 'ml', category: 'Pantry', price: '₱80/bottle', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365, aliases: ['cooking wine', 'Shaoxing wine', 'rice wine', 'mirin', 'Chinese cooking wine'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Beef Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['beef broth', 'beef stock', 'sabaw ng baka', 'beef bouillon', 'beef cubes'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Chicken Broth / Stock', unit: 'ml', category: 'Pantry', price: '₱35/pack', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['chicken broth', 'chicken stock', 'sabaw ng manok', 'chicken bouillon', 'Knorr cubes'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Water', unit: 'ml', category: 'Pantry', price: '₱0', store: 'Any', storage: 'counter', shelfLifeDays: 36500, isStaple: true, aliases: ['water', 'tubig', 'drinking water'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Annatto (Atsuete)', unit: 'g', category: 'Pantry', price: '₱20/pack', store: 'Wet Market / Asian Store', storage: 'counter', shelfLifeDays: 730, aliases: ['atsuete', 'annatto', 'annatto seeds', 'achuete', 'achiote'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Tamarind (Sampalok)', unit: 'g', category: 'Pantry', price: '₱30/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30, aliases: ['sampalok', 'tamarind', 'sambag', 'raw tamarind', 'fresh tamarind'], fridgeDays: null, freezerDays: null, trackExpiry: true },
+  { name: 'Tamarind Paste', unit: 'g', category: 'Pantry', price: '₱50/jar', store: 'Supermarket / Asian Store', storage: 'counter', shelfLifeDays: 365, aliases: ['tamarind paste', 'tamarind concentrate', 'sinigang mix'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Bagoong', unit: 'g', category: 'Pantry', price: '₱40/small jar', store: 'Any Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['bagoong', 'fermented shrimp paste', 'bagoong alamang', 'shrimp bagoong'], fridgeDays: 365, freezerDays: null, trackExpiry: true },
+  { name: 'Shrimp Paste', unit: 'g', category: 'Pantry', price: '₱35/small jar', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 180, aliases: ['shrimp paste', 'bagoong hipon', 'terasi', 'belacan'], fridgeDays: 180, freezerDays: null, trackExpiry: true },
+  { name: 'Cooking Cream', unit: 'ml', category: 'Pantry', price: '₱75/250ml', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 5, aliases: ['cooking cream', 'heavy cream', 'nestle cream', 'all purpose cream', 'Nestle All Purpose Cream'], fridgeDays: 5, freezerDays: 90, trackExpiry: true },
+  { name: 'Baking Powder', unit: 'g', category: 'Pantry', price: '₱25/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 365, isStaple: true, aliases: ['baking powder', 'raising agent', 'double acting baking powder'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Baking Soda', unit: 'g', category: 'Pantry', price: '₱20/pack', store: 'Any Store', storage: 'counter', shelfLifeDays: 730, isStaple: true, aliases: ['baking soda', 'bicarbonate of soda', 'sodium bicarbonate', 'bicarb'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Vanilla Extract', unit: 'ml', category: 'Pantry', price: '₱45/bottle', store: 'Supermarket / Grocery', storage: 'counter', shelfLifeDays: 1825, aliases: ['vanilla', 'vanilla extract', 'vanilla essence', 'pure vanilla'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Chia Seeds', unit: 'g', category: 'Pantry', price: '₱150/250g', store: 'Supermarket / Health Store', storage: 'counter', shelfLifeDays: 365, aliases: ['chia seeds', 'chia', 'black chia seeds'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Red Lentils', unit: 'g', category: 'Pantry', price: '₱120/500g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, aliases: ['red lentils', 'lentils', 'masoor dal', 'red dal'], fridgeDays: null, freezerDays: null, trackExpiry: false },
+  { name: 'Kimchi', unit: 'g', category: 'Pantry', price: '₱200/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 180, aliases: ['kimchi', 'kimchee', 'Korean fermented cabbage', 'kimchi cabbage'], fridgeDays: 180, freezerDays: null, trackExpiry: true },
+  { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['gochujang', 'Korean chili paste', 'Korean red pepper paste', 'gochuchang'], fridgeDays: 365, freezerDays: null, trackExpiry: true },
 ];
 
 function filterIngredients(query) {

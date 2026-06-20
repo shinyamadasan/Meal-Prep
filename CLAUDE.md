@@ -83,6 +83,11 @@ git push origin main
 ```
 GitHub Pages auto-deploys from main branch. Takes ~1 min to go live.
 
+## Current State (update each session)
+- Last push: commit `a190564` — fixed grocery list mobile layout (category total inline with header, checkbox inline with ingredient)
+- Pending: user to confirm on phone that fix worked
+- Recent major work: Settings modal (in ⋯ More menu), planner vertical scroll, grocery density pass, mobile header cleanup
+
 ## Common Bugs to Avoid
 - `onclick="openEditRecipeModal(${recipe.id})"` — ALWAYS quote the id: `onclick="openEditRecipeModal('${recipe.id}')"`
   because Firestore IDs are strings and render as bare identifiers without quotes
