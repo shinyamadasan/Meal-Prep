@@ -6431,7 +6431,7 @@ function capList(arr, max) {
 // through the gram-bridge so kg/g/ml/pieces all line up. Returns a summary.
 function deductIngredientsForRecipe(recipe) {
   var ingredients = recipe.baseIngredients || recipe.ingredients || [];
-  var deducted = [], outOfStock = [];
+  var deducted = [], outOfStock = [], depleted = [];
   ingredients.forEach(function(ing) {
     var p = findPantryMatch(ing.name);
     if (!p) return;                                   // not in pantry
@@ -6445,8 +6445,16 @@ function deductIngredientsForRecipe(recipe) {
     if (used <= 0) return;
     p.quantity = parseFloat(Math.max(0, p.quantity - used).toFixed(2));
     deducted.push('−' + formatQuantity(used) + ' ' + (p.unit || '') + ' ' + p.name);
-    if (p.quantity <= 0) outOfStock.push(p.name);
+    if (p.quantity <= 0) {
+      outOfStock.push(p.name);
+      depleted.push(p.id);
+    }
   });
+  if (depleted.length) {
+    AppState.pantry = AppState.pantry.filter(function(p) {
+      return depleted.indexOf(p.id) === -1;
+    });
+  }
   return { deducted: deducted, outOfStock: outOfStock };
 }
 
