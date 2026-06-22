@@ -279,6 +279,7 @@ function loadFromLocalStorage() {
     if (saved) {
       const data = JSON.parse(saved);
       AppState.recipes = data.recipes || [];
+      if (AppState.recipes.length === 0) AppState.recipes = [...sampleRecipes];
       patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -4798,6 +4799,7 @@ async function loadFromFirestore() {
       AppState.dataVersion = data.version || 0;
       AppState.cloudSavedAt = data.lastSaved || data.lastUpdated || null;
       AppState.recipes = data.recipes || [];
+      if (AppState.recipes.length === 0) AppState.recipes = [...sampleRecipes];
       const didPatch = patchMissingNutrition(AppState.recipes);
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
