@@ -334,6 +334,7 @@
                                     <option value="counter">Counter</option>
                                 </select>
                                 <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
+                                <button class="btn btn--ghost btn--sm" onclick="openIngredientBrowser()" title="Browse all ingredients">Browse</button>
                             </div>
                             <div id="pantry-list"></div>
                         </div>
@@ -1104,6 +1105,21 @@
     </div>
 
     <!-- Kitchen Setup Wizard Modal -->
+    <!-- Ingredient Browser Modal -->
+    <div id="ingredient-browser-modal" class="modal hidden">
+        <div class="modal-content ib-modal-content">
+            <div class="modal-header">
+                <h3>Browse Ingredients</h3>
+                <button class="modal-close" onclick="closeIngredientBrowser()">&times;</button>
+            </div>
+            <div class="modal-body ib-modal-body">
+                <input type="text" id="ib-search" class="form-control" placeholder="Search ingredients…" oninput="renderIngredientBrowserContent(this.value)" autocomplete="off">
+                <p class="ib-hint">Tap to add &middot; Tap highlighted to remove</p>
+                <div id="ib-content"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="kitchen-setup-modal" class="modal hidden">
         <div class="modal-content ks-modal-content">
             <!-- Step 1: Choose kitchen type -->

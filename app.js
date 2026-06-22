@@ -6278,6 +6278,101 @@ function confirmKitchenSetup() {
   if (el) el.classList.add('hidden');
 }
 
+// ── Ingredient Browser ───────────────────────────────────────────────────────
+
+function openIngredientBrowser() {
+  var modal = document.getElementById('ingredient-browser-modal');
+  if (!modal) return;
+  var searchEl = document.getElementById('ib-search');
+  if (searchEl) searchEl.value = '';
+  renderIngredientBrowserContent('');
+  modal.classList.remove('hidden');
+}
+window.openIngredientBrowser = openIngredientBrowser;
+
+function closeIngredientBrowser() {
+  var modal = document.getElementById('ingredient-browser-modal');
+  if (modal) modal.classList.add('hidden');
+}
+window.closeIngredientBrowser = closeIngredientBrowser;
+
+function renderIngredientBrowserContent(filter) {
+  var container = document.getElementById('ib-content');
+  if (!container) return;
+  var f = (filter || '').toLowerCase().trim();
+  var pantryNames = new Set(AppState.pantry.map(function(p) { return p.name.toLowerCase(); }));
+
+  var items = f
+    ? INGREDIENT_DB.filter(function(i) {
+        return i.name.toLowerCase().includes(f) ||
+               (i.aliases || []).some(function(a) { return a.toLowerCase().includes(f); });
+      })
+    : INGREDIENT_DB;
+
+  var groups = {};
+  items.forEach(function(i) {
+    var cat = i.category || 'Other';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(i);
+  });
+
+  var catOrder = ['Protein', 'Vegetable', 'Fruit', 'Grain', 'Dairy', 'Pantry', 'Condiment', 'Spice', 'Other'];
+  var keys = Object.keys(groups).sort(function(a, b) {
+    var ai = catOrder.indexOf(a), bi = catOrder.indexOf(b);
+    if (ai < 0) ai = 99;
+    if (bi < 0) bi = 99;
+    return ai !== bi ? ai - bi : a.localeCompare(b);
+  });
+
+  if (!keys.length) {
+    container.innerHTML = '<p class="ib-empty">No ingredients found.</p>';
+    return;
+  }
+
+  container.innerHTML = keys.map(function(cat) {
+    var chips = groups[cat].map(function(item) {
+      var active = pantryNames.has(item.name.toLowerCase());
+      return '<button class="ib-chip' + (active ? ' ib-chip--active' : '') + '"' +
+             ' onclick="toggleIngredientFromBrowser(this.dataset.name)"' +
+             ' data-name="' + escapeHtml(item.name) + '">' +
+             escapeHtml(item.name) + '</button>';
+    }).join('');
+    return '<div class="ib-group"><div class="ib-cat-label">' + escapeHtml(cat) + '</div>' +
+           '<div class="ib-chips">' + chips + '</div></div>';
+  }).join('');
+}
+window.renderIngredientBrowserContent = renderIngredientBrowserContent;
+
+function toggleIngredientFromBrowser(name) {
+  var idx = AppState.pantry.findIndex(function(p) {
+    return p.name.toLowerCase() === name.toLowerCase();
+  });
+  if (idx >= 0) {
+    AppState.pantry.splice(idx, 1);
+  } else {
+    var db = INGREDIENT_DB.find(function(i) { return i.name === name; });
+    var cat = db ? db.category : inferCategory(name);
+    var storage = db && db.storage ? db.storage : inferStorage(name, cat);
+    AppState.pantry.push({
+      id: 'ib_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      name: name,
+      category: cat,
+      purchaseDate: storage !== 'counter' ? todayISO() : null,
+      shelfLifeDays: ingredientShelfLife(name, cat),
+      storage: storage,
+      unit: db ? db.unit : '',
+      quantity: null,
+      staple: db ? !!db.isStaple : (cat.toLowerCase() === 'pantry'),
+      stockLevel: 'ok'
+    });
+  }
+  saveData();
+  renderPantry();
+  var searchEl = document.getElementById('ib-search');
+  renderIngredientBrowserContent(searchEl ? searchEl.value : '');
+}
+window.toggleIngredientFromBrowser = toggleIngredientFromBrowser;
+
 // ── Cooked meal tracking ─────────────────────────────────────────────────────
 
 // Staples (spices, condiments, salt, sugar, oil) are "always stocked" and never
