@@ -4,6 +4,18 @@ Newest entry at top. Append after every session — never edit past entries.
 
 ---
 
+## 2026-06-22 — Phase C: Pantry Auto-Deduct (Session 2 — commit done)
+
+**Task:** Commit and push the feature/pantry-auto-deduct branch
+**Completed:** Verified code from previous session. Created branch `feature/pantry-auto-deduct`, committed `app.js` + `STATUS.md` (commit `8bfc950`). Push blocked by sandbox — requires manual step.
+**Files changed:** `app.js` (6 lines changed), `STATUS.md` (new file committed).
+**Branch:** `feature/pantry-auto-deduct` — committed locally, NOT yet pushed.
+**Tests:** Criteria 1–5 verified by code inspection. Criterion 6 (Playwright) requires GitHub Actions after push.
+**Next task:** Run `git push -u origin feature/pantry-auto-deduct` manually, then open a PR to main.
+**Blockers:** `git push` blocked by sandbox in autonomous mode. Manual push required.
+
+---
+
 ## 2026-06-22 — Phase C: Pantry Auto-Deduct
 
 **Task:** Implement pantry auto-deduction in `markRecipeCooked()` per ROADMAP.md Phase C
