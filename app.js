@@ -6331,8 +6331,21 @@ function renderIngredientBrowserContent(filter) {
 
   container.innerHTML = keys.map(function(cat) {
     var chips = groups[cat].map(function(item) {
-      var active = pantryNames.has(item.name.toLowerCase());
-      return '<button class="ib-chip' + (active ? ' ib-chip--active' : '') + '"' +
+      var pItem = AppState.pantry.find(function(p) { return p.name.toLowerCase() === item.name.toLowerCase(); });
+      var active = !!pItem;
+      if (active) {
+        var qty = pItem.quantity != null ? pItem.quantity : '';
+        var unit = escapeHtml(item.unit || pItem.unit || '');
+        return '<span class="ib-chip ib-chip--active" data-name="' + escapeHtml(item.name) + '">' +
+               '<span class="ib-chip-name">' + escapeHtml(item.name) + '</span>' +
+               '<input class="ib-qty" type="number" min="0" step="any" placeholder="—" value="' + qty + '"' +
+               ' onchange="updateBrowserItemQty(this.parentElement.dataset.name, this.value)"' +
+               ' onclick="event.stopPropagation()">' +
+               (unit ? '<span class="ib-unit">' + unit + '</span>' : '') +
+               '<button class="ib-remove" onclick="toggleIngredientFromBrowser(this.parentElement.dataset.name)" title="Remove">×</button>' +
+               '</span>';
+      }
+      return '<button class="ib-chip"' +
              ' onclick="toggleIngredientFromBrowser(this.dataset.name)"' +
              ' data-name="' + escapeHtml(item.name) + '">' +
              escapeHtml(item.name) + '</button>';
@@ -6372,6 +6385,16 @@ function toggleIngredientFromBrowser(name) {
   renderIngredientBrowserContent(searchEl ? searchEl.value : '');
 }
 window.toggleIngredientFromBrowser = toggleIngredientFromBrowser;
+
+function updateBrowserItemQty(name, value) {
+  var item = AppState.pantry.find(function(p) { return p.name.toLowerCase() === name.toLowerCase(); });
+  if (!item) return;
+  var qty = parseFloat(value);
+  item.quantity = (!isNaN(qty) && qty > 0) ? qty : null;
+  saveData();
+  renderPantry();
+}
+window.updateBrowserItemQty = updateBrowserItemQty;
 
 // ── Cooked meal tracking ─────────────────────────────────────────────────────
 
