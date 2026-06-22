@@ -57,8 +57,8 @@ AppState.nutritionGoals   // { calories, protein, carbs, fat, fiber, sodium }
 - `saveData()` — saves to both localStorage and Firestore
 
 ## Databases (in app.js)
-- `sampleRecipes` — 11 built-in recipes with `nutritionPerServing`
-- `INGREDIENT_DB` — 130+ ingredients with `{ name, unit, category, price, store }`
+- `sampleRecipes` — 26 built-in recipes with `nutritionPerServing` (IDs 1–26)
+- `INGREDIENT_DB` — 175 ingredients with `{ name, unit, category, price, store, aliases, fridgeDays, freezerDays, trackExpiry, priceValue, minStockQty }`
 - `LOCAL_NUTRITION_DB` — 90+ ingredients with `{ name, calories, protein, carbs, fat, fiber, sodium }` per 100g
 - `PANTRY_KNOWLEDGE` — 22 ingredients with storage guidance (location, lasts, store, spoilage, freshness)
 
@@ -84,9 +84,9 @@ git push origin main
 GitHub Pages auto-deploys from main branch. Takes ~1 min to go live.
 
 ## Current State (update each session)
-- Last push: commit `a190564` — fixed grocery list mobile layout (category total inline with header, checkbox inline with ingredient)
-- Pending: user to confirm on phone that fix worked
-- Recent major work: Settings modal (in ⋯ More menu), planner vertical scroll, grocery density pass, mobile header cleanup
+- Last push: commit `907602e` — Phase B INGREDIENT_DB extension (priceValue + minStockQty on all 175 entries)
+- Pending: commit + push the 11 new sample recipes (IDs 16–26)
+- Recent major work: Phase A (aliases, fridgeDays, freezerDays, trackExpiry) + Phase B (priceValue, minStockQty) INGREDIENT_DB enrichment; 11 new sampleRecipes added (Tapsilog, Longsilog, Champorado, Bulalo, Chicken Sopas, Fish Sinigang, Lomi, Caldereta, Menudo, Laing, Ginataang Manok)
 
 ## Common Bugs to Avoid
 - `onclick="openEditRecipeModal(${recipe.id})"` — ALWAYS quote the id: `onclick="openEditRecipeModal('${recipe.id}')"`
