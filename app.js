@@ -1888,6 +1888,7 @@ function showTab(tabId) {
   } else if (tabId === 'planner') {
     updateWeeklyStats();
   } else if (tabId === 'grocery') {
+    if (checkAndReplenishLowStock()) saveData();
     updateGrocerySummary();
     updateBudgetDisplay();
     renderGroceryList();
@@ -1917,21 +1918,23 @@ function openAddRecipeModal() {
 function updateServingSize(recipeId, newServings) {
   const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe || newServings < 1) return;
-  
+
   recipe.currentServings = newServings;
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
+  generateGroceryList();
 }
 
 function resetServingSize(recipeId) {
   const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
-  
+
   recipe.currentServings = recipe.baseServings;
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
+  generateGroceryList();
 }
 
 function openEditRecipeModal(recipeId) {
@@ -2136,6 +2139,15 @@ function deleteRecipe(recipeId) {
   }
 }
 
+function toggleFavorite(recipeId) {
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
+  if (!recipe) return;
+  recipe.favorite = !recipe.favorite;
+  saveData();
+  renderRecipes();
+}
+window.toggleFavorite = toggleFavorite;
+
 // Click anywhere on a recipe card to edit it — except on interactive controls
 // (serving steppers, quick-serve buttons, Cooked/Edit/Delete).
 function handleRecipeCardClick(e, id) {
@@ -2265,6 +2277,7 @@ function renderRecipes() {
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
   const categoryFilter = document.getElementById('category-filter').value;
   const preptimeFilter = document.getElementById('preptime-filter').value;
+  const favoritesOnly = document.getElementById('favorites-filter') && document.getElementById('favorites-filter').checked;
 
   let filteredRecipes = AppState.recipes.filter(recipe => {
     const matchesSearch = recipe.name.toLowerCase().includes(searchTerm) ||
@@ -2273,7 +2286,8 @@ function renderRecipes() {
     const totalTime = (recipe.basePrepTime || 0) + (recipe.baseCookTime || 0);
     const matchesTime = !preptimeFilter ||
       (preptimeFilter === '999' ? totalTime >= 60 : totalTime < parseInt(preptimeFilter));
-    return matchesSearch && matchesCategory && matchesTime;
+    const matchesFavorites = !favoritesOnly || !!recipe.favorite;
+    return matchesSearch && matchesCategory && matchesTime && matchesFavorites;
   });
   
   if (filteredRecipes.length === 0) {
@@ -2313,6 +2327,7 @@ function renderRecipes() {
       <div class="recipe-card-header">
         <h3 class="recipe-title">${recipe.name}</h3>
         <span class="recipe-category">${recipe.category}</span>
+        <button class="recipe-fav-btn${recipe.favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${recipe.id}')" title="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
       </div>
       
       <!-- Serving Size Controls -->
@@ -2837,10 +2852,14 @@ function getCookableRecipes() {
     var ings = recipe.baseIngredients || [];
     if (ings.length < 2) return;
     var matched = 0;
-    ings.forEach(function(ing) { if (pantryHas(ing.name)) matched++; });
+    var missingIngredients = [];
+    ings.forEach(function(ing) {
+      if (pantryHas(ing.name)) matched++;
+      else missingIngredients.push(ing.name);
+    });
     var missing = ings.length - matched;
     if (missing <= 2 && matched >= 1) {
-      results.push({ recipe: recipe, matched: matched, total: ings.length, missing: missing });
+      results.push({ recipe: recipe, matched: matched, total: ings.length, missing: missing, missingIngredients: missingIngredients });
     }
   });
 
@@ -2878,6 +2897,25 @@ function renderDashboard() {
   });
   expiringItems.sort(function(a, b) { return a.daysLeft - b.daysLeft; });
 
+  // ── Expiry-based recipe suggestions (≤3 days) ─────────────────
+  var nearExpiryNames = [];
+  AppState.pantry.forEach(function(p) {
+    var dl = pantryDaysLeft(p);
+    if (dl != null && dl <= 3) nearExpiryNames.push(p.name.toLowerCase());
+  });
+  var expirySuggestions = [];
+  if (nearExpiryNames.length > 0) {
+    AppState.recipes.forEach(function(r) {
+      if (!r.baseIngredients) return;
+      var match = r.baseIngredients.find(function(ing) {
+        var n = ing.name.toLowerCase();
+        return nearExpiryNames.some(function(en) { return n.includes(en) || en.includes(n); });
+      });
+      if (match) expirySuggestions.push({ recipe: r, ingredient: match.name });
+    });
+    expirySuggestions = expirySuggestions.slice(0, 3);
+  }
+
   // ── Week analysis ──────────────────────────────────────────────
   var dayMealCounts = {};
   weekDays.forEach(function(day) {
@@ -2899,7 +2937,8 @@ function renderDashboard() {
   var level1Card = '';
   var hasExpiring = expiringItems.length > 0;
   var hasLow = lowStaples.length > 0;
-  if (hasExpiring || hasLow) {
+  var hasSuggestions = expirySuggestions.length > 0;
+  if (hasExpiring || hasLow || hasSuggestions) {
     var expirySection = '';
     if (hasExpiring) {
       var expRows = expiringItems.slice(0, 3).map(function(item) {
@@ -2927,9 +2966,23 @@ function renderDashboard() {
         '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'grocery\')">Add to Shop →</button>' +
         '</div>';
     }
+    var useSoonSection = '';
+    if (hasSuggestions) {
+      var sugRows = expirySuggestions.map(function(s) {
+        return '<div class="dash-attn-row">' +
+          '<span class="dash-attn-name">' + escapeHtml(s.recipe.name) + '</span>' +
+          '<span class="dash-expiry-tag" style="color:var(--color-text-secondary)">uses ' + escapeHtml(s.ingredient) + '</span>' +
+          '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + String(s.recipe.id) + '\')">Plan it</button>' +
+          '</div>';
+      }).join('');
+      useSoonSection = '<div class="dash-l1-block' + (hasExpiring || hasLow ? ' dash-l1-block--sep' : '') + '">' +
+        '<div class="dash-l1-sublabel">' + icon('salad') + ' Use before they expire</div>' +
+        sugRows +
+        '</div>';
+    }
     level1Card = '<div class="dash-card dash-card--warn">' +
       '<div class="dash-level-header">' + icon('triangle-alert') + ' What needs attention?</div>' +
-      expirySection + lowSection +
+      expirySection + lowSection + useSoonSection +
       '</div>';
   }
 
@@ -2956,10 +3009,14 @@ function renderDashboard() {
         var meta = tier.key === 0
           ? '<span class="dash-cook-full">All ingredients ✓</span>'
           : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
+        var buyBtn = '';
+        if (tier.key === 1 && s.missingIngredients && s.missingIngredients.length === 1) {
+          buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJ(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
+        }
         return '<div class="dash-cook-row">' +
           '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
-          '</button></div>';
+          '</button>' + buyBtn + '</div>';
       }).join('');
       return '<div class="dash-cook-tier ' + tier.cls + '">' +
         '<div class="dash-cook-tier-label">' + tier.label + '</div>' + rows + '</div>';
@@ -3029,6 +3086,43 @@ function renderDashboard() {
     level3Card +
     '</div>';
 }
+
+function buyMissingIngredient(ingName) {
+  var already = (AppState.groceryList || []).some(function(g) {
+    return g.name.toLowerCase() === ingName.toLowerCase();
+  });
+  if (already) { showSuccessMessage(ingName + ' is already on your grocery list.'); return; }
+  var db = INGREDIENT_DB.find(function(i) { return i.name.toLowerCase() === ingName.toLowerCase(); });
+  AppState.groceryList.push({
+    id: Date.now() + Math.random(),
+    name: ingName,
+    category: db ? db.category : 'Pantry',
+    quantity: null,
+    unit: db ? db.unit : '',
+    sources: [],
+    checked: false,
+    custom: true
+  });
+  renderGroceryList();
+  saveData();
+  showSuccessMessage(ingName + ' added to grocery list.');
+}
+window.buyMissingIngredient = buyMissingIngredient;
+
+function planRecipeForToday(recipeId) {
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var today = dayNames[new Date().getDay()];
+  if (!AppState.weeklyPlan[today]) {
+    AppState.weeklyPlan[today] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+  }
+  AppState.weeklyPlan[today].dinner = String(recipeId);
+  saveData();
+  generateGroceryList();
+  renderWeeklyPlanner();
+  renderDashboard();
+  showSuccessMessage('Added to tonight\'s dinner!');
+}
+window.planRecipeForToday = planRecipeForToday;
 
 // Grocery list functions
 function generateGroceryList() {
@@ -3257,7 +3351,8 @@ function updateGrocerySummary() {
     }, 0);
   }, 0);
   
-  document.getElementById('selected-meals-count').textContent = plannedMealsCount;
+  var el = document.getElementById('selected-meals-count');
+  if (el) el.textContent = plannedMealsCount;
 }
 
 // Storage guide functions
@@ -4604,6 +4699,21 @@ async function signUp(email, password) {
   }
 }
 
+async function sendPasswordReset() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) {
+    showErrorMessage('Please enter your email address first.');
+    return;
+  }
+  try {
+    await window.firebase.sendPasswordResetEmail(window.firebase.auth, email);
+    showSuccessMessage('Password reset email sent — check your inbox.');
+  } catch (error) {
+    console.error('Password reset error:', error);
+    showErrorMessage('Could not send reset email: ' + error.message);
+  }
+}
+
 async function signOut() {
   try {
     await window.firebase.signOut(window.firebase.auth);
@@ -5751,6 +5861,8 @@ function downloadCSVTemplate() {
 
 function openPasteRecipeModal() {
   document.getElementById('paste-recipe-text').value = '';
+  var fb = document.getElementById('parse-feedback');
+  if (fb) { fb.className = 'parse-feedback hidden'; fb.innerHTML = ''; }
   document.getElementById('paste-recipe-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('paste-recipe-text').focus(), 50);
 }
@@ -5764,7 +5876,47 @@ function parseAndImportRecipe() {
   if (!text) return;
 
   const parsed = parseRecipeText(text);
+  const feedbackEl = document.getElementById('parse-feedback');
 
+  const hasName = !!parsed.name;
+  const ingCount = parsed.ingredients.length;
+  const hasInstructions = !!parsed.instructions;
+
+  // Confidence: count detected fields
+  let detected = 0;
+  if (hasName) detected++;
+  if (ingCount >= 2) detected++;
+  else if (ingCount === 1) detected += 0.5;
+  if (hasInstructions) detected++;
+
+  // Failed: no name and fewer than 2 ingredients
+  if (!hasName && ingCount < 2) {
+    feedbackEl.className = 'parse-feedback parse-feedback--error';
+    feedbackEl.innerHTML =
+      '<strong>Couldn\'t read this format.</strong> Try pasting just the ingredients list, ' +
+      'or copy the full recipe page text including the title, ingredients, and steps.';
+    feedbackEl.classList.remove('hidden');
+    return;
+  }
+
+  // Partial: name or ingredients found but not both
+  let toastMsg = '';
+  if (!hasName) {
+    feedbackEl.className = 'parse-feedback parse-feedback--warn';
+    feedbackEl.innerHTML = 'Found <strong>' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + '</strong> but no recipe title. Please add a name before saving.';
+    feedbackEl.classList.remove('hidden');
+    toastMsg = ingCount + ' ingredients imported — add a title before saving.';
+  } else if (ingCount < 2) {
+    feedbackEl.className = 'parse-feedback parse-feedback--warn';
+    feedbackEl.innerHTML = 'Found title "<strong>' + escapeHtml(parsed.name) + '</strong>" but only ' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + '. Check the ingredients section and add more manually.';
+    feedbackEl.classList.remove('hidden');
+    toastMsg = 'Partial import — add the missing ingredients manually.';
+  } else {
+    const fieldList = [hasName ? 'title' : null, ingCount + ' ingredients', hasInstructions ? 'instructions' : null].filter(Boolean).join(', ');
+    toastMsg = 'Imported: ' + fieldList + ' — review and save.';
+  }
+
+  // Proceed to the recipe form
   closePasteRecipeModal();
   AppState.currentEditingRecipe = null;
   document.getElementById('modal-title').textContent = 'Add New Recipe';
@@ -5788,6 +5940,8 @@ function parseAndImportRecipe() {
   } else {
     addIngredientField();
   }
+
+  if (toastMsg) showSuccessMessage(toastMsg);
 }
 
 function parseRecipeText(text) {
@@ -6106,6 +6260,48 @@ function syncStapleToGrocery(p) {
   }
 }
 
+// Scan all pantry items and keep the grocery list in sync with low-stock state.
+// Staples use stockLevel; non-staples use quantity vs minStockQty.
+// Returns true if the grocery list was modified.
+function checkAndReplenishLowStock() {
+  var changed = false;
+  AppState.pantry.forEach(function(p) {
+    var db = INGREDIENT_DB.find(function(i) { return i.name === p.name; });
+    if (isStaple(p)) {
+      var inList = AppState.groceryList.some(function(g) {
+        return g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase();
+      });
+      var shouldBeInList = p.stockLevel === 'low' || p.stockLevel === 'empty';
+      if (inList !== shouldBeInList) { syncStapleToGrocery(p); changed = true; }
+    } else if (db && db.minStockQty != null && p.quantity != null) {
+      var alreadyInList = AppState.groceryList.some(function(g) {
+        return g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase();
+      });
+      var isBelowMin = p.quantity < db.minStockQty;
+      if (isBelowMin && !alreadyInList) {
+        AppState.groceryList.push({
+          id: Date.now() + Math.random(),
+          name: p.name,
+          category: p.category || db.category,
+          quantity: db.minStockQty,
+          unit: p.unit || db.unit || '',
+          sources: ['Running low'],
+          checked: false,
+          custom: true,
+          fromStaple: true
+        });
+        changed = true;
+      } else if (!isBelowMin && alreadyInList) {
+        AppState.groceryList = AppState.groceryList.filter(function(g) {
+          return !(g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase());
+        });
+        changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
 // Tap-to-cycle a staple's stock level: Full → OK → Low → Full.
 function cycleStapleLevel(id) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
@@ -6156,6 +6352,7 @@ function updatePantryQty(id, value) {
   if (!p) return;
   var q = parseFloat(value);
   p.quantity = isNaN(q) ? null : q;
+  checkAndReplenishLowStock();
   saveData();
   renderPantry();
 }
@@ -6334,11 +6531,25 @@ function renderIngredientBrowserContent(filter) {
       var pItem = AppState.pantry.find(function(p) { return p.name.toLowerCase() === item.name.toLowerCase(); });
       var active = !!pItem;
       if (active) {
+        if (item.isStaple) {
+          var level = pItem.stockLevel || 'ok';
+          var levelHtml = ['full', 'ok', 'low'].map(function(l) {
+            var cls = 'ib-level ib-level--' + l + (l === level ? ' ib-level--active' : '');
+            return '<button class="' + cls + '" data-level="' + l + '"' +
+                   ' onclick="setBrowserItemLevel(this.closest(\'[data-name]\').dataset.name, this.dataset.level); event.stopPropagation()">' +
+                   (l.charAt(0).toUpperCase() + l.slice(1)) + '</button>';
+          }).join('');
+          return '<span class="ib-chip ib-chip--active" data-name="' + escapeHtml(item.name) + '">' +
+                 '<span class="ib-chip-name">' + escapeHtml(item.name) + '</span>' +
+                 '<span class="ib-levels">' + levelHtml + '</span>' +
+                 '<button class="ib-remove" onclick="toggleIngredientFromBrowser(this.parentElement.dataset.name)" title="Remove">×</button>' +
+                 '</span>';
+        }
         var qty = pItem.quantity != null ? pItem.quantity : '';
         var unit = escapeHtml(item.unit || pItem.unit || '');
         return '<span class="ib-chip ib-chip--active" data-name="' + escapeHtml(item.name) + '">' +
                '<span class="ib-chip-name">' + escapeHtml(item.name) + '</span>' +
-               '<input class="ib-qty" type="number" min="0" step="any" placeholder="—" value="' + qty + '"' +
+               '<input class="ib-qty" type="number" min="0" step="any" placeholder="qty" value="' + qty + '"' +
                ' onchange="updateBrowserItemQty(this.parentElement.dataset.name, this.value)"' +
                ' onclick="event.stopPropagation()">' +
                (unit ? '<span class="ib-unit">' + unit + '</span>' : '') +
@@ -6391,10 +6602,23 @@ function updateBrowserItemQty(name, value) {
   if (!item) return;
   var qty = parseFloat(value);
   item.quantity = (!isNaN(qty) && qty > 0) ? qty : null;
+  checkAndReplenishLowStock();
   saveData();
   renderPantry();
 }
 window.updateBrowserItemQty = updateBrowserItemQty;
+
+function setBrowserItemLevel(name, level) {
+  var item = AppState.pantry.find(function(p) { return p.name.toLowerCase() === name.toLowerCase(); });
+  if (!item) return;
+  item.stockLevel = level;
+  syncStapleToGrocery(item);
+  saveData();
+  renderPantry();
+  var searchEl = document.getElementById('ib-search');
+  renderIngredientBrowserContent(searchEl ? searchEl.value : '');
+}
+window.setBrowserItemLevel = setBrowserItemLevel;
 
 // ── Cooked meal tracking ─────────────────────────────────────────────────────
 
@@ -6476,6 +6700,7 @@ function markRecipeCooked(recipeId) {
   });
 
   var sum = deductIngredientsForRecipe(recipe);
+  checkAndReplenishLowStock();
 
   saveData();
   renderCookedMeals();
@@ -6875,7 +7100,9 @@ function renderIngredientsTab() {
 
   var addBtnHtml = '<button class="btn btn--primary ingcat-add-btn" onclick="openAddUserIngredientModal()">+ Add My Ingredient</button>';
 
-  list.innerHTML = storesHtml + searchHtml + addBtnHtml + userSection +
+  var noResultsHtml = '<div id="ingcat-no-results" class="ingcat-no-results" style="display:none">No ingredients found for that search.</div>';
+
+  list.innerHTML = storesHtml + searchHtml + addBtnHtml + userSection + noResultsHtml +
     '<div class="ingcat-table">' + colHeaderHtml + rowsHtml + '</div>';
 }
 
@@ -6885,10 +7112,14 @@ function filterIngredientCatalog(query) {
     var name = (row.dataset.name || '').toLowerCase();
     row.style.display = (!q || name.includes(q)) ? '' : 'none';
   });
+  var anyVisible = false;
   document.querySelectorAll('.ingcat-section').forEach(function(section) {
     var visible = Array.from(section.querySelectorAll('.ingcat-row')).some(function(r) { return r.style.display !== 'none'; });
     section.style.display = visible ? '' : 'none';
+    if (visible) anyVisible = true;
   });
+  var noResultsEl = document.getElementById('ingcat-no-results');
+  if (noResultsEl) noResultsEl.style.display = (q && !anyVisible) ? '' : 'none';
 }
 
 function addMyStore() {
@@ -7560,6 +7791,32 @@ const LOCAL_NUTRITION_DB = [
   { name: 'Kimchi', calories: 15, protein: 1.1, carbs: 2.4, fat: 0.5, fiber: 1.6, sodium: 498 },
   { name: 'Gochujang', calories: 175, protein: 5, carbs: 35, fat: 2, fiber: 1.5, sodium: 1490 },
   { name: 'Tamarind', calories: 239, protein: 2.8, carbs: 63, fat: 0.6, fiber: 5.1, sodium: 28 },
+  // Filipino ingredients — new entries
+  { name: 'Gabi', calories: 112, protein: 1.5, carbs: 27, fat: 0.2, fiber: 4.1, sodium: 11 },
+  { name: 'Mung Beans', calories: 347, protein: 24, carbs: 63, fat: 1.2, fiber: 16, sodium: 15 },
+  { name: 'Mung Beans (cooked)', calories: 105, protein: 7.2, carbs: 19, fat: 0.4, fiber: 7.6, sodium: 2 },
+  { name: 'Monggo', calories: 105, protein: 7.2, carbs: 19, fat: 0.4, fiber: 7.6, sodium: 2 },
+  { name: 'Black Beans', calories: 341, protein: 22, carbs: 63, fat: 1.4, fiber: 15, sodium: 5 },
+  { name: 'Black Beans (cooked)', calories: 132, protein: 8.9, carbs: 24, fat: 0.5, fiber: 8.7, sodium: 1 },
+  { name: 'Jasmine Rice (cooked)', calories: 130, protein: 2.7, carbs: 29, fat: 0.3, fiber: 0.3, sodium: 1 },
+  { name: 'Ube', calories: 140, protein: 2, carbs: 34, fat: 0.1, fiber: 4, sodium: 10 },
+  { name: 'Sayote', calories: 24, protein: 0.8, carbs: 5.5, fat: 0.2, fiber: 2.2, sodium: 2 },
+  { name: 'Labanos', calories: 16, protein: 0.7, carbs: 3.4, fat: 0.1, fiber: 1.6, sodium: 39 },
+  { name: 'Calamansi', calories: 30, protein: 0.5, carbs: 7, fat: 0.1, fiber: 2, sodium: 2 },
+  { name: 'Siling Haba', calories: 40, protein: 1.9, carbs: 8.8, fat: 0.4, fiber: 1.5, sodium: 9 },
+  { name: 'Saging na Saba', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, fiber: 2.6, sodium: 1 },
+  { name: 'Achuete', calories: 313, protein: 5.8, carbs: 55, fat: 10, fiber: 6, sodium: 7 },
+  { name: 'Bagoong Alamang', calories: 110, protein: 16, carbs: 2, fat: 3.5, fiber: 0, sodium: 4500 },
+  { name: 'Tocino', calories: 320, protein: 15, carbs: 18, fat: 20, fiber: 0, sodium: 850 },
+  { name: 'Balut', calories: 188, protein: 13, carbs: 9, fat: 12, fiber: 0, sodium: 100 },
+  { name: 'Kesong Puti', calories: 280, protein: 20, carbs: 2, fat: 22, fiber: 0, sodium: 480 },
+  // Filipino-name aliases for English entries
+  { name: 'Kamote', calories: 86, protein: 1.6, carbs: 20, fat: 0.1, fiber: 3, sodium: 55 },
+  { name: 'Talong', calories: 25, protein: 1, carbs: 5.9, fat: 0.2, fiber: 3, sodium: 2 },
+  { name: 'Gata', calories: 230, protein: 2.3, carbs: 6, fat: 24, fiber: 0, sodium: 15 },
+  { name: 'Patis', calories: 35, protein: 5, carbs: 3.6, fat: 0, fiber: 0, sodium: 5670 },
+  { name: 'Toyo', calories: 53, protein: 8.1, carbs: 5, fat: 0.1, fiber: 0.8, sodium: 5493 },
+  { name: 'Tahong', calories: 86, protein: 12, carbs: 4, fat: 2.2, fiber: 0, sodium: 286 },
 ];
 
 function searchLocalNutrition(query) {
@@ -7763,10 +8020,10 @@ const INGREDIENT_DB = [
   { name: 'Corned Beef (Canned)', unit: 'can', category: 'Protein', price: '₱75/can', store: 'Any Store', storage: 'counter', shelfLifeDays: 1095, isStaple: true, aliases: ['corned beef', 'cornbeef', 'karne norte', 'palm corned beef'], fridgeDays: null, freezerDays: null, trackExpiry: false, priceValue: 75, minStockQty: null },
 
   // Vegetables
-  { name: 'Garlic (Bawang)', unit: 'g', category: 'Vegetable', price: '₱80/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 180, aliases: ['bawang', 'garlic', 'garlic cloves', 'garlic clove', 'minced garlic'], fridgeDays: 14, freezerDays: 365, trackExpiry: true, priceValue: 80, minStockQty: 20 },
-  { name: 'Onion (Sibuyas)', unit: 'kg', category: 'Vegetable', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, aliases: ['sibuyas', 'onion', 'onions', 'white onion', 'yellow onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: true, priceValue: 80, minStockQty: 0.25 },
-  { name: 'Red Onion', unit: 'kg', category: 'Vegetable', price: '₱90/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, aliases: ['red onion', 'sibuyas pula', 'bombay onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: true, priceValue: 90, minStockQty: null },
-  { name: 'Shallots', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 30, aliases: ['shallots', 'sibuyas tagalog', 'echalotes', 'eschalots'], fridgeDays: 30, freezerDays: 365, trackExpiry: true, priceValue: 60, minStockQty: null },
+  { name: 'Garlic (Bawang)', unit: 'g', category: 'Vegetable', price: '₱80/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 180, isStaple: true, aliases: ['bawang', 'garlic', 'garlic cloves', 'garlic clove', 'minced garlic'], fridgeDays: 14, freezerDays: 365, trackExpiry: false, priceValue: 80, minStockQty: null },
+  { name: 'Onion (Sibuyas)', unit: 'kg', category: 'Vegetable', price: '₱80/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, isStaple: true, aliases: ['sibuyas', 'onion', 'onions', 'white onion', 'yellow onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: false, priceValue: 80, minStockQty: null },
+  { name: 'Red Onion', unit: 'kg', category: 'Vegetable', price: '₱90/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 60, isStaple: true, aliases: ['red onion', 'sibuyas pula', 'bombay onion'], fridgeDays: 60, freezerDays: 365, trackExpiry: false, priceValue: 90, minStockQty: null },
+  { name: 'Shallots', unit: 'kg', category: 'Vegetable', price: '₱60/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 30, isStaple: true, aliases: ['shallots', 'sibuyas tagalog', 'echalotes', 'eschalots'], fridgeDays: 30, freezerDays: 365, trackExpiry: false, priceValue: 60, minStockQty: null },
   { name: 'Tomato (Kamatis)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 5, aliases: ['kamatis', 'tomato', 'tomatoes', 'fresh tomato'], fridgeDays: 10, freezerDays: 365, trackExpiry: true, priceValue: 50, minStockQty: null },
   { name: 'Potato (Patatas)', unit: 'kg', category: 'Vegetable', price: '₱70/kg', store: 'Wet Market / Supermarket', storage: 'counter', shelfLifeDays: 28, aliases: ['patatas', 'potato', 'potatoes', 'white potato'], fridgeDays: null, freezerDays: 365, trackExpiry: true, priceValue: 70, minStockQty: null },
   { name: 'Sweet Potato (Kamote)', unit: 'kg', category: 'Vegetable', price: '₱50/kg', store: 'Wet Market', storage: 'counter', shelfLifeDays: 21, aliases: ['kamote', 'sweet potato', 'camote', 'yam'], fridgeDays: null, freezerDays: 365, trackExpiry: true, priceValue: 50, minStockQty: null },
@@ -7788,7 +8045,7 @@ const INGREDIENT_DB = [
   { name: 'Red Bell Pepper', unit: 'pieces', category: 'Vegetable', price: '₱35/pc', store: 'Wet Market / Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['red bell pepper', 'red capsicum', 'red pepper'], fridgeDays: 7, freezerDays: 365, trackExpiry: true, priceValue: 35, minStockQty: null },
   { name: 'Celery (Kintsay)', unit: 'stalks', category: 'Vegetable', price: '₱20/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 14, aliases: ['kintsay', 'celery', 'kinchay', 'celery stalk'], fridgeDays: 14, freezerDays: 365, trackExpiry: true, priceValue: 20, minStockQty: null },
   { name: 'Green Onion (Sibuyas Dahon)', unit: 'stalks', category: 'Vegetable', price: '₱15/bundle', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 7, aliases: ['sibuyas dahon', 'green onion', 'spring onion', 'scallion', 'dahon ng sibuyas'], fridgeDays: 7, freezerDays: 180, trackExpiry: true, priceValue: 15, minStockQty: null },
-  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable', price: '₱60/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30, aliases: ['luya', 'ginger', 'gengibre', 'fresh ginger'], fridgeDays: 30, freezerDays: 180, trackExpiry: true, priceValue: 60, minStockQty: null },
+  { name: 'Ginger (Luya)', unit: 'g', category: 'Vegetable', price: '₱60/100g', store: 'Wet Market / Grocery', storage: 'counter', shelfLifeDays: 30, isStaple: true, aliases: ['luya', 'ginger', 'gengibre', 'fresh ginger'], fridgeDays: 30, freezerDays: 180, trackExpiry: false, priceValue: 60, minStockQty: null },
   { name: 'Lemongrass (Tanglad)', unit: 'stalks', category: 'Vegetable', price: '₱10/bundle', store: 'Wet Market', storage: 'fridge', shelfLifeDays: 14, aliases: ['tanglad', 'lemongrass', 'salay', 'lemon grass'], fridgeDays: 14, freezerDays: 90, trackExpiry: true, priceValue: 10, minStockQty: null },
   { name: 'Mushroom', unit: 'g', category: 'Vegetable', price: '₱150/200g', store: 'Supermarket', storage: 'fridge', shelfLifeDays: 7, aliases: ['mushroom', 'kabute', 'button mushroom', 'shiitake'], fridgeDays: 7, freezerDays: 90, trackExpiry: true, priceValue: 150, minStockQty: null },
   { name: 'Corn (Mais)', unit: 'pieces', category: 'Vegetable', price: '₱20/pc', store: 'Wet Market / Grocery', storage: 'fridge', shelfLifeDays: 3, aliases: ['mais', 'corn', 'maize', 'sweet corn', 'corn on the cob'], fridgeDays: 3, freezerDays: 365, trackExpiry: true, priceValue: 20, minStockQty: null },
@@ -7900,6 +8157,7 @@ const INGREDIENT_DB = [
   { name: 'Red Lentils', unit: 'g', category: 'Pantry', price: '₱120/500g', store: 'Supermarket', storage: 'counter', shelfLifeDays: 730, aliases: ['red lentils', 'lentils', 'masoor dal', 'red dal'], fridgeDays: null, freezerDays: null, trackExpiry: false, priceValue: 120, minStockQty: null },
   { name: 'Kimchi', unit: 'g', category: 'Pantry', price: '₱200/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 180, aliases: ['kimchi', 'kimchee', 'Korean fermented cabbage', 'kimchi cabbage'], fridgeDays: 180, freezerDays: null, trackExpiry: true, priceValue: 200, minStockQty: null },
   { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['gochujang', 'Korean chili paste', 'Korean red pepper paste', 'gochuchang'], fridgeDays: 365, freezerDays: null, trackExpiry: true, priceValue: 250, minStockQty: null },
+  { name: 'Mung Beans', unit: 'g', category: 'Grain', price: '₱80/500g', store: 'Palengke / Supermarket', storage: 'counter', shelfLifeDays: 365, aliases: ['mung beans', 'monggo', 'green mung beans', 'munggo', 'mung dal'], fridgeDays: null, freezerDays: null, trackExpiry: false, priceValue: 80, minStockQty: 200 },
 ];
 
 function filterIngredients(query) {
@@ -7991,4 +8249,19 @@ function attachIngredientAutocomplete(nameInput, onSelect) {
     if (e.key === 'Escape') suggestBox.classList.add('hidden');
   });
 }
+
+// ── Global error handler ────────────────────────────────────────────────────
+window.addEventListener('error', function(event) {
+  console.error('[Global error]', event.error || event.message, event);
+  var existing = document.getElementById('global-error-banner');
+  if (existing) return; // already shown
+  var banner = document.createElement('div');
+  banner.id = 'global-error-banner';
+  banner.className = 'global-error-banner';
+  banner.innerHTML =
+    '<span>Something went wrong — try refreshing the page.</span>' +
+    '<button type="button" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>';
+  var app = document.querySelector('.app') || document.body;
+  app.insertBefore(banner, app.firstChild);
+});
 

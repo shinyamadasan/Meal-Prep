@@ -111,6 +111,10 @@
                             <option value="60">Under 1 hour</option>
                             <option value="999">1 hour+</option>
                         </select>
+                        <label class="favorites-filter-label">
+                            <input type="checkbox" id="favorites-filter" onchange="filterRecipes()">
+                            ♥ Favorites
+                        </label>
                     </div>
 
                     <div id="recipes-grid" class="recipes-grid">
@@ -541,7 +545,7 @@
       // Import the functions you need from the SDKs you need
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
       import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
-      import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+      import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
       import { getFirestore, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
       // Your web app's Firebase configuration
@@ -572,7 +576,7 @@
       const db = getFirestore(app);
       
       // Make Firebase available globally
-      window.firebase = { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, runTransaction };
+      window.firebase = { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, runTransaction };
     </script>
     
     <script src="app.js"></script>
@@ -740,6 +744,9 @@
                     <button type="button" class="btn btn--outline" onclick="closeLoginModal()">Cancel</button>
                     <button type="submit" class="btn btn--primary">Sign In</button>
                 </div>
+                <p style="text-align:right;margin:8px 0 0;font-size:0.85rem;">
+                    <a href="#" onclick="sendPasswordReset();return false;">Forgot password?</a>
+                </p>
             </form>
         </div>
     </div>
@@ -957,6 +964,7 @@
                 </p>
                 <textarea id="paste-recipe-text" class="form-control" rows="16"
                     placeholder="Paste the full recipe page text here..."></textarea>
+                <div id="parse-feedback" class="parse-feedback hidden"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closePasteRecipeModal()">Cancel</button>

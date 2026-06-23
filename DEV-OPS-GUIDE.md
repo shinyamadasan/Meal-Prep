@@ -125,24 +125,26 @@ Claude updates ROADMAP.md. The overnight script picks it up at 2am automatically
 
 ---
 
-## 6. Overnight Schedule
+## 6. Scheduled Runs
 
-- Runs at: **2:00 AM daily**
+- **2:00 PM daily** — Claude works through task queue. PC stays on after.
+- **7:00 PM daily** — Claude continues where it left off. PC shuts down 60s after finishing.
 - PC wakes from sleep automatically (WakeToRun = ON)
 - Output logged to: `claude-session.log`
+- If queue is empty: Claude logs "No tasks remaining" and skips shutdown.
 
-**Pause overnight runs:**
+**Pause scheduled runs:**
 ```powershell
 Disable-ScheduledTask -TaskName "Meal Prep Claude Overnight"
 ```
 
-**Resume overnight runs:**
+**Resume scheduled runs:**
 ```powershell
 Enable-ScheduledTask -TaskName "Meal Prep Claude Overnight"
 ```
 
-**Change run time** (e.g. to 3am):
-Edit `setup-task-scheduler.ps1` → change `-At "2:00AM"` → re-run the script as Admin.
+**Change run time:**
+Edit `setup-task-scheduler.ps1` → change `-At "2:00PM"` or `-At "6:00PM"` → re-run the script as Admin.
 
 **Test the script manually:**
 ```powershell

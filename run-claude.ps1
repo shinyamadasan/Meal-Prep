@@ -24,7 +24,9 @@ Rules - follow exactly:
 - Do not touch anything in the "Do Not Work On" section
 - If a task is ambiguous or you hit a blocker, log it in STATUS.md and skip to the next task
 - Do not delete any files
-- Keep going until the Task Queue is empty or you are close to your context limit
+- Keep going until the Task Queue is empty or you are close to your context limit.
+
+If the Task Queue is empty and there is no Current Task, write "No tasks remaining" to STATUS.md and stop — do not shut down the PC.
 
 For EACH task:
 1. Read the Current Task and its Success Criteria from ROADMAP.md
@@ -45,3 +47,12 @@ claude -p $prompt `
 
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="
+
+# Only shut down after the 6pm run, and only if tasks were actually completed
+# Claude writes "No tasks remaining" to the log if queue was empty — skip shutdown in that case
+$hour = (Get-Date).Hour
+$logContent = Get-Content -Path $logFile -Raw -ErrorAction SilentlyContinue
+if ($hour -ge 19 -and $logContent -notlike "*No tasks remaining*") {
+    Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
+    shutdown /s /t 60
+}

@@ -1313,6 +1313,41 @@ select.form-control {
   justify-content: flex-end;
 }
 
+.recipe-fav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  color: var(--color-border);
+  transition: color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.recipe-fav-btn:hover { color: #e74c3c; transform: scale(1.2); }
+.recipe-fav-btn.active { color: #e74c3c; }
+
+.favorites-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  transition: border-color 0.15s, color 0.15s;
+}
+.favorites-filter-label:has(input:checked) {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+.favorites-filter-label input { display: none; }
+
 /* Modal */
 .modal {
   position: fixed;
@@ -1378,6 +1413,25 @@ select.form-control {
   gap: var(--space-12);
   justify-content: flex-end;
   margin-top: var(--space-24);
+}
+
+/* Parse recipe feedback */
+.parse-feedback {
+  margin-top: var(--space-12);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+.parse-feedback.hidden { display: none; }
+.parse-feedback--error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: var(--color-error, #dc2626);
+}
+.parse-feedback--warn {
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.3);
+  color: var(--color-warning, #92400e);
 }
 
 /* Ingredients List */
@@ -4702,6 +4756,29 @@ select.form-control {
 [data-color-scheme="dark"] .sync-offline { color: #fbbf24; }
 
 /* Email-verification banner (shown while signed in but unverified) */
+.global-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 1rem;
+  background: rgba(239, 68, 68, 0.12);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+.global-error-banner button {
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.4rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
 .email-verify-banner {
   display: flex;
   flex-wrap: wrap;
@@ -6019,4 +6096,13 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 0.1rem;
 }
 .ib-remove:hover { color: #fff; }
+.ib-levels { display: flex; gap: 2px; margin: 0 4px; }
+.ib-level {
+  font-size: 0.65rem; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.35); background: transparent;
+  color: rgba(255,255,255,0.55); cursor: pointer; letter-spacing: 0.02em;
+  transition: background 0.15s, color 0.15s;
+}
+.ib-level--active { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.7); }
+.ib-level--low.ib-level--active { background: rgba(239,68,68,0.25); border-color: #f87171; color: #fca5a5; }
 .ib-empty { text-align: center; color: var(--color-text-secondary); padding: 1.5rem 0; font-size: 0.9rem; }

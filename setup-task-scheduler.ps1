@@ -12,8 +12,12 @@ $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
     -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$scriptPath`""
 
-# Change -At to whatever time you want (e.g. "3:00AM", "11:00PM")
-$trigger = New-ScheduledTaskTrigger -Daily -At "2:00AM"
+# Two daily runs — 2pm and 6pm
+# 2pm: Claude works through task queue, PC stays on
+# 6pm: Claude continues where it left off, PC shuts down after
+$trigger1 = New-ScheduledTaskTrigger -Daily -At "2:00PM"
+$trigger2 = New-ScheduledTaskTrigger -Daily -At "7:00PM"
+$trigger = @($trigger1, $trigger2)
 
 $settings = New-ScheduledTaskSettingsSet `
     -WakeToRun `
@@ -31,7 +35,7 @@ Register-ScheduledTask `
 
 Write-Host ""
 Write-Host "Task registered: '$taskName'" -ForegroundColor Green
-Write-Host "Runs at: 2:00 AM daily" -ForegroundColor Green
+Write-Host "Runs at: 2:00 PM and 7:00 PM daily" -ForegroundColor Green
 Write-Host "WakeToRun: ON (PC will wake from sleep to run)" -ForegroundColor Green
 Write-Host ""
 Write-Host "To verify: open Task Scheduler and look for '$taskName'"
