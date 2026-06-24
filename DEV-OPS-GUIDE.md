@@ -127,8 +127,8 @@ Claude updates ROADMAP.md. The overnight script picks it up at 2am automatically
 
 ## 6. Scheduled Runs
 
-- **2:00 PM daily** — Claude works through task queue. PC stays on after.
-- **7:00 PM daily** — Claude continues where it left off. PC shuts down 60s after finishing.
+- **9:00 PM daily** — Claude works through task queue. PC stays on after.
+- **2:00 AM daily** — Claude continues where it left off. PC shuts down 60s after finishing.
 - PC wakes from sleep automatically (WakeToRun = ON)
 - Output logged to: `claude-session.log`
 - If queue is empty: Claude logs "No tasks remaining" and skips shutdown.

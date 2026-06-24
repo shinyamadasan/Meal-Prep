@@ -52,7 +52,7 @@ Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="
 # Claude writes "No tasks remaining" to the log if queue was empty — skip shutdown in that case
 $hour = (Get-Date).Hour
 $logContent = Get-Content -Path $logFile -Raw -ErrorAction SilentlyContinue
-if ($hour -ge 19 -and $logContent -notlike "*No tasks remaining*") {
+if ($hour -lt 6 -and $logContent -notlike "*No tasks remaining*") {
     Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
     shutdown /s /t 60
 }

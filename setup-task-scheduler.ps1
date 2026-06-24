@@ -15,8 +15,8 @@ $action = New-ScheduledTaskAction `
 # Two daily runs — 2pm and 6pm
 # 2pm: Claude works through task queue, PC stays on
 # 6pm: Claude continues where it left off, PC shuts down after
-$trigger1 = New-ScheduledTaskTrigger -Daily -At "2:00PM"
-$trigger2 = New-ScheduledTaskTrigger -Daily -At "7:00PM"
+$trigger1 = New-ScheduledTaskTrigger -Daily -At "9:00PM"
+$trigger2 = New-ScheduledTaskTrigger -Daily -At "2:00AM"
 $trigger = @($trigger1, $trigger2)
 
 $settings = New-ScheduledTaskSettingsSet `
@@ -35,7 +35,7 @@ Register-ScheduledTask `
 
 Write-Host ""
 Write-Host "Task registered: '$taskName'" -ForegroundColor Green
-Write-Host "Runs at: 2:00 PM and 7:00 PM daily" -ForegroundColor Green
+Write-Host "Runs at: 9:00 PM and 2:00 AM daily" -ForegroundColor Green
 Write-Host "WakeToRun: ON (PC will wake from sleep to run)" -ForegroundColor Green
 Write-Host ""
 Write-Host "To verify: open Task Scheduler and look for '$taskName'"
