@@ -1433,6 +1433,20 @@ select.form-control {
   border: 1px solid rgba(245,158,11,0.3);
   color: var(--color-warning, #92400e);
 }
+.parse-feedback--summary {
+  background: var(--color-surface, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  color: var(--color-text, #111827);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem 1rem;
+}
+.pf-row { font-size: 0.85rem; line-height: 1.4; }
+.pf-ok   { color: var(--color-success, #16a34a); }
+.pf-warn { color: var(--color-warning, #b45309); }
+.pf-dim  { color: var(--color-text-muted, #6b7280); }
+.pf-proceed-btn { margin-top: 0.6rem; align-self: flex-start; }
 
 /* Ingredients List */
 .ingredient-item {
@@ -4743,6 +4757,48 @@ select.form-control {
 .slot-cooked-btn:hover {
   background: var(--color-success);
   color: #fff;
+}
+.slot-cooked-btn--done {
+  background: var(--color-success);
+  color: #fff;
+  border-color: var(--color-success);
+  opacity: 0.8;
+  cursor: default;
+}
+
+/* Generic confirm dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.confirm-dialog {
+  background: var(--color-bg, #fff);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 380px;
+  width: calc(100% - 2rem);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.confirm-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--color-text);
+}
+.confirm-body { font-size: 0.875rem; color: var(--color-text-muted); line-height: 1.5; }
+.confirm-body p { margin: 0 0 0.5rem; }
+.confirm-body p:last-child { margin-bottom: 0; }
+.confirm-body strong { color: var(--color-text); }
+.confirm-btns {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
 }
 
 /* "⋯ Data" dropdown menu (My Recipes header declutter) */

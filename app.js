@@ -2562,7 +2562,7 @@ function renderWeeklyPlanner() {
                     <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">' + icon('triangle-alert') + '</span>' : ''}</div>
                     <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
                   </div>
-                  <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${recipe.id}')" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
+                  <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${recipe.id}', this)" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
                 </div>
               </div>`;
           }
@@ -6018,25 +6018,24 @@ function closePasteRecipeModal() {
   document.getElementById('paste-recipe-modal').classList.add('hidden');
 }
 
-function parseAndImportRecipe() {
+var _lastParsedRecipe = null;
+
+function parseAndPreview() {
   const text = document.getElementById('paste-recipe-text').value.trim();
   if (!text) return;
 
   const parsed = parseRecipeText(text);
-  const feedbackEl = document.getElementById('parse-feedback');
+  _lastParsedRecipe = parsed;
 
   const hasName = !!parsed.name;
   const ingCount = parsed.ingredients.length;
   const hasInstructions = !!parsed.instructions;
+  const hasServings = parsed.servings !== 4; // 4 is the default fallback
+  const hasTimes = parsed.prepTime !== 15 || parsed.cookTime !== 30;
 
-  // Confidence: count detected fields
-  let detected = 0;
-  if (hasName) detected++;
-  if (ingCount >= 2) detected++;
-  else if (ingCount === 1) detected += 0.5;
-  if (hasInstructions) detected++;
+  const feedbackEl = document.getElementById('parse-feedback');
 
-  // Failed: no name and fewer than 2 ingredients
+  // Complete failure
   if (!hasName && ingCount < 2) {
     feedbackEl.className = 'parse-feedback parse-feedback--error';
     feedbackEl.innerHTML =
@@ -6046,24 +6045,39 @@ function parseAndImportRecipe() {
     return;
   }
 
-  // Partial: name or ingredients found but not both
-  let toastMsg = '';
-  if (!hasName) {
-    feedbackEl.className = 'parse-feedback parse-feedback--warn';
-    feedbackEl.innerHTML = 'Found <strong>' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + '</strong> but no recipe title. Please add a name before saving.';
-    feedbackEl.classList.remove('hidden');
-    toastMsg = ingCount + ' ingredients imported — add a title before saving.';
-  } else if (ingCount < 2) {
-    feedbackEl.className = 'parse-feedback parse-feedback--warn';
-    feedbackEl.innerHTML = 'Found title "<strong>' + escapeHtml(parsed.name) + '</strong>" but only ' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + '. Check the ingredients section and add more manually.';
-    feedbackEl.classList.remove('hidden');
-    toastMsg = 'Partial import — add the missing ingredients manually.';
-  } else {
-    const fieldList = [hasName ? 'title' : null, ingCount + ' ingredients', hasInstructions ? 'instructions' : null].filter(Boolean).join(', ');
-    toastMsg = 'Imported: ' + fieldList + ' — review and save.';
-  }
+  // Build confidence summary
+  var rows = '';
+  rows += hasName
+    ? '<div class="pf-row pf-ok">✓ Title: <strong>' + escapeHtml(parsed.name) + '</strong></div>'
+    : '<div class="pf-row pf-warn">⚠ No title found — add one before saving</div>';
+  rows += ingCount >= 2
+    ? '<div class="pf-row pf-ok">✓ ' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + ' found</div>'
+    : '<div class="pf-row pf-warn">⚠ Only ' + ingCount + ' ingredient' + (ingCount !== 1 ? 's' : '') + ' found — add more manually</div>';
+  rows += hasInstructions
+    ? '<div class="pf-row pf-ok">✓ Instructions found</div>'
+    : '<div class="pf-row pf-warn">⚠ No instructions found — add them in the form</div>';
+  rows += hasServings
+    ? '<div class="pf-row pf-ok">✓ Servings: ' + parsed.servings + '</div>'
+    : '<div class="pf-row pf-dim">— Servings: defaulted to 4</div>';
+  rows += hasTimes
+    ? '<div class="pf-row pf-ok">✓ Prep ' + parsed.prepTime + ' min · Cook ' + parsed.cookTime + ' min</div>'
+    : '<div class="pf-row pf-dim">— Times: using defaults (15 min prep / 30 min cook)</div>';
 
-  // Proceed to the recipe form
+  feedbackEl.className = 'parse-feedback parse-feedback--summary';
+  feedbackEl.innerHTML = rows +
+    '<button class="btn btn--primary btn--sm pf-proceed-btn" onclick="proceedToRecipeForm()">Fill Form with This →</button>';
+  feedbackEl.classList.remove('hidden');
+
+  // Change parse button to "Re-parse" in case user edits the text
+  const parseBtn = document.getElementById('parse-btn');
+  if (parseBtn) parseBtn.textContent = 'Re-parse';
+}
+window.parseAndPreview = parseAndPreview;
+
+function proceedToRecipeForm() {
+  const parsed = _lastParsedRecipe;
+  if (!parsed) return;
+
   closePasteRecipeModal();
   AppState.currentEditingRecipe = null;
   document.getElementById('modal-title').textContent = 'Add New Recipe';
@@ -6088,8 +6102,18 @@ function parseAndImportRecipe() {
     addIngredientField();
   }
 
-  if (toastMsg) showSuccessMessage(toastMsg);
+  const ingCount = parsed.ingredients.length;
+  const hasName = !!parsed.name;
+  var msg = hasName && ingCount >= 2
+    ? 'Imported: ' + parsed.name + ', ' + ingCount + ' ingredients — review and save.'
+    : 'Partial import — fill in the missing fields before saving.';
+  showSuccessMessage(msg);
 }
+window.proceedToRecipeForm = proceedToRecipeForm;
+
+// Keep old name as alias so any existing calls still work
+function parseAndImportRecipe() { parseAndPreview(); }
+window.parseAndImportRecipe = parseAndImportRecipe;
 
 function parseRecipeText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -6829,14 +6853,46 @@ function deductIngredientsForRecipe(recipe) {
   return { deducted: deducted, outOfStock: outOfStock };
 }
 
-// Mark a recipe as cooked today → create a tracked batch (defaults to fridge)
-// AND deduct its ingredients from the pantry. Snapshots the recipe's
-// fridge/freezer life so later recipe edits don't retroactively change batches.
-function markRecipeCooked(recipeId) {
-  var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
-  if (!recipe) { showErrorMessage('Recipe not found'); return; }
+// Returns ingredient names that appear to be missing or insufficient in the pantry.
+// Skips staples (assumed always available) and items with no quantity tracked.
+function checkMissingIngredients(recipe) {
+  var ingredients = recipe.baseIngredients || recipe.ingredients || [];
+  var missing = [];
+  ingredients.forEach(function(ing) {
+    var p = findPantryMatch(ing.name);
+    if (!p) { missing.push(ing.name); return; }
+    if (isStaple(p)) return;
+    if (p.quantity == null || isNaN(p.quantity)) return;
+    var scaledQty = calculateScaledQuantity(recipe, ing);
+    if (!scaledQty || isNaN(scaledQty)) return;
+    var gramsUsed = toGrams(scaledQty, ing.unit);
+    var gramsPerPantryUnit = toGrams(1, p.unit) || 1;
+    var used = gramsUsed / gramsPerPantryUnit;
+    if (used > 0 && p.quantity < used) missing.push(ing.name);
+  });
+  return missing;
+}
 
-  // Append to cook history (newest first)
+function showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm) {
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-dialog">' +
+      '<h3 class="confirm-title">' + title + '</h3>' +
+      '<div class="confirm-body">' + bodyHtml + '</div>' +
+      '<div class="confirm-btns">' +
+        '<button class="btn btn--ghost confirm-cancel-btn">' + cancelLabel + '</button>' +
+        '<button class="btn btn--primary confirm-ok-btn">' + confirmLabel + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+  overlay.querySelector('.confirm-cancel-btn').addEventListener('click', close);
+  overlay.querySelector('.confirm-ok-btn').addEventListener('click', function() { close(); onConfirm(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+}
+
+function _doMarkCooked(recipe, btn) {
   AppState.cookHistory = AppState.cookHistory || [];
   AppState.cookHistory.unshift({
     recipeId: String(recipe.id),
@@ -6844,7 +6900,6 @@ function markRecipeCooked(recipeId) {
     date: new Date().toISOString(),
     servings: recipe.currentServings
   });
-  // Keep at most 100 entries
   if (AppState.cookHistory.length > 100) AppState.cookHistory.length = 100;
 
   AppState.cookedMeals = AppState.cookedMeals || [];
@@ -6865,11 +6920,38 @@ function markRecipeCooked(recipeId) {
   renderCookedMeals();
   renderPantry();
 
+  if (btn) {
+    btn.textContent = '✓ Added to fridge!';
+    btn.classList.add('slot-cooked-btn--done');
+    btn.disabled = true;
+  }
+
   var msg = 'Added "' + recipe.name + '" to 🧊 My Fridge.';
   if (sum.deducted.length) msg += ' Deducted: ' + capList(sum.deducted, 4) + '.';
   else msg += ' (No tracked pantry items to deduct.)';
   if (sum.outOfStock.length) msg += ' ⚠️ Now out: ' + capList(sum.outOfStock, 4) + '.';
   showSuccessMessage(msg);
+}
+
+// Mark a recipe as cooked today → create a tracked batch (defaults to fridge)
+// AND deduct its ingredients from the pantry.
+function markRecipeCooked(recipeId, btn) {
+  var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
+  if (!recipe) { showErrorMessage('Recipe not found'); return; }
+
+  var missing = checkMissingIngredients(recipe);
+  if (missing.length > 0) {
+    showConfirmDialog(
+      'Not enough ingredients?',
+      '<p>These items may not be in your pantry: <strong>' + escapeHtml(capList(missing, 5)) + '</strong>.</p>' +
+        '<p>Did you already buy them but forgot to add to the app?</p>',
+      'Yes, mark as cooked anyway',
+      'Cancel',
+      function() { _doMarkCooked(recipe, btn); }
+    );
+    return;
+  }
+  _doMarkCooked(recipe, btn);
 }
 
 function cookedShelfLife(m) {
