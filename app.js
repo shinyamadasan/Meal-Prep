@@ -7062,6 +7062,7 @@ function openBulkAddModal() {
   if (modal) { modal.classList.remove('hidden'); if (ta) setTimeout(() => ta.focus(), 50); }
 }
 function closeBulkAddModal() {
+  stopVoiceInput();
   const modal = document.getElementById('bulk-add-modal');
   if (modal) modal.classList.add('hidden');
 }
@@ -7131,6 +7132,139 @@ function confirmBulkAdd() {
 window.openBulkAddModal = openBulkAddModal;
 window.closeBulkAddModal = closeBulkAddModal;
 window.confirmBulkAdd = confirmBulkAdd;
+
+// ── Voice input for bulk add ─────────────────────────────────────────────────
+var _voiceRecognition = null;
+var _voiceActive = false;
+
+function parseSpokenItem(transcript) {
+  var text = transcript.toLowerCase().trim();
+
+  var unitMap = {
+    'grams': 'g', 'gram': 'g',
+    'kilograms': 'kg', 'kilogram': 'kg', 'kilos': 'kg', 'kilo': 'kg',
+    'milliliters': 'ml', 'milliliter': 'ml', 'millilitres': 'ml', 'millilitre': 'ml',
+    'liters': 'L', 'liter': 'L', 'litres': 'L', 'litre': 'L',
+    'pieces': 'pieces', 'piece': 'pieces', 'pcs': 'pieces', 'pc': 'pieces',
+    'cans': 'can', 'can': 'can',
+    'bottles': 'bottle', 'bottle': 'bottle',
+    'stalks': 'stalks', 'stalk': 'stalks',
+    'bundles': 'bundle', 'bundle': 'bundle',
+    'packs': 'pack', 'pack': 'pack',
+    'bags': 'bag', 'bag': 'bag',
+    'cups': 'cups', 'cup': 'cups',
+    'tablespoons': 'tbsp', 'tablespoon': 'tbsp', 'tbsp': 'tbsp',
+    'teaspoons': 'tsp', 'teaspoon': 'tsp', 'tsp': 'tsp',
+    'cloves': 'cloves', 'clove': 'cloves',
+    'heads': 'heads', 'head': 'heads',
+  };
+
+  // Sort longest first to prevent partial unit matches
+  var unitKeys = Object.keys(unitMap).sort(function(a, b) { return b.length - a.length; });
+  var unitPat = unitKeys.join('|');
+
+  var qty = null, unit = null, name = null, m;
+
+  // "[qty] [unit] [name]" → "500 grams pork belly"
+  var re1 = new RegExp('^(\\d+(?:\\.\\d+)?)\\s+(' + unitPat + ')\\s+(.+)$');
+  // "[name] [qty] [unit]" → "pork belly 500 grams"
+  var re2 = new RegExp('^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\s+(' + unitPat + ')$');
+  // "[qty] [name]" → "3 eggs"
+  var re3 = new RegExp('^(\\d+(?:\\.\\d+)?)\\s+(.+)$');
+
+  if ((m = text.match(re1))) {
+    qty = parseFloat(m[1]); unit = unitMap[m[2]]; name = m[3];
+  } else if ((m = text.match(re2))) {
+    name = m[1]; qty = parseFloat(m[2]); unit = unitMap[m[3]];
+  } else if ((m = text.match(re3))) {
+    qty = parseFloat(m[1]); name = m[2];
+  } else {
+    name = text;
+  }
+
+  // Match to INGREDIENT_DB for canonical name and default unit
+  var dbEntry = INGREDIENT_DB.find(function(i) {
+    return i.name.toLowerCase() === name ||
+           (i.aliases || []).some(function(a) { return a.toLowerCase() === name; });
+  });
+
+  if (dbEntry) {
+    name = dbEntry.name;
+    if (!unit) unit = dbEntry.unit;
+  } else {
+    name = name.split(' ').map(function(w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(' ');
+  }
+
+  var parts = [name];
+  if (qty != null) parts.push(qty);
+  if (unit) parts.push(unit);
+  return parts.join(', ');
+}
+window.parseSpokenItem = parseSpokenItem;
+
+function toggleVoiceInput() {
+  if (_voiceActive) { stopVoiceInput(); } else { startVoiceInput(); }
+}
+window.toggleVoiceInput = toggleVoiceInput;
+
+function startVoiceInput() {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var statusEl = document.getElementById('bulk-voice-status');
+  var btn = document.getElementById('bulk-voice-btn');
+  if (!SR) {
+    if (statusEl) statusEl.textContent = 'Voice not supported in this browser.';
+    return;
+  }
+  _voiceActive = true;
+  if (btn) btn.classList.add('voice-btn--active');
+
+  _voiceRecognition = new SR();
+  _voiceRecognition.lang = 'en-US';
+  _voiceRecognition.continuous = false;
+  _voiceRecognition.interimResults = false;
+
+  _voiceRecognition.onresult = function(e) {
+    var transcript = e.results[0][0].transcript.trim();
+    var line = parseSpokenItem(transcript);
+    var ta = document.getElementById('bulk-add-textarea');
+    if (ta) ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + line;
+    if (statusEl) statusEl.textContent = '✓ ' + line;
+  };
+
+  _voiceRecognition.onerror = function(e) {
+    if (e.error === 'not-allowed') {
+      if (statusEl) statusEl.textContent = 'Microphone access denied.';
+      stopVoiceInput();
+    }
+    // no-speech and others: onend will restart
+  };
+
+  _voiceRecognition.onend = function() {
+    if (_voiceActive) {
+      // Brief pause so user sees the result, then listen again
+      setTimeout(startVoiceInput, 600);
+    }
+  };
+
+  _voiceRecognition.start();
+  if (statusEl) statusEl.textContent = 'Listening…';
+}
+window.startVoiceInput = startVoiceInput;
+
+function stopVoiceInput() {
+  _voiceActive = false;
+  if (_voiceRecognition) {
+    try { _voiceRecognition.stop(); } catch(e) {}
+    _voiceRecognition = null;
+  }
+  var btn = document.getElementById('bulk-voice-btn');
+  var statusEl = document.getElementById('bulk-voice-status');
+  if (btn) btn.classList.remove('voice-btn--active');
+  if (statusEl) statusEl.textContent = '';
+}
+window.stopVoiceInput = stopVoiceInput;
 
 function removeFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(p => String(p.id) !== String(id));

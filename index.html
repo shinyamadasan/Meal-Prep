@@ -1125,6 +1125,10 @@
             </div>
             <div class="modal-body">
                 <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; or just <code>Garlic</code></p>
+                <div class="bulk-voice-row">
+                  <button id="bulk-voice-btn" class="voice-btn" onclick="toggleVoiceInput()" title="Speak items one at a time">🎙 Speak</button>
+                  <span id="bulk-voice-status" class="voice-status"></span>
+                </div>
                 <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Chicken Thigh, 500, g&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
                 <div id="bulk-add-warnings" style="margin-top:0.5rem"></div>
             </div>
