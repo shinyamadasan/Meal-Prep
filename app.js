@@ -3482,9 +3482,9 @@ function renderGroceryPricePanel() {
 
   var myStores = getMyStores();
   var prices = AppState.ingredientPrices || {};
-  var colTemplate = '1fr ' + myStores.map(function() { return '100px'; }).join(' ');
+  var colTemplate = '1fr ' + myStores.map(function() { return '90px'; }).join(' ');
 
-  var html = '<div class="gpl-wrap">';
+  var html = '<div class="gpl-scroll"><div class="gpl-wrap">';
 
   // Header row
   html += '<div class="gpl-header-row" style="grid-template-columns:' + colTemplate + '">';
@@ -3525,7 +3525,7 @@ function renderGroceryPricePanel() {
     });
   });
 
-  html += '</div>';
+  html += '</div></div>'; // close .gpl-wrap + .gpl-scroll
   el.innerHTML = html;
 }
 
