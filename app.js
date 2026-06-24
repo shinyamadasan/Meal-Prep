@@ -1894,6 +1894,7 @@ function showTab(tabId) {
     if (checkAndReplenishLowStock()) saveData();
     updateGrocerySummary();
     updateBudgetDisplay();
+    switchShopTab('list');
     renderGroceryList();
   } else if (tabId === 'fridge') {
     renderCookedMeals();
@@ -3443,6 +3444,89 @@ function clearGroceryList() {
     AppState.groceryList = [];
     renderGroceryList();
   }
+}
+
+function switchShopTab(subTab) {
+  var listEl = document.getElementById('grocery-list');
+  var priceEl = document.getElementById('grocery-price-panel');
+  var summaryEl = document.getElementById('weekly-cost-summary');
+  var listBtn = document.getElementById('shop-subtab-list');
+  var pricesBtn = document.getElementById('shop-subtab-prices');
+  if (!listEl || !priceEl) return;
+
+  if (subTab === 'prices') {
+    listEl.classList.add('hidden');
+    if (summaryEl) summaryEl.classList.add('hidden');
+    priceEl.classList.remove('hidden');
+    if (listBtn) listBtn.classList.remove('active');
+    if (pricesBtn) pricesBtn.classList.add('active');
+    renderGroceryPricePanel();
+  } else {
+    priceEl.classList.add('hidden');
+    if (summaryEl) summaryEl.classList.remove('hidden');
+    listEl.classList.remove('hidden');
+    if (pricesBtn) pricesBtn.classList.remove('active');
+    if (listBtn) listBtn.classList.add('active');
+  }
+}
+window.switchShopTab = switchShopTab;
+
+function renderGroceryPricePanel() {
+  var el = document.getElementById('grocery-price-panel');
+  if (!el) return;
+
+  if (!AppState.groceryList || AppState.groceryList.length === 0) {
+    el.innerHTML = '<div class="gpl-empty">' + emptyState('piggy-bank', 'No items to price', 'Add items from the Shop List first.') + '</div>';
+    return;
+  }
+
+  var myStores = getMyStores();
+  var prices = AppState.ingredientPrices || {};
+  var colTemplate = '1fr ' + myStores.map(function() { return '100px'; }).join(' ');
+
+  var html = '<div class="gpl-wrap">';
+
+  // Header row
+  html += '<div class="gpl-header-row" style="grid-template-columns:' + colTemplate + '">';
+  html += '<div class="gpl-col-name">Item</div>';
+  myStores.forEach(function(s) {
+    html += '<div class="gpl-col-store">' + escapeHtml(s) + '</div>';
+  });
+  html += '</div>';
+
+  // Group by category
+  var cats = {};
+  AppState.groceryList.forEach(function(item) {
+    var cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push(item);
+  });
+
+  Object.keys(cats).sort(function(a, b) {
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    return a.localeCompare(b);
+  }).forEach(function(cat) {
+    html += '<div class="gpl-cat-label">' + escapeHtml(cat) + '</div>';
+    cats[cat].forEach(function(item) {
+      var override = prices[item.name] || {};
+      var storePrices = override.prices || {};
+      html += '<div class="gpl-row" style="grid-template-columns:' + colTemplate + '">';
+      html += '<div class="gpl-col-name">';
+      html += '<div class="gpl-item-name">' + escapeHtml(item.name) + '</div>';
+      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + (item.unit || '') + '</div>';
+      html += '</div>';
+      myStores.forEach(function(s) {
+        var p = storePrices[s] || '';
+        html += '<div class="gpl-col-store"><input class="gpl-price-input" value="' + escapeHtml(p) +
+          '" placeholder="₱—" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)" /></div>';
+      });
+      html += '</div>';
+    });
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function addCustomGroceryItem() {

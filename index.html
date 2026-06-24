@@ -294,17 +294,22 @@
                 <section id="grocery" class="tab-content">
                     <div class="section-header">
                         <h2>Shop</h2>
-                        <div class="grocery-controls">
+                        <div class="grocery-controls" id="grocery-controls">
                             <button class="btn btn--outline" id="clear-grocery">Clear All</button>
                             <button class="btn btn--secondary" id="add-custom-item">Add Item</button>
-                            <button class="btn btn--outline" onclick="showTab('ingredients')" title="Compare prices by store"><span class="ic" data-icon="piggy-bank"></span> Prices</button>
                             <button class="btn btn--secondary" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy</button>
                         </div>
                     </div>
-                    
+
+                    <div class="shop-subtabs">
+                        <button class="shop-subtab active" id="shop-subtab-list" onclick="switchShopTab('list')">Shop List</button>
+                        <button class="shop-subtab" id="shop-subtab-prices" onclick="switchShopTab('prices')">Price List</button>
+                    </div>
+
                     <div id="weekly-cost-summary"></div>
 
                     <div id="grocery-list" class="grocery-categories"></div>
+                    <div id="grocery-price-panel" class="hidden"></div>
                 </section>
 
                 <!-- My Fridge / Freezer Tab -->

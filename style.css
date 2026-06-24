@@ -1605,6 +1605,75 @@ select.form-control {
   color: var(--color-btn-primary-text);
 }
 
+/* Shop sub-tabs */
+.shop-subtabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  margin: 0 0 var(--space-12);
+}
+.shop-subtab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.shop-subtab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+.shop-subtab:hover:not(.active) { color: var(--color-text); }
+
+/* Price List panel (inside shop sub-tab) */
+.gpl-wrap { padding: 0 0 var(--space-16); }
+.gpl-header-row {
+  display: grid;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid var(--color-border);
+}
+.gpl-cat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding: 14px 0 4px;
+}
+.gpl-row {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-light, #f3f4f6);
+}
+.gpl-item-name { font-size: 0.875rem; font-weight: 500; }
+.gpl-item-qty { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 1px; }
+.gpl-col-store { display: flex; align-items: center; }
+.gpl-price-input {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: right;
+}
+.gpl-price-input:focus { outline: 2px solid var(--color-primary); border-color: transparent; }
+.gpl-empty { padding: var(--space-16) 0; }
+
 /* Grocery List */
 .grocery-summary {
   background: var(--color-bg-2);
