@@ -292,16 +292,14 @@
 
                 <!-- Grocery List Tab -->
                 <section id="grocery" class="tab-content">
-                    <div class="shop-header-bar">
-                        <div class="shop-subtabs">
-                            <button class="shop-subtab active" id="shop-subtab-list" onclick="switchShopTab('list')">Shop List</button>
-                            <button class="shop-subtab" id="shop-subtab-prices" onclick="switchShopTab('prices')">Price List</button>
-                        </div>
-                        <div class="grocery-controls" id="grocery-controls">
-                            <button class="btn btn--outline btn--sm" id="clear-grocery">Clear All</button>
-                            <button class="btn btn--secondary btn--sm" id="add-custom-item">Add Item</button>
-                            <button class="btn btn--secondary btn--sm" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy</button>
-                        </div>
+                    <div class="shop-subtabs">
+                        <button class="shop-subtab active" id="shop-subtab-list" onclick="switchShopTab('list')">Shop List</button>
+                        <button class="shop-subtab" id="shop-subtab-prices" onclick="switchShopTab('prices')">Price List</button>
+                    </div>
+                    <div class="grocery-controls" id="grocery-controls">
+                        <button class="btn btn--outline btn--sm" id="clear-grocery">Clear All</button>
+                        <button class="btn btn--secondary btn--sm" id="add-custom-item">Add Item</button>
+                        <button class="btn btn--secondary btn--sm" onclick="copyGroceryList()"><span class="ic" data-icon="copy"></span> Copy</button>
                     </div>
 
                     <div id="weekly-cost-summary"></div>

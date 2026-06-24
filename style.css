@@ -1605,18 +1605,12 @@ select.form-control {
   color: var(--color-btn-primary-text);
 }
 
-/* Shop header bar — sub-tabs left, action buttons right */
-.shop-header-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--space-12);
-  gap: var(--space-8);
-}
+/* Shop sub-tabs row */
 .shop-subtabs {
   display: flex;
   gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0;
 }
 .shop-subtab {
   padding: 10px 16px;
@@ -1636,10 +1630,13 @@ select.form-control {
   border-bottom-color: var(--color-primary);
 }
 .shop-subtab:hover:not(.active) { color: var(--color-text); }
-.shop-header-bar .grocery-controls {
+
+/* Action buttons row — below the sub-tabs */
+#grocery-controls {
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
+  padding: var(--space-8) 0;
+  margin-bottom: var(--space-8);
 }
 
 /* Price List panel — horizontally scrollable table */
