@@ -272,6 +272,8 @@
                         <div class="meal-planner-grid" id="meal-planner"></div>
                     </div>
 
+                    <div id="weekly-nutrition-totals"></div>
+
                     <div class="week-stats week-stats--compact">
                         <div class="stat-card">
                             <span class="stat-label">Prep</span>
@@ -339,6 +341,7 @@
                                 </select>
                                 <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
                                 <button class="btn btn--ghost btn--sm" onclick="openIngredientBrowser()" title="Browse all ingredients">Browse</button>
+                                <button class="btn btn--ghost btn--sm" onclick="openBulkAddModal()" title="Add multiple items at once">Bulk add</button>
                             </div>
                             <div id="pantry-list"></div>
                         </div>
@@ -1113,6 +1116,25 @@
     </div>
 
     <!-- Kitchen Setup Wizard Modal -->
+    <!-- Bulk Add Pantry Modal -->
+    <div id="bulk-add-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:480px">
+            <div class="modal-header">
+                <h3>Bulk Add to Pantry</h3>
+                <button class="modal-close" onclick="closeBulkAddModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; or just <code>Garlic</code></p>
+                <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Chicken Thigh, 500, g&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
+                <div id="bulk-add-warnings" style="margin-top:0.5rem"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closeBulkAddModal()">Cancel</button>
+                <button class="btn btn--primary" onclick="confirmBulkAdd()">Add Items</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Ingredient Browser Modal -->
     <div id="ingredient-browser-modal" class="modal hidden">
         <div class="modal-content ib-modal-content">

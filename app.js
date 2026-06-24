@@ -31,6 +31,7 @@ const AppState = {
   myStores: [],
   customStores: [],
   cookedMeals: [],
+  cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
@@ -260,6 +261,7 @@ function saveToLocalStorage() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
+      cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
@@ -307,6 +309,7 @@ function loadFromLocalStorage() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
+      AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
@@ -2157,6 +2160,37 @@ function handleRecipeCardClick(e, id) {
 window.handleRecipeCardClick = handleRecipeCardClick;
 
 // Expand/collapse a recipe card's ingredients + instructions.
+function buildDetailIngList(recipe, servings) {
+  const scale = servings / recipe.baseServings;
+  return (recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
+    const baseQty = ingredient.baseQuantity || ingredient.quantity;
+    const scaledQty = baseQty * scale;
+    const showBoth = servings !== recipe.currentServings || recipe.currentServings !== recipe.baseServings;
+    return `<li class="ingredient-quantity">${
+      showBoth
+        ? `<span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
+           <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>`
+        : `<span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>`
+    }</li>`;
+  }).join('');
+}
+
+function adjustDetailServings(event, recipeId, delta) {
+  const card = event.currentTarget.closest('.recipe-card');
+  if (!card) return;
+  const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
+  if (!recipe) return;
+
+  const countEl = card.querySelector('.detail-serving-count');
+  const current = parseInt(countEl ? countEl.textContent : recipe.currentServings, 10) || recipe.currentServings;
+  const next = Math.max(1, current + delta);
+
+  if (countEl) countEl.textContent = next;
+  const ul = card.querySelector('.detail-inglist');
+  if (ul) ul.innerHTML = buildDetailIngList(recipe, next);
+}
+window.adjustDetailServings = adjustDetailServings;
+
 function toggleRecipeDetails(e) {
   e.stopPropagation();
   const btn = e.currentTarget;
@@ -2165,6 +2199,19 @@ function toggleRecipeDetails(e) {
   const nowHidden = details.classList.toggle('hidden');
   btn.setAttribute('aria-expanded', String(!nowHidden));
   btn.innerHTML = nowHidden ? 'Ingredients &amp; steps ▾' : 'Hide details ▴';
+
+  if (nowHidden) {
+    // Reset the detail scaler back to the recipe's saved serving count
+    const card = btn.closest('.recipe-card');
+    if (!card) return;
+    const recipeId = card.dataset.recipeId;
+    const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
+    if (!recipe) return;
+    const countEl = card.querySelector('.detail-serving-count');
+    if (countEl) countEl.textContent = recipe.currentServings;
+    const ul = card.querySelector('.detail-inglist');
+    if (ul) ul.innerHTML = buildDetailIngList(recipe, recipe.currentServings);
+  }
 }
 window.toggleRecipeDetails = toggleRecipeDetails;
 
@@ -2314,7 +2361,7 @@ function renderRecipes() {
     };
     
     return `
-    <div class="recipe-card" onclick="handleRecipeCardClick(event, '${recipe.id}')" title="Click to edit">
+    <div class="recipe-card" data-recipe-id="${recipe.id}" onclick="handleRecipeCardClick(event, '${recipe.id}')" title="Click to edit">
       ${recipe.photo ? `
         <div class="recipe-photo">
           <img src="${recipe.photo}" alt="${recipe.name}" class="recipe-image">
@@ -2415,24 +2462,16 @@ function renderRecipes() {
       <!-- Ingredients + instructions: collapsed by default so the grid stays scannable -->
       <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false">Ingredients &amp; steps ▾</button>
       <div class="recipe-details hidden">
+        <div class="detail-scaler">
+          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${recipe.id}',-1)">−</button>
+          <span class="detail-serving-count">${recipe.currentServings}</span>
+          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${recipe.id}',1)">+</button>
+          <span class="detail-scaler-label"> servings</span>
+        </div>
         <div class="recipe-ingredients">
           <h4>Ingredients:</h4>
-          <ul>
-            ${(recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
-              const scaledQty = calculateScaledQuantity(recipe, ingredient);
-              const baseQty = ingredient.baseQuantity || ingredient.quantity;
-
-              return `
-                <li class="ingredient-quantity">
-                  ${isScaled ? `
-                    <span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
-                    <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>
-                  ` : `
-                    <span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>
-                  `}
-                </li>
-              `;
-            }).join('')}
+          <ul class="detail-inglist">
+            ${buildDetailIngList(recipe, recipe.currentServings)}
           </ul>
         </div>
         <p><strong>Instructions:</strong> ${recipe.instructions}</p>
@@ -2543,6 +2582,50 @@ function renderWeeklyPlanner() {
 
   updateMobileDayNav();
   renderStorageAlerts();
+  renderWeeklyNutritionTotals();
+}
+
+function renderWeeklyNutritionTotals() {
+  const el = document.getElementById('weekly-nutrition-totals');
+  if (!el) return;
+
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const meals = ['breakfast', 'lunch', 'dinner', 'snacks'];
+  let totals = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  let anyRecipe = false;
+  let anyMissing = false;
+
+  days.forEach(day => {
+    meals.forEach(meal => {
+      const mealData = AppState.weeklyPlan[day][meal];
+      const ids = meal === 'snacks' ? mealData : (mealData ? [mealData] : []);
+      ids.forEach(id => {
+        const recipe = AppState.recipes.find(r => String(r.id) === String(id));
+        if (!recipe) return;
+        anyRecipe = true;
+        const n = calculateRecipeNutrition(recipe);
+        if (!n || n.calories === 0) { anyMissing = true; return; }
+        totals.calories += n.calories;
+        totals.protein  += n.protein;
+        totals.carbs    += n.carbs;
+        totals.fat      += n.fat;
+      });
+    });
+  });
+
+  if (!anyRecipe) { el.innerHTML = ''; return; }
+
+  const fmt = (v, missing) => missing && v === 0 ? '—' : Math.round(v);
+
+  el.innerHTML = `
+    <div class="weekly-nutrition-bar">
+      <span class="wn-label">Weekly totals</span>
+      <span class="wn-item"><strong>${fmt(totals.calories, anyMissing)}</strong> kcal</span>
+      <span class="wn-item"><strong>${fmt(totals.protein, anyMissing)}</strong>g protein</span>
+      <span class="wn-item"><strong>${fmt(totals.carbs, anyMissing)}</strong>g carbs</span>
+      <span class="wn-item"><strong>${fmt(totals.fat, anyMissing)}</strong>g fat</span>
+      ${anyMissing ? '<span class="wn-note">— = nutrition data unavailable for some recipes</span>' : ''}
+    </div>`;
 }
 
 function renderStorageAlerts() {
@@ -3079,11 +3162,33 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
+  // ══════════════════════════════════════════════════════════════
+  // Cook History
+  // ══════════════════════════════════════════════════════════════
+  var history = AppState.cookHistory || [];
+  var historyCard = '';
+  if (history.length > 0) {
+    var recentEntries = history.slice(0, 10);
+    var rows = recentEntries.map(function(entry) {
+      var d = new Date(entry.date);
+      var dateStr = isNaN(d) ? '—' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      return '<div class="dash-history-row">' +
+        '<span class="dash-history-name">' + escapeHtml(entry.recipeName) + '</span>' +
+        '<span class="dash-history-meta">' + escapeHtml(dateStr) + ' &bull; ' + (entry.servings || '?') + ' servings</span>' +
+        '</div>';
+    }).join('');
+    historyCard = '<div class="dash-card">' +
+      '<div class="dash-level-header">Cook History</div>' +
+      rows +
+      '</div>';
+  }
+
   el.innerHTML = '<div class="dashboard">' +
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
     level1Card +
     level2Card +
     level3Card +
+    historyCard +
     '</div>';
 }
 
@@ -3215,13 +3320,12 @@ function renderGroceryList() {
     return;
   }
   
-  // Group by category
+  // Group by category (fall back to "Other" when category is absent)
   const categories = {};
   AppState.groceryList.forEach(item => {
-    if (!categories[item.category]) {
-      categories[item.category] = [];
-    }
-    categories[item.category].push(item);
+    const cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(item);
   });
 
   // Within each category, sink checked / already-in-stock items to the bottom so
@@ -3243,7 +3347,13 @@ function renderGroceryList() {
       </div>`
     : '';
 
-  groceryListEl.innerHTML = stockBar + Object.keys(categories).map(category => {
+  const sortedCats = Object.keys(categories).sort((a, b) => {
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    return a.localeCompare(b);
+  });
+
+  groceryListEl.innerHTML = stockBar + sortedCats.map(category => {
     const categoryTotal = categories[category].reduce((total, item) => total + groceryItemCost(item), 0);
 
     return `
@@ -4818,6 +4928,7 @@ function buildFirestorePayload() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
+    cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
@@ -5115,6 +5226,7 @@ function setupRealtimeListeners() {
         AppState.myStores = data.myStores || [];
         AppState.customStores = data.customStores || [];
         AppState.cookedMeals = data.cookedMeals || [];
+        AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
 
         // Update UI
@@ -5129,6 +5241,7 @@ function setupRealtimeListeners() {
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
+        renderDashboard();
         // Silent — the ✓ Synced badge already conveys sync status.
       }
     }
@@ -6688,6 +6801,18 @@ function deductIngredientsForRecipe(recipe) {
 function markRecipeCooked(recipeId) {
   var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
   if (!recipe) { showErrorMessage('Recipe not found'); return; }
+
+  // Append to cook history (newest first)
+  AppState.cookHistory = AppState.cookHistory || [];
+  AppState.cookHistory.unshift({
+    recipeId: String(recipe.id),
+    recipeName: recipe.name,
+    date: new Date().toISOString(),
+    servings: recipe.currentServings
+  });
+  // Keep at most 100 entries
+  if (AppState.cookHistory.length > 100) AppState.cookHistory.length = 100;
+
   AppState.cookedMeals = AppState.cookedMeals || [];
   AppState.cookedMeals.push({
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -6927,6 +7052,85 @@ function addToPantry() {
   renderPantry();
   renderGroceryList();
 }
+
+function openBulkAddModal() {
+  const ta = document.getElementById('bulk-add-textarea');
+  if (ta) ta.value = '';
+  const warn = document.getElementById('bulk-add-warnings');
+  if (warn) warn.innerHTML = '';
+  const modal = document.getElementById('bulk-add-modal');
+  if (modal) { modal.classList.remove('hidden'); if (ta) setTimeout(() => ta.focus(), 50); }
+}
+function closeBulkAddModal() {
+  const modal = document.getElementById('bulk-add-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function confirmBulkAdd() {
+  const ta = document.getElementById('bulk-add-textarea');
+  const raw = (ta ? ta.value : '').trim();
+  if (!raw) { closeBulkAddModal(); return; }
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const added = [];
+  const warnings = [];
+
+  lines.forEach((line, idx) => {
+    const parts = line.split(',').map(p => p.trim());
+    const name = parts[0];
+    if (!name) { warnings.push(`Line ${idx + 1}: empty name — skipped`); return; }
+
+    const qty = parts[1] ? parseFloat(parts[1]) : null;
+    const unit = parts[2] || null;
+
+    if (parts[1] && (isNaN(qty) || qty < 0)) {
+      warnings.push(`Line ${idx + 1}: "${line}" — invalid quantity, skipped`);
+      return;
+    }
+
+    if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      warnings.push(`Line ${idx + 1}: "${name}" already in pantry — skipped`);
+      return;
+    }
+
+    const dbEntry = INGREDIENT_DB.find(i =>
+      i.name.toLowerCase() === name.toLowerCase() ||
+      (i.aliases || []).some(a => a.toLowerCase() === name.toLowerCase())
+    );
+    const category = dbEntry ? dbEntry.category : inferCategory(name);
+    const storage = inferStorage(name, category);
+    AppState.pantry.push({
+      id: Date.now() + Math.random(),
+      name,
+      category,
+      purchaseDate: todayISO(),
+      shelfLifeDays: ingredientShelfLife(name, category),
+      storage,
+      quantity: (qty && qty > 0) ? qty : null,
+      unit: unit || (dbEntry ? dbEntry.unit : ''),
+      staple: dbEntry ? !!dbEntry.isStaple : undefined
+    });
+    added.push(name);
+  });
+
+  if (warnings.length > 0) {
+    const warnEl = document.getElementById('bulk-add-warnings');
+    if (warnEl) warnEl.innerHTML = `<div class="bulk-add-warn"><strong>Warnings (${warnings.length}):</strong><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
+    if (added.length === 0) return; // don't close; let user see and fix warnings
+  }
+
+  if (added.length > 0) {
+    saveData();
+    renderPantry();
+    renderGroceryList();
+    showSuccessMessage(`${added.length} item${added.length > 1 ? 's' : ''} added to pantry`);
+  }
+
+  if (warnings.length === 0) closeBulkAddModal();
+}
+window.openBulkAddModal = openBulkAddModal;
+window.closeBulkAddModal = closeBulkAddModal;
+window.confirmBulkAdd = confirmBulkAdd;
 
 function removeFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(p => String(p.id) !== String(id));

@@ -19,27 +19,9 @@ buy → cook → store → use → restock.
 
 ## Current Task
 
-**Queue empty — all tasks done as of 2026-06-22.**
+**Queue empty — all tasks done as of 2026-06-23.**
 
 No pending tasks. Next session: add new tasks here before starting.
-
----
-
-## Task Queue (in order — Claude works top to bottom)
-
-*(empty)*
-
----
-
-## Bugs & Stability
-
-*(all bugs fixed as of 2026-06-22)*
-
----
-
-## Features
-
-*(all features shipped as of 2026-06-22)*
 
 ---
 
@@ -103,3 +85,18 @@ Checked grocery items are automatically transferred to pantry with undo support.
 `markRecipeCooked()` now deducts used ingredients from `AppState.pantry`.
 Depleted items are removed. `renderPantry()` called immediately after.
 Merged via PR #1.
+
+### ✅ Weekly nutrition totals in the Plan tab (2026-06-23)
+`renderWeeklyNutritionTotals()` added, called at the end of `renderWeeklyPlanner()`. Sums calories/protein/carbs/fat across all planned recipes using `calculateRecipeNutrition()`. Shows "—" if any recipe has missing nutrition data. Renders into `#weekly-nutrition-totals` div added to `index.html` after the meal grid.
+
+### ✅ Grocery list alphabetical sort (2026-06-23)
+`renderGroceryList()` now sorts category keys alphabetically before rendering, with "Other" always last. Items missing a category fall back to "Other". Existing grouping and check/uncheck logic unchanged.
+
+### ✅ Recipe serving scaler on recipe detail (2026-06-23)
+`buildDetailIngList(recipe, servings)` helper renders ingredient `<li>` items at any serving count. `adjustDetailServings(event, recipeId, delta)` updates the count display and re-renders the ingredient list in real time. Serving stepper (− / count / +) added at the top of the collapsible detail section. `toggleRecipeDetails()` resets the count and ingredient list when the section is closed. `data-recipe-id` added to each recipe card.
+
+### ✅ Pantry bulk-add mode (2026-06-23)
+"Bulk add" button added to Pantry tab. Opens `#bulk-add-modal` with a textarea (one item per line, `Name, Qty, Unit` format). `confirmBulkAdd()` parses all lines, matches to `INGREDIENT_DB` for defaults, adds valid items to `AppState.pantry` in one pass, and lists malformed/duplicate lines as warnings without silently skipping them.
+
+### ✅ Cook history log (2026-06-23)
+`AppState.cookHistory` array added. `markRecipeCooked()` prepends `{ recipeId, recipeName, date, servings }` entries (newest-first, max 100). Persisted via `saveToLocalStorage()`, `buildFirestorePayload()`, `loadFromLocalStorage()`, and the Firestore real-time listener. Dashboard shows a "Cook History" card with the last 10 entries (hidden when empty).

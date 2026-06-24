@@ -4,6 +4,22 @@ Newest entry at top. Append after every session — never edit past entries.
 
 ---
 
+## 2026-06-23 — Autonomous overnight session — full ROADMAP queue completed
+
+**Tasks completed (in order):**
+1. Weekly nutrition totals in the Plan tab — `renderWeeklyNutritionTotals()` called from `renderWeeklyPlanner()`, renders into `#weekly-nutrition-totals` div
+2. Grocery list alphabetical sort — `renderGroceryList()` sorts category keys A→Z with "Other" last; fallback to "Other" for missing category
+3. Recipe serving scaler on recipe detail — `buildDetailIngList()` + `adjustDetailServings()` + stepper UI in collapsed detail section; resets on close
+4. Pantry bulk-add mode — "Bulk add" button + `#bulk-add-modal` + `confirmBulkAdd()` with warning list for bad lines
+5. Cook history log — `AppState.cookHistory` persisted to localStorage + Firestore; dashboard shows last 10 entries newest-first
+
+**Files changed:** `app.js`, `style.css`, `index.html`, `ROADMAP.md`, `STATUS.md`
+**Branch:** `main` — all changes on disk, NOT yet committed or pushed.
+**Next task:** `git add app.js style.css index.html ROADMAP.md STATUS.md && git commit -m "feat: weekly nutrition totals, grocery sort, recipe scaler, bulk pantry add, cook history" && git push origin main`
+**Blockers:** none (code is done)
+
+---
+
 ## 2026-06-22 — Autonomous session — commit pending work from last session
 
 **Task:** Commit and push all pending changes from the previous overnight session.
