@@ -1923,6 +1923,7 @@ function updateServingSize(recipeId, newServings) {
   if (!recipe || newServings < 1) return;
 
   recipe.currentServings = newServings;
+  saveData();
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
@@ -1934,6 +1935,7 @@ function resetServingSize(recipeId) {
   if (!recipe) return;
 
   recipe.currentServings = recipe.baseServings;
+  saveData();
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
@@ -7480,7 +7482,12 @@ function filterIngredientCatalog(query) {
   var q = query.toLowerCase().trim();
   document.querySelectorAll('.ingcat-row').forEach(function(row) {
     var name = (row.dataset.name || '').toLowerCase();
-    row.style.display = (!q || name.includes(q)) ? '' : 'none';
+    var match = !q || name.includes(q);
+    if (!match && q) {
+      var db = INGREDIENT_DB.find(function(i) { return i.name.toLowerCase() === name; });
+      if (db && (db.aliases || []).some(function(a) { return a.toLowerCase().includes(q); })) match = true;
+    }
+    row.style.display = match ? '' : 'none';
   });
   var anyVisible = false;
   document.querySelectorAll('.ingcat-section').forEach(function(section) {
