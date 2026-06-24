@@ -3051,11 +3051,19 @@ function renderDashboard() {
     }
     var useSoonSection = '';
     if (hasSuggestions) {
+      var todayPlan = AppState.weeklyPlan[today] || {};
+      var todayIds = [todayPlan.breakfast, todayPlan.lunch, todayPlan.dinner].filter(Boolean)
+        .concat(todayPlan.snacks || []).map(String);
       var sugRows = expirySuggestions.map(function(s) {
+        var sid = String(s.recipe.id);
+        var alreadyPlanned = todayIds.indexOf(sid) >= 0;
+        var btn = alreadyPlanned
+          ? '<span class="dash-planned-badge">Planned ✓</span>'
+          : '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + sid + '\')">Plan it</button>';
         return '<div class="dash-attn-row">' +
           '<span class="dash-attn-name">' + escapeHtml(s.recipe.name) + '</span>' +
           '<span class="dash-expiry-tag" style="color:var(--color-text-secondary)">uses ' + escapeHtml(s.ingredient) + '</span>' +
-          '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + String(s.recipe.id) + '\')">Plan it</button>' +
+          btn +
           '</div>';
       }).join('');
       useSoonSection = '<div class="dash-l1-block' + (hasExpiring || hasLow ? ' dash-l1-block--sep' : '') + '">' +
@@ -3220,12 +3228,36 @@ function planRecipeForToday(recipeId) {
   if (!AppState.weeklyPlan[today]) {
     AppState.weeklyPlan[today] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
   }
-  AppState.weeklyPlan[today].dinner = String(recipeId);
+  var plan = AppState.weeklyPlan[today];
+  var id = String(recipeId);
+
+  // Already planned somewhere today — do nothing
+  if (plan.breakfast === id || plan.lunch === id || plan.dinner === id ||
+      (plan.snacks || []).indexOf(id) >= 0) {
+    showSuccessMessage('Already planned for today!');
+    return;
+  }
+
+  // Find next empty main slot, fall back to snacks
+  var slot;
+  if (!plan.dinner) { slot = 'dinner'; }
+  else if (!plan.lunch) { slot = 'lunch'; }
+  else if (!plan.breakfast) { slot = 'breakfast'; }
+  else { slot = 'snacks'; }
+
+  var slotLabel = { dinner: "tonight's dinner", lunch: "today's lunch", breakfast: "today's breakfast", snacks: "today's snacks" };
+  if (slot === 'snacks') {
+    plan.snacks = plan.snacks || [];
+    plan.snacks.push(id);
+  } else {
+    plan[slot] = id;
+  }
+
   saveData();
   generateGroceryList();
   renderWeeklyPlanner();
   renderDashboard();
-  showSuccessMessage('Added to tonight\'s dinner!');
+  showSuccessMessage('Added to ' + slotLabel[slot] + '!');
 }
 window.planRecipeForToday = planRecipeForToday;
 

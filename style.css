@@ -5712,6 +5712,10 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   margin-top: 0.3rem;
 }
 
+.dash-planned-badge {
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--color-success, #22c55e); white-space: nowrap;
+}
 .dash-inline-btn {
   background: none;
   border: none;
