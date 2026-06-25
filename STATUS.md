@@ -5,6 +5,16 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Capture pipeline live; first Triage
+
+**Triage:** 1 capture in `captures/inbox/` (`20260625T1621Z-4-feature`, "test capture") → recognized as
+a smoke-test, **dropped** (no task created), archived to `captures/processed/2026/06/`. Inbox empty.
+**Pipeline status:** Telegram → n8n → `captures/inbox/` confirmed working end to end (real commit + reply).
+**Next task:** Queue empty. Send a real `/feature`/`/bug` from Telegram, or promote a task into `planning/TASK.md`.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Mobile capture pipeline (Telegram → inbox → Triage) + repo reorg
 
 **Task:** Build the Telegram capture system: dumb capture in n8n, smart Triage in Claude.
