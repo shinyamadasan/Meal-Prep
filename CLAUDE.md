@@ -16,6 +16,7 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `captures/` | `inbox/` = mobile captures (from Telegram/n8n); `processed/` = triaged archive | Inbound idea pipeline |
 | `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
 | `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, triage, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
+| `GUIDE.md` (root) | Human phone cheat-sheet for the Telegram capture commands | How the human uses the system (keep in sync if commands change) |
 | `docs/PROJECT.md` | What/why/who, non-goals, **North-star goals** (triage scoring) | Product intent & scope |
 | `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
