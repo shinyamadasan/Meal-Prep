@@ -3746,6 +3746,13 @@ select.form-control {
   margin-bottom: 0.75rem;
 }
 
+.pantry-search-wrap {
+  margin-bottom: 0.75rem;
+}
+.pantry-search-wrap .form-control {
+  width: 100%;
+}
+
 .pantry-add-row .form-control {
   flex: 1;
 }

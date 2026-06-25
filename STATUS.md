@@ -5,6 +5,24 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Pantry search (Internal Alpha: "did I already buy garlic?")
+
+**Task:** Add real-time pantry search so a growing kitchen stays scannable (Job #1).
+**Built:** `#pantry-search` field above the pantry list. Filters by name on input (wired
+`addEventListener('input', renderPantry)` — matches the recipe-search pattern); `renderPantry()`
+filters within each storage group (grouping preserved), shows an encouraging "No matches" empty state,
+and hides the field when the pantry is empty. Reused `emptyState`, `.form-control`, existing tokens —
+no redesign, no new state (transient view filter). Files: `index.html`, `app.js`, `style.css`.
+**Self Review:** pass (smallest impl, reuse, no debt; search input is a sibling of `#pantry-list` so it
+keeps focus while typing). **QA:** pass (ref pair intact, light-only invariant clean, no secrets, all 6
+acceptance criteria traced). **Verification:** code-trace only — eyeball on device after deploy.
+**Files changed:** `index.html`, `app.js`, `style.css`, `docs/FEATURES.md`, `planning/DONE.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Other alpha quick wins (add-feedback toast, Price Book naming, sample-recipe badge) — see the alpha audit.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — METRICS.md + OS locked at v1.0; product direction set
 
 **Completed:**

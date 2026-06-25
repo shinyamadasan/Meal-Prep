@@ -1802,6 +1802,8 @@ function setupEventListeners() {
   
   // Search and filter
   document.getElementById('recipe-search').addEventListener('input', filterRecipes);
+  var pantrySearchEl = document.getElementById('pantry-search');
+  if (pantrySearchEl) pantrySearchEl.addEventListener('input', renderPantry);
   document.getElementById('category-filter').addEventListener('change', filterRecipes);
   document.getElementById('preptime-filter').addEventListener('change', filterRecipes);
   
@@ -6386,10 +6388,18 @@ function renderPantry() {
   const n = AppState.pantry.length;
   count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
 
+  // Real-time search: filters the pantry view by name (renderPantry is the renderer, re-run on input).
+  const searchWrap = document.getElementById('pantry-search-wrap');
+  const searchEl = document.getElementById('pantry-search');
+  const q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  const searching = q.length > 0;
+
   if (n === 0) {
+    if (searchWrap) searchWrap.classList.add('hidden');   // nothing to search yet
     list.innerHTML = emptyState('package', 'Your pantry is empty', 'Add ingredients you already have at home — cooking a recipe then deducts from your stock and tracks freshness.');
     return;
   }
+  if (searchWrap) searchWrap.classList.remove('hidden');
 
   // Summary banner: expired / expiring soon (freshness) + running-low staples (stock)
   var expiredCount = 0, expiringCount = 0, lowCount = 0;
@@ -6488,15 +6498,25 @@ function renderPantry() {
     { key: 'counter', label: icon('archive') + ' Counter / Pantry' }
   ];
 
-  var html = banner;
+  var html = searching ? '' : banner;   // hide the kitchen-wide freshness summary while searching
+  var matched = 0;
   groups.forEach(function(g) {
-    var items = AppState.pantry.filter(function(p) { return effStorage(p) === g.key; })
+    var items = AppState.pantry.filter(function(p) {
+        return effStorage(p) === g.key && (!searching || p.name.toLowerCase().includes(q));
+      })
       .sort(function(a, b) { return a.name.localeCompare(b.name); });
     if (items.length === 0) return;
+    matched += items.length;
     html += '<div class="fridge-subsection-title">' + g.label +
             ' <span class="fridge-subsection-count">(' + items.length + ')</span></div>';
     html += '<div class="pi-list">' + items.map(buildPantryItem).join('') + '</div>';
   });
+  if (searching && matched === 0) {
+    list.innerHTML = emptyState('search', 'No matches',
+      'Nothing in your kitchen matches “' + escapeHtml(searchEl.value.trim()) +
+      '”. Try another word, or add it with <b>+ Add</b> above.');
+    return;
+  }
   list.innerHTML = html;
 }
 
