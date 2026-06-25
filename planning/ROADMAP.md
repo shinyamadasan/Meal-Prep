@@ -19,7 +19,34 @@ At **Next Task Selection** the agent moves the finished task to [DONE.md](DONE.m
 
 Prioritized; top item is promoted next. Each entry: outcome + priority/complexity + success criteria.
 
-*(empty — add prioritized tasks here, or let triage fill it)*
+> **Dependency chain (drain test, 2026-06-25).** Build in order — each builds on the previous via a
+> `suggested` flag on grocery items. EXTEND existing code, don't duplicate: low-stock auto-add already
+> lives in `checkAndReplenishLowStock()` / `syncStapleToGrocery()`; grocery rendering in
+> `renderGroceryList()`; state in `AppState.groceryList` (items) and `AppState.pantry`.
+
+- [ ] **1. Flag auto-suggested low-stock grocery items** · P2 · complexity:S
+  - The grocery list already auto-adds pantry items when `quantity < minStockQty`
+    (`checkAndReplenishLowStock()`). This task only **marks** those auto-added entries so later tasks
+    can tell them apart — do NOT rebuild the suggestion logic.
+  - acceptance:
+    - [ ] items auto-added by `checkAndReplenishLowStock()` get `suggested: true` (+ a short `suggestedReason`, e.g. "low stock") on the grocery item
+    - [ ] manually-added grocery items are NOT flagged
+    - [ ] flag persists through `saveData()` and survives reload (it's part of the grocery item)
+  - likely files: `app.js` (`checkAndReplenishLowStock`, `syncStapleToGrocery`)
+- [ ] **2. "Suggested" badge in the grocery list** · P2 · complexity:S
+  - Depends on Task 1's `suggested` flag.
+  - acceptance:
+    - [ ] grocery items with `suggested === true` render a small "Suggested" badge (with the reason as a title/tooltip)
+    - [ ] non-suggested items render unchanged
+  - likely files: `app.js` (`renderGroceryList`), `style.css` (badge), `index.html` if a class is needed
+- [ ] **3. Dismiss a suggested grocery item** · P2 · complexity:M
+  - Depends on Tasks 1 + 2.
+  - acceptance:
+    - [ ] a dismiss control on suggested grocery items removes the item from `AppState.groceryList`
+    - [ ] the corresponding `AppState.pantry` item is **untouched** (only the grocery entry goes)
+    - [ ] dismissed items are **not re-added** by the next `checkAndReplenishLowStock()` run while still below min (track the dismissal — e.g. a flag on the pantry item or a dismissed set)
+    - [ ] persists through `saveData()`
+  - likely files: `app.js` (`renderGroceryList`, `checkAndReplenishLowStock`)
 
 ---
 
@@ -50,6 +77,19 @@ Low-commitment thoughts from `/idea` captures. Promote into the Task Queue when 
   count (`git log` reverts). Ship as a `/report` prompt → `planning/METRICS.md`, optionally a Sunday
   scheduled run. **Review time + merge rate need the PR approval gate first** (see OPERATOR.md) — that
   gate unlocks those two metrics *and* a review-before-live step; decide it separately.
+- **Extract the AI Dev OS into its own repo** (`ai-dev-os/`) so new apps clone it.
+  The reusable "System 2" is the *protocol* layer, NOT this app's content. Separate them first:
+  GENERIC (move to ai-dev-os as templates) = `WORKFLOW.md`, `PROMPTS.md`, `OPERATOR.md`, the doc-router
+  pattern, `run-claude.ps1`, the n8n capture workflow, and empty `TASK/ROADMAP/DONE/STATUS` + `captures/`
+  scaffolds. APP-SPECIFIC (stays per app) = `CLAUDE.md`'s project section + hard rules, and all of
+  `docs/` (PROJECT/ARCHITECTURE/DATA_MODEL/FEATURES/DECISIONS). A new app = clone ai-dev-os, fill in
+  CLAUDE.md's project block + docs/. Open question: keep it in sync across apps via a template repo,
+  git submodule, or a copy-on-init script.
+- **Failure-recovery test** (run after the multi-task drain proves out).
+  Queue 3 tasks where the middle one is likely to block. Expected per current policy: Task 1 ✅ →
+  Task 2 blocked → record blocker in TASK.md + STATUS.md → move it to ROADMAP **Blocked** → **promote
+  the next queue item and continue** (the workflow already parks-and-continues, not stop-on-blocker;
+  WORKFLOW.md autonomous table). Tests resilience, not just throughput.
 
 ---
 
