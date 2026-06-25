@@ -5,6 +5,18 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Queued an alpha P1 ahead of tonight's drain; Job #5 preserved
+
+**Queue (top → bottom) for tonight's run:**
+1. **Alpha P1 — one onboarding modal on first run** (don't stack Help over the Kitchen Setup Wizard). Friction removal, first impression.
+2–4. The P2 low-stock dependency chain (flag → badge → dismiss) — drain test.
+**Job #5** ("cheapest") is recorded in ROADMAP as **⏳ decision-pending, do-NOT-auto-build** — preserved, the run must skip it (human decides: descope vs build).
+**Tonight:** 9 PM run builds the alpha P1 first, then drains the P2 chain. First unattended run of the new pipeline + QA/Self-Review gates — review `DONE.md`/commits in the morning.
+**Branch:** `main` — committed + pushed.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Alpha P1: "Sample" badge on seeded recipes (Job #3 clarity)
 
 **Why highest-priority:** Job #1 done; Job #4's grocery empty state already guides; Job #5 is a product
