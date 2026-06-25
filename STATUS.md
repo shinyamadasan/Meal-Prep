@@ -5,6 +5,19 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — OPERATOR.md + GUIDE slimmed; triaged 2 noise captures
+
+**Docs:** Added `OPERATOR.md` (human playbook: 7 operating principles + daily/weekly rhythm); slimmed
+`GUIDE.md` to a muscle-memory capture card; registered both in `CLAUDE.md`.
+**Triage:** 2 inbox captures dropped as noise — the GUIDE cheat-sheet text pasted into the bot chat,
+and an empty message. Both archived to `captures/processed/2026/06/`. Inbox empty.
+**Friction found:** the bot captures *everything* sent to it. Reference material (the cheat sheet)
+belongs in Telegram **Saved Messages**, not the bot chat.
+**Next task:** Queue empty. Start sending real `/feature`/`/bug` captures.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Capture pipeline live; first Triage
 
 **Triage:** 1 capture in `captures/inbox/` (`20260625T1621Z-4-feature`, "test capture") → recognized as
