@@ -1,96 +1,65 @@
-# Meal Prep Planner — Project Context
+# Meal Prep Planner — Agent Router
 
-Plain HTML/CSS/JS single-page app. No build step. No framework.
-Deployed on GitHub Pages at: https://shinyamadasan.github.io/Meal-Prep/
+Plain HTML/CSS/JS single-page app. No build step, no framework. Firebase Auth + Firestore with
+localStorage offline fallback. Deployed on GitHub Pages (auto-deploys from `main`).
+Files: `app.js` (all logic, ~8,800 lines), `index.html` (all tabs/modals inline), `style.css`.
 
-## Files
-- `app.js` — all application logic (~5500+ lines)
-- `style.css` — all styles
-- `index.html` — single HTML file, all tabs inline
+This file is the **router**. Read it + `STATUS.md` first, then pull only the docs the task needs.
 
-## Data Storage
-- `AppState` global object holds all runtime state
-- `saveData()` → calls `saveToLocalStorage()` + `saveToFirestore()`
-- Firebase Auth + Firestore for cloud sync when user is logged in
-- localStorage (`STORAGE_KEY`) as offline fallback
-- **Important:** recipes loaded from localStorage/Firebase are plain JSON
-  and may be missing fields added later. Always call `patchMissingNutrition()`
-  after loading recipes.
+## Documentation map
+| File | What's in it | Source of truth for |
+|---|---|---|
+| `STATUS.md` (root) | Current state, next task, blockers | Where we are right now |
+| `ROADMAP.md` (root) | Task queue (Now/Next/Later), Known Issues & Debt, Do Not Work On | Priority & open defects |
+| `docs/PROJECT.md` | What/why/who, non-goals | Product intent & scope |
+| `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
+| `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
+| `docs/FEATURES.md` | Feature catalog by tab + status | Feature existence & status |
+| `docs/DECISIONS.md` | Why the key choices were made (ADR-lite) | Rationale; "don't undo this" |
 
-## Key Data Structures
+Code is the source of truth for *how things behave*; docs are the source of truth for *why & where*.
+If a doc disagrees with the code about behavior, fix the doc.
 
-### AppState
-```js
-AppState.recipes          // user's recipe list (includes sampleRecipes on first load)
-AppState.weeklyPlan       // { Monday: { breakfast, lunch, dinner, snacks[] }, ... }
-AppState.pantry           // [{ id, name }]
-AppState.customIngredients // storage guide items
-AppState.nutritionGoals   // { calories, protein, carbs, fat, fiber, sodium }
-```
+## Read protocol (start of session)
+- **Always:** this file (auto) + `STATUS.md`.
+- New feature / feature change → relevant `docs/FEATURES.md` section + `docs/ARCHITECTURE.md`.
+- Bug fix → `ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section.
+- Data / schema / storage change → `docs/DATA_MODEL.md`.
+- Refactor or "why is it like this?" → `docs/DECISIONS.md` + `docs/ARCHITECTURE.md`.
+- Planning → `ROADMAP.md`.
 
-### Recipe object
-```js
-{
-  id,                    // number (1-11 for samples), string for user-added (Firestore ID)
-  name,
-  baseServings,          // original serving count
-  currentServings,       // scaled serving count
-  baseIngredients: [{ name, baseQuantity, unit, category, pricePerUnit? }],
-  nutritionPerServing: { calories, protein, carbs, fat, fiber, sodium },
-  fridgeLife,            // days
-  freezerLife,           // days
-  instructions,
-  category,              // "Breakfast", "Main Dish", etc.
-}
-```
+Don't load every doc. Pull the row(s) above for the task at hand.
 
-## Key Functions
-- `renderRecipes()` — My Recipes tab
-- `renderWeeklyPlanner()` — Weekly planner tab
-- `renderNutritionTab()` → calls `renderWeeklyNutritionChart()`, `renderDailyNutritionBreakdown()`, `filterRecipesByNutrition()`
-- `calculateRecipeNutrition(recipe)` — uses `nutritionPerServing` if present, else tries ingredient lookup
-- `patchMissingNutrition(recipes)` — backfills nutrition from `sampleRecipes` for old saved data
-- `filterRecipesByNutrition()` — renders recipe cards in Nutrition tab
-- `openEditRecipeModal(recipeId)` — opens recipe edit form (recipeId is string OR number, always quote in onclick)
-- `attachIngredientAutocomplete(inputEl)` — wires autocomplete to any text input
-- `addToPantry()` / `renderPantry()` — pantry management
-- `saveData()` — saves to both localStorage and Firestore
+## Update protocol (end of session)
+- **Always:** `STATUS.md` (last shipped, next action, blockers).
+- Shipped/changed a feature → `docs/FEATURES.md` status (+ a clear git commit message).
+- Found a bug / gap / dead code → `ROADMAP.md` → Known Issues & Debt.
+- Fixed a known issue → remove it from `ROADMAP.md`.
+- Changed a data shape/key → `docs/DATA_MODEL.md`.
+- Added/restructured a subsystem → `docs/ARCHITECTURE.md`.
+- Made a non-obvious architectural choice → `docs/DECISIONS.md` (new `D-0NN` entry).
 
-## Databases (in app.js)
-- `sampleRecipes` — 26 built-in recipes with `nutritionPerServing` (IDs 1–26)
-- `INGREDIENT_DB` — 175 ingredients with `{ name, unit, category, price, store, aliases, fridgeDays, freezerDays, trackExpiry, priceValue, minStockQty }`
-- `LOCAL_NUTRITION_DB` — 90+ ingredients with `{ name, calories, protein, carbs, fat, fiber, sodium }` per 100g
-- `PANTRY_KNOWLEDGE` — 22 ingredients with storage guidance (location, lasts, store, spoilage, freshness)
+## Hard rules (these cause bugs if violated)
+1. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` — Firestore ids
+   are strings; unquoted they render as bare identifiers and break.
+2. **After loading recipes from storage, call `patchMissingNutrition(AppState.recipes)`** — old saved
+   recipes are missing later-added fields (see DECISIONS D-005).
+3. **Persist through `saveData()`** — it writes BOTH localStorage and Firestore. Don't call
+   `saveToLocalStorage()` alone, or a signed-in user's next refresh reloads the old cloud copy.
+4. **Never add a second `:root` block** in `style.css` — it overrides dark mode (already broke once).
+5. **Reference stable anchors in docs** — function/object names, DOM ids, Firestore paths,
+   localStorage keys. **Never line numbers** (DECISIONS D-008).
+6. **Match existing style.** One file, global functions, imperative `render*()`. Don't introduce a
+   framework, build step, or module system (DECISIONS D-001).
 
-## Nutrition Search
-`searchNutritionDB()` — searches `LOCAL_NUTRITION_DB` first (instant, offline).
-Falls back to USDA FoodData Central API (`DEMO_KEY`) if not found locally.
+## Tooling gotchas
+- PowerShell `Add-Content` mangles Unicode — use the Edit/Write tools for any file with emoji/special chars.
+- Autonomous sessions run via `run-claude.ps1`; it reads `ROADMAP.md`, `STATUS.md`, `CLAUDE.md` first.
 
-## Ingredient Autocomplete
-`attachIngredientAutocomplete(input)` — works on recipe form AND pantry input.
-Shows name, unit, category, price, and where to buy from `INGREDIENT_DB`.
-
-## CSS Notes
-- CSS variables in `:root` — dark mode via `[data-color-scheme="dark"]` attribute
-- Do NOT add a second `:root` block — it will override dark mode (already fixed once)
-- Mobile breakpoint: `@media (max-width: 768px)`
-
-## Deployment
+## Deploy
 ```
 git add app.js style.css index.html
 git commit -m "..."
 git push origin main
 ```
-GitHub Pages auto-deploys from main branch. Takes ~1 min to go live.
-
-## Current State (update each session)
-- Last push: commit `907602e` — Phase B INGREDIENT_DB extension (priceValue + minStockQty on all 175 entries)
-- Pending: commit + push the 11 new sample recipes (IDs 16–26)
-- Recent major work: Phase A (aliases, fridgeDays, freezerDays, trackExpiry) + Phase B (priceValue, minStockQty) INGREDIENT_DB enrichment; 11 new sampleRecipes added (Tapsilog, Longsilog, Champorado, Bulalo, Chicken Sopas, Fish Sinigang, Lomi, Caldereta, Menudo, Laing, Ginataang Manok)
-
-## Common Bugs to Avoid
-- `onclick="openEditRecipeModal(${recipe.id})"` — ALWAYS quote the id: `onclick="openEditRecipeModal('${recipe.id}')"`
-  because Firestore IDs are strings and render as bare identifiers without quotes
-- After loading recipes from storage, always call `patchMissingNutrition(AppState.recipes)`
-  so that hardcoded sample recipe data (like nutritionPerServing) is applied to old saved copies
-- PowerShell `Add-Content` mangles Unicode — use Edit tool for any file with emoji/special chars
+GitHub Pages auto-deploys from `main` (~1 min to go live).

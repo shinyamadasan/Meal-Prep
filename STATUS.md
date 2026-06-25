@@ -1,6 +1,23 @@
 # Session Log
 
 Newest entry at top. Append after every session — never edit past entries.
+The top entry is the current **working memory** (where we are / next task / blockers).
+
+---
+
+## 2026-06-24 — AI-first documentation system
+
+**Task:** Redesign project docs for AI-assisted development; retire the monolithic `feature-inventory.md`.
+**Completed:**
+- New router `CLAUDE.md` (read/update protocol + hard rules + gotchas, folded in).
+- New `docs/`: `PROJECT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `FEATURES.md`, `DECISIONS.md` (D-001…D-008 seeded).
+- `ROADMAP.md` restructured: kept the autonomous Current Task / Queue / Done sections, added **Known Issues & Debt** (merged from KNOWN_ISSUES), kept **Do Not Work On**.
+- `feature-inventory.md` content split across the above, **line numbers stripped** (stable anchors only), then deleted.
+- `ROADMAP.md` + `STATUS.md` kept at **repo root** (not `/docs`) because `run-claude.ps1` reads them there by name.
+**Files changed:** `CLAUDE.md`, `ROADMAP.md`, `STATUS.md`, `docs/*` (new), `feature-inventory.md` (deleted).
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Queue is empty — add tasks to `ROADMAP.md` before the next session. Optionally commit the doc migration.
+**Blockers:** none.
 
 ---
 
