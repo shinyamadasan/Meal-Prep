@@ -44,6 +44,12 @@ Low-commitment thoughts from `/idea` captures. Promote into the Task Queue when 
   Reactive: capture workflow's error branch → if GitHub node returns 401/403, Telegram-alert to
   regenerate the PAT. Proactive: monthly n8n Schedule does a no-op GitHub call; on failure → Telegram.
   (Current PAT expires 2026-09-23.)
+- **Process / flow-metrics report** (weekly, markdown-native — no metrics DB).
+  Compute from data we already keep: throughput (DONE.md / `git log --since`), avg cycle time
+  (`captures/processed/**` `captured:` → commit date), queued + blocked (ROADMAP counts), rollback
+  count (`git log` reverts). Ship as a `/report` prompt → `planning/METRICS.md`, optionally a Sunday
+  scheduled run. **Review time + merge rate need the PR approval gate first** (see OPERATOR.md) — that
+  gate unlocks those two metrics *and* a review-before-live step; decide it separately.
 
 ---
 
