@@ -17,6 +17,7 @@
 - **Favorites** — Working · `toggleFavorite()`, `recipe.favorite`, `#favorites-filter`.
 - **Serving scaler** — Working · stepper + `adjustDetailServings()` / `buildDetailIngList()`.
 - **Search & filter** — Working · name/instructions, category, prep-time, favorites-only.
+- **Recipe count** — Working · `#recipe-count` shows how many recipes match the active search/filter (updates live in `renderRecipes()`).
 - **Add/Edit recipe modal** — Working · `openEditRecipeModal()`; autocomplete from `INGREDIENT_DB`; USDA lookup; photo upload w/ compression.
 - **Cook suggestions strip** — Working · 3 tiers from pantry.
 - **Getting Started card** — Working · 2-step onboarding, auto-dismiss.

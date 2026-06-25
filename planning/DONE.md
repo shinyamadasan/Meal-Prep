@@ -3,6 +3,7 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ Live recipe count on the Cook tab (`#recipe-count`, updates with search/filter) (2026-06-25)
 - ✅ Firestore write guard — stop cloud-data wipe on deploy/reload (`AppState.cloudReady`) (2026-06-25)
 - ✅ Pantry add row simplified; ingredient browser modal (2026-06-24)
 - ✅ Weekly nutrition totals, grocery A→Z sort, recipe detail scaler, bulk pantry add, cook history (2026-06-23)

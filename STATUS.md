@@ -5,6 +5,25 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Pipeline validation: first real feature through the full lifecycle
+
+**Why:** Prove the *build* half end to end before trusting tonight's scheduled run (capture + triage
+were already proven; build was not).
+**Feature shipped:** Live recipe count on the Cook tab — `#recipe-count` shows how many recipes match
+the active search/filter, updates in `renderRecipes()`. Files: `index.html` (count div), `app.js`
+(set count from `filteredRecipes`), `style.css` (`.recipe-count`).
+**Lifecycle exercised:** Triage (scored strong/goal #1, complexity S) → routed → promoted → Execution
+→ Task Completion (FEATURES.md + DONE.md + this entry) → Commit. Capture archived to
+`captures/processed/2026/06/20260625T1900Z-validation-feature.md`.
+**Verification:** Code trace — count rides the existing filter render path; guarded against a missing
+element; "1 recipe"/"N recipes"/"0 recipes" handled. **Not run in-browser here** — eyeball it on the
+live site after deploy (Cook tab, type in search → count should change).
+**Result:** Build half works end to end. Tonight's 9 PM scheduler run is now confirmation, not a first test.
+**Next task:** Queue empty. Start real captures.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — OPERATOR.md + GUIDE slimmed; triaged 2 noise captures
 
 **Docs:** Added `OPERATOR.md` (human playbook: 7 operating principles + daily/weekly rhythm); slimmed

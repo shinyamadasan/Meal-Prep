@@ -1231,6 +1231,12 @@ select.form-control {
   flex-wrap: wrap;
 }
 
+.recipe-count {
+  margin-bottom: var(--space-16);
+  font-size: var(--font-size-sm, 0.85rem);
+  color: var(--color-text-secondary, #626c71);
+}
+
 .search-filter .form-control {
   flex: 1;
   min-width: 200px;

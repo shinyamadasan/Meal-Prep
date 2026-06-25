@@ -2345,7 +2345,10 @@ function renderRecipes() {
     const matchesFavorites = !favoritesOnly || !!recipe.favorite;
     return matchesSearch && matchesCategory && matchesTime && matchesFavorites;
   });
-  
+
+  const countEl = document.getElementById('recipe-count');
+  if (countEl) countEl.textContent = filteredRecipes.length + (filteredRecipes.length === 1 ? ' recipe' : ' recipes');
+
   if (filteredRecipes.length === 0) {
     recipesGrid.innerHTML = AppState.recipes.length > 0
       ? emptyState('search', 'No recipes match', 'Try a different search term or filter.')
