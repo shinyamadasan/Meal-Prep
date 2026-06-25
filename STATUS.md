@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Product prompts added to PROMPTS.md (PP1–PP7)
+
+**Completed:** Split `PROMPTS.md` into **⚙️ Engineering (P1–P10)** and **🎯 Product (PP1–PP7)**.
+The product prompts: PP1 Internal Alpha Audit · PP2 UX Friction Audit · PP3 First-Time User Audit ·
+PP4 Feature Simplification · PP5 Release Readiness · PP6 User Research Analysis · PP7 Post-Test
+Improvement Sprint. They produce **findings/decisions routed into ROADMAP**, not features — honoring
+the no-new-features / prefer-simplify constraint and the QA honesty rule (flag human-verified, don't
+claim it). Updated `AI-DEV-OS.md` (manifest) + `CLAUDE.md` (doc map). Part of the v1.0 template.
+**Self Review:** pass (consistent format, reuse, defers to system docs). **QA:** pass (docs only).
+**Files changed:** `PROMPTS.md`, `AI-DEV-OS.md`, `CLAUDE.md`, `STATUS.md`, `planning/DONE.md`.
+**Branch:** `main` — pushed.
+**Next task:** Remaining alpha quick wins (sample-recipe badge, one first-launch modal) + the Job #5 decision.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Alpha quick wins: pantry add-feedback + Price Book naming
 
 **Built (2 trust/feedback fixes from the alpha audit):**

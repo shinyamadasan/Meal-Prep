@@ -14,6 +14,11 @@
 
 ---
 
+# ⚙️ Engineering — how to build
+*P1–P10 · turn intent into shipped code.*
+
+---
+
 ## P1 — Draft a task (idea → TASK.md)
 *Use when you have a rough idea and want an agent-executable task.*
 ```
@@ -107,6 +112,83 @@ Review your own diff as if reviewing someone's PR. Run SELF_REVIEW.md's Code Hea
 unnecessary DOM queries, extract-to-helper) and answer "Would I ship this?". Fix/simplify any findings
 BEFORE QA. If the only hesitation is a human-verified aspect (feel/polish/device), mark it
 ship-pending-human-review in STATUS — don't claim it's verified.
+```
+
+---
+
+# 🎯 Product — how to make better products
+*PP1–PP7 · these don't write code. They produce **findings and decisions** (routed into
+`planning/ROADMAP.md`), not features — and honor the constraint: don't add a feature unless a **core
+job** (`docs/PROJECT.md`) requires it; prefer simplifying, hiding, or removing. Be honest about what
+you can verify (code-grounded) vs what needs real users/devices (flag it — QA.md honesty rule).*
+
+---
+
+## PP1 — Internal Alpha Audit
+*Use to decide if the app is usable enough for a real person without your help.*
+```
+Audit the product as a first-time user (not a developer), against the five core jobs in docs/PROJECT.md.
+Cover: First Impression · Core Flows (end-to-end, not features in isolation) · Friction · Edge Cases ·
+Trust. Tie every issue to a core job and tag P0–P3. Ground each finding in the actual code/flows
+(verify, don't speculate). End with an Internal Alpha Readiness Report: score 0–100, blockers, quick
+wins, fix order, Go/No-Go for external testing. Constraint: propose a new feature only if one is
+required to complete a core job; prefer simplifying or hiding over building.
+```
+
+## PP2 — UX Friction Audit
+*Use to find what makes a flow feel heavier than it should.*
+```
+Walk this flow end to end and list every friction: unnecessary taps, typing, decisions, navigation;
+confusing wording; duplicate actions; poor defaults; missing feedback. For each, recommend the SIMPLEST
+fix (often a better default, a toast, or removing a step — not adding UI). Tie each to a core job.
+Don't redesign; reuse existing components.
+Flow: <name it>
+```
+
+## PP3 — First-Time User Audit
+*Use to evaluate the first 60 seconds for someone who just installed the app.*
+```
+Evaluate first-run as a brand-new user. Does the app communicate its purpose immediately? Is the first
+screen useful or confusing? Are there dead ends, unexplained states, or too many gates (modals) before
+value? Is seeded/sample data distinguishable from the user's own? Recommend the smallest changes that
+get a stranger to their first core-job win fastest. No new features.
+```
+
+## PP4 — Feature Simplification
+*Use when a feature might be adding confusion instead of value.*
+```
+Evaluate <feature> against the five core jobs: does it directly serve one? Is it discoverable, or
+clutter? Decide: keep / simplify / hide / remove — and prefer removing or hiding over improving a
+feature that confuses. If keeping, state the single simplest version that still serves its job. A frozen
+feature set means fewer, clearer features beat more.
+```
+
+## PP5 — Release Readiness
+*Use to gate a release stage (internal alpha / external beta / public).*
+```
+Produce a Release Readiness Report for <stage>: overall score (0–100), must-fix blockers, quick wins,
+recommended fix order, and a Go/No-Go. Judge against the five core jobs being completable without
+guidance. Be honest about scope: code-grounded checks are yours; feel / polish / real-device are
+human-verified — flag them as pending, never claim them (QA.md honesty rule).
+```
+
+## PP6 — User Research Analysis
+*Use to turn real user-testing observations into prioritized findings. Needs real input.*
+```
+Observations from watching N users: <paste where they got stuck / ignored / delighted / confused>.
+Synthesize into themes, separate signal from one-off noise, map each to a core job, and rank by
+(users affected × severity). Output prioritized findings (P0–P3) and route them into
+planning/ROADMAP.md (bugs → Known Issues, gaps → Task Queue, ideas → Ideas). Do NOT fabricate user
+behavior — work only from the observations given; if data is thin, say so.
+```
+
+## PP7 — Post-Test Improvement Sprint
+*Use after user testing to turn findings into an executable sprint.*
+```
+From the prioritized findings (PP6 output / ROADMAP), assemble the next sprint: highest job-impact +
+lowest effort first. Write each as a TASK with verifiable success criteria (P1 form) and queue them in
+priority order in planning/ROADMAP.md. Prefer fixes that simplify. Anything needing a product decision
+stays flagged for the human — don't guess.
 ```
 
 ---

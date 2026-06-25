@@ -17,7 +17,7 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
 | `SELF_REVIEW.md` (root) | Code-health gate: "is this good code?" + "would I ship this?" (runs before QA) | Maintainability/quality before QA |
 | `QA.md` (root) | Pre-commit quality gate: AI checks (must pass) + human checks (logged) | Correctness before every production commit |
-| `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, triage, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
+| `PROMPTS.md` (root) | Engineering prompts (P1–P10) + Product prompts (PP1–PP7: alpha/UX/release audits, user research) | How to frame recurring eng & product work (not auto-read) |
 | `GUIDE.md` (root) | Tiny phone capture card (the 5 commands) | Muscle-memory capture reference |
 | `OPERATOR.md` (root) | Human playbook: operating principles + daily/weekly rhythm | How the *human* runs the system (keep in sync if flow changes) |
 | `AI-DEV-OS.md` (root) | Template manifest: generic OS vs app-specific files + new-app bootstrap | Reusing this OS to start a new app |

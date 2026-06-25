@@ -21,7 +21,7 @@ because the whole engineering workflow comes with it.
 | `WORKFLOW.md` | Task-driven lifecycle (Triage + 7 events) | none |
 | `SELF_REVIEW.md` | Code-health gate ("would I ship this?") | tweak the "existing patterns" line |
 | `QA.md` | Correctness gate | swap the `[app]`-tagged checks |
-| `PROMPTS.md` | P1–P10 reusable prompts | none |
+| `PROMPTS.md` | Engineering (P1–P10) + Product (PP1–PP7) reusable prompts | none |
 | `OPERATOR.md` | Human playbook (principles + rhythm) | none |
 | `GUIDE.md` | Phone capture card | none |
 | `run-claude.ps1` · `setup-task-scheduler.ps1` | Scheduled autonomous runs | set project path |
