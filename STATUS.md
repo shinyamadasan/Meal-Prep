@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-24 — TASK.md: single active-task handoff
+
+**Task:** Split tactical (active task) from strategic (roadmap) so the autonomous agent never picks priorities.
+**Completed:**
+- New `TASK.md` — the single active task (Objective / Current Step / Success Criteria / Definition of Done); idle state = NO ACTIVE TASK.
+- `CLAUDE.md` read protocol now: CLAUDE → STATUS → **TASK** → only-required docs. Update protocol: on task done, promote next ROADMAP queue item into TASK.md (mechanical FIFO).
+- `ROADMAP.md` is now strategic only — removed "Current Task"; the agent works `TASK.md`, not the roadmap.
+- `run-claude.ps1` rewritten to the new flow (reads TASK.md, stops on NO ACTIVE TASK).
+- Noted for later: `PROMPTS.md` (deferred — not built).
+**Files changed:** `TASK.md` (new), `CLAUDE.md`, `ROADMAP.md`, `run-claude.ps1`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Queue empty; promote a task into `TASK.md` to activate the next autonomous run.
+**Blockers:** none.
+
+---
+
 ## 2026-06-24 — AI-first documentation system
 
 **Task:** Redesign project docs for AI-assisted development; retire the monolithic `feature-inventory.md`.

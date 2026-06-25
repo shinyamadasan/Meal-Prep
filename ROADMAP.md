@@ -1,25 +1,23 @@
 # Meal Prep Planner — Roadmap
 
-Forward work + open defects. Vision and product scope live in [docs/PROJECT.md](docs/PROJECT.md).
+**Strategic** — this file is for the human to set priority. Vision/scope live in
+[docs/PROJECT.md](docs/PROJECT.md); the **active** task lives in [TASK.md](TASK.md).
 
-## How Claude works through this file (autonomous sessions)
-1. Do the **Current Task** (meet its Success Criteria).
-2. Mark it ✅ and move it to **Done** (newest at top; prune old entries — git has the history).
-3. Pull the next item from the **Task Queue** into Current Task.
-4. Repeat until the queue is empty or token budget is hit.
-5. Update `STATUS.md` after each completed task.
-
----
-
-## Current Task
-
-**Queue empty as of 2026-06-24.** Add the next task here before starting a session.
+## How the active task flows (autonomous sessions)
+The agent does **not** pick from this roadmap. It works the single task in `TASK.md`. When that task
+is done it updates `STATUS.md` and **promotes the top item of the Task Queue below into `TASK.md`**
+(mechanical FIFO). You control priority by ordering the queue.
+1. Do the task in `TASK.md` (meet its Success Criteria).
+2. Update `STATUS.md`; mark it ✅ in **Done** below (newest at top; prune old — git has history).
+3. Promote the top **Task Queue** item into `TASK.md`. If the queue is empty, stop.
 
 ---
 
 ## Task Queue (Now / Next / Later)
 
-*(empty — add prioritized tasks here; each with a one-line outcome + success criteria)*
+Prioritized; top item is promoted next. Each entry: one-line outcome + success criteria.
+
+*(empty — add prioritized tasks here)*
 
 ---
 

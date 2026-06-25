@@ -1,6 +1,6 @@
 # Autonomous overnight Claude Code session
 # Triggered by Windows Task Scheduler at 2am
-# Claude reads ROADMAP.md, implements the current task, commits and pushes directly to main
+# Claude reads TASK.md (the single active task), implements it, commits and pushes directly to main
 
 $projectPath = "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 $logFile = "$projectPath\claude-session.log"
@@ -17,28 +17,30 @@ Add-Content -Path $logFile -Value "=== Session started: $timestamp ==="
 $prompt = @'
 You are running in autonomous overnight mode. No human is available to answer questions.
 
-Read ROADMAP.md, STATUS.md, and CLAUDE.md first.
+Read CLAUDE.md, STATUS.md, and TASK.md first. CLAUDE.md routes you to any other docs you need.
+TASK.md is the single active task — it is what you work on. Do NOT pick tasks from ROADMAP.md
+yourself; a human already promoted today's task into TASK.md.
+
+If TASK.md status is "NO ACTIVE TASK", write "No tasks remaining" to STATUS.md and stop — do not
+shut down the PC, do not invent work.
 
 Rules - follow exactly:
-- Work through tasks one by one, top to bottom
-- Do not touch anything in the "Do Not Work On" section
-- If a task is ambiguous or you hit a blocker, log it in STATUS.md and skip to the next task
-- Do not delete any files
-- Keep going until the Task Queue is empty or you are close to your context limit.
+- Work ONLY the task in TASK.md. Do not touch anything in the ROADMAP "Do Not Work On" section.
+- If the task is ambiguous or you hit a blocker, log it in STATUS.md and stop.
+- Do not delete any files.
+- Keep going until TASK.md is NO ACTIVE TASK or you are close to your context limit.
 
-If the Task Queue is empty and there is no Current Task, write "No tasks remaining" to STATUS.md and stop — do not shut down the PC.
-
-For EACH task:
-1. Read the Current Task and its Success Criteria from ROADMAP.md
-2. Make sure you are on main branch (git checkout main && git pull origin main)
-3. Implement the task in app.js and/or index.html
-4. Verify each Success Criterion by inspecting the code logic
-5. Commit directly to main with a clear message
-6. Push to main (git push origin main)
-7. Move the completed task to the Done section in ROADMAP.md
-8. Pull the next item from the Task Queue into Current Task in ROADMAP.md
-9. Append a new entry at the TOP of STATUS.md: date, task, what changed, files, next task
-10. Continue to the next task
+Loop, for the active task in TASK.md:
+1. Read TASK.md (objective, current step, success criteria). Read only the docs CLAUDE.md routes you to.
+2. Make sure you are on main (git checkout main && git pull origin main).
+3. Implement the task in app.js and/or index.html and/or style.css.
+4. Verify each Success Criterion by inspecting the code logic; update TASK.md "Current Step" as you go.
+5. Commit directly to main with a clear message, then push (git push origin main).
+6. Update the relevant docs per CLAUDE.md's update protocol (FEATURES/DATA_MODEL/DECISIONS as applicable).
+7. Append a new entry at the TOP of STATUS.md: date, task, what changed, files, next task.
+8. Promote the next item from ROADMAP.md "Task Queue" into TASK.md (mechanical FIFO — top of queue).
+   If the queue is empty, set TASK.md to NO ACTIVE TASK and stop.
+9. Continue with the now-active task.
 '@
 
 claude -p $prompt `
