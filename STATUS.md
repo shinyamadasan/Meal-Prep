@@ -5,6 +5,19 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Light-only release: force light, remove dark mode (D-013)
+
+**Why:** Dark-mode phones auto-applied a broken/inconsistent dark theme + darkened native controls, eroding trust. Product decision: ship one polished light theme.
+**Cause (audit):** (1) inline JS set `data-color-scheme="dark"` from `prefers-color-scheme`; (2) two `@media (prefers-color-scheme: dark)` CSS blocks auto-swapped tokens; (3) no `color-scheme` declared → WebView darkened native form controls.
+**Fix (web standards, no hacks):** `<meta name="color-scheme" content="light">` + `color-scheme: light` on `:root` + static `data-color-scheme="light"` on `<html>`. Removed the theme script, both `@media` dark blocks, the `[data-color-scheme="dark"]` token block, and all 12 `[data-color-scheme="dark"] .x` overrides. The `[data-color-scheme="light"]` block stays the single light theme → light appearance unchanged.
+**Verification:** grep-confirmed zero `prefers-color-scheme` / `data-color-scheme="dark"` / JS theme logic remain; confirmed no light rule references a now-undefined token (`--color-border-secondary`/`--button-border-secondary` had zero uses). **Code-traced only — not yet tested in a real browser/phone.** Needs a live check on iOS Safari + Android Chrome in device dark mode.
+**Files changed:** `index.html`, `style.css`, `docs/DECISIONS.md` (D-013), `docs/DATA_MODEL.md`, `planning/ROADMAP.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Deploy + verify on a dark-mode phone (the whole point); then the broader UX polish is parked.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Pipeline validation: first real feature through the full lifecycle
 
 **Why:** Prove the *build* half end to end before trusting tonight's scheduled run (capture + triage

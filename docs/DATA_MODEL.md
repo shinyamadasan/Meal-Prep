@@ -70,7 +70,7 @@ Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` 
 |---|---|
 | `mealPrepAppData` | full AppState snapshot (primary offline store) |
 | `mealPrepBackup` | pre-destructive-action snapshot (Restore Backup / Import) |
-| `colorScheme` | `'light'`/`'dark'` — **read on load, never written** (no toggle exists) |
+| `colorScheme` | **unused** — light-only release; no longer read or written (theme script removed, D-013) |
 | `mealPrepDisplayName` | display name |
 | `pantryOnboardingDone`, `mealPrepStartDone` | first-run flags |
 

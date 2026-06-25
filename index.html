@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-color-scheme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#7BAE7F">
+    <meta name="color-scheme" content="light">
     <meta name="apple-mobile-web-app-title" content="Meal Prep">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.svg">
@@ -27,13 +28,9 @@
         document.head.appendChild(_s);
       }
     </script>
-    <script>
-      (function() {
-        var saved = localStorage.getItem('colorScheme');
-        var scheme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-color-scheme', scheme);
-      })();
-    </script>
+    <!-- Light-only release: the app is designed for one polished light theme.
+         No theme script — the device's dark-mode setting is intentionally ignored
+         (color-scheme:light in <meta> above + :root in style.css). -->
 </head>
 <body>
     <div class="app">

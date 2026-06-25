@@ -125,7 +125,7 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 - **`#storage` tab** — full UI + `renderStorageGuide()` but no nav button (superseded by Inventory).
 - **Orphaned pantry reads** — `addToPantry()` still calls `getElementById` on the removed
   `#pantry-qty-input` / `#pantry-storage` (resolves null, no crash).
-- **`colorScheme` localStorage key** — read on load, never written (no dark-mode toggle exists).
+- **`colorScheme` localStorage key** — now fully unused (light-only release, D-013); harmless orphan in some users' storage.
 - **`recipe.highlights`** — rendered as tag chips but no edit-form input to set it.
 - **`printGroceryList()`** — defined, no button wired.
 - Hidden features: Family Sharing modal, Community Feed / `sharedRecipes`.

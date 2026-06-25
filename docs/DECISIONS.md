@@ -101,3 +101,11 @@ Decision: At Triage, score each item's alignment with the ranked **North-star go
 Why: Keeps the autonomous queue pointed at what actually moves the product, not at whatever was captured most recently. Scoring stays a documented heuristic (LLM judgment), not a rigid formula.
 Trade-off: Triage ranking influences queue order, which is normally the human's lever — but it's intake ranking against goals the human defined, not the agent overriding an explicit human ordering. Accepted.
 Supersedes: —
+
+## D-013 — Light-only release: force light, remove dark mode
+Date: 2026-06-25 · Status: Active
+Context: Phones in dark mode auto-applied the app's dark theme (and the browser/WebView darkened native controls), making the UI look broken and eroding trust. Dark mode had been patched component-by-component, so it was inconsistent. Product decision: ship one polished light theme this release.
+Decision: Force light regardless of the device setting, via web standards only — `<meta name="color-scheme" content="light">`, `color-scheme: light` on `:root`, and a static `data-color-scheme="light"` on `<html>`. Removed the theme-applying inline script, both `@media (prefers-color-scheme: dark)` blocks, the `[data-color-scheme="dark"]` token block, and every `[data-color-scheme="dark"] .x` component override. The existing `[data-color-scheme="light"]` block remains the single light theme, so the light appearance is byte-for-byte unchanged.
+Why: Consistency and trust matter now; a quality dark theme is a redesign, not a quick fix. Forcing light is a few lines of standards — no hacks, no duplicate CSS.
+Trade-off: No dark mode this release. Unused dark *primitive* tokens (`--color-dark-bg`, `--color-dark-surface`, `--select-caret-dark`, etc.) remain inert in `:root` — optional to delete. A future warm dark theme would be a deliberate design-system project (see the UX audit notes).
+Supersedes: the previous auto/system dark mode behavior.
