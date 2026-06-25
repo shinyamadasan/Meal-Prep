@@ -5,6 +5,23 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Alpha quick wins: pantry add-feedback + Price Book naming
+
+**Built (2 trust/feedback fixes from the alpha audit):**
+1. **Add-feedback toasts** — `addToPantry()` now confirms: `Added "X" to your kitchen`, or
+   `"X" is already in your kitchen` (was a silent no-op). Reuses `showSuccessMessage` (textContent →
+   XSS-safe). Answers Job #1 directly: type a name, get told if you already have it.
+2. **Naming consistency** — the "Price Book" tab opened a screen titled "Ingredient Catalog"; heading
+   renamed to **Price Book** to match the tab (trust).
+**Self Review:** pass (smallest impl, reuse, did not touch the out-of-scope orphaned qty read).
+**QA:** pass (toast textContent-safe; no theme/state change; no secrets). **Verification:** code-trace.
+**Files changed:** `app.js`, `index.html`, `docs/FEATURES.md`, `planning/DONE.md`, `STATUS.md`.
+**Branch:** `main` — pushed.
+**Next task:** Remaining alpha quick wins — "Sample" badge on seeded recipes; collapse first-launch to one modal; then the Job #5 decision (descope vs minimal store-compare).
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Pantry search (Internal Alpha: "did I already buy garlic?")
 
 **Task:** Add real-time pantry search so a growing kitchen stays scannable (Job #1).

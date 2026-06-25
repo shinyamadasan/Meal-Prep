@@ -29,7 +29,7 @@
 - **Cooked meals** — Working · `renderCookedMeals()` · location, days-remaining, expired highlight.
 - **Pantry grid** — Working · `renderPantry()` · grouped by storage; staple cycling; inline date/qty/storage edit; storage tips from `PANTRY_KNOWLEDGE`.
 - **Pantry search** — Working · `#pantry-search` filters the pantry by name in real time (`renderPantry()`); preserves storage grouping; encouraging "No matches" empty state; hidden when the pantry is empty. *(Job: "did I already buy X?")*
-- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. (Qty input + storage selector were removed; `addToPantry()` still reads removed `#pantry-qty-input`/`#pantry-storage` — see ROADMAP Known Issues.)
+- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. Toast feedback on add ("Added …" / "… is already in your kitchen"). (Qty input + storage selector were removed; `addToPantry()` still reads removed `#pantry-qty-input`/`#pantry-storage` — see ROADMAP Known Issues.)
 - **Ingredient Browser modal** — Working · `openIngredientBrowser()`, `#ingredient-browser-modal`.
 - **Bulk add + voice** — Working · `openBulkAddModal()`, `confirmBulkAdd()`, `startVoiceInput()` (Web Speech API; Chrome/Edge only, text fallback elsewhere).
 - **Freshness alert banner** — Working · top-of-app on load; dismissable per session.
@@ -54,7 +54,7 @@
 - Recipe filter by nutrition (high protein / low carb / low cal / high fiber) — Working.
 - USDA lookup in recipe form — Working · `searchNutritionDB()` (`DEMO_KEY` may rate-limit).
 
-## Price Book (Ingredient Catalog)
+## Price Book
 - ~175 `INGREDIENT_DB` entries — Working · `renderIngredientsTab()` · per-store pricing, My Stores filter, add custom ingredient, Add to Pantry, text search (`#ingcat-search`), category filter.
 
 ## Cooking Hacks

@@ -3,6 +3,7 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ Alpha quick wins — pantry add-feedback toasts + Price Book heading naming fix (2026-06-25)
 - ✅ Pantry search — filter the kitchen by name (`#pantry-search`, Job "did I already buy X?") (2026-06-25)
 - ✅ Live recipe count on the Cook tab (`#recipe-count`, updates with search/filter) (2026-06-25)
 - ✅ Firestore write guard — stop cloud-data wipe on deploy/reload (`AppState.cloudReady`) (2026-06-25)

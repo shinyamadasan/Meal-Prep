@@ -7262,6 +7262,7 @@ function addToPantry() {
   if (!name) { input.focus(); return; }
 
   if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showSuccessMessage('"' + name + '" is already in your kitchen');
     input.value = '';
     var qtyClr = document.getElementById('pantry-qty-input');
     if (qtyClr) qtyClr.value = '';
@@ -7295,6 +7296,7 @@ function addToPantry() {
   saveData();
   renderPantry();
   renderGroceryList();
+  showSuccessMessage('Added "' + name + '" to your kitchen');
 }
 
 function openBulkAddModal() {
