@@ -9,6 +9,11 @@
 > **QA** (`QA.md`, "does it work?"). AI-verifiable checks block commits; human-only checks are logged,
 > never faked. (DECISIONS D-009, D-011, D-012, D-014.)
 
+**Version: v1.0 — locked 2026-06-25.** The OS is good enough to build products on. Further changes
+should be *deliberate* (a real friction surfaced during use), not reflexive. The success test isn't
+how many docs it has — it's whether, months from now, a brand-new app is productive on **day one**
+because the whole engineering workflow comes with it.
+
 ## Generic — the OS (clone as-is into a new app)
 | File / folder | Role | Per-app change |
 |---|---|---|

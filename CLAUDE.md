@@ -21,6 +21,7 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `GUIDE.md` (root) | Tiny phone capture card (the 5 commands) | Muscle-memory capture reference |
 | `OPERATOR.md` (root) | Human playbook: operating principles + daily/weekly rhythm | How the *human* runs the system (keep in sync if flow changes) |
 | `AI-DEV-OS.md` (root) | Template manifest: generic OS vs app-specific files + new-app bootstrap | Reusing this OS to start a new app |
+| `METRICS.md` (root) | Weekly engineering metrics (auto from git/files + manual) | Evidence over intuition; is the process improving |
 | `docs/PROJECT.md` | What/why/who, non-goals, **North-star goals** (triage scoring) | Product intent & scope |
 | `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |

@@ -15,6 +15,18 @@ At **Next Task Selection** the agent moves the finished task to [DONE.md](DONE.m
 
 ---
 
+## Product Direction (Sprints)
+The **AI Dev OS is locked at v1.0** (see [../AI-DEV-OS.md](../AI-DEV-OS.md)) — stop refining the
+workflow; build the product. North star for the next month: **10 real users > more features.**
+- **Sprint 1 — Polish:** ✅ light-only fix · design-system pass · UI polish (per the UX audit).
+- **Sprint 2 — User testing:** get **5–10 real users**; record where they stick / ignore / delight / confuse.
+- **Sprint 3 — Fix what users found.**
+- **Sprint 4 — Product intelligence:** smarter "what can I cook?", pantry, suggestions.
+- **Sprint 5 — Public beta.**
+Track progress with evidence, not intuition → [METRICS.md](../METRICS.md).
+
+---
+
 ## Task Queue (Now / Next / Later)
 
 Prioritized; top item is promoted next. Each entry: outcome + priority/complexity + success criteria.

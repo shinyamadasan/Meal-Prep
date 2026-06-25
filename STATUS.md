@@ -5,6 +5,20 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — METRICS.md + OS locked at v1.0; product direction set
+
+**Completed:**
+- New `METRICS.md` — weekly engineering metrics, each tagged Auto (git/files) vs Manual (honesty rule). Seeded an honest bootstrap baseline (1 user-facing feature, 3 fixes, 0 reverts, 4 captures, no autonomous builds yet — labeled as baseline, not steady-state).
+- **AI Dev OS locked at v1.0** (`AI-DEV-OS.md`) — stop refining the workflow; build the product.
+- Product direction (5 sprints) added to `planning/ROADMAP.md`: polish → user testing (5–10 real users) → fix → product intelligence → public beta. North star: **10 users > more features.**
+- Registered `METRICS.md` in `CLAUDE.md`.
+**Files changed:** `METRICS.md` (new), `AI-DEV-OS.md`, `CLAUDE.md`, `planning/ROADMAP.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next mission (human):** get **10 people using the app** — collect where they stick / ignore / delight / confuse. That feedback > more workflow refinement.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — AI-DEV-OS.md template manifest (app-creation system)
 
 **Task:** Make the AI Dev OS reusable — define the template so new apps inherit the full pipeline.
