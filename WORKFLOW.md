@@ -17,7 +17,8 @@
 
 ## File map
 ```
-root/        CLAUDE.md (router) · STATUS.md (working memory) · WORKFLOW.md · PROMPTS.md · QA.md
+root/        CLAUDE.md (router) · STATUS.md (working memory) · WORKFLOW.md · PROMPTS.md
+             SELF_REVIEW.md (code-health gate) · QA.md (correctness gate)
 planning/    ROADMAP.md (priority) · TASK.md (active task) · DONE.md (completed log)
 captures/    inbox/ (new captures) · processed/YYYY/MM/ (triaged archive)
 docs/        PROJECT.md · ARCHITECTURE.md · DATA_MODEL.md · FEATURES.md · DECISIONS.md
@@ -34,7 +35,9 @@ stateDiagram-v2
     Execution --> Checkpoint: pause / budget hit / compaction
     Checkpoint --> Execution: resume (same run)
     Checkpoint --> [*]: stop (resume later from Current Step)
-    Execution --> TaskCompletion: all success criteria pass
+    Execution --> SelfReview: success criteria met
+    SelfReview --> Execution: code-health fix needed
+    SelfReview --> TaskCompletion: clean + "would I ship this?" = yes
     TaskCompletion --> Commit
     Commit --> NextTaskSelection
     NextTaskSelection --> Execution: promote top of queue
@@ -94,7 +97,15 @@ stateDiagram-v2
 - **Does NOT:** mark Done, advance ROADMAP, or update reference docs.
 - **Exit:** resume Execution (same run) **or** stop. A later run resumes from `TASK.md` Current Step.
 
-### 4. Task Completion
+### 4. Self Review  ← "is this *good code*?" (precedes QA's "does it *work*?")
+- **Trigger:** Execution's success criteria are met — but **before** Task Completion / QA / Commit.
+- **Who:** the agent reviews **its own diff** as if reviewing a PR. **AI-verifiable** — reads the diff/codebase; no device or human judgment.
+- **Does:** run `SELF_REVIEW.md` — the **Code Health** checklist (duplication, magic numbers, complexity, dead code, TODOs, reuse, naming, unnecessary state, unnecessary DOM queries, extract-to-helper) and answer **"Would I ship this?"**.
+- **If it finds a problem:** fix it now (simplify, dedupe, delete dead code) and **re-review — before QA**, so QA verifies the clean version.
+- **Honesty rule:** if the only hesitation on "Would I ship this?" is a **human-verified** aspect (feel/polish/animation/device), mark it `ship-pending-human-review` and log to `STATUS.md` — never claim it's verified.
+- **Exit:** code-health clean **and** "would I ship this?" = yes → **Task Completion**. ("Almost" is a no — fix it.)
+
+### 5. Task Completion
 - **Trigger:** **every** Success Criterion in `TASK.md` is verified (by code trace; autonomous also requires any test gate to pass).
 - **Conditions for Done:** all criteria ticked **and** the Definition of Done is met. **Partial ≠ Done.**
 - **Reads:** `TASK.md` (criteria) + the reference docs for whatever changed.
@@ -108,7 +119,7 @@ stateDiagram-v2
   - `STATUS.md` → "shipped" entry.
 - **Exit:** → **Commit**.
 
-### 5. Commit
+### 6. Commit
 - **QA gate (mandatory before a production commit):** pass every **AI** check in `QA.md`
   (Functional · Visual · Regression · Data Integrity · Documentation · Git Hygiene). **Any AI check
   fails → Blocked:** record it in `TASK.md` + `STATUS.md` and do NOT commit. Append `QA.md`'s **Human**
@@ -118,7 +129,7 @@ stateDiagram-v2
 - **Does:** stage code + docs; commit with a message tied to the task; **push** (autonomous) or **propose the message** (interactive — don't push unless asked).
 - **Exit:** → **Next Task Selection** (continuing) or stop.
 
-### 6. Next Task Selection
+### 7. Next Task Selection
 - **Trigger:** a task is Done + committed and work continues.
 - **Who:** Mechanical FIFO — **promote the top of the ROADMAP Task Queue into `TASK.md`.** Priority was set by triage score + the human ordering the queue; the agent never re-chooses.
 - **Writes:** the finished task is already logged in `planning/DONE.md` (at Task Completion); load the next into `TASK.md`. Queue empty → `TASK.md` = `NO ACTIVE TASK`.

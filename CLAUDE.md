@@ -15,7 +15,8 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `planning/DONE.md` | Completed-work log (append-only) | What shipped & when |
 | `captures/` | `inbox/` = mobile captures (from Telegram/n8n); `processed/` = triaged archive | Inbound idea pipeline |
 | `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
-| `QA.md` (root) | Pre-commit quality gate: AI checks (must pass) + human checks (logged) | What to verify before every production commit |
+| `SELF_REVIEW.md` (root) | Code-health gate: "is this good code?" + "would I ship this?" (runs before QA) | Maintainability/quality before QA |
+| `QA.md` (root) | Pre-commit quality gate: AI checks (must pass) + human checks (logged) | Correctness before every production commit |
 | `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, triage, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
 | `GUIDE.md` (root) | Tiny phone capture card (the 5 commands) | Muscle-memory capture reference |
 | `OPERATOR.md` (root) | Human playbook: operating principles + daily/weekly rhythm | How the *human* runs the system (keep in sync if flow changes) |
@@ -37,6 +38,8 @@ The essentials:
 - **Triage first:** if `captures/inbox/` has any `*.md`, process them (route into `planning/ROADMAP.md`,
   score against PROJECT.md North-star goals, archive to `captures/processed/YYYY/MM/`) before the task.
 - **Code + docs commit together.** Doc updates ride in the same commit as the code — never deferred.
+- **Self Review before QA:** after building, run `SELF_REVIEW.md` ("is it *good code*?" — code health
+  + "would I ship this?"); fix/simplify, then run QA. Two different gates: Self Review = quality, QA = correctness.
 - **QA gate before any production commit:** pass `QA.md`'s AI checks (a failure = Blocked, don't
   commit); append `QA.md`'s human checks to `STATUS.md` for post-deploy review.
 - **`STATUS.md` updates at Triage, Checkpoint, Task Completion.** **`ROADMAP.md` advances only at

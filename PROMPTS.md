@@ -99,6 +99,16 @@ research → Research. Then archive the capture to captures/processed/YYYY/MM/<i
 one-line triage summary to STATUS.md. Skip any id already in ROADMAP/DONE/processed (idempotency).
 ```
 
+## P10 — Self Review (before QA)
+*Use after building, before QA. See `SELF_REVIEW.md` / WORKFLOW.md "Self Review".*
+```
+Review your own diff as if reviewing someone's PR. Run SELF_REVIEW.md's Code Health checklist
+(duplication, magic numbers, complexity, dead code, TODOs, reuse, naming, unnecessary state,
+unnecessary DOM queries, extract-to-helper) and answer "Would I ship this?". Fix/simplify any findings
+BEFORE QA. If the only hesitation is a human-verified aspect (feel/polish/device), mark it
+ship-pending-human-review in STATUS — don't claim it's verified.
+```
+
 ---
 
 ## Adding your own

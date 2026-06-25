@@ -5,6 +5,23 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Self Review event + SELF_REVIEW.md (code health, "would I ship this?")
+
+**Task:** Separate "is it *good code*?" (Self Review) from "does it *work*?" (QA) as distinct gates.
+**Completed:** New `SELF_REVIEW.md` — Code Health checklist (duplication, magic numbers, complexity,
+dead code, TODOs, reuse, naming, unnecessary state/DOM queries, extract-to-helper) + the one-question
+gate **"Would I ship this?"** ("Almost" = not done). All items AI-verifiable by reading the diff;
+honesty rule preserved (human-only aspects → `ship-pending-human-review`, never claimed verified).
+Lifecycle: **Execution → Self Review → Task Completion → QA gate → Commit.** Wired into `WORKFLOW.md`
+(new event 4, renumbered, diagram, file map), `CLAUDE.md` (doc map + lifecycle), `PROMPTS.md` (P10),
+`run-claude.ps1` (COMPLETED branch). Recorded as DECISIONS **D-014**.
+**Files changed:** `SELF_REVIEW.md` (new), `WORKFLOW.md`, `CLAUDE.md`, `PROMPTS.md`, `run-claude.ps1`, `docs/DECISIONS.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** 3-task dependency chain still queued for tonight's drain (now gated by Self Review + QA).
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — QA.md pre-commit quality gate added to the OS
 
 **Task:** Add a mandatory, AI-runnable QA checklist before every production commit.

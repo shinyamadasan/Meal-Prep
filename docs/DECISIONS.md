@@ -109,3 +109,11 @@ Decision: Force light regardless of the device setting, via web standards only �
 Why: Consistency and trust matter now; a quality dark theme is a redesign, not a quick fix. Forcing light is a few lines of standards — no hacks, no duplicate CSS.
 Trade-off: No dark mode this release. Unused dark *primitive* tokens (`--color-dark-bg`, `--color-dark-surface`, `--select-caret-dark`, etc.) remain inert in `:root` — optional to delete. A future warm dark theme would be a deliberate design-system project (see the UX audit notes).
 Supersedes: the previous auto/system dark mode behavior.
+
+## D-014 — Self Review (code health) as a distinct gate before QA (correctness)
+Date: 2026-06-25 · Status: Active
+Context: `QA.md` verifies "does it work?" but not "is it good code?". An agent can pass QA while shipping overengineered, duplicated, or debt-laden code. Senior engineers self-review and simplify before verifying.
+Decision: Add a distinct **Self Review** event between Execution and Task Completion (WORKFLOW.md), driven by `SELF_REVIEW.md` — a Code Health checklist (duplication, magic numbers, complexity, dead code, TODOs, reuse, naming, unnecessary state/DOM queries, extract-to-helper) plus the one-question gate **"Would I ship this?"**. Self Review = quality; QA = correctness; Self Review runs first so QA verifies the cleaned-up version. Wired into CLAUDE.md, PROMPTS.md (P10), and run-claude.ps1.
+Why: Separating quality from correctness catches debt before it ships and keeps the codebase maintainable for long-term solo dev. Code-health checks are AI-verifiable (read the diff), so they fit autonomous runs.
+Trade-off: One more gate per task. The honesty rule is preserved — if a "would I ship this?" hesitation is a human-verified aspect (feel/polish/device), the agent marks it `ship-pending-human-review`, never claims verification.
+Supersedes: —

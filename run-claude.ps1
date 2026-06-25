@@ -38,7 +38,9 @@ STEP C — loop over the active task:
 2. Ensure you are on main (git checkout main && git pull origin main).
 3. EXECUTION: implement in app.js / index.html / style.css; keep "Current Step" current.
 4. Decide the outcome:
-   - COMPLETED (all Success Criteria verified): tick criteria in TASK.md; update reference docs
+   - COMPLETED (all Success Criteria verified): FIRST run SELF_REVIEW.md (code-health checklist +
+     "would I ship this?") and fix/simplify any findings before proceeding; then tick criteria in
+     TASK.md; update reference docs
      (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md;
      update STATUS.md; RUN THE QA GATE in QA.md — every AI check must pass (any failure → treat as
      BLOCKED: record it, do NOT commit; append QA.md's human checks to STATUS.md); then COMMIT
