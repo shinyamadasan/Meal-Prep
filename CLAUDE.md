@@ -53,6 +53,9 @@ Don't load every doc; pull the row(s) for the task at hand.
    recipes are missing later-added fields (see DECISIONS D-005).
 3. **Persist through `saveData()`** — it writes BOTH localStorage and Firestore. Don't call
    `saveToLocalStorage()` alone, or a signed-in user's next refresh reloads the old cloud copy.
+3a. **Never write to Firestore before reading it.** `saveToFirestore()` is gated on
+   `AppState.cloudReady`; don't bypass the guard. Writing before the cloud baseline is loaded
+   overwrites a signed-in user's entire cloud doc with empty state (DECISIONS D-010).
 4. **Never add a second `:root` block** in `style.css` — it overrides dark mode (already broke once).
 5. **Reference stable anchors in docs** — function/object names, DOM ids, Firestore paths,
    localStorage keys. **Never line numbers** (DECISIONS D-008).

@@ -77,3 +77,11 @@ Decision: Replace the session-based workflow with a task-driven lifecycle of six
 Why: Tasks have clean, observable boundaries; sessions don't. Checkpoints make unfinished work resumable with zero context loss across scheduled runs.
 Trade-off: More explicit ceremony per task; the agent must judge completed-vs-partial-vs-blocked. Accepted — it's what makes 5–6h autonomous runs safe.
 Supersedes: the session-based update protocol previously in `CLAUDE.md`.
+
+## D-010 — Firestore write guard: never write before reading the cloud
+Date: 2026-06-25 · Status: Active
+Context: Signed-in users lost ALL cloud data around deploys/reloads. Root cause: `loadUserData()` is not awaited, `loadFromFirestore()` loads nothing if `navigator.onLine` flickers false, and writes (30s auto-save, the `online` event, renders) fire during that window. `saveToFirestore()` uses `tx.set` (full-document overwrite), so a save with a default/empty `AppState` wiped the cloud doc.
+Decision: Add `AppState.cloudReady` (transient). `saveToFirestore()` refuses to write while it's false. It flips true only once the cloud baseline is known — `loadFromFirestore()` returned `loaded`/`empty`, an `onSnapshot` arrived, or a new account is being seeded (`initializeUserData`). It resets to false on each sign-in. The `online` handler loads (not pushes) when not ready.
+Why: Makes overwriting un-read cloud data structurally impossible. localStorage still saves, so nothing is lost locally — the cloud write just waits until it's safe.
+Trade-off: A cloud write can be briefly deferred until the baseline loads (seconds). Worth it to never wipe cloud data. Does NOT fix the deeper `tx.set` full-overwrite design (still merge-only-on-version-conflict) — left as debt in ROADMAP.
+Supersedes: —

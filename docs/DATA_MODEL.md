@@ -21,6 +21,11 @@ AppState.myStores           // [] stores the user shops at (filter)
 AppState.customStores        // [] user-added stores
 AppState.recentRecipes      // [] recently used recipe ids
 AppState.currentUser        // Firebase user object or null
+AppState.isOnline           // navigator.onLine (transient)
+AppState.cloudReady         // transient: true once this account's cloud doc has been READ.
+                            // Gates Firestore writes (saveToFirestore) so we never overwrite
+                            // good cloud data with a not-yet-loaded local state. Not persisted.
+AppState.dataVersion        // cloud-doc version last loaded (optimistic concurrency)
 ```
 
 ## Recipe object

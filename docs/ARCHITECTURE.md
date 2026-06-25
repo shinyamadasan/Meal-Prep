@@ -37,6 +37,10 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
   Real-time `onSnapshot` listener applies remote changes live across devices/tabs.
 - **Always after loading recipes:** call `patchMissingNutrition(AppState.recipes)` — old saved
   recipes are plain JSON missing fields added later (D-005).
+- **Write guard — never write before read:** `saveToFirestore()` no-ops until `AppState.cloudReady`
+  is true (set only after the cloud doc is read, or on sign-up). This stops a load-window save (the
+  30s auto-save, the `online` event, a render) from overwriting good cloud data with an un-loaded
+  default `AppState` — the deploy/reload data-loss bug (D-010).
 
 ## Photos
 Recipe photos are compressed (max 1000px JPEG ~0.7) and stored in a Firestore **subcollection**

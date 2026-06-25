@@ -5,6 +5,36 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Fix: cloud data wiped on deploy/reload (signed-in users)
+
+**Task:** Stop signed-in users' Firestore data being wiped after a push/deploy.
+**Root cause:** Writes (30s auto-save, `online` event, renders) could fire before the cloud doc was
+read — `loadUserData()` isn't awaited and `loadFromFirestore()` loads nothing if `navigator.onLine`
+flickers false. `saveToFirestore()` uses `tx.set` (full overwrite), so a save with default/empty
+`AppState` overwrote the whole cloud doc.
+**Fix:** Added `AppState.cloudReady` write guard — `saveToFirestore()` no-ops until the cloud baseline
+is read (`loaded`/`empty`, an `onSnapshot`, or sign-up seeding); resets on each sign-in; the `online`
+handler now loads (not pushes) when not ready. Also fixed `loadFromFirestore()` omitting `cookHistory`.
+**Verification:** By code trace only — no runtime/automated test harness for this path. Traced deploy
++ flaky-connection, normal load, sign-up, offline, and online-recovery scenarios; cloud is never
+overwritten with un-loaded state. **Recommend a real signed-in deploy test before trusting it fully.**
+**Files changed:** `app.js`, `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`,
+`docs/DECISIONS.md` (D-010), `ROADMAP.md` (residual `tx.set` debt), `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Manually verify on the live site signed in; then consider the field-level-merge debt (ROADMAP).
+**Blockers:** none.
+
+---
+
+## 2026-06-25 — No tasks remaining
+
+**Task:** None — ROADMAP.md Task Queue is empty and TASK.md is NO ACTIVE TASK.
+**Action:** Autonomous run stopped per WORKFLOW.md (no-active-task behavior). No work invented.
+**Next task:** Add prioritized tasks to `ROADMAP.md` Task Queue, then promote the top item into `TASK.md` to activate the next run.
+**Blockers:** none.
+
+---
+
 ## 2026-06-24 — Task-driven lifecycle (WORKFLOW.md), replaces "session end"
 
 **Task:** Redesign the dev workflow around task completion + explicit events instead of unreliable "session end".

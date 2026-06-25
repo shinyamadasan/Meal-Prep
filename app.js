@@ -38,7 +38,10 @@ const AppState = {
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
   profile: null,              // { displayName } — public identity for the community feed
   currentUser: null,
-  isOnline: navigator.onLine
+  isOnline: navigator.onLine,
+  cloudReady: false           // true once THIS account's cloud doc has been read.
+                              // Gates Firestore WRITES so we never overwrite good
+                              // cloud data with a default/empty, not-yet-loaded AppState.
 };
 
 // Header badge showing whether data made it to the cloud. Hidden when logged out
@@ -1619,7 +1622,10 @@ function initApp() {
       updateAuthUI();
       
       if (user) {
-        // User is signed in
+        // User is signed in. Reset the write guard until THIS account's cloud doc is
+        // loaded, so we never write before we've read (and never write this account's
+        // data into a different account's doc).
+        AppState.cloudReady = false;
         loadUserData();
         setupRealtimeListeners();
       } else {
@@ -5076,6 +5082,11 @@ function mergeCloudConflict(remote, local) {
 async function saveToFirestore() {
   if (!AppState.currentUser || !window.firebase) return;
   if (!AppState.isOnline) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
+  // WRITE GUARD: never push to the cloud until we've read the cloud baseline. Otherwise a
+  // save fired during the load window (30s auto-save, the 'online' event, a render) would
+  // overwrite good cloud data with a default/empty AppState — the deploy/reload data-loss bug.
+  // localStorage still has everything; the cloud syncs once cloudReady flips true.
+  if (!AppState.cloudReady) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
   AppState.syncStatus = 'saving'; updateSyncIndicator();
 
   const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
@@ -5166,6 +5177,7 @@ async function loadFromFirestore() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = data.cookedMeals || [];
+      AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
 
       // Photos: legacy data may have them inline in this doc; new photos live in
@@ -5201,7 +5213,9 @@ async function loadFromFirestore() {
 }
 
 async function initializeUserData() {
-  // Save current local data to Firestore for new users
+  // New account: deliberately seed the cloud from this device's local data. The cloud doc
+  // doesn't exist yet, so there's nothing to overwrite — allow the write.
+  AppState.cloudReady = true;
   await saveToFirestore();
   loadUserData();
 }
@@ -5209,6 +5223,10 @@ async function initializeUserData() {
 async function loadUserData() {
   // Try to load from Firestore first, fallback to local storage
   const status = await loadFromFirestore();
+  // We now know the cloud baseline (its data, or that it's confirmed-empty) → writes are safe.
+  // On 'error' (offline / read failed) we deliberately leave cloudReady false so a later save
+  // can't overwrite the cloud doc we were never able to read.
+  if (status === 'loaded' || status === 'empty') AppState.cloudReady = true;
   if (status !== 'loaded') {
     loadFromLocalStorage();
     // First sign-in on an account that has no cloud data yet → push this
@@ -5319,6 +5337,7 @@ function setupRealtimeListeners() {
   
   window.firebase.onSnapshot(userDocRef, (doc) => {
     if (doc.exists() && AppState.currentUser) {
+      AppState.cloudReady = true; // we've observed this account's cloud doc → writes are safe
       const data = doc.data();
       // Apply only when the cloud VERSION advanced — i.e. a real change from
       // another device/tab. Our own writes bump dataVersion before the echo
@@ -5480,7 +5499,9 @@ function setupOnlineOfflineListeners() {
     showSuccessMessage('Back online! Syncing data...');
     updateSyncIndicator();
     if (AppState.currentUser) {
-      saveToFirestore();
+      // If the initial load raced a flaky connection and we never read the cloud,
+      // LOAD it now instead of pushing — pushing first would overwrite the cloud.
+      if (AppState.cloudReady) saveToFirestore(); else loadUserData();
       setupRealtimeListeners();
     }
   });
