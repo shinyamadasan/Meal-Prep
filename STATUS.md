@@ -5,6 +5,17 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-24 — PROMPTS.md: reusable session prompts
+
+**Task:** Add a prompt library so task framing stays consistent across sessions.
+**Completed:** New `PROMPTS.md` with P1–P7 (draft task → TASK.md, implement, fix, refactor, audit, record decision, wrap-up). Each defers to `CLAUDE.md` for rules so it can't drift. Registered in the CLAUDE.md doc map (not auto-read).
+**Files changed:** `PROMPTS.md` (new), `CLAUDE.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Queue empty; promote a task into `TASK.md` to activate the next run.
+**Blockers:** none.
+
+---
+
 ## 2026-06-24 — TASK.md: single active-task handoff
 
 **Task:** Split tactical (active task) from strategic (roadmap) so the autonomous agent never picks priorities.

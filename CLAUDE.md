@@ -12,6 +12,7 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `STATUS.md` (root) | Current state, last shipped, blockers | Where we are right now |
 | `TASK.md` (root) | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
 | `ROADMAP.md` (root) | Task queue, Known Issues & Debt, Do Not Work On | Priority & open defects (strategic) |
+| `PROMPTS.md` (root) | Reusable session prompts (P1 idea→TASK, fix, audit, …) | How to frame recurring work (not auto-read) |
 | `docs/PROJECT.md` | What/why/who, non-goals | Product intent & scope |
 | `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
