@@ -21,13 +21,13 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
           "combinator": "and",
           "conditions": [
             {
               "leftValue": "={{ $json.message.from.id }}",
               "rightValue": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": { "type": "number", "operation": "equals" }
             }
           ]
         }
