@@ -15,32 +15,32 @@ Add-Content -Path $logFile -Value ""
 Add-Content -Path $logFile -Value "=== Session started: $timestamp ==="
 
 $prompt = @'
-You are running in autonomous overnight mode. No human is available to answer questions.
+You are running in autonomous mode. No human is available. Follow WORKFLOW.md — the task-driven
+lifecycle. There is no "session end": when you stop, you perform a Checkpoint first.
 
-Read CLAUDE.md, STATUS.md, and TASK.md first. CLAUDE.md routes you to any other docs you need.
-TASK.md is the single active task — it is what you work on. Do NOT pick tasks from ROADMAP.md
-yourself; a human already promoted today's task into TASK.md.
+Read CLAUDE.md, STATUS.md, and TASK.md first. CLAUDE.md routes you to any other docs. TASK.md is the
+single active task — it is what you work on. Do NOT pick tasks from ROADMAP.md yourself; a human
+already promoted today's task. Never touch the ROADMAP "Do Not Work On" section. Do not delete files.
 
-If TASK.md status is "NO ACTIVE TASK", write "No tasks remaining" to STATUS.md and stop — do not
-shut down the PC, do not invent work.
+If TASK.md is "NO ACTIVE TASK": write "No tasks remaining" to STATUS.md and stop (do not shut down
+the PC, do not invent or plan work).
 
-Rules - follow exactly:
-- Work ONLY the task in TASK.md. Do not touch anything in the ROADMAP "Do Not Work On" section.
-- If the task is ambiguous or you hit a blocker, log it in STATUS.md and stop.
-- Do not delete any files.
-- Keep going until TASK.md is NO ACTIVE TASK or you are close to your context limit.
-
-Loop, for the active task in TASK.md:
-1. Read TASK.md (objective, current step, success criteria). Read only the docs CLAUDE.md routes you to.
-2. Make sure you are on main (git checkout main && git pull origin main).
-3. Implement the task in app.js and/or index.html and/or style.css.
-4. Verify each Success Criterion by inspecting the code logic; update TASK.md "Current Step" as you go.
-5. Commit directly to main with a clear message, then push (git push origin main).
-6. Update the relevant docs per CLAUDE.md's update protocol (FEATURES/DATA_MODEL/DECISIONS as applicable).
-7. Append a new entry at the TOP of STATUS.md: date, task, what changed, files, next task.
-8. Promote the next item from ROADMAP.md "Task Queue" into TASK.md (mechanical FIFO — top of queue).
-   If the queue is empty, set TASK.md to NO ACTIVE TASK and stop.
-9. Continue with the now-active task.
+Otherwise loop over the active task:
+1. RESUME: read TASK.md "Current Step" and continue from there (don't restart). Read only routed docs.
+2. Ensure you are on main (git checkout main && git pull origin main).
+3. EXECUTION: implement in app.js / index.html / style.css; keep TASK.md "Current Step" current.
+4. Decide the outcome:
+   - COMPLETED (all Success Criteria verified): tick criteria in TASK.md; update reference docs
+     (FEATURES/DATA_MODEL/ARCHITECTURE/DECISIONS as applicable) AND STATUS.md; COMMIT code+docs
+     together and push (git push origin main); then NEXT TASK SELECTION — promote the top ROADMAP
+     Task Queue item into TASK.md (FIFO) and move the finished task to ROADMAP Done. Continue.
+   - PARTIAL (near context/token limit mid-task): CHECKPOINT — write the precise next action into
+     TASK.md "Current Step" and an in-progress entry at the TOP of STATUS.md; make a `wip:` commit
+     and push; then STOP. Do NOT mark Done or advance ROADMAP.
+   - BLOCKED (ambiguous / missing input / failing gate): record the blocker in TASK.md (Blocker) and
+     STATUS.md; move the task to ROADMAP "Blocked"; promote the next queue item into TASK.md and
+     continue. If the queue is empty, STOP.
+5. Stop when TASK.md is NO ACTIVE TASK or you are near your context limit (Checkpoint first).
 '@
 
 claude -p $prompt `

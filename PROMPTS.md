@@ -71,13 +71,20 @@ Decision / Why / Trade-off / Supersedes). Keep it to the rationale and the "don'
 boundary. If it reverses an existing decision, mark the old one "Superseded by D-0NN".
 ```
 
-## P7 — Session wrap-up
-*Use at the end of any session.*
+## P7 — Checkpoint (stopping mid-task)
+*Use whenever you stop with the task unfinished — this is the `/wrap` action. See WORKFLOW.md "Checkpoint".*
 ```
-Run CLAUDE.md's update protocol: update STATUS.md (last shipped, next action, blockers); update
-FEATURES / DATA_MODEL / ARCHITECTURE / DECISIONS as applicable; if a task finished, tick TASK.md and
-promote the next ROADMAP queue item into TASK.md (or set it to NO ACTIVE TASK). Then propose a
-commit message — do not push unless I ask.
+Perform a Checkpoint. Update TASK.md "Current Step" to the precise next action (what's done, what's
+left) so a fresh run resumes with zero context. Update STATUS.md (task, in-progress state, next step,
+any blocker). Optionally make a `wip:` commit of code-in-progress. Do NOT mark the task Done, do NOT
+advance ROADMAP, do NOT update reference docs.
+```
+
+## P8 — Resume
+*Use to pick up unfinished work (start of a new run/session).*
+```
+Resume the active task. Read STATUS.md (top entry) and TASK.md "Current Step", then continue
+Execution from exactly that step. Read only the docs CLAUDE.md routes to. Don't restart from scratch.
 ```
 
 ---

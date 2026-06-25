@@ -1,12 +1,12 @@
 # Current Task
 
-> The **single active task** — tactical handoff for the agent. Read right after `STATUS.md`.
-> This is the one thing being worked on now. Priority is decided in `ROADMAP.md` by a human;
-> the agent never picks — it just executes what's here.
+> The **single active task** — what's being worked on now. Read right after `STATUS.md`.
+> Priority is set in `ROADMAP.md` by a human; the agent executes what's here, it never picks.
+> Lifecycle and Done conditions are defined in `WORKFLOW.md`.
 >
-> When this task is **Done**: tick the criteria, update `STATUS.md`, then promote the next item
-> from `ROADMAP.md` → "Task Queue" into this file (mechanical FIFO — top of queue, no judgment).
-> If the queue is empty, set status to NO ACTIVE TASK and stop.
+> **Current Step is the resume point** — keep it precise enough that a fresh run can continue with
+> zero context. On Task Completion: tick all criteria, then Next Task Selection promotes the next
+> `ROADMAP.md` queue item here (FIFO). Queue empty → set NO ACTIVE TASK.
 
 ## Status: NO ACTIVE TASK
 
@@ -20,14 +20,18 @@ Queue empty as of 2026-06-24. Add a task to `ROADMAP.md`, then promote it here t
 <one sentence: the outcome to build>
 
 ## Current Step
-<the immediate next step; keep this updated as you progress>
+<the precise next action — the resume point; update it as you progress>
 
 ## Success Criteria
 - [ ] <verifiable criterion 1>
 - [ ] <verifiable criterion 2>
 - [ ] <verifiable criterion 3>
 
+## Blocker
+<none | what's blocking + what input/decision is needed to unblock>
+
 ## Definition of Done
-All criteria pass. Update STATUS.md. Promote the next ROADMAP Task Queue item into this file.
+All Success Criteria verified. Reference docs updated (FEATURES/DATA_MODEL/ARCHITECTURE/DECISIONS as
+applicable). STATUS.md updated. Code + docs committed together. Then Next Task Selection.
 
 -->

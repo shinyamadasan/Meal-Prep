@@ -3,13 +3,12 @@
 **Strategic** — this file is for the human to set priority. Vision/scope live in
 [docs/PROJECT.md](docs/PROJECT.md); the **active** task lives in [TASK.md](TASK.md).
 
-## How the active task flows (autonomous sessions)
-The agent does **not** pick from this roadmap. It works the single task in `TASK.md`. When that task
-is done it updates `STATUS.md` and **promotes the top item of the Task Queue below into `TASK.md`**
-(mechanical FIFO). You control priority by ordering the queue.
-1. Do the task in `TASK.md` (meet its Success Criteria).
-2. Update `STATUS.md`; mark it ✅ in **Done** below (newest at top; prune old — git has history).
-3. Promote the top **Task Queue** item into `TASK.md`. If the queue is empty, stop.
+## How the active task flows
+Full lifecycle is in [WORKFLOW.md](WORKFLOW.md). In short: the agent works the single task in
+`TASK.md` and never picks from this roadmap. At **Next Task Selection** it moves the finished task to
+**Done** and promotes the **top of the Task Queue** into `TASK.md` (mechanical FIFO). You control
+priority by ordering the queue. A **blocked** task is parked in **Blocked** below and the next item
+is promoted.
 
 ---
 
@@ -18,6 +17,15 @@ is done it updates `STATUS.md` and **promotes the top item of the Task Queue bel
 Prioritized; top item is promoted next. Each entry: one-line outcome + success criteria.
 
 *(empty — add prioritized tasks here)*
+
+---
+
+## Blocked
+
+Tasks parked by an autonomous run because they hit a blocker. Each: task + the blocker + what's
+needed to unblock. Resolve, then re-add to the top of the Task Queue.
+
+*(none)*
 
 ---
 

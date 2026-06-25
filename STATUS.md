@@ -5,6 +5,24 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-24 — Task-driven lifecycle (WORKFLOW.md), replaces "session end"
+
+**Task:** Redesign the dev workflow around task completion + explicit events instead of unreliable "session end".
+**Completed:**
+- New `WORKFLOW.md` — source of truth for the lifecycle: 6 events (Planning, Execution, Checkpoint, Task Completion, Commit, Next Task Selection), per-file change timing, and autonomous behavior for completed/partial/blocked/no-task.
+- `CLAUDE.md` — replaced "Read/Update protocol (session)" with a Lifecycle pointer to WORKFLOW.md + kept the per-task read-routing table; added WORKFLOW.md to the doc map.
+- `TASK.md` — added Blocker field; Current Step marked as the resume point; Done conditions reference WORKFLOW.md.
+- `ROADMAP.md` — added a **Blocked** section; flow description now defers to WORKFLOW.md.
+- `PROMPTS.md` — P7 reframed "Session wrap-up" → **Checkpoint**; added **P8 — Resume**.
+- `run-claude.ps1` — autonomous prompt rewritten to the event model (resume → execute → completed/partial/blocked outcomes, Checkpoint on stop).
+- `DECISIONS.md` — added **D-009** (task-driven lifecycle; no session end).
+**Files changed:** `WORKFLOW.md` (new), `CLAUDE.md`, `TASK.md`, `ROADMAP.md`, `PROMPTS.md`, `run-claude.ps1`, `docs/DECISIONS.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Queue empty; promote a task into `TASK.md` to activate the next run.
+**Blockers:** none.
+
+---
+
 ## 2026-06-24 — PROMPTS.md: reusable session prompts
 
 **Task:** Add a prompt library so task framing stays consistent across sessions.

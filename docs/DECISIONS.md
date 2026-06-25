@@ -69,3 +69,11 @@ Decision: Docs reference function/object names, DOM ids, Firestore paths, localS
 Why: A reference that needs re-grepping after every commit is worse than none.
 Trade-off: Slightly less precise navigation (search by name vs jump to line). Worth it.
 Supersedes: the monolithic `feature-inventory.md`.
+
+## D-009 — Task-driven lifecycle; no "session end"
+Date: 2026-06-24 · Status: Active
+Context: Interactive AI sessions have no reliable end event (you stop typing, context compacts, the tab closes). Anchoring doc updates to "session end" meant they happened inconsistently. Autonomous runs also stop mid-task on token/time budget.
+Decision: Replace the session-based workflow with a task-driven lifecycle of six explicit events (Planning, Execution, Checkpoint, Task Completion, Commit, Next Task Selection), documented in `WORKFLOW.md`. Stopping mid-work = a **Checkpoint** (persist `TASK.md` Current Step + `STATUS.md`). Code and docs commit together. STATUS updates only at Checkpoint/Task Completion; ROADMAP advances only at Next Task Selection.
+Why: Tasks have clean, observable boundaries; sessions don't. Checkpoints make unfinished work resumable with zero context loss across scheduled runs.
+Trade-off: More explicit ceremony per task; the agent must judge completed-vs-partial-vs-blocked. Accepted — it's what makes 5–6h autonomous runs safe.
+Supersedes: the session-based update protocol previously in `CLAUDE.md`.

@@ -12,7 +12,8 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | `STATUS.md` (root) | Current state, last shipped, blockers | Where we are right now |
 | `TASK.md` (root) | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
 | `ROADMAP.md` (root) | Task queue, Known Issues & Debt, Do Not Work On | Priority & open defects (strategic) |
-| `PROMPTS.md` (root) | Reusable session prompts (P1 idea→TASK, fix, audit, …) | How to frame recurring work (not auto-read) |
+| `WORKFLOW.md` (root) | Task-driven lifecycle: the 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
+| `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
 | `docs/PROJECT.md` | What/why/who, non-goals | Product intent & scope |
 | `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
@@ -22,29 +23,28 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 Code is the source of truth for *how things behave*; docs are the source of truth for *why & where*.
 If a doc disagrees with the code about behavior, fix the doc.
 
-## Read protocol (start of session)
-- **Always:** this file (auto) + `STATUS.md` + `TASK.md`. `TASK.md` tells you what to work on —
-  don't choose from the roadmap yourself; a human already promoted today's task into `TASK.md`.
-- Then pull **only** the docs the active task needs:
-  - New feature / feature change → relevant `docs/FEATURES.md` section + `docs/ARCHITECTURE.md`.
-  - Bug fix → `ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section.
-  - Data / schema / storage change → `docs/DATA_MODEL.md`.
-  - Refactor or "why is it like this?" → `docs/DECISIONS.md` + `docs/ARCHITECTURE.md`.
+## Lifecycle
+Work is **task-driven**, not session-driven — there is no "session end". Read `WORKFLOW.md` for the
+full event model (Planning · Execution · Checkpoint · Task Completion · Commit · Next Task Selection).
+The essentials:
+- **Always read first:** this file (auto) + `STATUS.md` + `TASK.md`. `TASK.md` is what you work on —
+  don't pick from the roadmap; a human already promoted today's task.
+- **Code + docs commit together.** Doc updates ride in the same commit as the code — never deferred.
+- **`STATUS.md` updates only at Checkpoint and Task Completion.** **`ROADMAP.md` advances only at
+  Next Task Selection** (promote top of queue, FIFO). **`DECISIONS.md`** gets a `D-0NN` entry only
+  when a non-obvious choice is made/reversed.
+- Stopping mid-task = perform a **Checkpoint** (persist `TASK.md` Current Step + `STATUS.md`), then stop.
 
-`ROADMAP.md` is strategic (human-owned priority) — you only read it to promote the next task; you
-don't pick from it. Don't load every doc; pull the row(s) above for the task at hand.
+## What to read (per task)
+Pull **only** the docs the active task needs:
+| Task type | Read |
+|---|---|
+| New feature / change | relevant `docs/FEATURES.md` section + `docs/ARCHITECTURE.md` |
+| Bug fix | `ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section |
+| Data / schema / storage | `docs/DATA_MODEL.md` |
+| Refactor / "why is it like this?" | `docs/DECISIONS.md` + `docs/ARCHITECTURE.md` |
 
-## Update protocol (end of session)
-- **Always:** `STATUS.md` (last shipped, next action, blockers).
-- **Task finished →** tick the criteria in `TASK.md`, then **promote the next item from
-  `ROADMAP.md` "Task Queue" into `TASK.md`** (mechanical FIFO — top of queue, no priority call).
-  If the queue is empty, set `TASK.md` to NO ACTIVE TASK and stop.
-- Shipped/changed a feature → `docs/FEATURES.md` status (+ a clear git commit message).
-- Found a bug / gap / dead code → `ROADMAP.md` → Known Issues & Debt.
-- Fixed a known issue → remove it from `ROADMAP.md`.
-- Changed a data shape/key → `docs/DATA_MODEL.md`.
-- Added/restructured a subsystem → `docs/ARCHITECTURE.md`.
-- Made a non-obvious architectural choice → `docs/DECISIONS.md` (new `D-0NN` entry).
+Don't load every doc; pull the row(s) for the task at hand.
 
 ## Hard rules (these cause bugs if violated)
 1. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` — Firestore ids
