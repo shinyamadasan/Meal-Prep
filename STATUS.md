@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — QA.md pre-commit quality gate added to the OS
+
+**Task:** Add a mandatory, AI-runnable QA checklist before every production commit.
+**Completed:** New `QA.md` — 6 sections (Functional / Visual & Responsive / Regression / Data
+Integrity / Documentation / Git Hygiene), each item grep/trace-verifiable by an agent, grounded in
+this repo's hard rules (`[app]`-tagged). Explicit **AI-verifiable vs Human-verifiable** split: AI
+checks gate the commit (fail → Blocked); human checks (phone feel, polish, copy, real-device render)
+are logged to STATUS, never block a run. Wired in: `WORKFLOW.md` Commit event + file map, `CLAUDE.md`
+doc map + lifecycle, `run-claude.ps1` COMPLETED branch.
+**Files changed:** `QA.md` (new), `WORKFLOW.md`, `CLAUDE.md`, `run-claude.ps1`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Queue still holds the 3-task dependency chain for tonight's drain (now gated by QA.md).
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Light-only release: force light, remove dark mode (D-013)
 
 **Why:** Dark-mode phones auto-applied a broken/inconsistent dark theme + darkened native controls, eroding trust. Product decision: ship one polished light theme.

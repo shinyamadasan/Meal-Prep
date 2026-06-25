@@ -17,7 +17,7 @@
 
 ## File map
 ```
-root/        CLAUDE.md (router) · STATUS.md (working memory) · WORKFLOW.md · PROMPTS.md
+root/        CLAUDE.md (router) · STATUS.md (working memory) · WORKFLOW.md · PROMPTS.md · QA.md
 planning/    ROADMAP.md (priority) · TASK.md (active task) · DONE.md (completed log)
 captures/    inbox/ (new captures) · processed/YYYY/MM/ (triaged archive)
 docs/        PROJECT.md · ARCHITECTURE.md · DATA_MODEL.md · FEATURES.md · DECISIONS.md
@@ -109,8 +109,12 @@ stateDiagram-v2
 - **Exit:** → **Commit**.
 
 ### 5. Commit
+- **QA gate (mandatory before a production commit):** pass every **AI** check in `QA.md`
+  (Functional · Visual · Regression · Data Integrity · Documentation · Git Hygiene). **Any AI check
+  fails → Blocked:** record it in `TASK.md` + `STATUS.md` and do NOT commit. Append `QA.md`'s **Human**
+  checklist to `STATUS.md` as pending verification (it never blocks the commit).
 - **Golden rule:** **code + updated docs go in the same commit.** No deferred doc updates.
-- **Trigger:** after Task Completion (a *completion* commit) or after a Checkpoint (a *wip* commit).
+- **Trigger:** after Task Completion (a *completion* commit) or after a Checkpoint (a *wip* commit; QA gate may be lighter for `wip:`).
 - **Does:** stage code + docs; commit with a message tied to the task; **push** (autonomous) or **propose the message** (interactive — don't push unless asked).
 - **Exit:** → **Next Task Selection** (continuing) or stop.
 

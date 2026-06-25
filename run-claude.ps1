@@ -40,8 +40,10 @@ STEP C — loop over the active task:
 4. Decide the outcome:
    - COMPLETED (all Success Criteria verified): tick criteria in TASK.md; update reference docs
      (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md;
-     update STATUS.md; COMMIT code+docs together and push; then NEXT TASK SELECTION — promote the top
-     ROADMAP Task Queue item into TASK.md (FIFO). Continue.
+     update STATUS.md; RUN THE QA GATE in QA.md — every AI check must pass (any failure → treat as
+     BLOCKED: record it, do NOT commit; append QA.md's human checks to STATUS.md); then COMMIT
+     code+docs together and push; then NEXT TASK SELECTION — promote the top ROADMAP Task Queue item
+     into TASK.md (FIFO). Continue.
    - PARTIAL (near context/token limit mid-task): CHECKPOINT — write the precise next action into
      TASK.md "Current Step" and an in-progress entry at the TOP of STATUS.md; make a `wip:` commit
      and push; then STOP. Do NOT mark Done or advance ROADMAP.
