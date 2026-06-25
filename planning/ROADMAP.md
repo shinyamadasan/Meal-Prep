@@ -35,7 +35,15 @@ Low-commitment thoughts from `/idea` captures. Promote into the Task Queue when 
 
 `/research` captures — open questions to explore, not yet actionable.
 
-*(none)*
+- **Immediate run on new capture (online), scheduled as fallback.** Trigger a Claude run as soon as a
+  file lands in `captures/inbox/`, with the cron runs as backup when the PC is offline.
+  Approach: self-hosted GitHub Actions runner on the PC, `on: push` to `captures/inbox/**` (offline →
+  run queues until the runner reconnects); add a lockfile so it can't overlap a scheduled run.
+  Simpler alt: Task Scheduler poller every ~5 min that `git pull`s and runs only if inbox is non-empty.
+- **Self-maintaining PAT expiry alert via n8n/Telegram** (replace the calendar reminder).
+  Reactive: capture workflow's error branch → if GitHub node returns 401/403, Telegram-alert to
+  regenerate the PAT. Proactive: monthly n8n Schedule does a no-op GitHub call; on failure → Telegram.
+  (Current PAT expires 2026-09-23.)
 
 ---
 
