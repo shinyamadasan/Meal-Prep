@@ -78,6 +78,7 @@ Low-commitment thoughts from `/idea` captures. Promote into the Task Queue when 
   scheduled run. **Review time + merge rate need the PR approval gate first** (see OPERATOR.md) — that
   gate unlocks those two metrics *and* a review-before-live step; decide it separately.
 - **Extract the AI Dev OS into its own repo** (`ai-dev-os/`) so new apps clone it.
+  *(Manifest done: `AI-DEV-OS.md` defines generic vs app-specific + the bootstrap. Remaining = the actual repo lift.)*
   The reusable "System 2" is the *protocol* layer, NOT this app's content. Separate them first:
   GENERIC (move to ai-dev-os as templates) = `WORKFLOW.md`, `PROMPTS.md`, `OPERATOR.md`, the doc-router
   pattern, `run-claude.ps1`, the n8n capture workflow, and empty `TASK/ROADMAP/DONE/STATUS` + `captures/`

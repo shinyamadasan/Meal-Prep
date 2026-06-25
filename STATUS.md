@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — AI-DEV-OS.md template manifest (app-creation system)
+
+**Task:** Make the AI Dev OS reusable — define the template so new apps inherit the full pipeline.
+**Completed:** New `AI-DEV-OS.md` — manifest of **generic** OS files (clone as-is: WORKFLOW, SELF_REVIEW,
+QA, PROMPTS, OPERATOR, GUIDE, CLAUDE router, run-claude.ps1, n8n workflow, captures/planning/STATUS
+scaffolds) vs **app-specific** files (CLAUDE project block + hard rules, all of docs/, QA `[app]`
+checks), plus a 7-step new-app bootstrap. Self Review + QA are now part of the template. Registered in
+`CLAUDE.md`; ROADMAP "extract ai-dev-os" Research item updated (manifest done, repo lift remains).
+Also pushed: the light-only fix (`7cb87f5`) — **now live, ready for the dark-mode phone test.**
+**Files changed:** `AI-DEV-OS.md` (new), `CLAUDE.md`, `planning/ROADMAP.md`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Verify light-only on a dark-mode phone (live). 3-task drain chain still queued for tonight.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Self Review event + SELF_REVIEW.md (code health, "would I ship this?")
 
 **Task:** Separate "is it *good code*?" (Self Review) from "does it *work*?" (QA) as distinct gates.
