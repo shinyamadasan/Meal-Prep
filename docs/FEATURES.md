@@ -14,6 +14,7 @@
 
 ## Cook (My Recipes)
 - **Recipe card grid** — Working · `renderRecipes()` · photo, nutrition, cost, shelf-life badges.
+- **Sample badge** — Working · `isSampleRecipe()` tags the 26 seeded recipes "Sample" so a first-time user knows they didn't add them. *(Job: "what can I cook" — clarity/trust.)*
 - **Favorites** — Working · `toggleFavorite()`, `recipe.favorite`, `#favorites-filter`.
 - **Serving scaler** — Working · stepper + `adjustDetailServings()` / `buildDetailIngList()`.
 - **Search & filter** — Working · name/instructions, category, prep-time, favorites-only.

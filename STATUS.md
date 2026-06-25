@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Alpha P1: "Sample" badge on seeded recipes (Job #3 clarity)
+
+**Why highest-priority:** Job #1 done; Job #4's grocery empty state already guides; Job #5 is a product
+decision reserved for the human. The top *implementable* P1 was the Cook tab showing 26 recipes a
+first-timer never added ("are these mine?"). On the primary nav, unguided, undermines the differentiator.
+**Built:** `isSampleRecipe()` (membership in `sampleRecipes` by id) + a "Sample" badge in the recipe
+card header (`#recipe card`), styled with `.recipe-sample-badge` (tokens, mirrors `.recipe-category`).
+Derived at render (no state, no data change), reuses card rendering, no redesign.
+**Self Review:** pass. **QA:** pass (symbol pair intact, light-only clean, no secrets, XSS-safe static badge). **Verification:** code-trace; eyeball on device.
+**Files changed:** `app.js`, `style.css`, `docs/FEATURES.md`, `planning/DONE.md`, `STATUS.md`.
+**Branch:** `main` — committed (push pending).
+**Next P1 (recommend, do NOT auto-implement):** the **Job #5 decision** — descope "cheapest" (reframe Price Book as a price *reference*) vs build a minimal basket-per-store compare. It's the last external-testing blocker and a product call. Lesser P1: verify cook-suggestion reliability with the wizard-seeded pantry.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Product prompts added to PROMPTS.md (PP1–PP7)
 
 **Completed:** Split `PROMPTS.md` into **⚙️ Engineering (P1–P10)** and **🎯 Product (PP1–PP7)**.

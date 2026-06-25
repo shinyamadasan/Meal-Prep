@@ -1160,6 +1160,15 @@ select.form-control {
   font-weight: var(--font-weight-medium);
 }
 
+.recipe-sample-badge {
+  background: var(--color-secondary);
+  color: var(--color-text-secondary);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
 .recipe-times {
   display: flex;
   gap: var(--space-16);

@@ -2328,6 +2328,12 @@ function renderCookSuggestions() {
     sections + '</div>';
 }
 
+// A recipe is a "sample" if it's one of the seeded example recipes (ids 1–26).
+// Badged on the card so a first-time user knows they didn't add these themselves.
+function isSampleRecipe(r) {
+  return !!r && sampleRecipes.some(function(s) { return String(s.id) === String(r.id); });
+}
+
 function renderRecipes() {
   renderGettingStarted();
   renderCookSuggestions();
@@ -2388,6 +2394,7 @@ function renderRecipes() {
       <div class="recipe-card-header">
         <h3 class="recipe-title">${recipe.name}</h3>
         <span class="recipe-category">${recipe.category}</span>
+        ${isSampleRecipe(recipe) ? '<span class="recipe-sample-badge" title="A built-in example to get you started — edit or delete it anytime">Sample</span>' : ''}
         <button class="recipe-fav-btn${recipe.favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${recipe.id}')" title="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
       </div>
       
