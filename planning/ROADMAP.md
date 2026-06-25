@@ -1,22 +1,41 @@
 # Meal Prep Planner — Roadmap
 
-**Strategic** — this file is for the human to set priority. Vision/scope live in
-[docs/PROJECT.md](docs/PROJECT.md); the **active** task lives in [TASK.md](TASK.md).
+**Strategic** — for the human to set priority. Vision/scope: [../docs/PROJECT.md](../docs/PROJECT.md).
+Active task: [TASK.md](TASK.md) · Completed log: [DONE.md](DONE.md) · Lifecycle: [../WORKFLOW.md](../WORKFLOW.md).
 
-## How the active task flows
-Full lifecycle is in [WORKFLOW.md](WORKFLOW.md). In short: the agent works the single task in
-`TASK.md` and never picks from this roadmap. At **Next Task Selection** it moves the finished task to
-**Done** and promotes the **top of the Task Queue** into `TASK.md` (mechanical FIFO). You control
-priority by ordering the queue. A **blocked** task is parked in **Blocked** below and the next item
-is promoted.
+## How work flows in
+Two ways items land here:
+1. **You order the queue** — priority is yours; the agent never picks.
+2. **Triage** — each run processes `captures/inbox/` (from the Telegram bot), scores items against the
+   North-star goals in PROJECT.md, and routes them: actionable → **Task Queue** / **Known Issues**;
+   low-commitment → **Ideas** / **Research** (parked, never auto-built). See [../WORKFLOW.md](../WORKFLOW.md).
+
+At **Next Task Selection** the agent moves the finished task to [DONE.md](DONE.md) and promotes the
+**top of the Task Queue** into `TASK.md` (FIFO). A **blocked** task is parked in **Blocked**.
 
 ---
 
 ## Task Queue (Now / Next / Later)
 
-Prioritized; top item is promoted next. Each entry: one-line outcome + success criteria.
+Prioritized; top item is promoted next. Each entry: outcome + priority/complexity + success criteria.
 
-*(empty — add prioritized tasks here)*
+*(empty — add prioritized tasks here, or let triage fill it)*
+
+---
+
+## Ideas (parked — never auto-built)
+
+Low-commitment thoughts from `/idea` captures. Promote into the Task Queue when you want one built.
+
+*(none)*
+
+---
+
+## Research (parked — investigate before building)
+
+`/research` captures — open questions to explore, not yet actionable.
+
+*(none)*
 
 ---
 
@@ -67,13 +86,3 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 - UI redesign beyond what a task specifies.
 - New sample recipes.
 - USDA API changes.
-
----
-
-## Done (recent — full history in git log)
-
-- ✅ Pantry add row simplified; ingredient browser modal (2026-06-24)
-- ✅ Weekly nutrition totals, grocery A→Z sort, recipe detail scaler, bulk pantry add, cook history (2026-06-23)
-- ✅ Recipe favorites, buy-it button, global error handler, Mung Beans, text search, bug fixes (2026-06-22)
-- ✅ Password reset, expiry suggestions, grocery→pantry transfer, paste-parser confidence, Filipino nutrition entries (2026-06-22)
-- ✅ Phase C — pantry auto-deduction on cook (`markRecipeCooked()` → `deductIngredientsForRecipe()`) (2026-06-22)

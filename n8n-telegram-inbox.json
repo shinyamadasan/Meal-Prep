@@ -1,0 +1,131 @@
+{
+  "name": "Telegram → captures/inbox (Mobile Capture)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.from.id }}",
+              "rightValue": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "authorized-user",
+      "name": "Authorized sender?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dumb capture: turn one Telegram message into one immutable markdown file.\n// No AI, no parsing of planning files. The /command IS the category.\nconst msg = ($input.first().json.message) || {};\nconst text = (msg.text || '').trim();\nconst m = text.match(/^\\/(feature|bug|idea|research|todo)\\b\\s*([\\s\\S]*)$/i);\nconst type = m ? m[1].toLowerCase() : 'unknown';\nconst command = m ? ('/' + type) : '(none)';\nconst body = (m ? (m[2] || '') : text).trim();\nconst d = new Date();\nconst p = (n) => String(n).padStart(2, '0');\nconst ts = `${d.getUTCFullYear()}${p(d.getUTCMonth()+1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}Z`;\nconst msgId = msg.message_id || 'na';\nconst id = `${ts}-${msgId}-${type}`;\nconst path = `captures/inbox/${id}.md`;\nconst content = `---\\nid: ${id}\\ncommand: ${command}\\ntype: ${type}\\ncaptured: ${d.toISOString()}\\nvia: telegram\\nmsg_id: ${msgId}\\nstatus: new\\n---\\n\\n${body || '(empty capture)'}\\n`;\nconst contentB64 = Buffer.from(content, 'utf8').toString('base64');\nreturn [{ json: { id, path, type, command, body, contentB64, chatId: (msg.chat && msg.chat.id) } }];"
+      },
+      "id": "build-capture",
+      "name": "Build capture file",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/shinyamadasan/Meal-Prep/contents/{{ $json.path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer REPLACE_WITH_YOUR_GITHUB_PAT" },
+            { "name": "Accept", "value": "application/vnd.github+json" },
+            { "name": "User-Agent", "value": "n8n-meal-prep-capture" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"capture: {{ $json.command }} ({{ $json.id }})\",\n  \"content\": \"{{ $json.contentB64 }}\",\n  \"branch\": \"main\"\n}",
+        "options": {}
+      },
+      "id": "github-create-file",
+      "name": "GitHub: create capture file",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=✅ Captured `{{ $('Build capture file').item.json.id }}` as {{ $('Build capture file').item.json.command }}. I'll triage it on the next run.",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "reply-ok",
+      "name": "Reply: captured",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 220],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "⛔ Not authorized.",
+        "additionalFields": {}
+      },
+      "id": "reply-unauthorized",
+      "name": "Reply: unauthorized",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [680, 420],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Authorized sender?", "type": "main", "index": 0 }]] },
+    "Authorized sender?": {
+      "main": [
+        [{ "node": "Build capture file", "type": "main", "index": 0 }],
+        [{ "node": "Reply: unauthorized", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build capture file": { "main": [[{ "node": "GitHub: create capture file", "type": "main", "index": 0 }]] },
+    "GitHub: create capture file": { "main": [[{ "node": "Reply: captured", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_setup_notes": [
+    "Replace the 4 REPLACE_WITH_* placeholders: Telegram credential id (3 nodes), your numeric Telegram user id, and a fine-grained GitHub PAT (repo Contents: read+write).",
+    "Repo is prefilled as shinyamadasan/Meal-Prep — change the URL if it differs.",
+    "Prefer moving the GitHub PAT into an n8n 'Header Auth' credential instead of the inline Authorization header before going live.",
+    "Get your Telegram user id by messaging @userinfobot.",
+    "typeVersions reflect a recent n8n; if import complains, let n8n auto-upgrade the nodes.",
+    "This workflow ONLY creates files in captures/inbox/. Triage + routing happen in the Claude run (see WORKFLOW.md)."
+  ]
+}

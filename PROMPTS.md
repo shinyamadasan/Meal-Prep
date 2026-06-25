@@ -2,7 +2,7 @@
 
 > A library of named, parameterized prompts for the recurring kinds of work on this project.
 > Copy one, fill the `<…>` placeholders, and paste it into Claude Code — or use **P1** to turn an
-> idea into a `TASK.md` entry for an autonomous run.
+> idea into a `planning/TASK.md` entry for an autonomous run.
 >
 > Each prompt **references** the conventions in `CLAUDE.md` instead of restating them, so this file
 > can't drift from the rules. Not auto-read every session — it's a tool you reach for to start work.
@@ -83,8 +83,20 @@ advance ROADMAP, do NOT update reference docs.
 ## P8 — Resume
 *Use to pick up unfinished work (start of a new run/session).*
 ```
-Resume the active task. Read STATUS.md (top entry) and TASK.md "Current Step", then continue
+Resume the active task. Read STATUS.md (top entry) and planning/TASK.md "Current Step", then continue
 Execution from exactly that step. Read only the docs CLAUDE.md routes to. Don't restart from scratch.
+```
+
+## P9 — Triage the inbox
+*Use to process mobile captures (start of a run, or on demand). See WORKFLOW.md "Triage".*
+```
+Process every file in captures/inbox/. For each capture: categorize (use the /command, infer if
+none); dedupe against planning/ROADMAP.md + planning/DONE.md; score against the North-star goals in
+docs/PROJECT.md (strong/some/weak); set priority (goal-alignment first, complexity as tiebreaker),
+complexity (S/M/L), and tags; write acceptance criteria for features/bugs; list likely files (grep by
+function name / DOM id). Route: feature/todo → ROADMAP Task Queue; bug → Known Issues; idea → Ideas;
+research → Research. Then archive the capture to captures/processed/YYYY/MM/<id>.md and append a
+one-line triage summary to STATUS.md. Skip any id already in ROADMAP/DONE/processed (idempotency).
 ```
 
 ---

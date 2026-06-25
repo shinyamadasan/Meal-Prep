@@ -85,3 +85,19 @@ Decision: Add `AppState.cloudReady` (transient). `saveToFirestore()` refuses to 
 Why: Makes overwriting un-read cloud data structurally impossible. localStorage still saves, so nothing is lost locally — the cloud write just waits until it's safe.
 Trade-off: A cloud write can be briefly deferred until the baseline loads (seconds). Worth it to never wipe cloud data. Does NOT fix the deeper `tx.set` full-overwrite design (still merge-only-on-version-conflict) — left as debt in ROADMAP.
 Supersedes: —
+
+## D-011 — Mobile capture pipeline: Telegram → n8n → captures/inbox → Triage
+Date: 2026-06-25 · Status: Active
+Context: Want to capture ideas from a phone while away and have the autonomous pipeline act on them, without GitHub Issues and without n8n needing to understand the planning files.
+Decision: n8n (dumb capture) writes **one immutable markdown file per Telegram message** to `captures/inbox/` via the GitHub Contents API — no AI, no parsing of planning files. A Claude run's **Triage** event (new, runs first) categorizes, dedupes, enriches, routes into `planning/ROADMAP.md`, and **archives** the processed capture to `captures/processed/YYYY/MM/` for provenance. Repo reorganized: `planning/` holds ROADMAP/TASK/DONE; `captures/` holds inbox/processed; `STATUS.md` + `CLAUDE.md` stay at root (auto-loaded / automation-appended). `DONE.md` split out of ROADMAP.
+Why: Capture must be reliable and dumb; judgment (dedupe, file hints, scoring) needs full repo context, which only the Claude run has. One-file-per-capture avoids the append/merge race of a single INBOX.md and gives an immutable event log.
+Trade-off: A folder of capture files + an archive tree to keep tidy; `run-claude.ps1` and all doc paths updated to the new layout. Accepted.
+Supersedes: the unused root `n8n-telegram-github.json` (GitHub-Issue approach).
+
+## D-012 — Triage scores captures against PROJECT.md North-star goals
+Date: 2026-06-25 · Status: Active
+Context: Captures arrive unprioritized; a cosmetic idea shouldn't outrank a friction-reducing one just because it was sent later.
+Decision: At Triage, score each item's alignment with the ranked **North-star goals** in `docs/PROJECT.md` (strong/some/weak). Priority = goal-alignment first, complexity (S/M/L) as tiebreaker. This sets the item's order in the Task Queue. `/idea` and `/research` are parked (never auto-built) regardless of score.
+Why: Keeps the autonomous queue pointed at what actually moves the product, not at whatever was captured most recently. Scoring stays a documented heuristic (LLM judgment), not a rigid formula.
+Trade-off: Triage ranking influences queue order, which is normally the human's lever — but it's intake ranking against goals the human defined, not the agent overriding an explicit human ordering. Accepted.
+Supersedes: —

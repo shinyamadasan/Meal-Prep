@@ -10,11 +10,13 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | File | What's in it | Source of truth for |
 |---|---|---|
 | `STATUS.md` (root) | Current state, last shipped, blockers | Where we are right now |
-| `TASK.md` (root) | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
-| `ROADMAP.md` (root) | Task queue, Known Issues & Debt, Do Not Work On | Priority & open defects (strategic) |
-| `WORKFLOW.md` (root) | Task-driven lifecycle: the 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
-| `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
-| `docs/PROJECT.md` | What/why/who, non-goals | Product intent & scope |
+| `planning/TASK.md` | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
+| `planning/ROADMAP.md` | Task queue, Ideas, Research, Known Issues & Debt, Do Not Work On | Priority & open defects (strategic) |
+| `planning/DONE.md` | Completed-work log (append-only) | What shipped & when |
+| `captures/` | `inbox/` = mobile captures (from Telegram/n8n); `processed/` = triaged archive | Inbound idea pipeline |
+| `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
+| `PROMPTS.md` (root) | Reusable prompts (P1 idea→TASK, fix, audit, triage, checkpoint, resume, …) | How to frame recurring work (not auto-read) |
+| `docs/PROJECT.md` | What/why/who, non-goals, **North-star goals** (triage scoring) | Product intent & scope |
 | `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
 | `docs/FEATURES.md` | Feature catalog by tab + status | Feature existence & status |
@@ -25,24 +27,27 @@ If a doc disagrees with the code about behavior, fix the doc.
 
 ## Lifecycle
 Work is **task-driven**, not session-driven — there is no "session end". Read `WORKFLOW.md` for the
-full event model (Planning · Execution · Checkpoint · Task Completion · Commit · Next Task Selection).
+full event model (Triage · Planning · Execution · Checkpoint · Task Completion · Commit · Next Task Selection).
 The essentials:
-- **Always read first:** this file (auto) + `STATUS.md` + `TASK.md`. `TASK.md` is what you work on —
-  don't pick from the roadmap; a human already promoted today's task.
+- **Always read first:** this file (auto) + `STATUS.md` + `planning/TASK.md`. `TASK.md` is what you
+  work on — don't pick from the roadmap; a human already promoted today's task.
+- **Triage first:** if `captures/inbox/` has any `*.md`, process them (route into `planning/ROADMAP.md`,
+  score against PROJECT.md North-star goals, archive to `captures/processed/YYYY/MM/`) before the task.
 - **Code + docs commit together.** Doc updates ride in the same commit as the code — never deferred.
-- **`STATUS.md` updates only at Checkpoint and Task Completion.** **`ROADMAP.md` advances only at
-  Next Task Selection** (promote top of queue, FIFO). **`DECISIONS.md`** gets a `D-0NN` entry only
-  when a non-obvious choice is made/reversed.
-- Stopping mid-task = perform a **Checkpoint** (persist `TASK.md` Current Step + `STATUS.md`), then stop.
+- **`STATUS.md` updates at Triage, Checkpoint, Task Completion.** **`ROADMAP.md` advances only at
+  Next Task Selection** (promote top of queue, FIFO). **`planning/DONE.md`** appends at Task Completion.
+  **`DECISIONS.md`** gets a `D-0NN` entry only when a non-obvious choice is made/reversed.
+- Stopping mid-task = perform a **Checkpoint** (persist `planning/TASK.md` Current Step + `STATUS.md`).
 
 ## What to read (per task)
 Pull **only** the docs the active task needs:
 | Task type | Read |
 |---|---|
 | New feature / change | relevant `docs/FEATURES.md` section + `docs/ARCHITECTURE.md` |
-| Bug fix | `ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section |
+| Bug fix | `planning/ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section |
 | Data / schema / storage | `docs/DATA_MODEL.md` |
 | Refactor / "why is it like this?" | `docs/DECISIONS.md` + `docs/ARCHITECTURE.md` |
+| Triage captures | `captures/README.md` + `docs/PROJECT.md` (goals) + `planning/ROADMAP.md` |
 
 Don't load every doc; pull the row(s) for the task at hand.
 
@@ -64,7 +69,7 @@ Don't load every doc; pull the row(s) for the task at hand.
 
 ## Tooling gotchas
 - PowerShell `Add-Content` mangles Unicode — use the Edit/Write tools for any file with emoji/special chars.
-- Autonomous sessions run via `run-claude.ps1`; it reads `ROADMAP.md`, `STATUS.md`, `CLAUDE.md` first.
+- Autonomous sessions run via `run-claude.ps1`; it reads `CLAUDE.md`, `STATUS.md`, `planning/TASK.md`, then runs Triage on `captures/inbox/`.
 
 ## Deploy
 ```

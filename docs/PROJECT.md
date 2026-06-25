@@ -17,6 +17,15 @@ Filipino home cooks who batch-cook and meal-prep. Content is localized: peso pri
 4. Mark recipes cooked → ingredients deducted from pantry, batch tracked with expiry.
 5. Dashboard surfaces what to cook now, what's expiring, and what to restock.
 
+## North-star goals (for triage scoring)
+Ranked. Triage scores each captured idea against these — items that serve a higher goal outrank
+cosmetic ones regardless of how appealing they sound. Update this list as priorities shift.
+1. **Reduce friction in the core loop** — plan → shop → cook → log → restock with the fewest taps.
+2. **Never lose user data** — offline-first integrity; cloud sync must be safe (see DECISIONS D-010).
+3. **Zero-friction start** — a new user has a working plan in under a minute, no account required.
+4. **Filipino-localization depth** — pricing, stores, ingredients, recipes stay locally accurate.
+5. **Stay simple & maintainable** — one file, no framework/build (DECISIONS D-001); don't add weight.
+
 ## What makes it different
 - **Offline-first** — fully usable with no account and no internet.
 - **"What can I cook right now?"** engine — matches pantry inventory to recipes in 3 tiers.

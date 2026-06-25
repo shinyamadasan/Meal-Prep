@@ -1,8 +1,8 @@
 # Current Task
 
-> The **single active task** — what's being worked on now. Read right after `STATUS.md`.
+> The **single active task** — what's being worked on now. Read right after `../STATUS.md`.
 > Priority is set in `ROADMAP.md` by a human; the agent executes what's here, it never picks.
-> Lifecycle and Done conditions are defined in `WORKFLOW.md`.
+> Lifecycle and Done conditions are defined in `../WORKFLOW.md`.
 >
 > **Current Step is the resume point** — keep it precise enough that a fresh run can continue with
 > zero context. On Task Completion: tick all criteria, then Next Task Selection promotes the next

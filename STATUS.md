@@ -5,6 +5,26 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Mobile capture pipeline (Telegram → inbox → Triage) + repo reorg
+
+**Task:** Build the Telegram capture system: dumb capture in n8n, smart Triage in Claude.
+**Completed:**
+- **Reorg:** `planning/` (ROADMAP, TASK, DONE) + `captures/` (inbox, processed). `STATUS.md`/`CLAUDE.md` stay at root.
+- `planning/DONE.md` split out of ROADMAP; ROADMAP gained **Ideas** + **Research** parked buckets.
+- `WORKFLOW.md`: new **Triage** event (runs first) — categorize, dedupe, **goal-score vs PROJECT.md**, route, archive to `captures/processed/YYYY/MM/`. Updated diagram, file-change table, autonomous behavior, all paths.
+- `docs/PROJECT.md`: added ranked **North-star goals** for triage scoring.
+- `captures/README.md`: pipeline contract + capture file format (`id` = idempotency key).
+- `CLAUDE.md`, `PROMPTS.md` (P9 Triage), `run-claude.ps1` (Triage-first flow, planning/ paths, `git mv` allowed) updated.
+- `n8n-telegram-inbox.json`: redesigned workflow — n8n only creates files in `captures/inbox/` (folder approach, no sha/merge race). Needs your bot token, PAT, and Telegram user id.
+- DECISIONS **D-011** (capture pipeline + reorg) and **D-012** (goal-aligned triage scoring).
+**Verification:** Docs/structure only — no app.js change. n8n JSON is best-effort (placeholders), **not import-tested**.
+**Files changed:** `planning/*` (moved+new), `captures/*` (new), `WORKFLOW.md`, `CLAUDE.md`, `PROMPTS.md`, `run-claude.ps1`, `docs/PROJECT.md`, `docs/DECISIONS.md`, `n8n-telegram-inbox.json`, `STATUS.md`.
+**Branch:** `main` — on disk, not yet committed.
+**Next task:** Wire n8n (token/PAT/user-id), send a test `/feature`, confirm a file lands in `captures/inbox/`, then let a run triage it. Old `n8n-telegram-github.json` can be deleted (superseded, D-011).
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — Fix: cloud data wiped on deploy/reload (signed-in users)
 
 **Task:** Stop signed-in users' Firestore data being wiped after a push/deploy.

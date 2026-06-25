@@ -18,33 +18,41 @@ $prompt = @'
 You are running in autonomous mode. No human is available. Follow WORKFLOW.md — the task-driven
 lifecycle. There is no "session end": when you stop, you perform a Checkpoint first.
 
-Read CLAUDE.md, STATUS.md, and TASK.md first. CLAUDE.md routes you to any other docs. TASK.md is the
-single active task — it is what you work on. Do NOT pick tasks from ROADMAP.md yourself; a human
-already promoted today's task. Never touch the ROADMAP "Do Not Work On" section. Do not delete files.
+Read CLAUDE.md, STATUS.md, and planning/TASK.md first. CLAUDE.md routes you to any other docs.
+planning/TASK.md is the single active task — it is what you work on. Do NOT pick tasks from
+planning/ROADMAP.md yourself; a human already set priority. Never touch the ROADMAP "Do Not Work On"
+section. Do not delete files (archiving captures is a git mv, not a delete).
 
-If TASK.md is "NO ACTIVE TASK": write "No tasks remaining" to STATUS.md and stop (do not shut down
-the PC, do not invent or plan work).
+STEP A — TRIAGE FIRST: if captures/inbox/ has any *.md, process them per WORKFLOW.md "Triage":
+categorize, dedupe vs ROADMAP/DONE, score against docs/PROJECT.md North-star goals, set priority +
+complexity + tags, write acceptance criteria, list likely files, route into planning/ROADMAP.md
+(feature/todo→Task Queue, bug→Known Issues, idea→Ideas, research→Research), archive each to
+captures/processed/YYYY/MM/<id>.md, and append a one-line triage summary to STATUS.md. Commit.
 
-Otherwise loop over the active task:
-1. RESUME: read TASK.md "Current Step" and continue from there (don't restart). Read only routed docs.
+STEP B — if planning/TASK.md is "NO ACTIVE TASK": promote the top ROADMAP Task Queue item into it.
+If the queue is also empty, write "No tasks remaining" to STATUS.md and stop (do not shut down the
+PC, do not invent or plan work).
+
+STEP C — loop over the active task:
+1. RESUME: read planning/TASK.md "Current Step" and continue from there. Read only routed docs.
 2. Ensure you are on main (git checkout main && git pull origin main).
-3. EXECUTION: implement in app.js / index.html / style.css; keep TASK.md "Current Step" current.
+3. EXECUTION: implement in app.js / index.html / style.css; keep "Current Step" current.
 4. Decide the outcome:
    - COMPLETED (all Success Criteria verified): tick criteria in TASK.md; update reference docs
-     (FEATURES/DATA_MODEL/ARCHITECTURE/DECISIONS as applicable) AND STATUS.md; COMMIT code+docs
-     together and push (git push origin main); then NEXT TASK SELECTION — promote the top ROADMAP
-     Task Queue item into TASK.md (FIFO) and move the finished task to ROADMAP Done. Continue.
+     (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md;
+     update STATUS.md; COMMIT code+docs together and push; then NEXT TASK SELECTION — promote the top
+     ROADMAP Task Queue item into TASK.md (FIFO). Continue.
    - PARTIAL (near context/token limit mid-task): CHECKPOINT — write the precise next action into
      TASK.md "Current Step" and an in-progress entry at the TOP of STATUS.md; make a `wip:` commit
      and push; then STOP. Do NOT mark Done or advance ROADMAP.
    - BLOCKED (ambiguous / missing input / failing gate): record the blocker in TASK.md (Blocker) and
-     STATUS.md; move the task to ROADMAP "Blocked"; promote the next queue item into TASK.md and
-     continue. If the queue is empty, STOP.
+     STATUS.md; move the task to ROADMAP "Blocked"; promote the next queue item; continue. Queue
+     empty → STOP.
 5. Stop when TASK.md is NO ACTIVE TASK or you are near your context limit (Checkpoint first).
 '@
 
 claude -p $prompt `
-    --allowedTools "Edit" "Write" "Read" "Glob" "Grep" "Bash(git checkout main)" "Bash(git add *)" "Bash(git commit *)" "Bash(git push origin main)" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
+    --allowedTools "Edit" "Write" "Read" "Glob" "Grep" "Bash(git checkout main)" "Bash(git add *)" "Bash(git mv *)" "Bash(git commit *)" "Bash(git push origin main)" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
     | Tee-Object -FilePath $logFile -Append
 
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
