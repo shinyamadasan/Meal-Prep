@@ -43,12 +43,7 @@ Prioritized; top item is promoted next. Each entry: outcome + priority/complexit
 > `renderGroceryList()`; state in `AppState.groceryList` (items) and `AppState.pantry`.
 
 - [x] ~~**1. Flag auto-suggested low-stock grocery items**~~ ✅ (2026-06-25)
-- [ ] **2. "Suggested" badge in the grocery list** · P2 · complexity:S
-  - Depends on Task 1's `suggested` flag.
-  - acceptance:
-    - [ ] grocery items with `suggested === true` render a small "Suggested" badge (with the reason as a title/tooltip)
-    - [ ] non-suggested items render unchanged
-  - likely files: `app.js` (`renderGroceryList`), `style.css` (badge), `index.html` if a class is needed
+- [x] ~~**2. "Suggested" badge in the grocery list**~~ ✅ (2026-06-25)
 - [ ] **3. Dismiss a suggested grocery item** · P2 · complexity:M
   - Depends on Tasks 1 + 2.
   - acceptance:

@@ -3436,6 +3436,7 @@ function renderGroceryList() {
             <div class="grocery-item-name">
               ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
               ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span>' : ''}
+              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span>` : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
               <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>

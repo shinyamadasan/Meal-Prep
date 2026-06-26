@@ -9,15 +9,16 @@
 > `ROADMAP.md` queue item here (FIFO). Queue empty → set NO ACTIVE TASK.
 
 ## Objective
-Add a `suggested: true` flag (+ `suggestedReason`) to grocery items auto-added by `checkAndReplenishLowStock()` / `syncStapleToGrocery()`, so later tasks can distinguish them from manually-added items.
+Add a dismiss control to suggested grocery items: removes the item from AppState.groceryList, leaves pantry untouched, and prevents re-addition by checkAndReplenishLowStock() while still below min.
 
 ## Current Step
-Implementing — finding `checkAndReplenishLowStock` and `syncStapleToGrocery` in app.js to add the flag at the point items are created/pushed.
+COMPLETE — Task 2 committed. Starting Task 3 implementation.
 
 ## Success Criteria
-- [ ] items auto-added by `checkAndReplenishLowStock()` get `suggested: true` + `suggestedReason: "low stock"`
-- [ ] manually-added grocery items are NOT flagged
-- [ ] flag persists through `saveData()` and survives reload
+- [ ] a dismiss control on suggested grocery items removes the item from AppState.groceryList
+- [ ] the corresponding pantry item is untouched
+- [ ] dismissed items are not re-added by the next checkAndReplenishLowStock() run while still below min
+- [ ] persists through saveData()
 
 ## Blocker
 none

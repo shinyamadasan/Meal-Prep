@@ -5,6 +5,15 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — P2 Task 2: "Suggested" badge on auto-added grocery items
+
+**Built:** Added `grocery-suggested-badge` to the `grocery-item-name` div in `renderGroceryList()` — renders only when `item.suggested === true`, with `suggestedReason` as the `title` tooltip (XSS-safe via `escapeHtml`). CSS `.grocery-suggested-badge` mirrors `.pantry-badge` with amber colors (`#fef3c7` bg / `#92400e` text) — light-only safe, no dark-mode block.
+**Self Review:** pass (reuses pantry-badge pattern exactly; `escapeHtml` on tooltip). **QA:** pass (non-suggested items unchanged; XSS-safe; no light-only invariant violation).
+**Files changed:** `app.js`, `style.css`, `planning/DONE.md`, `planning/ROADMAP.md`, `planning/TASK.md`, `STATUS.md`.
+**Next:** P2 Task 3 — Dismiss a suggested grocery item (dismiss control + re-add prevention).
+
+---
+
 ## 2026-06-25 — P2 Task 1: `suggested` flag on auto-added grocery items
 
 **Built:** Added `suggested: true` and `suggestedReason: 'low stock'` to the grocery item push in both auto-add sites — `syncStapleToGrocery()` (staple path) and `checkAndReplenishLowStock()` (non-staple below-minQty path). Additive only — no existing logic changed. Flag persists through `saveData()` as plain JSON. DATA_MODEL.md updated with grocery item shape and `mealPrepHelpSeen` localStorage entry.

@@ -3897,6 +3897,18 @@ select.form-control {
   font-weight: 600;
 }
 
+.grocery-suggested-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  font-weight: 600;
+}
+
 
 
 /* ── Nutrition Database Search ─────────────────────────────────────────────── */
