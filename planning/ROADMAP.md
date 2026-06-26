@@ -1,17 +1,20 @@
 # Meal Prep Planner — Roadmap
 
-**Strategic** — for the human to set priority. Vision/scope: [../docs/PROJECT.md](../docs/PROJECT.md).
-Active task: [TASK.md](TASK.md) · Completed log: [DONE.md](DONE.md) · Lifecycle: [../WORKFLOW.md](../WORKFLOW.md).
+**The approved product backlog** — work you've judged worth building, eventually. Vision/scope:
+[../docs/PROJECT.md](../docs/PROJECT.md) · Active task: [TASK.md](TASK.md) · Completed: [DONE.md](DONE.md) ·
+Lifecycle: [../WORKFLOW.md](../WORKFLOW.md).
 
-## How work flows in
-Two ways items land here:
-1. **You order the queue** — priority is yours; the agent never picks.
-2. **Triage** — each run processes `captures/inbox/` (from the Telegram bot), scores items against the
-   North-star goals in PROJECT.md, and routes them: actionable → **Task Queue** / **Known Issues**;
-   low-commitment → **Ideas** / **Research** (parked, never auto-built). See [../WORKFLOW.md](../WORKFLOW.md).
+## How work flows (gated pipeline)
+**This file is protected — only the Human Approval gate writes to it.** The Sprint Planner *reads* it
+but never modifies it; the Builder never touches it.
 
-At **Next Task Selection** the agent moves the finished task to [DONE.md](DONE.md) and promotes the
-**top of the Task Queue** into `TASK.md` (FIFO). A **blocked** task is parked in **Blocked**.
+```
+captures/inbox → Triage → PROPOSALS.md → (you approve) → ROADMAP.md (here)
+   → AI Sprint Planner → (you approve the batch) → BUILD_QUEUE.md → Builder → staging → (you validate) → prod
+```
+
+**One job per stage:** Triage *routes*, the Planner *schedules*, the Builder *builds* — none cross
+lanes. **Nothing is built without your approval.** See [../WORKFLOW.md](../WORKFLOW.md).
 
 ---
 
@@ -27,24 +30,12 @@ Track progress with evidence, not intuition → [METRICS.md](../METRICS.md).
 
 ---
 
-## Task Queue (Now / Next / Later)
+## Approved Backlog
+Work you've approved (via the Proposals gate) that we intend to build — eventually. The **Sprint
+Planner** reads this to propose the next batch; it never edits it. Building happens only through
+`BUILD_QUEUE.md`. *(Job #5 is now PROP-001 in `PROPOSALS.md`, awaiting your decision.)*
 
-Prioritized; top item is promoted next. Each entry: outcome + priority/complexity + success criteria.
-
-> **⏳ Decision pending (do NOT auto-build) — Job #5 "cheapest":** descope (reframe Price Book as a
-> price *reference*) vs build a minimal basket-per-store compare. The **human** decides; the autonomous
-> run must SKIP this. Last external-testing blocker. *(Preserved — do not delete.)*
-
-- [x] ~~**Alpha P1: one onboarding modal on first run**~~ ✅ (2026-06-25)
-
-> **Dependency chain (drain test, 2026-06-25).** Build in order — each builds on the previous via a
-> `suggested` flag on grocery items. EXTEND existing code, don't duplicate: low-stock auto-add already
-> lives in `checkAndReplenishLowStock()` / `syncStapleToGrocery()`; grocery rendering in
-> `renderGroceryList()`; state in `AppState.groceryList` (items) and `AppState.pantry`.
-
-- [x] ~~**1. Flag auto-suggested low-stock grocery items**~~ ✅ (2026-06-25)
-- [x] ~~**2. "Suggested" badge in the grocery list**~~ ✅ (2026-06-25)
-- [x] ~~**3. Dismiss a suggested grocery item**~~ ✅ (2026-06-25)
+*(empty — approve a proposal in `PROPOSALS.md` to populate this)*
 
 ---
 

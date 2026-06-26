@@ -10,8 +10,10 @@ This file is the **router**. Read it + `STATUS.md` first, then pull only the doc
 | File | What's in it | Source of truth for |
 |---|---|---|
 | `STATUS.md` (root) | Current state, last shipped, blockers | Where we are right now |
+| `planning/PROPOSALS.md` | Triage output — proposals **pending your approval** (nothing built) | Ideas awaiting product judgment |
+| `planning/ROADMAP.md` | **Approved backlog** (protected — only the approval gate writes it) + Ideas/Research/Known Issues/Do Not Work On | Approved long-term work |
+| `planning/BUILD_QUEUE.md` | **Approved sprint** — the ONLY file the Builder reads | What's cleared to build now |
 | `planning/TASK.md` | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
-| `planning/ROADMAP.md` | Task queue, Ideas, Research, Known Issues & Debt, Do Not Work On | Priority & open defects (strategic) |
 | `planning/DONE.md` | Completed-work log (append-only) | What shipped & when |
 | `captures/` | `inbox/` = mobile captures (from Telegram/n8n); `processed/` = triaged archive | Inbound idea pipeline |
 | `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
@@ -37,16 +39,17 @@ full event model (Triage · Planning · Execution · Checkpoint · Task Completi
 The essentials:
 - **Always read first:** this file (auto) + `STATUS.md` + `planning/TASK.md`. `TASK.md` is what you
   work on — don't pick from the roadmap; a human already promoted today's task.
-- **Triage first:** if `captures/inbox/` has any `*.md`, process them (route into `planning/ROADMAP.md`,
-  score against PROJECT.md North-star goals, archive to `captures/processed/YYYY/MM/`) before the task.
+- **Triage routes to Proposals, never to build:** captures in `captures/inbox/` → triage → score against
+  PROJECT.md goals → `planning/PROPOSALS.md` (**pending your approval**) → archive. Triage never schedules or builds.
 - **Code + docs commit together.** Doc updates ride in the same commit as the code — never deferred.
 - **Self Review before QA:** after building, run `SELF_REVIEW.md` ("is it *good code*?" — code health
   + "would I ship this?"); fix/simplify, then run QA. Two different gates: Self Review = quality, QA = correctness.
 - **QA gate before any production commit:** pass `QA.md`'s AI checks (a failure = Blocked, don't
   commit); append `QA.md`'s human checks to `STATUS.md` for post-deploy review.
-- **`STATUS.md` updates at Triage, Checkpoint, Task Completion.** **`ROADMAP.md` advances only at
-  Next Task Selection** (promote top of queue, FIFO). **`planning/DONE.md`** appends at Task Completion.
-  **`DECISIONS.md`** gets a `D-0NN` entry only when a non-obvious choice is made/reversed.
+- **Gated build:** only **human-approved** work in `planning/BUILD_QUEUE.md` is built — the Builder reads
+  nothing else for work. `ROADMAP.md` is the protected approved backlog (only the approval gate writes it).
+  **`planning/DONE.md`** appends at Task Completion. **`DECISIONS.md`** gets a `D-0NN` entry only when a
+  non-obvious choice is made/reversed.
 - Stopping mid-task = perform a **Checkpoint** (persist `planning/TASK.md` Current Step + `STATUS.md`).
 
 ## What to read (per task)
@@ -62,6 +65,10 @@ Pull **only** the docs the active task needs:
 Don't load every doc; pull the row(s) for the task at hand.
 
 ## Hard rules (these cause bugs if violated)
+0. **Build only from `planning/BUILD_QUEUE.md`** (human-approved). Triage writes captures to
+   `planning/PROPOSALS.md` (pending), never to a build queue or `ROADMAP.md`. Nothing builds without
+   human approval. One job per stage — Triage routes · Sprint Planner schedules · Builder builds; none
+   cross lanes (DECISIONS D-015).
 1. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` — Firestore ids
    are strings; unquoted they render as bare identifiers and break.
 2. **After loading recipes from storage, call `patchMissingNutrition(AppState.recipes)`** — old saved

@@ -117,3 +117,13 @@ Decision: Add a distinct **Self Review** event between Execution and Task Comple
 Why: Separating quality from correctness catches debt before it ships and keeps the codebase maintainable for long-term solo dev. Code-health checks are AI-verifiable (read the diff), so they fit autonomous runs.
 Trade-off: One more gate per task. The honesty rule is preserved — if a "would I ship this?" hesitation is a human-verified aspect (feel/polish/device), the agent marks it `ship-pending-human-review`, never claims verification.
 Supersedes: —
+
+## D-015 — Gated pipeline: capture ≠ build; human approves, AI executes
+Date: 2026-06-26 · Status: Active (migrating incrementally; Phase 0 done)
+Context: Captures were auto-triaged straight into the build queue and built unattended to live — a stray `/feature` became a production change with no human decision. Capture (cheap, noisy, low-commitment) must not auto-convert into a shipped commitment.
+Decision: Insert human gates and separate the stages, each with ONE responsibility:
+`captures/inbox → Triage → PROPOSALS.md (pending) → [human approval] → ROADMAP.md (protected approved backlog) → AI Sprint Planner → [human sprint approval] → BUILD_QUEUE.md → Builder → staging → [human validation] → prod`.
+The Builder reads **only** `BUILD_QUEUE.md`. `ROADMAP.md` is written only by the approval gate (the Sprint Planner reads it, never edits; the Builder never touches it). Phone = product management (approve via natural-language replies to digests — no new commands); PC = engineering + validation.
+Why: Puts scarce human judgment on the two decisions that matter (what to build, whether to ship), removes the human from mechanical work, and stops unreviewed auto-builds from reaching real users. Single-responsibility per stage keeps each simple and debuggable.
+Trade-off: Two extra approval gates (more deliberate, less "instant") — accepted; this optimizes for leverage, not automation. Migrated incrementally: **Phase 0 = the firewall** (Builder reads only BUILD_QUEUE; triage → Proposals; Task Queue retired). Later phases add enrichment/evidence, the approval digest, the optimizing Sprint Planner, and staging.
+Supersedes: the D-009-era auto-promote-from-Task-Queue-and-build flow; the ROADMAP "Task Queue" is retired.
