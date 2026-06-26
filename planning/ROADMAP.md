@@ -44,14 +44,7 @@ Prioritized; top item is promoted next. Each entry: outcome + priority/complexit
 
 - [x] ~~**1. Flag auto-suggested low-stock grocery items**~~ ✅ (2026-06-25)
 - [x] ~~**2. "Suggested" badge in the grocery list**~~ ✅ (2026-06-25)
-- [ ] **3. Dismiss a suggested grocery item** · P2 · complexity:M
-  - Depends on Tasks 1 + 2.
-  - acceptance:
-    - [ ] a dismiss control on suggested grocery items removes the item from `AppState.groceryList`
-    - [ ] the corresponding `AppState.pantry` item is **untouched** (only the grocery entry goes)
-    - [ ] dismissed items are **not re-added** by the next `checkAndReplenishLowStock()` run while still below min (track the dismissal — e.g. a flag on the pantry item or a dismissed set)
-    - [ ] persists through `saveData()`
-  - likely files: `app.js` (`renderGroceryList`, `checkAndReplenishLowStock`)
+- [x] ~~**3. Dismiss a suggested grocery item**~~ ✅ (2026-06-25)
 
 ---
 

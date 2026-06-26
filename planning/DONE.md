@@ -3,6 +3,7 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ P2 Task 3 — Dismiss suggested grocery items: ✕ button, `suggestDismissed` pantry flag, skip re-add, auto-clear on restock (2026-06-25)
 - ✅ P2 Task 2 — "Suggested" amber badge on auto-suggested grocery items (`.grocery-suggested-badge`, tooltip = reason) (2026-06-25)
 - ✅ P2 Task 1 — `suggested: true` + `suggestedReason: 'low stock'` flag on auto-suggested grocery items (`syncStapleToGrocery`, `checkAndReplenishLowStock`) (2026-06-25)
 - ✅ Alpha P1 — one onboarding gate: Help modal no longer auto-opens on first run when Kitchen Setup Wizard fires (`pantryOnboardingDone` gate in `initApp()`) (2026-06-25)

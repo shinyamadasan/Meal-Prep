@@ -3909,6 +3909,21 @@ select.form-control {
   font-weight: 600;
 }
 
+.grocery-dismiss-btn {
+  display: inline-block;
+  font-size: 0.75rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--color-text-muted, #9ca3af);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  margin-left: 0.2rem;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+.grocery-dismiss-btn:hover { opacity: 1; color: var(--color-danger, #dc2626); }
+
 
 
 /* ── Nutrition Database Search ─────────────────────────────────────────────── */

@@ -54,9 +54,16 @@ Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` 
 
 ## Pantry item
 ```js
-{ id, name, quantity?, unit?, purchaseDate? | expiryDate?, shelfLifeDays?, storage?, staple? }
-// storage: 'fridge' | 'freezer' | 'counter' (inferred INGREDIENT_DB → PANTRY_KNOWLEDGE → category)
-// staple cycles: none → staple → running low; staples are never deducted on cook
+{
+  id, name,
+  quantity?,          // number — tracked for non-staples vs minStockQty
+  unit?,
+  purchaseDate? | expiryDate?, shelfLifeDays?,
+  storage?,           // 'fridge' | 'freezer' | 'counter' (inferred INGREDIENT_DB → PANTRY_KNOWLEDGE → category)
+  staple?,            // boolean — staple cycles: none → staple → running low; staples not deducted on cook
+  stockLevel?,        // 'full' | 'ok' | 'low' | 'empty' — for staples
+  suggestDismissed?,  // boolean — user dismissed the auto-grocery suggestion; skip re-add until restocked
+}
 ```
 
 ## Grocery item

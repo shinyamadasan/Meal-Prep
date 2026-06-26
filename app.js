@@ -3436,7 +3436,7 @@ function renderGroceryList() {
             <div class="grocery-item-name">
               ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
               ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span>' : ''}
-              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span>` : ''}
+              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${item.id})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
               <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
@@ -3460,6 +3460,19 @@ function toggleGroceryItem(itemId) {
     renderGroceryList();
   }
 }
+
+function dismissSuggestedGroceryItem(itemId) {
+  var item = AppState.groceryList.find(function(g) { return g.id === itemId; });
+  if (!item || !item.suggested) return;
+  var pantryItem = AppState.pantry.find(function(p) {
+    return p.name.toLowerCase() === item.name.toLowerCase();
+  });
+  if (pantryItem) pantryItem.suggestDismissed = true;
+  AppState.groceryList = AppState.groceryList.filter(function(g) { return g.id !== itemId; });
+  saveData();
+  renderGroceryList();
+}
+window.dismissSuggestedGroceryItem = dismissSuggestedGroceryItem;
 
 function clearGroceryList() {
   if (confirm('Are you sure you want to clear the grocery list?')) {
@@ -6556,19 +6569,24 @@ function syncStapleToGrocery(p) {
     return !(it.fromStaple && it.name.toLowerCase() === p.name.toLowerCase());
   });
   if (isStaple(p) && p.stockLevel === 'low') {
-    AppState.groceryList.push({
-      id: Date.now() + Math.random(),
-      name: p.name,
-      category: p.category || 'Pantry',
-      quantity: null,
-      unit: p.unit || '',
-      sources: ['Running low'],
-      checked: false,
-      custom: true,
-      fromStaple: true,
-      suggested: true,
-      suggestedReason: 'low stock'
-    });
+    if (!p.suggestDismissed) {
+      AppState.groceryList.push({
+        id: Date.now() + Math.random(),
+        name: p.name,
+        category: p.category || 'Pantry',
+        quantity: null,
+        unit: p.unit || '',
+        sources: ['Running low'],
+        checked: false,
+        custom: true,
+        fromStaple: true,
+        suggested: true,
+        suggestedReason: 'low stock'
+      });
+    }
+  } else if (p.stockLevel !== 'empty') {
+    // Restocked (full/ok): clear dismiss so next dip suggests again
+    delete p.suggestDismissed;
   }
 }
 
@@ -6590,7 +6608,7 @@ function checkAndReplenishLowStock() {
         return g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase();
       });
       var isBelowMin = p.quantity < db.minStockQty;
-      if (isBelowMin && !alreadyInList) {
+      if (isBelowMin && !alreadyInList && !p.suggestDismissed) {
         AppState.groceryList.push({
           id: Date.now() + Math.random(),
           name: p.name,
@@ -6609,6 +6627,7 @@ function checkAndReplenishLowStock() {
         AppState.groceryList = AppState.groceryList.filter(function(g) {
           return !(g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase());
         });
+        delete p.suggestDismissed; // restocked: suggest again next time it drops
         changed = true;
       }
     }

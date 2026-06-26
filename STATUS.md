@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — P2 Task 3: Dismiss a suggested grocery item
+
+**Built:**
+- `dismissSuggestedGroceryItem(itemId)`: removes from `AppState.groceryList`, sets `pantryItem.suggestDismissed = true`, calls `saveData()` + re-renders.
+- ✕ dismiss button on suggested items in `renderGroceryList()` (inside the name row, `event.stopPropagation()` prevents row-toggle).
+- `syncStapleToGrocery()`: skips push when `p.suggestDismissed`; clears flag when `stockLevel` returns to `full`/`ok`.
+- `checkAndReplenishLowStock()` (non-staple path): skips add when `p.suggestDismissed`; `delete p.suggestDismissed` on restock.
+- `.grocery-dismiss-btn` CSS: unobtrusive (low-opacity ×), red on hover.
+- DATA_MODEL.md updated with `suggestDismissed` pantry field and `stockLevel` clarification.
+**Self Review:** pass (focused function, clear responsibility split, correct flag lifecycle). **QA:** pass (all 4 criteria met; XSS-safe; pantry data untouched; light-only safe).
+**Files changed:** `app.js`, `style.css`, `docs/DATA_MODEL.md`, `planning/DONE.md`, `planning/ROADMAP.md`, `planning/TASK.md`, `STATUS.md`.
+**Branch:** `main` — committing now.
+**Next:** Queue empty. Waiting for human to promote next task or send capture.
+
+---
+
 ## 2026-06-25 — P2 Task 2: "Suggested" badge on auto-added grocery items
 
 **Built:** Added `grocery-suggested-badge` to the `grocery-item-name` div in `renderGroceryList()` — renders only when `item.suggested === true`, with `suggestedReason` as the `title` tooltip (XSS-safe via `escapeHtml`). CSS `.grocery-suggested-badge` mirrors `.pantry-badge` with amber colors (`#fef3c7` bg / `#92400e` text) — light-only safe, no dark-mode block.

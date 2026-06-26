@@ -8,20 +8,7 @@
 > zero context. On Task Completion: tick all criteria, then Next Task Selection promotes the next
 > `ROADMAP.md` queue item here (FIFO). Queue empty → set NO ACTIVE TASK.
 
-## Objective
-Add a dismiss control to suggested grocery items: removes the item from AppState.groceryList, leaves pantry untouched, and prevents re-addition by checkAndReplenishLowStock() while still below min.
+## Status: NO ACTIVE TASK
 
-## Current Step
-COMPLETE — Task 2 committed. Starting Task 3 implementation.
-
-## Success Criteria
-- [ ] a dismiss control on suggested grocery items removes the item from AppState.groceryList
-- [ ] the corresponding pantry item is untouched
-- [ ] dismissed items are not re-added by the next checkAndReplenishLowStock() run while still below min
-- [ ] persists through saveData()
-
-## Blocker
-none
-
-## Definition of Done
-All Success Criteria verified. Reference docs updated. STATUS.md updated. Code + docs committed together. Then Next Task Selection.
+P2 dependency chain (Tasks 1–3) completed 2026-06-25. Queue empty.
+Add a task to `ROADMAP.md`, then promote it here to activate work.
