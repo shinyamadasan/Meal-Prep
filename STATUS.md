@@ -5,6 +5,15 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — P2 Task 1: `suggested` flag on auto-added grocery items
+
+**Built:** Added `suggested: true` and `suggestedReason: 'low stock'` to the grocery item push in both auto-add sites — `syncStapleToGrocery()` (staple path) and `checkAndReplenishLowStock()` (non-staple below-minQty path). Additive only — no existing logic changed. Flag persists through `saveData()` as plain JSON. DATA_MODEL.md updated with grocery item shape and `mealPrepHelpSeen` localStorage entry.
+**Self Review:** pass (minimal additive change; same field names in both sites). **QA:** pass (both auto-add paths flagged; manual-add paths untouched; JSON-serializable).
+**Files changed:** `app.js`, `docs/DATA_MODEL.md`, `planning/DONE.md`, `planning/ROADMAP.md`, `planning/TASK.md`, `STATUS.md`.
+**Next:** P2 Task 2 — "Suggested" badge in the grocery list rendering.
+
+---
+
 ## 2026-06-25 — Alpha P1: one onboarding gate (no double-modal on first run)
 
 **Problem:** On first run, `initApp()` scheduled `openHelpModal` after 600ms AND `seedPantryIfEmpty()` opened the Kitchen Setup Wizard synchronously — two modals stacked before the user reached the app.

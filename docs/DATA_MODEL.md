@@ -59,6 +59,23 @@ Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` 
 // staple cycles: none → staple → running low; staples are never deducted on cook
 ```
 
+## Grocery item
+```js
+{
+  id,               // Date.now() + Math.random()
+  name,
+  category,
+  quantity,         // number or null
+  unit,
+  sources,          // string[] — e.g. ['Running low'], ['Monday lunch']
+  checked,          // boolean
+  custom,           // boolean — user-added or auto-added (not from weekly plan)
+  fromStaple?,      // boolean — auto-added by checkAndReplenishLowStock / syncStapleToGrocery
+  suggested?,       // boolean — true on auto-suggested items (fromStaple items only)
+  suggestedReason?, // string — why it was suggested (e.g. 'low stock')
+}
+```
+
 ## Firestore layout
 - `users/{uid}` — main user-data doc (no inline photos). Carries the `version` concurrency field.
 - `users/{uid}/photos/{recipeId}` — one doc per recipe photo (data URL).
@@ -72,7 +89,8 @@ Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` 
 | `mealPrepBackup` | pre-destructive-action snapshot (Restore Backup / Import) |
 | `colorScheme` | **unused** — light-only release; no longer read or written (theme script removed, D-013) |
 | `mealPrepDisplayName` | display name |
-| `pantryOnboardingDone`, `mealPrepStartDone` | first-run flags |
+| `mealPrepHelpSeen` | first-run flag — set on first load; gates Help modal auto-open (only opens if wizard already done) |
+| `pantryOnboardingDone`, `mealPrepStartDone` | first-run flags — `pantryOnboardingDone` set by wizard skip or confirm; gates Kitchen Setup Wizard auto-open and Help modal auto-open |
 
 ## Hardcoded databases (in app.js)
 | Object | ~Size | Entry shape / purpose |

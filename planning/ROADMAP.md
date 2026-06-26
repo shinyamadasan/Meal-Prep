@@ -42,15 +42,7 @@ Prioritized; top item is promoted next. Each entry: outcome + priority/complexit
 > lives in `checkAndReplenishLowStock()` / `syncStapleToGrocery()`; grocery rendering in
 > `renderGroceryList()`; state in `AppState.groceryList` (items) and `AppState.pantry`.
 
-- [ ] **1. Flag auto-suggested low-stock grocery items** · P2 · complexity:S
-  - The grocery list already auto-adds pantry items when `quantity < minStockQty`
-    (`checkAndReplenishLowStock()`). This task only **marks** those auto-added entries so later tasks
-    can tell them apart — do NOT rebuild the suggestion logic.
-  - acceptance:
-    - [ ] items auto-added by `checkAndReplenishLowStock()` get `suggested: true` (+ a short `suggestedReason`, e.g. "low stock") on the grocery item
-    - [ ] manually-added grocery items are NOT flagged
-    - [ ] flag persists through `saveData()` and survives reload (it's part of the grocery item)
-  - likely files: `app.js` (`checkAndReplenishLowStock`, `syncStapleToGrocery`)
+- [x] ~~**1. Flag auto-suggested low-stock grocery items**~~ ✅ (2026-06-25)
 - [ ] **2. "Suggested" badge in the grocery list** · P2 · complexity:S
   - Depends on Task 1's `suggested` flag.
   - acceptance:

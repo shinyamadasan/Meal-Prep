@@ -3,6 +3,7 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ P2 Task 1 — `suggested: true` + `suggestedReason: 'low stock'` flag on auto-suggested grocery items (`syncStapleToGrocery`, `checkAndReplenishLowStock`) (2026-06-25)
 - ✅ Alpha P1 — one onboarding gate: Help modal no longer auto-opens on first run when Kitchen Setup Wizard fires (`pantryOnboardingDone` gate in `initApp()`) (2026-06-25)
 - ✅ "Sample" badge on the 26 seeded recipes (`isSampleRecipe()`, Job #3 clarity) (2026-06-25)
 - ✅ Product prompts PP1–PP7 added to PROMPTS.md (Engineering + Product sections); part of AI Dev OS v1.0 (2026-06-25)

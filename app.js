@@ -6564,7 +6564,9 @@ function syncStapleToGrocery(p) {
       sources: ['Running low'],
       checked: false,
       custom: true,
-      fromStaple: true
+      fromStaple: true,
+      suggested: true,
+      suggestedReason: 'low stock'
     });
   }
 }
@@ -6597,7 +6599,9 @@ function checkAndReplenishLowStock() {
           sources: ['Running low'],
           checked: false,
           custom: true,
-          fromStaple: true
+          fromStaple: true,
+          suggested: true,
+          suggestedReason: 'low stock'
         });
         changed = true;
       } else if (!isBelowMin && alreadyInList) {

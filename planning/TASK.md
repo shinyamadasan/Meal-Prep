@@ -9,19 +9,18 @@
 > `ROADMAP.md` queue item here (FIFO). Queue empty → set NO ACTIVE TASK.
 
 ## Objective
-On a brand-new first run, only the Kitchen Setup Wizard auto-appears — the Help modal must NOT auto-open on top of it.
+Add a `suggested: true` flag (+ `suggestedReason`) to grocery items auto-added by `checkAndReplenishLowStock()` / `syncStapleToGrocery()`, so later tasks can distinguish them from manually-added items.
 
 ## Current Step
-COMPLETE — fix implemented, Self Review passed, QA passed. Updating docs.
+Implementing — finding `checkAndReplenishLowStock` and `syncStapleToGrocery` in app.js to add the flag at the point items are created/pushed.
 
 ## Success Criteria
-- [x] on a brand-new first run, only the Kitchen Setup Wizard auto-appears (Help does NOT auto-open)
-- [x] Help stays reachable via Settings → How-to (unchanged)
-- [x] returning users get no surprise Help popups; Help still doesn't auto-open on every load
+- [ ] items auto-added by `checkAndReplenishLowStock()` get `suggested: true` + `suggestedReason: "low stock"`
+- [ ] manually-added grocery items are NOT flagged
+- [ ] flag persists through `saveData()` and survives reload
 
 ## Blocker
 none
 
 ## Definition of Done
-All Success Criteria verified. Reference docs updated (FEATURES/DATA_MODEL/ARCHITECTURE/DECISIONS as
-applicable). STATUS.md updated. Code + docs committed together. Then Next Task Selection.
+All Success Criteria verified. Reference docs updated. STATUS.md updated. Code + docs committed together. Then Next Task Selection.
