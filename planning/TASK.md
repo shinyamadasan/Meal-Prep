@@ -8,30 +8,20 @@
 > zero context. On Task Completion: tick all criteria, then Next Task Selection promotes the next
 > `ROADMAP.md` queue item here (FIFO). Queue empty → set NO ACTIVE TASK.
 
-## Status: NO ACTIVE TASK
-
-Queue empty as of 2026-06-24. Add a task to `ROADMAP.md`, then promote it here to activate work.
-
----
-
-<!-- TEMPLATE — copy this shape when promoting a task from ROADMAP:
-
 ## Objective
-<one sentence: the outcome to build>
+On a brand-new first run, only the Kitchen Setup Wizard auto-appears — the Help modal must NOT auto-open on top of it.
 
 ## Current Step
-<the precise next action — the resume point; update it as you progress>
+COMPLETE — fix implemented, Self Review passed, QA passed. Updating docs.
 
 ## Success Criteria
-- [ ] <verifiable criterion 1>
-- [ ] <verifiable criterion 2>
-- [ ] <verifiable criterion 3>
+- [x] on a brand-new first run, only the Kitchen Setup Wizard auto-appears (Help does NOT auto-open)
+- [x] Help stays reachable via Settings → How-to (unchanged)
+- [x] returning users get no surprise Help popups; Help still doesn't auto-open on every load
 
 ## Blocker
-<none | what's blocking + what input/decision is needed to unblock>
+none
 
 ## Definition of Done
 All Success Criteria verified. Reference docs updated (FEATURES/DATA_MODEL/ARCHITECTURE/DECISIONS as
 applicable). STATUS.md updated. Code + docs committed together. Then Next Task Selection.
-
--->

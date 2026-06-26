@@ -5,6 +5,19 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-25 — Alpha P1: one onboarding gate (no double-modal on first run)
+
+**Problem:** On first run, `initApp()` scheduled `openHelpModal` after 600ms AND `seedPantryIfEmpty()` opened the Kitchen Setup Wizard synchronously — two modals stacked before the user reached the app.
+**Fix (3-line gate):** In the `mealPrepHelpSeen` block, only schedule `openHelpModal` if `pantryOnboardingDone` is already set. When it's absent, the wizard is about to fire, so Help skips. Both flags are checked directly in `localStorage` — no AppState reads needed at that early point in `initApp()`.
+**Behaviour after fix:** Brand-new user → wizard only. Returning user (both flags set) → neither auto-opens. Edge: user cleared only `mealPrepHelpSeen` but wizard already done → Help opens normally. All acceptance criteria met. `openHelpModal()` reachable via Settings unchanged.
+**Triage:** One capture (`20260625T2227Z-10-feature`) in inbox — confirmed the same priority, archived, no new task created.
+**Self Review:** pass (reuses existing `localStorage.getItem` pattern; minimum change; `mealPrepHelpSeen` still set on first run so it doesn't re-open). **QA:** pass.
+**Files changed:** `app.js`, `docs/FEATURES.md`, `planning/DONE.md`, `planning/ROADMAP.md`, `planning/TASK.md`, `STATUS.md`, `captures/processed/2026/06/20260625T2227Z-10-feature.md`.
+**Branch:** `main` — committing now.
+**Next:** P2 drain chain — Task 1: flag auto-suggested low-stock grocery items.
+
+---
+
 ## 2026-06-25 — Queued an alpha P1 ahead of tonight's drain; Job #5 preserved
 
 **Queue (top → bottom) for tonight's run:**

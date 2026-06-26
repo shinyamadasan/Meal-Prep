@@ -63,7 +63,8 @@
 
 ## Settings & Help
 - Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, export/import, restore backup, clear all (snapshots first).
-- Help modal — Working · `#help-modal` · 6-step guide.
+- Help modal — Working · `#help-modal` · 6-step guide · reachable via Settings; does NOT auto-open on first run when the Kitchen Setup Wizard will also fire (`pantryOnboardingDone` gate in `initApp()`).
+- **Kitchen Setup Wizard** — Working · `openKitchenSetupModal()` / `seedPantryIfEmpty()` · auto-opens on first run only (when pantry is empty and `pantryOnboardingDone` not set); only onboarding gate on brand-new first run.
 
 ## Auth & Security
 - Email sign-in/sign-up, email verification (gates sharing), sign-out — Working.

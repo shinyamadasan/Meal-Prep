@@ -1607,11 +1607,14 @@ window.closeHelpModal = closeHelpModal;
 function initApp() {
   hydrateIcons(); // turn static data-icon placeholders into SVGs
 
-  // First-run: show the How-to-Use guide once.
+  // First-run: show the How-to-Use guide once — but not when the Kitchen Setup Wizard
+  // will also auto-open (pantryOnboardingDone absent = wizard fires = Help skips).
   try {
     if (!localStorage.getItem('mealPrepHelpSeen')) {
       localStorage.setItem('mealPrepHelpSeen', '1');
-      setTimeout(openHelpModal, 600);
+      if (localStorage.getItem('pantryOnboardingDone')) {
+        setTimeout(openHelpModal, 600);
+      }
     }
   } catch (e) { /* ignore storage errors */ }
 

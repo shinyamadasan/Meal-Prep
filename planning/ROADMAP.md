@@ -35,15 +35,7 @@ Prioritized; top item is promoted next. Each entry: outcome + priority/complexit
 > price *reference*) vs build a minimal basket-per-store compare. The **human** decides; the autonomous
 > run must SKIP this. Last external-testing blocker. *(Preserved — do not delete.)*
 
-- [ ] **Alpha P1: one onboarding modal on first run** · P1 · complexity:S
-  - Outcome: a brand-new user sees ONE onboarding gate (the Kitchen Setup Wizard), not the Help modal stacked on top of it. First-impression friction (audit: "two modals before you see the app").
-  - Context: on first run `initApp()` auto-opens Help (`!mealPrepHelpSeen` → `setTimeout(openHelpModal)`) AND `seedPantryIfEmpty()` opens the Kitchen Setup Wizard — both fire, stacking two modals before the user reaches the app.
-  - acceptance:
-    - [ ] on a brand-new first run, only the Kitchen Setup Wizard auto-appears (Help does NOT auto-open)
-    - [ ] Help stays reachable via Settings → How-to (unchanged)
-    - [ ] returning users get no surprise Help popups; Help still doesn't auto-open on every load
-  - likely files: `app.js` (`initApp` help trigger; `seedPantryIfEmpty` / `openKitchenSetupModal`)
-  - constraint: friction removal only — do not redesign the wizard or help modal.
+- [x] ~~**Alpha P1: one onboarding modal on first run**~~ ✅ (2026-06-25)
 
 > **Dependency chain (drain test, 2026-06-25).** Build in order — each builds on the previous via a
 > `suggested` flag on grocery items. EXTEND existing code, don't duplicate: low-stock auto-add already
