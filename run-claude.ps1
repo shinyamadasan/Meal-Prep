@@ -15,44 +15,44 @@ Add-Content -Path $logFile -Value ""
 Add-Content -Path $logFile -Value "=== Session started: $timestamp ==="
 
 $prompt = @'
-You are running in autonomous mode. No human is available. Follow WORKFLOW.md — the task-driven
-lifecycle. There is no "session end": when you stop, you perform a Checkpoint first.
+You are running in autonomous mode. No human is available. Follow WORKFLOW.md. There is no "session
+end": when you stop, perform a Checkpoint first.
 
-Read CLAUDE.md, STATUS.md, and planning/TASK.md first. CLAUDE.md routes you to any other docs.
-planning/TASK.md is the single active task — it is what you work on. Do NOT pick tasks from
-planning/ROADMAP.md yourself; a human already set priority. Never touch the ROADMAP "Do Not Work On"
-section. Do not delete files (archiving captures is a git mv, not a delete).
+Read CLAUDE.md, STATUS.md, and planning/TASK.md first. SINGLE RESPONSIBILITY — do not cross lanes:
+Triage only routes; the Builder only builds. The Builder builds ONLY from planning/BUILD_QUEUE.md
+(human-approved). NEVER build from captures/inbox/, planning/PROPOSALS.md, or planning/ROADMAP.md.
+Never touch the ROADMAP "Do Not Work On" section. Do not delete files (archiving captures is a git mv).
 
-STEP A — TRIAGE FIRST: if captures/inbox/ has any *.md, process them per WORKFLOW.md "Triage":
-categorize, dedupe vs ROADMAP/DONE, score against docs/PROJECT.md North-star goals, set priority +
-complexity + tags, write acceptance criteria, list likely files, route into planning/ROADMAP.md
-(feature/todo→Task Queue, bug→Known Issues, idea→Ideas, research→Research), archive each to
-captures/processed/YYYY/MM/<id>.md, and append a one-line triage summary to STATUS.md. Commit.
+STEP A — TRIAGE (route only; NEVER build, schedule, or prioritize-for-build): if captures/inbox/ has
+any *.md, process each per WORKFLOW.md "Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, score
+against docs/PROJECT.md North-star goals, estimate effort + dependencies + confidence, flag ambiguity,
+set an AI-recommended priority, and write it as a proposal (status: pending) in planning/PROPOSALS.md.
+Archive each capture to captures/processed/YYYY/MM/<id>.md and append a one-line triage summary to
+STATUS.md. Commit. Do NOT write to ROADMAP.md or BUILD_QUEUE.md, and do NOT build.
 
-STEP B — if planning/TASK.md is "NO ACTIVE TASK": promote the top ROADMAP Task Queue item into it.
-If the queue is also empty, write "No tasks remaining" to STATUS.md and stop (do not shut down the
-PC, do not invent or plan work).
+STEP B — BUILD (approved work only): if planning/TASK.md is "NO ACTIVE TASK", promote the top item of
+planning/BUILD_QUEUE.md into it. If BUILD_QUEUE.md is empty, write "No tasks remaining" to STATUS.md
+and stop (do not shut down the PC; do not invent, plan, prioritize, or build unapproved work).
 
 STEP C — loop over the active task:
-1. RESUME: read planning/TASK.md "Current Step" and continue from there. Read only routed docs.
+1. RESUME: read planning/TASK.md "Current Step" and continue. Read only routed docs.
 2. Ensure you are on main (git checkout main && git pull origin main).
 3. EXECUTION: implement in app.js / index.html / style.css; keep "Current Step" current.
 4. Decide the outcome:
-   - COMPLETED (all Success Criteria verified): FIRST run SELF_REVIEW.md (code-health checklist +
-     "would I ship this?") and fix/simplify any findings before proceeding; then tick criteria in
-     TASK.md; update reference docs
-     (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md;
-     update STATUS.md; RUN THE QA GATE in QA.md — every AI check must pass (any failure → treat as
-     BLOCKED: record it, do NOT commit; append QA.md's human checks to STATUS.md); then COMMIT
-     code+docs together and push; then NEXT TASK SELECTION — promote the top ROADMAP Task Queue item
-     into TASK.md (FIFO). Continue.
+   - COMPLETED (all Success Criteria verified): FIRST run SELF_REVIEW.md (code health + "would I ship
+     this?") and fix/simplify; then tick criteria in TASK.md; update reference docs
+     (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md; update
+     STATUS.md; RUN THE QA GATE in QA.md — every AI check must pass (any failure → BLOCKED: record it,
+     do NOT commit); then COMMIT code+docs together and push; then remove the finished item from
+     planning/BUILD_QUEUE.md and promote the next BUILD_QUEUE item into TASK.md. Continue.
    - PARTIAL (near context/token limit mid-task): CHECKPOINT — write the precise next action into
      TASK.md "Current Step" and an in-progress entry at the TOP of STATUS.md; make a `wip:` commit
-     and push; then STOP. Do NOT mark Done or advance ROADMAP.
+     and push; then STOP. Do NOT mark Done.
    - BLOCKED (ambiguous / missing input / failing gate): record the blocker in TASK.md (Blocker) and
-     STATUS.md; move the task to ROADMAP "Blocked"; promote the next queue item; continue. Queue
-     empty → STOP.
-5. Stop when TASK.md is NO ACTIVE TASK or you are near your context limit (Checkpoint first).
+     STATUS.md; remove it from BUILD_QUEUE.md (note why); promote the next BUILD_QUEUE item; continue.
+     Queue empty → STOP.
+5. Stop when BUILD_QUEUE.md is empty / TASK.md is NO ACTIVE TASK, or you are near your context limit
+   (Checkpoint first).
 '@
 
 claude -p $prompt `

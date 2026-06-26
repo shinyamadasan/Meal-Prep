@@ -5,6 +5,23 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-26 — Pipeline redesign Phase 0: firewall (capture ≠ build)
+
+**Done (Phase 0 of the gated pipeline, DECISIONS D-015):** separated capture from build so nothing
+ships without human approval. Three small commits:
+1. New `planning/PROPOSALS.md` (triage output, pending approval) + `planning/BUILD_QUEUE.md` (approved-only — the **only** file the Builder reads). Job #5 migrated → PROP-001.
+2. `planning/ROADMAP.md`: retired the auto-building **Task Queue** → now the **protected approved backlog** (only the approval gate writes it). `CLAUDE.md` hard rule 0 + doc map + lifecycle. `DECISIONS.md` D-015.
+3. `run-claude.ps1` rewired: Triage **routes to PROPOSALS only** (never builds); Builder builds **only from BUILD_QUEUE** (empty → stops). Single responsibility per stage enforced.
+**Effect:** auto-build is gone. The next scheduled run triages the 11 pending inbox captures into
+`PROPOSALS.md` (pending your judgment) and **builds nothing** (BUILD_QUEUE is empty).
+**Verification:** docs + automation only (no app code). Confirmed the Builder has no path to
+inbox/roadmap/proposals for work; BUILD_QUEUE empty.
+**Branch:** `main` — committed + pushed.
+**Next (do NOT start until you verify Phase 0):** Phase 1 — triage enrichment + evidence-gathering.
+**Blockers:** none.
+
+---
+
 ## 2026-06-25 — P2 Task 3: Dismiss a suggested grocery item
 
 **Built:**
