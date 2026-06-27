@@ -61,9 +61,29 @@ STEP C — loop over the active task:
    (Checkpoint first).
 '@
 
+# --- Phase 2 (deterministic, pre-build): apply approval replies into BUILD_QUEUE, if any ---
+# n8n only drops raw reply files in captures/decisions/; parsing + applying is code, not the LLM.
+try { & "$projectPath\tools\Apply-Decisions.ps1" | Tee-Object -FilePath $logFile -Append }
+catch { Add-Content -Path $logFile -Value "Apply-Decisions error: $_" }
+git add planning/PROPOSALS.md planning/BUILD_QUEUE.md captures/decisions
+git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) {
+    git commit -m "decisions: apply approval replies -> BUILD_QUEUE" | Out-Null
+    git push origin main | Out-Null
+}
+
 claude -p $prompt `
     --allowedTools "Edit" "Write" "Read" "Glob" "Grep" "Bash(git checkout main)" "Bash(git add *)" "Bash(git mv *)" "Bash(git commit *)" "Bash(git push origin main)" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
     | Tee-Object -FilePath $logFile -Append
+
+# --- Phase 2 (deterministic, post-run): refresh the digest for n8n's next morning send ---
+try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Add-Content -Path $logFile -Value "Generate-Digest error: $_" }
+git add planning/DIGEST.md
+git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) {
+    git commit -m "digest: refresh from latest proposals" | Out-Null
+    git push origin main | Out-Null
+}
 
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="

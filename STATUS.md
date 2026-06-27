@@ -5,6 +5,30 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-26 — Phase 2 reply gate built (PC side); n8n messaging is the remaining wiring
+
+**Architecture (D-017):** n8n owns all Telegram messaging; Claude/PC emits structured output only; the
+reply parser is deterministic code (no LLM).
+
+**Built + tested (PC side):**
+- `tools/Generate-Digest.ps1` → writes `planning/DIGEST.md` (no `-Send`; n8n reads + sends).
+- `tools/Apply-Decisions.ps1` → parses `captures/decisions/*.md` replies (`Approve/Park/Reject/Clarify N`),
+  marks `PROPOSALS.md` status, appends Approved → `BUILD_QUEUE.md`. Verified by dry-run + a reverted real
+  run; "tell me more about 5" is correctly ignored (numbers must immediately follow a verb).
+- `run-claude.ps1` wired: apply decisions (+commit/push) **before** build; refresh `DIGEST.md` (+commit/push) **after**. Parses clean.
+
+**Remaining (yours — needs the bot token + n8n; touches the live capture flow):** two n8n changes —
+(1) **morning schedule:** GET `planning/DIGEST.md` from GitHub → Telegram send;
+(2) **reply branch:** in the capture workflow, detect an `approve/park/reject` reply → write
+`captures/decisions/<id>.md` instead of an inbox capture. I'll provide importable JSON next.
+
+**⚠ Not mine:** an external `library-guardian` run modified `CLAUDE.md` and created `library/requirements/`
+— left **uncommitted**; decide if you want it.
+
+**Branch:** `main` — committed. **Next:** n8n JSON, then a real end-to-end reply test from your phone.
+
+---
+
 ## 2026-06-26 — Phase 2 (start): digest generator built; reply-gate pending one decision
 
 **Built:** `tools/Generate-Digest.ps1` — a **deterministic** morning digest from `PROPOSALS.md`
