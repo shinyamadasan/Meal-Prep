@@ -100,6 +100,7 @@ For each captures/inbox/*.md with `status: new` (SKIP any already `status: triag
 the /command, infer if none); dedupe against planning/PROPOSALS.md + planning/ROADMAP.md +
 planning/DONE.md. Then write ONE proposal per capture into planning/PROPOSALS.md using the **Proposal
 contract** there (status: pending), filling EVERY field:
+- ▶ Decision — the recommended next action (Approve / Park / Reject / Clarify) + a one-line why, stated FIRST so it's actionable straight from a phone digest
 - goal alignment — supports / conflicts / mixed vs the **Current Objective** in ROADMAP.md (+ which North-star goal in docs/PROJECT.md)
 - expected user value — who benefits, how much, in the current phase
 - evidence — recurring friction · dup count · demand signal · similar past work

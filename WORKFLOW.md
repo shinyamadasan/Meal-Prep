@@ -71,11 +71,13 @@ stateDiagram-v2
 - **Does**, for each capture with `status: new` (SKIP any already `status: triaged` — idempotency):
   1. **Categorize** — use the `/command`; infer the type if the capture had none.
   2. **Dedupe** — search PROPOSALS + ROADMAP + DONE; if a dup, merge (bump the dup count), don't re-add.
-  3. **Enrich into the Proposal contract** (the format in `PROPOSALS.md`), filling every field:
-     **goal alignment** (supports / conflicts / mixed vs the **Current Objective**, + which North-star
-     goal), **expected user value**, **evidence** (recurring friction · dup count · demand signal),
-     **effort / dependencies / confidence / ambiguity**, **why now vs later**, and a **goal-adjusted**
-     AI-recommended priority (P0..P3 — down-weight work that doesn't serve the Current Objective).
+  3. **Enrich into the Proposal contract** (the format in `PROPOSALS.md`), filling every field, **led
+     by `▶ Decision`** — the recommended next action (Approve / Park / Reject / Clarify) + a one-line
+     why, so the proposal is actionable straight from a phone digest. Then: **goal alignment** (supports
+     / conflicts / mixed vs the **Current Objective**, + which North-star goal), **expected user value**,
+     **evidence** (recurring friction · dup count · demand signal), **effort / dependencies / confidence
+     / ambiguity**, **why now vs later**, and a **goal-adjusted** AI-recommended priority (P0..P3 —
+     down-weight work that doesn't serve the Current Objective).
 - **Writes:** `planning/PROPOSALS.md` (one `status: pending` proposal per capture); **archives** each
   processed capture to `captures/processed/YYYY/MM/<id>.md` (provenance) and marks the inbox file
   `status: triaged`; a one-line triage summary to `STATUS.md`. **Never** writes `ROADMAP.md` or

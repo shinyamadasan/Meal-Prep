@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-26 — Phase 1.5: `▶ Decision` field; validate the contract by hand before automating
+
+Added **▶ Decision** (Approve / Park / Reject / Clarify + one-line why) as the lead field on every
+proposal and in the Proposal contract; triage prompts (run-claude STEP A, PROMPTS P9) + WORKFLOW Triage
+event now emit it first. Recommendations this batch: PROP-001 **Approve (Option A)**, PROP-002..010
+**Approve**, PROP-011/012/013 **Park**.
+
+**Deliberately NOT automating yet.** Per the plan: use `PROPOSALS.md` from the phone for a day or two
+and confirm the contract is enough to decide *without opening the PC* — then build the Telegram approval
+flow (Phase 2) on a contract we've already validated, rather than discovering usability gaps after the
+automation exists.
+
+**Branch:** `main` — committed. **Next:** validate in practice → Phase 2 (approval digest + natural-reply gate).
+
+---
+
 ## 2026-06-26 — Triage: 11 new captures → 12 proposals (PROP-002 through PROP-013)
 
 **Triage complete.** BUILD_QUEUE was empty (nothing to build). Processed 11 new captures from today's

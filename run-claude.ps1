@@ -26,11 +26,13 @@ Never touch the ROADMAP "Do Not Work On" section. Do not delete files (archiving
 STEP A — TRIAGE (route + enrich only; NEVER build, schedule, or prioritize-for-build): for each
 captures/inbox/*.md with `status: new` (SKIP any already `status: triaged`), process per WORKFLOW.md
 "Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, then ENRICH into the proposal contract in
-planning/PROPOSALS.md (status: pending) — fill EVERY field: goal alignment vs the **Current Objective**
-in ROADMAP.md (supports/conflicts/mixed + which North-star goal), expected user value, evidence
-(recurring friction · dup count · demand signal), effort + dependencies + confidence + ambiguity, why
-now vs later, and a **goal-adjusted** AI-recommended priority (P0..P3 — not raw priority; down-weight
-work that doesn't serve the Current Objective). Archive each capture to captures/processed/YYYY/MM/<id>.md,
+planning/PROPOSALS.md (status: pending) — fill EVERY field. LEAD with **▶ Decision** (the recommended
+next action: Approve | Park | Reject | Clarify + a one-line why) so it's actionable from a phone digest.
+Then: goal alignment vs the **Current Objective** in ROADMAP.md (supports/conflicts/mixed + which
+North-star goal), expected user value, evidence (recurring friction · dup count · demand signal), effort
++ dependencies + confidence + ambiguity, why now vs later, and a **goal-adjusted** AI-recommended
+priority (P0..P3 — not raw priority; down-weight work that doesn't serve the Current Objective).
+Archive each capture to captures/processed/YYYY/MM/<id>.md,
 mark the inbox file `status: triaged`, and append a one-line triage summary to STATUS.md. Commit.
 Do NOT write to ROADMAP.md or BUILD_QUEUE.md, and do NOT build.
 

@@ -5,6 +5,10 @@
 > **your approval**. Approve → it moves to `ROADMAP.md` (the approved backlog). Park/Reject is recorded
 > and dropped.
 >
+> **Every proposal leads with `▶ Decision`** — the AI's recommended next action
+> (**Approve · Park · Reject · Clarify**) with a one-line why, so you can act from the digest on your
+> phone without figuring out what to do. The rest of the fields are the evidence behind that call.
+>
 > Single responsibility: **Triage routes + enriches — it never schedules or builds.**
 >
 > **This file is a stage contract.** The format under "Proposal contract" below is the structured output
@@ -16,6 +20,7 @@
 ## Pending
 
 ### PROP-001 — Job #5 "cheapest": descope vs build store-compare
+- **▶ Decision: Approve (Option A — descope).** Reframe Price Book honestly as a price *reference* now (cheap, raises first-run trust); defer the Option B build until a user actually asks for store-compare.
 - **type:** decision · **source captures:** alpha audit (×1)
 - **goal alignment:** ⚠️ mixed vs the Current Objective (**Alpha stability**). **Option A (descope)**
   *supports* it — removes a promise the app doesn't keep, which raises first-run trust. **Option B (build)**
@@ -34,6 +39,7 @@
 ---
 
 ### PROP-002 — Dashboard: data doesn't load on first open (tab-switch workaround required)
+- **▶ Decision: Approve.** P0 — broken first impression on every app open; belongs in the next build.
 - **type:** bug · **source captures:** 20260626T1146Z-30 (×1) · *note: captured as /feature, reclassified bug*
 - **goal alignment:** strongly supports — North-star #1 (core loop friction) + #3 (zero-friction start). The home screen is the first thing a user sees; showing stale/empty data is a broken first impression.
 - **expected user value:** High — every user hits this on every app open; forces a meaningless tab-switch before the app feels alive.
@@ -46,6 +52,7 @@
 ---
 
 ### PROP-003 — Recipe JSON import fails
+- **▶ Decision: Approve.** P0 — recipe import is fully broken; fix before alpha user testing.
 - **type:** bug · **source captures:** 20260626T1152Z-32 (×1) · *note: captured as /feature, reclassified bug*
 - **goal alignment:** supports — North-star #1 (core loop). Recipe import is a primary way to populate the app; a silent failure blocks a real user from using it.
 - **expected user value:** High — feature is non-functional. User tried importing `cpb-diet-import.json` (file visible in repo as untracked) and it failed.
@@ -58,6 +65,7 @@
 ---
 
 ### PROP-004 — Bulk add parser: unit treated as ingredient name when comma is missing
+- **▶ Decision: Approve.** P1 — silently corrupts pantry data right now during alpha use.
 - **type:** bug · **source captures:** 20260626T1009Z-12 (×1)
 - **goal alignment:** supports — North-star #1 (reduce friction in core loop). Bulk add is a key pantry entry shortcut; a parser that silently corrupts data on format variations erodes trust.
 - **expected user value:** High — user is hitting this right now during alpha. Corrupted pantry entries require manual cleanup.
@@ -70,6 +78,7 @@
 ---
 
 ### PROP-005 — Duplicate pantry name: ask user instead of silent skip
+- **▶ Decision: Approve.** P1 — confirm the duplicate-add dialog copy at build time.
 - **type:** bug/feature · **source captures:** 20260626T1044Z-28 (×1)
 - **goal alignment:** supports — North-star #1 (friction) + #2 (never lose user data). Silently skipping a duplicate pantry add is wrong when the user legitimately has two of the same item (two oyster sauce jars with different expiry dates, different purchase dates, etc.).
 - **expected user value:** High — pantry becomes inaccurate. User can't log a second jar of the same item at all right now.
@@ -82,6 +91,7 @@
 ---
 
 ### PROP-006 — Pantry card: switching date field closes the card (should not close)
+- **▶ Decision: Approve.** P1 — friction in the core stock-tracking flow.
 - **type:** bug/UX · **source captures:** 20260626T1020Z-18 (×1, part A)
 - **goal alignment:** supports — North-star #1 (reduce friction in buy→stock flow). The collapse trigger fires on a field blur/switch, forcing the user to reopen the card just to fill in expiry date.
 - **expected user value:** High — hits anyone adding new pantry items and wanting to set expiry date right away (which is the post-bulk-add workflow).
@@ -94,6 +104,7 @@
 ---
 
 ### PROP-007 — Storage guide: don't show (or flag) guidance for unrecognized ingredients
+- **▶ Decision: Approve.** P2 — schedule after the P0/P1s; pick the fallback UX at build.
 - **type:** UX/trust · **source captures:** 20260626T1012Z-14 (×1)
 - **goal alignment:** supports — North-star #1 and alpha trust. Showing a generic or clearly wrong storage guide for items the app doesn't recognize damages trust in the guide for items it *does* know.
 - **expected user value:** Medium — prevents "this guide is wrong" perception during alpha testing.
@@ -106,6 +117,7 @@
 ---
 
 ### PROP-008 — Pantry list: show recently added items at the top
+- **▶ Decision: Approve.** P2 — small win; batch with the other post-add flow fixes (PROP-006/009).
 - **type:** feature · **source captures:** 20260626T1020Z-18 (×1, part B)
 - **goal alignment:** supports — North-star #1. After a bulk add, users need to fill in expiry dates and quantities; currently they have to scroll to find new items in an alphabetical or unordered list.
 - **expected user value:** Medium — reduces post-add friction, especially after bulk add.
@@ -118,6 +130,7 @@
 ---
 
 ### PROP-009 — Bulk add: include expiry date field in the add flow
+- **▶ Decision: Approve.** P2 — sequence after PROP-004 (same parser).
 - **type:** feature · **source captures:** 20260626T1023Z-22 (×1)
 - **goal alignment:** supports — North-star #1. Currently bulk add creates items without expiry; users then have to open each card individually to add the date. Relates to PROP-006 (card closes on date switch) and PROP-008 (recently added on top).
 - **expected user value:** High if implemented cleanly — eliminates the post-bulk-add editing step for expiry. Medium if the format gets complicated.
@@ -130,6 +143,7 @@
 ---
 
 ### PROP-010 — Ingredient card unit input: allow typing + offer dropdown
+- **▶ Decision: Approve.** P2 — quality-of-life; not urgent, batch with other P2s.
 - **type:** feature · **source captures:** 20260626T1015Z-16 (×1)
 - **goal alignment:** supports — North-star #1 (reduce friction in data entry). A hybrid input (free-type + common-unit dropdown) reduces unit typos and standardizes data.
 - **expected user value:** Medium — better data quality; reduces "g" vs "grams" inconsistencies that can break conversions.
@@ -142,6 +156,7 @@
 ---
 
 ### PROP-011 — Bulk add: autocomplete / search from existing pantry items
+- **▶ Decision: Park.** P3 — high effort; revisit after stability. If approved, build only the safe sub-part (autocomplete from the ingredient DB, not the pantry).
 - **type:** feature · **source captures:** 20260626T1036Z-24 (×1)
 - **goal alignment:** supports — North-star #1 (reduce friction). Typing ingredient names from scratch is slow; autocomplete from the existing pantry or ingredient DB would help.
 - **expected user value:** Medium — significant speed gain for restocking known items.
@@ -154,6 +169,7 @@
 ---
 
 ### PROP-012 — Long press to delete pantry item
+- **▶ Decision: Park.** P3 — nice-to-have; delete already works via the card edit.
 - **type:** feature · **source captures:** 20260626T1023Z-20 (×1)
 - **goal alignment:** neutral — a power-user shortcut; item deletion via card edit already exists.
 - **expected user value:** Low–Medium — faster for frequent deletions, but delete is not a high-frequency action.
@@ -166,6 +182,7 @@
 ---
 
 ### PROP-013 — Same product, different packaging sizes (data model decision)
+- **▶ Decision: Park.** Revisit as a product-direction decision once there's more user data — the data-model change is too big to make on a single example.
 - **type:** decision · **source captures:** 20260626T1037Z-26 (×1)
 - **goal alignment:** neutral — real product question but no urgency during alpha stability.
 - **expected user value:** unclear — depends on direction. Current model treats "Coconut Cream 200ml" and "Coconut Cream 400ml" as separate pantry items (correct short-term, but messy long-term).
@@ -181,6 +198,7 @@
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```
 ### PROP-NNN — <title>
+- ▶ Decision: Approve | Park | Reject | Clarify — <one-line why; the recommended next action, stated first>
 - type:        feature | bug | chore | decision
 - source captures: <ids> (×N duplicates)
 - goal alignment:  supports | conflicts | mixed | neutral  — vs the Current Objective (name it; add which North-star goal)
@@ -194,3 +212,6 @@
 - AI-recommended priority: P0..P3   (goal-adjusted, not raw priority)
 - status:      pending
 ```
+*`▶ Decision` is the recommended action; `status` is your recorded outcome. They differ on purpose —
+the AI recommends, you decide.* **Approve** = build it (→ ROADMAP). **Park** = valid, not now. **Reject**
+= drop it. **Clarify** = AI can't recommend confidently; it needs an answer from you first.
