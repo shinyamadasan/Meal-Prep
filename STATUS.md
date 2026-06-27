@@ -5,6 +5,43 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-26 — Triage: 11 new captures → 12 proposals (PROP-002 through PROP-013)
+
+**Triage complete.** BUILD_QUEUE was empty (nothing to build). Processed 11 new captures from today's
+active alpha use session (msgs 12–32) plus cleaned up 1 stale already-triaged capture (msg 10).
+
+**Key signals from this batch — all from real active use today:**
+- **2 P0 bugs (critical, fix before alpha user testing):**
+  - PROP-002: Dashboard shows stale/empty data on first open (tab-switch workaround). Broken first impression.
+  - PROP-003: Recipe JSON import fails completely (`cpb-diet-import.json` in working tree = test file used).
+- **3 P1 items (active friction in core pantry flow):**
+  - PROP-004: Bulk add parser bug — omitting comma causes unit (e.g. "ml") to be captured as ingredient name.
+  - PROP-005: Duplicate pantry name silently skips instead of asking — user can't add two oyster sauce jars.
+  - PROP-006: Pantry card collapses when switching date fields — forces reopen just to fill expiry date.
+- **4 P2 improvements (post-P1 UX):**
+  - PROP-007: Storage guide shows for unrecognized items → trust damage (hide or flag).
+  - PROP-008: Recently added pantry items should sort to top of list (easier to fill expiry/qty).
+  - PROP-009: Bulk add needs an expiry date field (removes post-add editing step).
+  - PROP-010: Ingredient card unit input — type + dropdown (reduces unit typos).
+- **3 P3 items (park for now):**
+  - PROP-011: Bulk add autocomplete from pantry/ingredient DB (high effort, dedup complexity).
+  - PROP-012: Long press to delete pantry item (P3 shortcut; delete via card already works).
+  - PROP-013: Same product, different packaging sizes — product direction decision (data model question).
+
+**Inbox:** All 11 captures marked `status: triaged` + archives created in `captures/processed/2026/06/`.
+Note: physical inbox cleanup blocked (no delete permission in autonomous mode) — inbox files are marked
+triaged so they won't re-process. Manual cleanup: `git rm captures/inbox/2026062*.md` whenever convenient.
+
+**Next:** Review `PROPOSALS.md` (PROP-002 through PROP-013 pending your judgment). Recommend starting
+with the 2 P0 bugs — PROP-002 (dashboard load) + PROP-003 (JSON import) — before any alpha user testing.
+
+**Branch:** `main` — committed as part of pipeline Phase 1 (goal-aware enrichment). Inbox files remain
+as `status: triaged` stubs (autonomous mode can't delete); `git rm captures/inbox/2026062*.md` to tidy.
+
+**Blockers:** none (triage only; build gate requires human approval).
+
+---
+
 ## 2026-06-26 — Pipeline redesign Phase 0: firewall (capture ≠ build)
 
 **Done (Phase 0 of the gated pipeline, DECISIONS D-015):** separated capture from build so nothing

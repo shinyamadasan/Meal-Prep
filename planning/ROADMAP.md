@@ -18,6 +18,15 @@ lanes. **Nothing is built without your approval.** See [../WORKFLOW.md](../WORKF
 
 ---
 
+## 🎯 Current Objective
+**Alpha stability** — a first-time user can complete the five core jobs (see [../docs/PROJECT.md](../docs/PROJECT.md))
+without help. Triage evidence, goal-alignment scoring, and the Sprint Planner all optimize for **this**
+objective. It changes by product phase (stability → growth → monetization); **when you change this one
+line, every pending proposal is re-evaluated against the new objective** — the same idea can rank
+differently. *(This is the single lever that re-points the whole pipeline.)*
+
+---
+
 ## Product Direction (Sprints)
 The **AI Dev OS is locked at v1.0** (see [../AI-DEV-OS.md](../AI-DEV-OS.md)) — stop refining the
 workflow; build the product. North star for the next month: **10 real users > more features.**
