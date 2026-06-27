@@ -34,7 +34,7 @@
   should wait** until a user actually asks. **A (descope) now** is the stability-aligned move.
 - **AI-recommended priority:** **P2** (raw priority was P1; **down-weighted** because building it doesn't
   serve the current objective)
-- **status:** pending — your call (Approve A / Approve B / Park / Reject)
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -47,7 +47,7 @@
 - **effort:** S–M · **dependencies:** none · **confidence:** high · **ambiguity:** root cause needs a quick code trace (could be a missing `await` or a missing render call in the init chain)
 - **why now vs later:** P0 — home screen is broken on load. Fix before any other UX work.
 - **AI-recommended priority:** **P0**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -60,7 +60,7 @@
 - **effort:** S–M · **dependencies:** none · **confidence:** high · **ambiguity:** root cause needs a code trace of the import handler + comparison against the actual JSON file structure
 - **why now vs later:** P0 — can't import recipes at all. Fix before alpha user testing.
 - **AI-recommended priority:** **P0**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -86,7 +86,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** decide the confirmation copy ("You already have X in your kitchen — add another?" + confirm/cancel)
 - **why now vs later:** P1 — data accuracy issue; alpha users are adding real pantries now and hitting this.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -164,7 +164,7 @@
 - **effort:** L · **dependencies:** PROP-004 (parser fix) should land first · **confidence:** med · **ambiguity:** two separate problems — (a) autocomplete from ingredient DB (safe, no dedup concern), (b) from existing pantry (requires clear signal: restock vs new). Start with (a) only.
 - **why now vs later:** P3 — high effort, valid but not urgent during alpha stability phase.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** parked 2026-06-27 (via digest reply)
 
 ---
 
@@ -177,7 +177,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** long press on mobile is tricky (needs 500ms timeout, visual feedback, accidental-trigger risk); needs a confirmation step to prevent accidental deletes. Desktop has no long press.
 - **why now vs later:** P3 — nice-to-have, address after P0/P1/P2 backlog.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** parked 2026-06-27 (via digest reply)
 
 ---
 
@@ -190,7 +190,7 @@
 - **effort:** L — any solution that merges/relates variants touches the data model (AppState, Firestore schema) · **confidence:** low · **ambiguity:** three options: (A) keep as separate items (status quo, user names them distinctly), (B) sub-items under a parent ingredient, (C) a "variant" field on each pantry item. All have trade-offs.
 - **why now vs later:** P3 — park. Get more user data before deciding; the data model change is significant.
 - **AI-recommended priority:** **P3**
-- **status:** pending — your call when you're ready to decide direction
+- **status:** parked 2026-06-27 (via digest reply)
 
 ---
 
