@@ -73,7 +73,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** need to confirm exact format the parser expects and edge cases (e.g. "Coconut cream 200ml" vs "Coconut cream, 200 ml")
 - **why now vs later:** P1 — active data corruption. Fix this in the next sprint.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -99,7 +99,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** identify exactly which event (blur? click-outside?) triggers the collapse and whether suppressing it has side effects
 - **why now vs later:** P1 — active friction in the core stock-tracking flow.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -112,7 +112,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** med (need to confirm where storage guide surfaces for pantry items) · **ambiguity:** decide the fallback UX: hide the section entirely, show "No storage guide for this item", or show a generic disclaimer
 - **why now vs later:** P2 — trust issue but not blocking the core loop. Fix after P0/P1 bugs.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -125,7 +125,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** "recently added" = added in the last N minutes, or just the newest item? Likely sort by `dateAdded` descending for a short window, then revert to normal sort.
 - **why now vs later:** P2 — UX improvement, not blocking.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -138,7 +138,7 @@
 - **effort:** M · **dependencies:** PROP-004 (bulk add parser) should land first — adds to the same parser · **confidence:** high · **ambiguity:** format question: append to existing line syntax (`Name, qty unit, expiry`) or a separate field in the modal? Separate field is safer UX.
 - **why now vs later:** P2 — good UX gain but builds on fixing the parser (PROP-004) first.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 
@@ -151,7 +151,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** define the dropdown list (g, kg, ml, L, pcs, cups, tbsp, tsp, etc.) and whether free-type is primary or secondary
 - **why now vs later:** P2 — quality-of-life, not blocking.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-27 (via digest reply)
 
 ---
 

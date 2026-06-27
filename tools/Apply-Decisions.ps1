@@ -65,6 +65,12 @@ foreach ($f in $files) {
 
         $title = $mBlock.Groups['title'].Value.Trim()
         $newStatus = $statusWord[$current]
+        # Idempotency: if it's already in the target status (re-applied reply, or decided a prior run),
+        # skip — don't re-stamp or re-queue. Prevents rebuilding already-built work.
+        $cur = [regex]::Match($mBlock.Groups['body'].Value, '\*\*status:\*\*\s*(?<s>\w+)')
+        if ($cur.Success -and $cur.Groups['s'].Value -eq $newStatus) {
+            $applied += "  = $propId already $newStatus - skipped"; continue
+        }
         # Replace this proposal's status line (scoped to its block via the id anchor).
         $propText = [regex]::Replace($propText,
             "(?ms)(^###\s+$propId\s+\p{Pd}.*?^- \*\*status:\*\*)[^\r\n]*",
@@ -97,8 +103,10 @@ if ($applied.Count -eq 0) { Write-Host 'No new decisions found.'; return }
 # Splice BQ items in under "## Approved sprint", dropping the empty placeholder.
 if ($bqAdds.Count -gt 0) {
     $block = ($bqAdds -join "`n`n")
-    if ($bqText -match '(?m)^\*\(empty.*\)\*\s*$') {
-        $bqText = $bqText -replace '(?m)^\*\(empty.*\)\*\s*$', $block
+    # Drop whatever "empty" placeholder is there (original `*(empty…)*` or the builder's `_…empty…Awaiting…_`).
+    $placeholder = '(?im)^[_*].*(empty|awaiting next sprint).*$'
+    if ($bqText -match $placeholder) {
+        $bqText = $bqText -replace $placeholder, $block
     } else {
         $bqText = $bqText.TrimEnd() + "`n`n" + $block + "`n"
     }
