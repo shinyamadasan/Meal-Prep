@@ -23,12 +23,16 @@ Triage only routes; the Builder only builds. The Builder builds ONLY from planni
 (human-approved). NEVER build from captures/inbox/, planning/PROPOSALS.md, or planning/ROADMAP.md.
 Never touch the ROADMAP "Do Not Work On" section. Do not delete files (archiving captures is a git mv).
 
-STEP A — TRIAGE (route only; NEVER build, schedule, or prioritize-for-build): if captures/inbox/ has
-any *.md, process each per WORKFLOW.md "Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, score
-against docs/PROJECT.md North-star goals, estimate effort + dependencies + confidence, flag ambiguity,
-set an AI-recommended priority, and write it as a proposal (status: pending) in planning/PROPOSALS.md.
-Archive each capture to captures/processed/YYYY/MM/<id>.md and append a one-line triage summary to
-STATUS.md. Commit. Do NOT write to ROADMAP.md or BUILD_QUEUE.md, and do NOT build.
+STEP A — TRIAGE (route + enrich only; NEVER build, schedule, or prioritize-for-build): for each
+captures/inbox/*.md with `status: new` (SKIP any already `status: triaged`), process per WORKFLOW.md
+"Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, then ENRICH into the proposal contract in
+planning/PROPOSALS.md (status: pending) — fill EVERY field: goal alignment vs the **Current Objective**
+in ROADMAP.md (supports/conflicts/mixed + which North-star goal), expected user value, evidence
+(recurring friction · dup count · demand signal), effort + dependencies + confidence + ambiguity, why
+now vs later, and a **goal-adjusted** AI-recommended priority (P0..P3 — not raw priority; down-weight
+work that doesn't serve the Current Objective). Archive each capture to captures/processed/YYYY/MM/<id>.md,
+mark the inbox file `status: triaged`, and append a one-line triage summary to STATUS.md. Commit.
+Do NOT write to ROADMAP.md or BUILD_QUEUE.md, and do NOT build.
 
 STEP B — BUILD (approved work only): if planning/TASK.md is "NO ACTIVE TASK", promote the top item of
 planning/BUILD_QUEUE.md into it. If BUILD_QUEUE.md is empty, write "No tasks remaining" to STATUS.md

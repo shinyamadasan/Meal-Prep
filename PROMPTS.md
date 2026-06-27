@@ -92,16 +92,23 @@ Resume the active task. Read STATUS.md (top entry) and planning/TASK.md "Current
 Execution from exactly that step. Read only the docs CLAUDE.md routes to. Don't restart from scratch.
 ```
 
-## P9 — Triage the inbox
-*Use to process mobile captures (start of a run, or on demand). See WORKFLOW.md "Triage".*
+## P9 — Triage the inbox (route + enrich → Proposals)
+*Use to process mobile captures (start of a run, or on demand). See WORKFLOW.md "Triage". Triage
+ROUTES + ENRICHES only — it never schedules or builds (DECISIONS D-015).*
 ```
-Process every file in captures/inbox/. For each capture: categorize (use the /command, infer if
-none); dedupe against planning/ROADMAP.md + planning/DONE.md; score against the North-star goals in
-docs/PROJECT.md (strong/some/weak); set priority (goal-alignment first, complexity as tiebreaker),
-complexity (S/M/L), and tags; write acceptance criteria for features/bugs; list likely files (grep by
-function name / DOM id). Route: feature/todo → ROADMAP Task Queue; bug → Known Issues; idea → Ideas;
-research → Research. Then archive the capture to captures/processed/YYYY/MM/<id>.md and append a
-one-line triage summary to STATUS.md. Skip any id already in ROADMAP/DONE/processed (idempotency).
+For each captures/inbox/*.md with `status: new` (SKIP any already `status: triaged`): categorize (use
+the /command, infer if none); dedupe against planning/PROPOSALS.md + planning/ROADMAP.md +
+planning/DONE.md. Then write ONE proposal per capture into planning/PROPOSALS.md using the **Proposal
+contract** there (status: pending), filling EVERY field:
+- goal alignment — supports / conflicts / mixed vs the **Current Objective** in ROADMAP.md (+ which North-star goal in docs/PROJECT.md)
+- expected user value — who benefits, how much, in the current phase
+- evidence — recurring friction · dup count · demand signal · similar past work
+- effort (S/M/L) · dependencies · confidence · ambiguity
+- why now vs later
+- AI-recommended priority P0..P3 — GOAL-ADJUSTED, not raw (down-weight work that doesn't serve the Current Objective)
+Then archive the full capture to captures/processed/YYYY/MM/<id>.md, mark the inbox file `status:
+triaged`, and append a one-line triage summary to STATUS.md. Do NOT write to ROADMAP.md or
+BUILD_QUEUE.md, and do NOT build. Idempotent: skip any id already triaged / in PROPOSALS / processed.
 ```
 
 ## P10 — Self Review (before QA)
