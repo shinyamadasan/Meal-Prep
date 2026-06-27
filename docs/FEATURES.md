@@ -24,13 +24,13 @@
 - **Getting Started card** — Working · 2-step onboarding, auto-dismiss.
 - **Paste recipe import** — Partial · `parseAndImportRecipe()`; heuristic, quality varies; shows confidence/warning.
 - **CSV import** — Working · file → preview → confirm; template download.
-- **JSON export/import** — Working · `exportData()` / `importData()`. Import **replaces** fields present in the file (recipes/weeklyPlan swapped wholesale), keeps absent fields, snapshots `mealPrepBackup` first. NOT a per-recipe merge.
+- **JSON export/import** — Working · `exportData()` / `importData()`. Import **merges** by id (`unionById`) — existing items win on collision, re-importing a backup is a no-op. Confirmation via `showConfirmDialog()` (works on iOS PWA; `confirm()` is silently blocked in standalone mode). Snapshots `mealPrepBackup` first.
 
 ## Inventory (My Fridge)
 - **Cooked meals** — Working · `renderCookedMeals()` · location, days-remaining, expired highlight.
 - **Pantry grid** — Working · `renderPantry()` · grouped by storage; staple cycling; inline date/qty/storage edit; storage tips from `PANTRY_KNOWLEDGE`.
 - **Pantry search** — Working · `#pantry-search` filters the pantry by name in real time (`renderPantry()`); preserves storage grouping; encouraging "No matches" empty state; hidden when the pantry is empty. *(Job: "did I already buy X?")*
-- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. Toast feedback on add ("Added …" / "… is already in your kitchen"). (Qty input + storage selector were removed; `addToPantry()` still reads removed `#pantry-qty-input`/`#pantry-storage` — see ROADMAP Known Issues.)
+- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. Toast feedback on add ("Added …"). Duplicate name: `showConfirmDialog()` asks "add another?" instead of silent skip — supports same-name items with different expiry dates. (Qty input + storage selector were removed; `addToPantry()` still reads removed `#pantry-qty-input`/`#pantry-storage` — see ROADMAP Known Issues.)
 - **Ingredient Browser modal** — Working · `openIngredientBrowser()`, `#ingredient-browser-modal`.
 - **Bulk add + voice** — Working · `openBulkAddModal()`, `confirmBulkAdd()`, `startVoiceInput()` (Web Speech API; Chrome/Edge only, text fallback elsewhere).
 - **Freshness alert banner** — Working · top-of-app on load; dismissable per session.

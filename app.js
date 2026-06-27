@@ -1641,6 +1641,7 @@ function initApp() {
         renderCookingHacks();
         renderCookedMeals();
         renderPantry();
+        renderDashboard();
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
@@ -1672,6 +1673,7 @@ function initApp() {
     renderCookingHacks();
     renderPantry();
     renderCookedMeals();
+    renderDashboard();
     updateFreshnessBadges();
     renderFreshnessBanner();
   }
@@ -4786,48 +4788,56 @@ function importData() {
           return r && r.id != null && !AppState.recipes.some(function(x) { return String(x.id) === String(r.id); });
         }).length;
 
-        if (confirm('Add the recipes and data from this file to your collection?\n\nNothing is removed — imported items are merged into what you already have.')) {
-          // Snapshot current data first so this can be undone via "Restore Backup".
-          createBackup('Import');
+        var bodyMsg = newRecipeCount > 0
+          ? 'Add <strong>' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + '</strong> and any other data from this file to your collection?<br><br>Nothing is removed — imported items are merged into what you already have.'
+          : 'Merge this file\'s data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.';
+        showConfirmDialog('Import data?', bodyMsg, 'Import', 'Cancel', function() {
+          try {
+            // Snapshot current data first so this can be undone via "Restore Backup".
+            createBackup('Import');
 
-          // MERGE, don't replace — union list-type data by id (existing items
-          // win on a collision, so re-importing your own backup is a no-op).
-          AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
-          patchMissingNutrition(AppState.recipes);
-          AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
-          AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
-          AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
-          AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
-          AppState.cookedMeals = unionById(AppState.cookedMeals, importedData.cookedMeals || []);
-          AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
+            // MERGE, don't replace — union list-type data by id (existing items
+            // win on a collision, so re-importing your own backup is a no-op).
+            AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
+            patchMissingNutrition(AppState.recipes);
+            AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
+            AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
+            AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
+            AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
+            AppState.cookedMeals = unionById(AppState.cookedMeals, importedData.cookedMeals || []);
+            AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
-          // Plan: fill empty slots only (never wipe a planned meal).
-          if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
+            // Plan: fill empty slots only (never wipe a planned meal).
+            if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
 
-          // Maps + store lists: combine; current values win on conflicts.
-          AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
-          AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
-          AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
-          cacheInlinePhotos();
+            // Maps + store lists: combine; current values win on conflicts.
+            AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
+            AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
+            AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
+            cacheInlinePhotos();
 
-          saveData();
+            saveData();
 
-          // Refresh every view
-          renderRecipes();
-          renderWeeklyPlanner();
-          renderStorageGuide();
-          renderCookingHacks();
-          renderCookedMeals();
-          renderPantry();
-          renderIngredientsTab();
-          updateNutritionGoalsDisplay();
-          updateFreshnessBadges();
-          renderFreshnessBanner();
+            // Refresh every view
+            renderRecipes();
+            renderWeeklyPlanner();
+            renderStorageGuide();
+            renderCookingHacks();
+            renderCookedMeals();
+            renderPantry();
+            renderIngredientsTab();
+            updateNutritionGoalsDisplay();
+            updateFreshnessBadges();
+            renderFreshnessBanner();
 
-          showSuccessMessage(newRecipeCount > 0
-            ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection. 🎉'
-            : 'Imported and merged into your data.');
-        }
+            showSuccessMessage(newRecipeCount > 0
+              ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
+              : 'Imported and merged into your data.');
+          } catch (importErr) {
+            console.error('Error applying import:', importErr);
+            showErrorMessage('Import failed while applying data. Your existing data is unchanged.');
+          }
+        });
       } catch (error) {
         console.error('Error importing data:', error);
         showErrorMessage('Failed to import data. Please check the file format.');
@@ -5293,6 +5303,7 @@ async function loadUserData() {
   renderCookingHacks();
   renderCookedMeals();
   renderPantry();
+  renderDashboard();
   updateNutritionGoalsDisplay();
   updateFreshnessBadges();
   renderFreshnessBanner();
@@ -7290,17 +7301,19 @@ function togglePantrySection() {
   icon.textContent = isHidden ? '▶' : '▼';
 }
 
-function addToPantry() {
+function addToPantry(forceAdd) {
   const input = document.getElementById('pantry-input');
   const name = input.value.trim();
   if (!name) { input.focus(); return; }
 
-  if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-    showSuccessMessage('"' + name + '" is already in your kitchen');
-    input.value = '';
-    var qtyClr = document.getElementById('pantry-qty-input');
-    if (qtyClr) qtyClr.value = '';
-    input.focus();
+  if (!forceAdd && AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showConfirmDialog(
+      'Already in your kitchen',
+      'You already have <strong>' + escapeHtml(name) + '</strong> in your kitchen. Add another one?',
+      'Add another',
+      'Cancel',
+      function() { addToPantry(true); }
+    );
     return;
   }
 

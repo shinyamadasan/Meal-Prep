@@ -10,5 +10,5 @@
 
 ## Status: NO ACTIVE TASK
 
-P2 dependency chain (Tasks 1–3) completed 2026-06-25. Queue empty.
-Add a task to `ROADMAP.md`, then promote it here to activate work.
+2026-06-27 sprint (BQ-001 through BQ-004) fully built and committed.
+Add new items to `ROADMAP.md`, then promote a batch to `planning/BUILD_QUEUE.md` to activate the next run.

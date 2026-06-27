@@ -87,7 +87,7 @@ foreach ($v in $groups.Keys) {
 }
 
 $lines.Add($g.dash)
-$lines.Add('*Reply naturally:* `Approve 2 3 4` ' + $g.dot + ' `Park 7` ' + $g.dot + ' `Reject 12`')
+$lines.Add('*Reply naturally:* `Approve 1-10` ' + $g.dot + ' `Approve 2 3` ' + $g.dot + ' `Park 7` ' + $g.dot + ' `Reject 12`')
 $lines.Add('Approved ' + $g.arrow + ' built next run. Silence ' + $g.arrow + ' nothing happens.')
 
 $digest = ($lines -join "`n")

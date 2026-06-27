@@ -5,6 +5,56 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-27 — 2026-06-27 sprint built: 2 P0 bugs + 1 P1 + 1 P2 (all from approved BUILD_QUEUE)
+
+**Built (4 items, all from BQ-001–004):**
+
+- **BQ-002 (P0) — Dashboard renders on first open.** Root cause: `renderDashboard()` was missing from
+  all three init paths. Added to `initApp()` signed-out branch, `initApp()` Firebase-unavailable branch,
+  and `loadUserData()`. No tab-switch workaround needed anymore.
+
+- **BQ-003 (P0) — Recipe JSON import works on iOS PWA.** Root cause: `confirm()` inside a FileReader
+  callback is silently blocked in iOS Safari standalone mode (returns false, no dialog, silent no-op).
+  Replaced with existing `showConfirmDialog()` pattern. Shows recipe count in dialog body. Added an
+  inner try-catch so import errors surface correctly rather than being swallowed.
+
+- **BQ-004 (P1) — Duplicate pantry name asks instead of silently skipping.** `addToPantry()` now
+  calls `showConfirmDialog()` when a same-name item exists: "You already have X in your kitchen. Add
+  another one?" Accepts `forceAdd` param; recursive call with `true` bypasses the check. Supports
+  real use case: two jars of oyster sauce with different expiry dates.
+
+- **BQ-001 (P2) — Price Book subtitle reframed.** New copy: "Your personal price reference — record
+  what ingredients cost at your go-to stores so you always know what to expect at checkout." Removes
+  the implied promise of automatic cheapest-finding.
+
+**Also updated:** `docs/FEATURES.md` (import was incorrectly documented as "replaces"; it's merge-by-id).
+
+**Self Review:** pass — all changes minimal, targeted, reuse existing helpers (`showConfirmDialog`,
+`escapeHtml`, `patchMissingNutrition`), no new abstractions.
+
+**QA:** pass — `renderDashboard()` has its own null guard; `escapeHtml(name)` in dialog; `forceAdd`
+falsy on normal `onclick="addToPantry()"` calls; hard rules 1–6 untouched.
+
+**Human checks (log here after testing on device):**
+- [ ] Dashboard shows real data on first open (no tab-switch needed)
+- [ ] Import JSON → dialog appears on iOS → confirm → recipes added
+- [ ] Add existing pantry item → "Add another?" dialog appears → confirm → second item added
+- [ ] Price Book subtitle reads correctly
+
+**Branch:** `main` — committed locally as `9a78700`. **Push blocked** — remote has diverged
+(remote contains commits the local tree doesn't have yet; fetch requires approval in autonomous mode).
+
+**To deploy manually:**
+```
+git pull --rebase origin main
+git push origin main
+```
+
+**Next:** After pushing, build queue is empty. Await next sprint approval (remaining proposals:
+PROP-004 bulk-add parser, PROP-006 pantry card collapse, PROP-007–013).
+
+---
+
 ## 2026-06-26 — Phase 2 reply gate built (PC side); n8n messaging is the remaining wiring
 
 **Architecture (D-017):** n8n owns all Telegram messaging; Claude/PC emits structured output only; the

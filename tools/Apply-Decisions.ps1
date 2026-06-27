@@ -44,13 +44,21 @@ foreach ($f in $files) {
     if ($raw -notmatch '(?m)^status:\s*new\s*$') { continue }   # only fresh decisions
     $body = ($raw -split '(?ms)^---\s*$', 3)[2]                  # frontmatter ... --- ... body
 
-    # Parse clauses: a verb followed immediately by numbers (digits / spaces / commas only).
-    # Prose like "tell me more about 5" has no verb before the number, so it is ignored.
-    $clauses = [regex]::Matches($body, '(?im)\b(approve|park|reject|clarify)\b[ \t]*(?<nums>[\d ,]+)')
+    # Parse clauses: a verb followed immediately by numbers, ranges, spaces or commas.
+    # Supports "approve 2 3", "approve 1-10", "approve 2,3 5-7". Prose like "tell me more
+    # about 5" has no verb before the number, so it is ignored.
+    $clauses = [regex]::Matches($body, '(?im)\b(approve|park|reject|clarify)\b[ \t]*(?<nums>[\d ,\-]+)')
     foreach ($cl in $clauses) {
       $current = $cl.Groups[1].Value.ToLower()
-      foreach ($nm in [regex]::Matches($cl.Groups['nums'].Value, '\d+')) {
-        $num = [int]$nm.Value
+      $numList = New-Object System.Collections.Generic.List[int]
+      $numsRaw = $cl.Groups['nums'].Value
+      foreach ($rng in [regex]::Matches($numsRaw, '(\d+)\s*-\s*(\d+)')) {        # ranges: 1-10
+        $a = [int]$rng.Groups[1].Value; $b = [int]$rng.Groups[2].Value
+        if ($a -le $b -and ($b - $a) -le 999) { $a..$b | ForEach-Object { $numList.Add($_) } }
+      }
+      $singles = [regex]::Replace($numsRaw, '\d+\s*-\s*\d+', ' ')                # loners (ranges stripped)
+      foreach ($s in [regex]::Matches($singles, '\d+')) { $numList.Add([int]$s.Value) }
+      foreach ($num in ($numList | Sort-Object -Unique)) {
         $propId = 'PROP-{0:000}' -f $num
         $mBlock = [regex]::Match($propText, "(?ms)^###\s+$propId\s+\p{Pd}\s+(?<title>.+?)\r?\n(?<body>.*?)(?=^###\s|\z)")
         if (-not $mBlock.Success) { $applied += "  ! $propId not found (from '$current $num') - skipped"; continue }

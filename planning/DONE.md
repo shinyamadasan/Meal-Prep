@@ -3,6 +3,10 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ BQ-001 — Price Book subtitle reframed as personal price reference (honest expectations; no store-compare promise) (2026-06-27)
+- ✅ BQ-002 — Dashboard renders on first open: added `renderDashboard()` to signed-out, Firebase-unavailable, and `loadUserData()` init paths (2026-06-27)
+- ✅ BQ-003 — Recipe JSON import fixed: replaced `confirm()` (silently blocked in iOS PWA) with `showConfirmDialog()`; shows recipe count in dialog body (2026-06-27)
+- ✅ BQ-004 — Duplicate pantry name: `addToPantry()` now asks "add another?" via `showConfirmDialog()` instead of silent skip (2026-06-27)
 - ✅ P2 Task 3 — Dismiss suggested grocery items: ✕ button, `suggestDismissed` pantry flag, skip re-add, auto-clear on restock (2026-06-25)
 - ✅ P2 Task 2 — "Suggested" amber badge on auto-suggested grocery items (`.grocery-suggested-badge`, tooltip = reason) (2026-06-25)
 - ✅ P2 Task 1 — `suggested: true` + `suggestedReason: 'low stock'` flag on auto-suggested grocery items (`syncStapleToGrocery`, `checkAndReplenishLowStock`) (2026-06-25)
