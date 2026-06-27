@@ -127,3 +127,11 @@ The Builder reads **only** `BUILD_QUEUE.md`. `ROADMAP.md` is written only by the
 Why: Puts scarce human judgment on the two decisions that matter (what to build, whether to ship), removes the human from mechanical work, and stops unreviewed auto-builds from reaching real users. Single-responsibility per stage keeps each simple and debuggable.
 Trade-off: Two extra approval gates (more deliberate, less "instant") — accepted; this optimizes for leverage, not automation. Migrated incrementally: **Phase 0 = the firewall** (Builder reads only BUILD_QUEUE; triage → Proposals; Task Queue retired). Later phases add enrichment/evidence, the approval digest, the optimizing Sprint Planner, and staging.
 Supersedes: the D-009-era auto-promote-from-Task-Queue-and-build flow; the ROADMAP "Task Queue" is retired.
+
+## D-016 — Goal-driven enrichment + modular stage contracts
+Date: 2026-06-26 · Status: Active (extends D-015)
+Context: Priority alone is context-free — the same proposal is worth building, or not, depending on the product's current phase. And a multi-stage pipeline (triage → approval → planner → builder) is brittle if stages share implicit assumptions instead of a defined interface.
+Decision: (1) A single **Current Objective** lives in `ROADMAP.md` (e.g. "alpha stability"); every proposal is scored for **goal alignment** against it, plus **expected user value** and **why-now-vs-later**, and its AI-recommended priority is goal-*adjusted*, not raw. Changing that one line re-points the whole pipeline — the same idea can rank differently. (2) Every stage reads/writes a **documented structured contract** co-located with its artifact (`PROPOSALS.md` = the proposal contract; `BUILD_QUEUE.md` = the sprint/task contract; …), so any single agent can be improved or replaced without redesigning the others.
+Why: Optimizes the batch for the current phase of the product, not just the loudest ticket; keeps the pipeline modular and debuggable (swap the Sprint Planner without touching triage). Makes human approval *evidence-based* rather than a guess.
+Trade-off: Triage does more work per capture (richer proposals), and contracts must be kept in sync with the agents that read them. Accepted — the enrichment is what makes approval defensible, and the contracts are what keep the system maintainable.
+Supersedes: — (extends D-015)

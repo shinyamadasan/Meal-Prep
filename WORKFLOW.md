@@ -5,6 +5,12 @@
 > around when a conversation or a scheduled process happens to stop. A run/agent that stops simply
 > performs a **Checkpoint** first. This file is the source of truth for *when* docs are read/updated.
 
+> **⚠ Migrating to the gated pipeline (DECISIONS D-015 / D-016).** Triage now *routes + enriches into
+> `planning/PROPOSALS.md` (pending your approval)* — **never** into a build queue. The Builder builds
+> only from `planning/BUILD_QUEUE.md`. Sections below that still describe ROADMAP "Task Queue"
+> auto-promotion are **legacy**, pending the Phase 5 rewrite; until then **CLAUDE.md hard rule 0 +
+> D-015/D-016 are the source of truth**.
+
 ## Principles
 - One unit of work = one **task**, held in `planning/TASK.md`.
 - Docs change at specific **events**, not on a timer or at a vague "end".
@@ -14,6 +20,12 @@
 - **Capture is dumb; triage is smart.** Mobile captures land in `captures/inbox/` (one immutable file
   each, written by n8n). All judgment happens later, in the Triage event, where the agent has the
   whole repo as context.
+- **Goal-driven, not priority-driven.** Every proposal is scored against the single **Current Objective**
+  in `ROADMAP.md` (e.g. "alpha stability"), not raw priority — change that one line and the whole
+  pipeline re-optimizes the same proposals differently (D-016).
+- **Modular stage contracts.** Each stage reads/writes a documented structured shape co-located with its
+  artifact (`PROPOSALS.md` = the proposal contract; `BUILD_QUEUE.md` = the sprint/task contract), so any
+  one agent can be improved or replaced without redesigning the others (D-016).
 
 ## File map
 ```
@@ -51,26 +63,25 @@ stateDiagram-v2
 ### 0. Triage (Intake)  ← runs first, every run
 - **Trigger:** start of a run when `captures/inbox/` has any `*.md`. (Captures arrive from the Telegram
   bot via n8n — see `captures/README.md`.)
-- **Who:** the agent. This is the one place mobile captures become real tasks.
-- **Reads:** `captures/inbox/*.md`, `docs/PROJECT.md` (**North-star goals**), `planning/ROADMAP.md`,
-  `planning/DONE.md`, and the codebase (for dedupe + file hints).
-- **Does**, for each capture (skip any whose `id` already appears in ROADMAP/DONE/processed — idempotency):
+- **Who:** the agent. This is where a capture becomes an **enriched proposal** — it routes + enriches,
+  it does **not** schedule or build (single responsibility, D-015).
+- **Reads:** `captures/inbox/*.md`, the **Current Objective** + North-star goals (`ROADMAP.md` /
+  `docs/PROJECT.md`), `planning/PROPOSALS.md` + `planning/ROADMAP.md` + `planning/DONE.md` (dedupe), and
+  the codebase (file hints).
+- **Does**, for each capture with `status: new` (SKIP any already `status: triaged` — idempotency):
   1. **Categorize** — use the `/command`; infer the type if the capture had none.
-  2. **Dedupe** — search ROADMAP + DONE for the same idea; if dup, merge/drop, don't re-add.
-  3. **Goal-alignment score** — rate the item against the **North-star goals in `docs/PROJECT.md`**
-     (e.g. *strong / some / weak* alignment). This is the **primary** input to priority: an item that
-     directly serves a top goal outranks a cosmetic one regardless of how fun it sounds.
-  4. **Priority** = goal-alignment first, then complexity as tiebreaker (quick high-alignment wins
-     bubble up). **Complexity** = S/M/L. Add **tags**.
-  5. **Acceptance criteria** for `/feature` and `/bug` (verifiable, code-inspection-checkable).
-  6. **Likely files** — grep the repo by function name / DOM id; list candidates.
-  7. **Route:** `/feature`,`/todo` → ROADMAP **Task Queue** (ranked by score); `/bug` → **Known Issues**
-     (or Queue if breaking); `/idea` → **Ideas** (parked); `/research` → **Research** (parked).
-     *Ideas/Research are never auto-built — they wait for a human to promote them.*
-- **Writes:** `planning/ROADMAP.md` (routed, enriched entries); **archive** each processed capture to
-  `captures/processed/YYYY/MM/<id>.md` (provenance — *why* a task exists); a one-line triage summary
-  to `STATUS.md`.
-- **Exit:** `captures/inbox/` is empty → continue to Next Task Selection / Execution.
+  2. **Dedupe** — search PROPOSALS + ROADMAP + DONE; if a dup, merge (bump the dup count), don't re-add.
+  3. **Enrich into the Proposal contract** (the format in `PROPOSALS.md`), filling every field:
+     **goal alignment** (supports / conflicts / mixed vs the **Current Objective**, + which North-star
+     goal), **expected user value**, **evidence** (recurring friction · dup count · demand signal),
+     **effort / dependencies / confidence / ambiguity**, **why now vs later**, and a **goal-adjusted**
+     AI-recommended priority (P0..P3 — down-weight work that doesn't serve the Current Objective).
+- **Writes:** `planning/PROPOSALS.md` (one `status: pending` proposal per capture); **archives** each
+  processed capture to `captures/processed/YYYY/MM/<id>.md` (provenance) and marks the inbox file
+  `status: triaged`; a one-line triage summary to `STATUS.md`. **Never** writes `ROADMAP.md` or
+  `BUILD_QUEUE.md`, and never builds.
+- **Exit:** all captures triaged → stop (proposals await your approval). Build only proceeds if
+  `BUILD_QUEUE.md` already holds approved work.
 
 ### 1. Planning
 - **Trigger:** `TASK.md` is `NO ACTIVE TASK` and a task is needed, or a human has a new idea.
