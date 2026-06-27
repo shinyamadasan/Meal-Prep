@@ -5,6 +5,28 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-26 — Phase 2 (start): digest generator built; reply-gate pending one decision
+
+**Built:** `tools/Generate-Digest.ps1` — a **deterministic** morning digest from `PROPOSALS.md`
+(parses each title + `▶ Decision`, groups by recommended action, optional `-Send` to Telegram via
+`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`). Verified output by hand. Per the "code for deterministic
+transforms" rule, formatting is code; the punchy text comes from each proposal's Decision line.
+
+**Validation finding (the point of this exercise):** the auto-digest is *more verbose* than a
+hand-written one because it uses full proposal **titles** + full Decision **reasons** (which include
+build-sequencing notes like "sequence after PROP-004" — noise for a *decision*). If the digest must be
+self-sufficient AND tight, the contract likely needs a short phone-friendly `digest:` one-liner, and
+the Decision reason should hold only what's needed to decide (impact + effort), not build order.
+
+**Reply gate NOT built** (Approve/Park reply → BUILD_QUEUE): needs the Telegram bot token + n8n routing,
+and it touches the live capture pipeline. Proposed design (dumb capture / smart apply): n8n routes an
+approval-style reply to `captures/decisions/`; a Claude run applies it (marks proposal `status`, moves
+Approved → `BUILD_QUEUE.md`). **Awaiting:** your read on the digest + go-ahead + token / n8n access.
+
+**Branch:** `main` — committed.
+
+---
+
 ## 2026-06-26 — Phase 1.5: `▶ Decision` field; validate the contract by hand before automating
 
 Added **▶ Decision** (Approve / Park / Reject / Clarify + one-line why) as the lead field on every
