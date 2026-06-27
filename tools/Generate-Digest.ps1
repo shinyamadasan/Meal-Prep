@@ -42,6 +42,9 @@ $blocks = [regex]::Matches($pending, '(?ms)^###\s+(?<id>PROP-\d+)\s+\p{Pd}\s+(?<
 
 $items = foreach ($b in $blocks) {
     $body = $b.Groups['body'].Value
+    # Only undecided proposals belong in the digest — skip anything already approved/parked/rejected.
+    $mStatus = [regex]::Match($body, '\*\*status:\*\*\s*(?<s>\w+)')
+    if ($mStatus.Success -and $mStatus.Groups['s'].Value -ne 'pending') { continue }
     if (-not [regex]::IsMatch($body, 'Decision:')) {
         Write-Warning "Proposal $($b.Groups['id'].Value) has no Decision line - omitted from digest."
         continue

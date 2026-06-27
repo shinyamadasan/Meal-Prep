@@ -5,6 +5,25 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-27 — UX audit → 10 proposals (PROP-014..023) into the pipeline
+
+Ran the `ux-ui-guardian` agent scoped to a **whole-app consistency audit** (constraints: vanilla
+HTML/CSS/JS, no framework/build, light-only, single `:root`). 10 findings → enriched
+proposals in `PROPOSALS.md`, **goal-adjusted vs "Alpha stability"**:
+- **Approve (6):** PROP-014 invisible `btn--ghost/danger/success`; PROP-015 white-on-sage contrast fail (WCAG);
+  PROP-016 sub-44px tap targets (mis-taps); PROP-017 undefined-var `:root` aliases + duplicated base block;
+  PROP-018 empty-state consistency; PROP-019 restore removed focus outlines (a11y).
+- **Park (4):** PROP-020 color-token consistency, PROP-021 badge consolidation, PROP-022 spacing-token
+  migration, PROP-023 modal sizing — pure cosmetic polish, deferred past stabilize.
+
+Also fixed: **digest now filters to `status: pending` only** (was showing already-decided 1–13).
+These flow through the same gated loop — approve from the phone, e.g. `Approve 14-19`.
+
+**Branch:** `main` — committed. **Next:** the 6 queued items (PROP-004,006-010) build tonight; UX
+proposals await your phone approval.
+
+---
+
 ## 2026-06-27 — 2026-06-27 sprint built: 2 P0 bugs + 1 P1 + 1 P2 (all from approved BUILD_QUEUE)
 
 **Built (4 items, all from BQ-001–004):**

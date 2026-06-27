@@ -194,6 +194,136 @@
 
 ---
 
+### PROP-014 — Missing button variants render as invisible/unstyled (btn--ghost, btn--danger, btn--success)
+- **▶ Decision: Approve.** P1 — core-screen buttons have no visible affordance and the Delete-Account button has no danger styling; a real usability + trust blocker.
+- **type:** bug · **source captures:** UX audit 2026-06-27 (whole-app consistency, finding #1)
+- **goal alignment:** strongly supports **Alpha stability** — North-star #1 (complete core jobs). `.btn--ghost` ("Browse", "Bulk add" on Inventory) falls back to bare `.btn` = transparent, no border → looks like floating text, not a button. `.btn--danger` (`#delete-account-btn`) renders default-styled, so the most destructive action looks benign.
+- **expected user value:** High — first-run users on the Inventory screen can't tell those are tappable; destructive action lacks a danger cue.
+- **evidence:** classes used in `index.html`/`app.js` but absent from `style.css` (only `--primary/--secondary/--outline` exist).
+- **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none
+- **why now vs later:** now — invisible primary controls on a core alpha screen.
+- **AI-recommended priority:** **P1**
+- **status:** pending
+
+---
+
+### PROP-015 — White text on sage-green surfaces fails contrast (unreadable active states)
+- **▶ Decision: Approve.** P1 — WCAG-failing ~1.9:1 white-on-sage on Plan/Price Book active chips; hard to read on a phone in daylight.
+- **type:** bug · **source captures:** UX audit 2026-06-27 (finding #7)
+- **goal alignment:** strongly supports — accessibility + readability on the core Plan flow. Same green surface shows dark text in some places and unreadable white in others (`.planner-day-chip.active`, `.ingcat-store-tag`, `.day-action-paste`, `.settings-row--primary`, etc.).
+- **expected user value:** High — active day chip and store tags are currently hard to read.
+- **evidence:** `color:#fff` on `--color-primary`/`--color-success` fills ≈1.9:1 (fails AA); the rest of the app uses dark `--color-btn-primary-text` on the same green.
+- **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none — standardize on dark text on light-sage.
+- **why now vs later:** now — readability blocker.
+- **AI-recommended priority:** **P1**
+- **status:** pending
+
+---
+
+### PROP-016 — Small tap targets below 44px cause mis-taps on phone (steppers, ×-remove, fav, day actions)
+- **▶ Decision: Approve.** P1 — sub-44px controls on a phone cause fiddly taps and accidental deletes; `.btn`/`.tab-btn` already get 44px, the most-tapped small controls don't.
+- **type:** bug/UX · **source captures:** UX audit 2026-06-27 (finding #4)
+- **goal alignment:** supports — North-star #1 (friction) + #2 (don't lose data: accidental pantry deletes). Phone-first.
+- **expected user value:** High — serving +/- (28px), `.recipe-fav-btn`, `.pantry-remove`/`.cooked-remove`/`.modal-close`, `.day-action-btn` are all below comfortable/again some below the 24px WCAG floor.
+- **evidence:** mobile `@media` block sets `min-height:44px` only on `.btn`/`.tab-btn`.
+- **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** keep glyphs visually small but pad the hit area.
+- **why now vs later:** now — directly causes mis-taps incl. accidental deletes.
+- **AI-recommended priority:** **P1**
+- **status:** pending
+
+---
+
+### PROP-017 — Undefined CSS variables + a duplicated base block (silent fallbacks / time-bomb)
+- **▶ Decision: Approve.** P1 for the `:root` alias fix (cheap, fixes transparent badges + many components at once); the duplicate-block deletion is riskier — confirm scope at build.
+- **type:** chore/bug · **source captures:** UX audit 2026-06-27 (finding #9)
+- **goal alignment:** supports — partly user-visible (e.g. `.member-status.pending` → transparent badge; Shop sub-tabs styled by an undefined token) and partly dev-health (a duplicated base block means a future fix to one copy silently won't take effect — will burn time during alpha).
+- **expected user value:** Medium now (a few transparent/incorrect surfaces) + high leverage (one alias map fixes dozens of components).
+- **evidence:** rules reference `--color-warning-light/--color-danger/--color-text-muted/--color-bg/--surface/--border` etc. not in `:root`; base block (`html,*,h1–h6,.btn*,.form-control,.card`) + `@font-face` defined 2–3×.
+- **effort:** M · **dependencies:** none · **confidence:** high (aliases) / med (safe deletion of the duplicate block) · **ambiguity:** which copy of the duplicated block to keep — verify they're identical first.
+- **why now vs later:** aliases now (low-risk, high-leverage); duplicate-block deletion now-ish with care.
+- **AI-recommended priority:** **P1**
+- **status:** pending
+
+---
+
+### PROP-018 — Empty states styled three different ways across tabs
+- **▶ Decision: Approve.** P2 — the first-run app is mostly empty states; route them all through the existing `emptyState()` helper for a consistent first impression.
+- **type:** UX · **source captures:** UX audit 2026-06-27 (finding #2)
+- **goal alignment:** supports — North-star #3 (zero-friction start). New users see empty states on every tab; some are friendly icon+title+hint, others a bare grey sentence → reads unfinished.
+- **expected user value:** Medium — consistency exactly where first impressions form.
+- **evidence:** `emptyState()` helper vs inline `<p style=…>` (nutrition filter), `.dash-l2-empty`, `.pantry-empty`/`.ib-empty` one-liners.
+- **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** none — reuse `.empty-state*`, delete orphaned inline styles.
+- **why now vs later:** now-ish — first-run polish, no new CSS.
+- **AI-recommended priority:** **P2**
+- **status:** pending
+
+---
+
+### PROP-019 — Some inputs remove the focus outline (outline:none) — accessibility regression
+- **▶ Decision: Approve.** P2 — Price Book / quantity inputs set `outline:none` with no replacement, so keyboard/switch users lose their place (WCAG 2.4.7). Restore the global focus outline.
+- **type:** bug (a11y) · **source captures:** UX audit 2026-06-27 (finding #5, focus subset)
+- **goal alignment:** supports — accessibility. (Full input-family unification is a separate, larger polish task — parked; see PROP-021/spacing.)
+- **expected user value:** Medium — affects keyboard/switch-access users; low effort.
+- **evidence:** `.ingcat-*:focus`, `.gpl-price-input:focus` use `outline:none`; the app otherwise has a global `:focus-visible { outline: var(--focus-outline) }`.
+- **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none — replace `outline:none` with `var(--focus-outline)`.
+- **why now vs later:** now — small a11y fix. (Unifying all bespoke inputs to `.form-control` = later.)
+- **AI-recommended priority:** **P2**
+- **status:** pending
+
+---
+
+### PROP-020 — Hardcoded hex colors bypass the token system (amber/red appear as 4+ shades)
+- **▶ Decision: Park.** Valid consistency debt, but pure cosmetic — defer past the stabilize phase. (Quick subset: point status reds/ambers at the existing semantic tokens.)
+- **type:** chore · **source captures:** UX audit 2026-06-27 (finding #3)
+- **goal alignment:** neutral-to-supports — improves the "amber = expiring" mental model, but doesn't block completing jobs. Down-weighted during alpha-stability.
+- **expected user value:** Low–Medium — consistency only.
+- **evidence:** warning appears as `#f59e0b/#fef3c7/#fffbeb` + token `#D67630`; error as `#e74c3c/#ef4444/#dc2626` + token `#C0152F`; tokens `--color-error/-warning/-success(+-rgb)` already exist.
+- **effort:** M · **dependencies:** overlaps PROP-017 (token aliases) · **confidence:** med · **ambiguity:** none.
+- **why now vs later:** later — cosmetic; revisit after the alpha usability fixes.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
+### PROP-021 — Badge/pill system fragmented (~13 treatments for one concept)
+- **▶ Decision: Park.** Defer the full consolidation; optionally do the S quick-win (normalize all badges to `--radius-full` + `--font-size-xs`) if a spare slot opens.
+- **type:** chore · **source captures:** UX audit 2026-06-27 (finding #6)
+- **goal alignment:** neutral — badges encode category/"in pantry"/"expiring"/cost; ~13 visual treatments add noise, but not a job blocker. Polish.
+- **expected user value:** Low–Medium.
+- **evidence:** `.status` (canonical) vs `.recipe-category/.pantry-badge/.grocery-suggested-badge/.tab-badge/.dash-*-tag` etc., each own font-size/padding/radius.
+- **effort:** L (full) / S (just normalize radius+size) · **dependencies:** none · **confidence:** med · **ambiguity:** scope.
+- **why now vs later:** later — incremental polish.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
+### PROP-022 — Spacing scale bypassed by ad-hoc rem/px in newer components
+- **▶ Decision: Park.** Vertical-rhythm drift between tabs; real but incremental — schedule post-alpha, convert per-component.
+- **type:** chore · **source captures:** UX audit 2026-06-27 (finding #8)
+- **goal alignment:** neutral — "connective tissue of polished," not a blocker. Down-weighted during stabilize.
+- **expected user value:** Low.
+- **evidence:** newer components (Pantry/Price Book/Prep/Dashboard/Settings) use literal `0.75rem/0.6rem/1rem` + `px` radii instead of `--space-*`/`--radius-*` (scale already covers them).
+- **effort:** L · **dependencies:** none · **confidence:** high · **ambiguity:** none — mechanical token mapping.
+- **why now vs later:** later — large surgical diff; not blocking alpha.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
+### PROP-023 — Modal sizing/structure varies; some hand-roll inline layout
+- **▶ Decision: Park.** Mostly polish — but the mobile-footer-stacking subset (action buttons cramped side-by-side on phone) is worth pulling forward.
+- **type:** UX · **source captures:** UX audit 2026-06-27 (finding #10)
+- **goal alignment:** supports (mobile footer subset) / neutral (rest) — modals host the core jobs (Add Recipe, Set Goals, Add Item); inline `max-width` + non-`.modal-footer` action rows mean buttons don't get the mobile stacking rule.
+- **expected user value:** Low–Medium (Medium for the phone footer subset).
+- **evidence:** inline `style="max-width:…"` overrides; Prep Mode / Username / Custom-Ingredient modals bypass `.modal-header/body/footer`.
+- **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** none — add `.modal-content--sm/--md`, ensure action rows use `.modal-footer`.
+- **why now vs later:** mobile-footer subset now-ish; full modal refactor later.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
 ## Proposal contract
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```
