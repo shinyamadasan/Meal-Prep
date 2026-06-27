@@ -1,23 +1,20 @@
 <#
 .SYNOPSIS
-  Phase 2 - build the morning Proposal Digest from planning/PROPOSALS.md (deterministic; no LLM).
+  Phase 2 - generate the morning Proposal Digest from planning/PROPOSALS.md (deterministic; no LLM).
 
 .DESCRIPTION
   Parses each pending proposal's title + Decision line, groups by recommended action
   (Approve / Clarify / Park / Reject), preserves the in-file priority order within each group,
-  and prints a Telegram-ready digest. The punchy per-item text comes straight from the proposal's
-  Decision line - so the digest is a pure transform of the validated contract.
+  and writes a Telegram-ready digest to planning/DIGEST.md (and stdout).
+
+  STRUCTURED OUTPUT ONLY. This script does NOT message anyone — delivery is n8n's job: n8n reads
+  planning/DIGEST.md from GitHub on a morning schedule and sends it to Telegram. (Separation of duties:
+  Claude/PC produces structured output; n8n owns all messaging.)
 
   Source is pure ASCII; all emoji/symbols are built from code points so it runs the same under
   Windows PowerShell 5.1 (Task Scheduler) regardless of file encoding.
-
-  Pass -Send to push it to Telegram (needs $env:TELEGRAM_BOT_TOKEN + $env:TELEGRAM_CHAT_ID).
-
-.EXAMPLE
-  ./tools/Generate-Digest.ps1                 # print to console
-  ./tools/Generate-Digest.ps1 -Send           # print + send to Telegram
 #>
-param([switch]$Send)
+param([string]$OutFile)
 
 $ErrorActionPreference = 'Stop'
 function U([int]$cp) { [char]::ConvertFromUtf32($cp) }
@@ -29,6 +26,7 @@ $g = @{
 $root      = Split-Path $PSScriptRoot -Parent
 $proposals = Join-Path $root 'planning/PROPOSALS.md'
 $roadmap   = Join-Path $root 'planning/ROADMAP.md'
+if (-not $OutFile) { $OutFile = Join-Path $root 'planning/DIGEST.md' }
 
 $raw = Get-Content $proposals -Raw -Encoding UTF8
 # Only the pending section (everything before the contract template).
@@ -89,22 +87,13 @@ foreach ($v in $groups.Keys) {
 }
 
 $lines.Add($g.dash)
-$lines.Add('*Reply naturally:* `Approve 2 3 4` ' + $g.dot + ' `Park 7` ' + $g.dot + ' `Reject 12` ' + $g.dot + ' `Tell me more about 5`')
+$lines.Add('*Reply naturally:* `Approve 2 3 4` ' + $g.dot + ' `Park 7` ' + $g.dot + ' `Reject 12`')
 $lines.Add('Approved ' + $g.arrow + ' built next run. Silence ' + $g.arrow + ' nothing happens.')
 
 $digest = ($lines -join "`n")
+
+# Structured output: write the file n8n will read + send. No messaging here.
+[System.IO.File]::WriteAllText($OutFile, $digest + "`n", (New-Object System.Text.UTF8Encoding($false)))
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Write-Output $digest
-
-if ($Send) {
-    if (-not $env:TELEGRAM_BOT_TOKEN -or -not $env:TELEGRAM_CHAT_ID) {
-        throw "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars to send."
-    }
-    $uri = "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage"
-    Invoke-RestMethod -Uri $uri -Method Post -Body @{
-        chat_id    = $env:TELEGRAM_CHAT_ID
-        text       = $digest
-        parse_mode = 'Markdown'
-    } | Out-Null
-    Write-Host "`n[sent to Telegram chat $($env:TELEGRAM_CHAT_ID)]"
-}
+Write-Host "`n[wrote $OutFile - n8n sends it to Telegram]"
