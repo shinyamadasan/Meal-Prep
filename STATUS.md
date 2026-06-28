@@ -5,6 +5,72 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-27 — BQ-001..006 sprint built (bulk add + pantry card UX)
+
+**Built (6 items, all from approved BUILD_QUEUE):**
+
+- **BQ-001 (P1) — Bulk add parser: no-comma format now works.** Added `NO_COMMA_RE` regex that
+  parses `"Coconut cream 200ml"` → name="Coconut cream", qty=200, unit="ml". Comma path unchanged.
+  Updated placeholder to show the new format. `const → let` for name/qty/unit (required for
+  reassignment in the no-comma path).
+
+- **BQ-002 (P1) — Pantry card stays open on in-card edits.** Root cause: `renderPantry()` rebuilds
+  all DOM, collapsing every expanded card. Added `renderPantryKeepOpen()` helper that saves
+  `piexp-*` IDs before render and restores them after. Wired into all 7 in-card update functions:
+  `updatePantryDate`, `updatePantryShelf`, `updatePantryQty`, `setPantryStorage`,
+  `togglePantryStaple`, `togglePantryDateMode`, `cycleStapleLevel`. Delete + add paths keep
+  `renderPantry()` (no card to restore).
+
+- **BQ-003 (P2) — Storage guide hidden for unrecognized pantry items.** Changed
+  `lookupPantryKnowledge(p.name) || genericStorageGuide(p)` to `lookupPantryKnowledge(p.name)`.
+  `genericStorageGuide()` still used by `inferStorage()` for location logic — only the in-card
+  "Storage guide" button is suppressed. Items in PANTRY_KNOWLEDGE still show it.
+
+- **BQ-004 (P2) — Recently added items sort to top.** Pantry list within each storage group now
+  sorts items added in the last 5 minutes to the top (newest first), then falls back to
+  alphabetical. Uses `Number(p.id)` as a timestamp proxy (id = `Date.now() + Math.random()`).
+
+- **BQ-005 (P2) — Bulk add expiry date field.** Added a date input to the bulk add modal below
+  the textarea: "Expiry date (optional — applies to all items)". `confirmBulkAdd()` reads the
+  value and sets `expiryDate` + `dateMode:'expiry'` on each pantry item. Input cleared on
+  `openBulkAddModal()`. Built alongside BQ-001 (same parser, same function).
+
+- **BQ-006 (P2) — Ingredient card unit input: native datalist.** Replaced the plain text input
+  with `<input list="ingredient-unit-list">` + `<datalist>` of 20 common units (g, kg, ml, L,
+  pcs, cup, tbsp, tsp, bunch, can, bottle, box, bag, pack, head, clove, stalk, slice, oz, lb).
+  Free typing still works. No JS required.
+
+**Self Review:** pass — all changes minimal, targeted, reuse existing patterns (`togglePantryExpand`
+DOM pattern, existing `saveData()`, existing `showConfirmDialog`). No new abstractions beyond
+`renderPantryKeepOpen` (which is exactly one pattern used in 7 places). No dead code.
+
+**QA:** pass — hard rules 1–6 untouched; `saveData()` used throughout; no second `:root`; no
+new innerHTML with unescaped user strings; `bulkExpiry` is a date-input value (YYYY-MM-DD format);
+`NO_COMMA_RE` regex cannot capture arbitrary HTML.
+
+**Human checks (log here after testing on device):**
+- [ ] Type "Coconut cream 200ml" in bulk add → parses as name + qty + unit (no unit-as-name bug)
+- [ ] Type "Garlic 3 cloves" → parses correctly; "Salt" alone → name only
+- [ ] Edit qty/date on an open pantry card → card stays open after save
+- [ ] Toggle "expires/bought" on a pantry card → card stays open
+- [ ] Pantry item not in PANTRY_KNOWLEDGE → no "Storage guide" button on card
+- [ ] Bulk add 2 items right now → they appear at top of their storage group for 5 min
+- [ ] Set expiry date in bulk add modal → all added items show expiry date on card
+- [ ] Unit input in ingredient modal shows dropdown suggestions (g, kg, ml, etc.)
+
+**Branch:** `main` — ready to commit. Push requires manual step (autonomous mode).
+
+**To deploy:**
+```
+git add app.js index.html planning/TASK.md planning/DONE.md planning/BUILD_QUEUE.md STATUS.md
+git commit -m "feat(pantry): bulk-add no-comma parser, card-keep-open, storage guide fix, recent-at-top, expiry field, unit datalist"
+git push origin main
+```
+
+**Next:** Build queue empty. UX proposals PROP-014..019 await your phone approval (still `status: pending`).
+
+---
+
 ## 2026-06-27 — UX audit → 10 proposals (PROP-014..023) into the pipeline
 
 Ran the `ux-ui-guardian` agent scoped to a **whole-app consistency audit** (constraints: vanilla

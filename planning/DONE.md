@@ -3,6 +3,7 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ BQ-001–BQ-006 sprint — bulk add parser (no-comma format), pantry card stays open on edit, storage guide hides for unrecognized items, recently added at top, bulk add expiry date field, unit input datalist (2026-06-27)
 - ✅ BQ-001 — Price Book subtitle reframed as personal price reference (honest expectations; no store-compare promise) (2026-06-27)
 - ✅ BQ-002 — Dashboard renders on first open: added `renderDashboard()` to signed-out, Firebase-unavailable, and `loadUserData()` init paths (2026-06-27)
 - ✅ BQ-003 — Recipe JSON import fixed: replaced `confirm()` (silently blocked in iOS PWA) with `showConfirmDialog()`; shows recipe count in dialog body (2026-06-27)

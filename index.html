@@ -613,7 +613,15 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Unit</label>
-                        <input type="text" class="form-control" id="ingredient-unit" placeholder="e.g., per kg, per piece" required>
+                        <input type="text" class="form-control" id="ingredient-unit" placeholder="e.g., g, kg, pcs" list="ingredient-unit-list" required>
+                        <datalist id="ingredient-unit-list">
+                            <option value="g"><option value="kg"><option value="ml"><option value="L">
+                            <option value="pcs"><option value="piece"><option value="cup"><option value="cups">
+                            <option value="tbsp"><option value="tsp"><option value="bunch"><option value="can">
+                            <option value="bottle"><option value="box"><option value="bag"><option value="pack">
+                            <option value="head"><option value="clove"><option value="stalk"><option value="slice">
+                            <option value="oz"><option value="lb">
+                        </datalist>
                     </div>
                 </div>
                 <div class="form-row">
@@ -1120,12 +1128,16 @@
                 <button class="modal-close" onclick="closeBulkAddModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; or just <code>Garlic</code></p>
+                <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong> or <strong>Name qty unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; <code>Coconut cream 200ml</code> &nbsp; or just <code>Garlic</code></p>
                 <div class="bulk-voice-row">
                   <button id="bulk-voice-btn" class="voice-btn" onclick="toggleVoiceInput()" title="Speak items one at a time">🎙 Speak</button>
                   <span id="bulk-voice-status" class="voice-status"></span>
                 </div>
-                <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Chicken Thigh, 500, g&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
+                <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Coconut cream 200ml&#10;Chicken Thigh 500g&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
+                <div class="bulk-expiry-row" style="margin-top:0.75rem">
+                  <label class="form-label" style="margin-bottom:0.25rem">Expiry date <span style="font-weight:400;color:var(--text-secondary)">(optional — applies to all items)</span></label>
+                  <input type="date" id="bulk-add-expiry" class="form-control" style="max-width:12rem">
+                </div>
                 <div id="bulk-add-warnings" style="margin-top:0.5rem"></div>
             </div>
             <div class="modal-footer">

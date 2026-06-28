@@ -6462,7 +6462,7 @@ function renderPantry() {
   function buildPantryItem(p) {
     var fs = freshnessStatus(pantryDaysLeft(p));
     var staple = isStaple(p);
-    var k = lookupPantryKnowledge(p.name) || genericStorageGuide(p);
+    var k = lookupPantryKnowledge(p.name); // only show guide for recognized items
     var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
     var expiryMode = p.dateMode === 'expiry';
     var dateVal = expiryMode ? (p.expiryDate || '') : (p.purchaseDate || '');
@@ -6539,7 +6539,16 @@ function renderPantry() {
     var items = AppState.pantry.filter(function(p) {
         return effStorage(p) === g.key && (!searching || p.name.toLowerCase().includes(q));
       })
-      .sort(function(a, b) { return a.name.localeCompare(b.name); });
+      .sort(function(a, b) {
+        // Items added in the last 5 minutes float to the top (newest first).
+        var RECENT_MS = 5 * 60 * 1000;
+        var now = Date.now();
+        var aNew = (now - Number(a.id)) < RECENT_MS;
+        var bNew = (now - Number(b.id)) < RECENT_MS;
+        if (aNew !== bNew) return aNew ? -1 : 1;
+        if (aNew && bNew) return Number(b.id) - Number(a.id);
+        return a.name.localeCompare(b.name);
+      });
     if (items.length === 0) return;
     matched += items.length;
     html += '<div class="fridge-subsection-title">' + g.label +
@@ -6560,7 +6569,7 @@ function setPantryStorage(id, storage) {
   if (!p) return;
   p.storage = storage;
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
 }
 
 function togglePantryStaple(id, checked) {
@@ -6569,7 +6578,7 @@ function togglePantryStaple(id, checked) {
   p.staple = !!checked;
   syncStapleToGrocery(p);   // un-stapling clears any auto "running low" entry
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
   renderGroceryList();
 }
 
@@ -6654,7 +6663,7 @@ function cycleStapleLevel(id) {
   p.stockLevel = order[(order.indexOf(p.stockLevel || 'empty') + 1) % order.length];
   syncStapleToGrocery(p);
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
   renderGroceryList();
 }
 
@@ -6670,7 +6679,7 @@ function updatePantryDate(id, value) {
     if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
   }
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
 }
 
 // Flip an item between "bought date + shelf life" and a printed "expiry date".
@@ -6679,7 +6688,7 @@ function togglePantryDateMode(id) {
   if (!p) return;
   p.dateMode = (p.dateMode === 'expiry') ? 'bought' : 'expiry';
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
 }
 
 function updatePantryShelf(id, value) {
@@ -6688,7 +6697,7 @@ function updatePantryShelf(id, value) {
   var days = parseInt(value, 10);
   p.shelfLifeDays = isNaN(days) ? null : days;
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
 }
 
 function updatePantryQty(id, value) {
@@ -6698,7 +6707,7 @@ function updatePantryQty(id, value) {
   p.quantity = isNaN(q) ? null : q;
   checkAndReplenishLowStock();
   saveData();
-  renderPantry();
+  renderPantryKeepOpen();
 }
 
 function togglePantryExpand(safeId) {
@@ -6707,6 +6716,23 @@ function togglePantryExpand(safeId) {
   var open = expand.classList.toggle('hidden') === false;
   var row = expand.previousElementSibling;
   if (row) row.classList.toggle('pi-row--open', open);
+}
+
+// Re-render the pantry while keeping any currently expanded cards open.
+// Use for in-card edits (date, qty, storage, staple) so the card doesn't collapse.
+function renderPantryKeepOpen() {
+  var openIds = [];
+  document.querySelectorAll('.pi-expand:not(.hidden)').forEach(function(el) {
+    openIds.push(el.id);
+  });
+  renderPantry();
+  openIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('hidden');
+    var row = el.previousElementSibling;
+    if (row) row.classList.add('pi-row--open');
+  });
 }
 
 // Expand/collapse an item's inline storage-guide row (no tab-switching needed).
@@ -7351,6 +7377,8 @@ function openBulkAddModal() {
   if (ta) ta.value = '';
   const warn = document.getElementById('bulk-add-warnings');
   if (warn) warn.innerHTML = '';
+  const exp = document.getElementById('bulk-add-expiry');
+  if (exp) exp.value = '';
   const modal = document.getElementById('bulk-add-modal');
   if (modal) { modal.classList.remove('hidden'); if (ta) setTimeout(() => ta.focus(), 50); }
 }
@@ -7365,17 +7393,29 @@ function confirmBulkAdd() {
   const raw = (ta ? ta.value : '').trim();
   if (!raw) { closeBulkAddModal(); return; }
 
+  const expiryInput = document.getElementById('bulk-add-expiry');
+  const bulkExpiry = expiryInput ? expiryInput.value : '';
+
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const added = [];
   const warnings = [];
 
+  // Regex to parse "Name qty unit" when no comma is used (e.g. "Coconut cream 200ml").
+  var NO_COMMA_RE = /^(.+?)\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|L|oz|lbs?|pcs?|pieces?|cups?|tbsp|tsp|bunch|bunches|cans?|bottles?|boxes?|bags?|packs?|head|cloves?|stalks?|slices?|liters?|litres?|ltr)\s*$/i;
+
   lines.forEach((line, idx) => {
     const parts = line.split(',').map(p => p.trim());
-    const name = parts[0];
+    let name = parts[0];
     if (!name) { warnings.push(`Line ${idx + 1}: empty name — skipped`); return; }
 
-    const qty = parts[1] ? parseFloat(parts[1]) : null;
-    const unit = parts[2] || null;
+    let qty = parts[1] ? parseFloat(parts[1]) : null;
+    let unit = parts[2] || null;
+
+    // No-comma path: try to extract trailing "qty unit" (e.g. "Coconut cream 200ml")
+    if (parts.length === 1) {
+      var m = line.match(NO_COMMA_RE);
+      if (m) { name = m[1]; qty = parseFloat(m[2]); unit = m[3]; }
+    }
 
     if (parts[1] && (isNaN(qty) || qty < 0)) {
       warnings.push(`Line ${idx + 1}: "${line}" — invalid quantity, skipped`);
@@ -7402,7 +7442,9 @@ function confirmBulkAdd() {
       storage,
       quantity: (qty && qty > 0) ? qty : null,
       unit: unit || (dbEntry ? dbEntry.unit : ''),
-      staple: dbEntry ? !!dbEntry.isStaple : undefined
+      staple: dbEntry ? !!dbEntry.isStaple : undefined,
+      expiryDate: bulkExpiry || null,
+      dateMode: bulkExpiry ? 'expiry' : undefined
     });
     added.push(name);
   });
