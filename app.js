@@ -1731,6 +1731,10 @@ function setupEventListeners() {
   const moreBtn = document.querySelector('.tab-more-btn');
   const moreMenu = document.querySelector('.tab-more-menu');
   if (moreBtn && moreMenu) {
+    // iOS Safari clips a position:fixed element when an ancestor uses -webkit-overflow-scrolling:touch.
+    // The mobile .tab-nav is overflow-x:auto, so this dropdown rendered invisibly on iPhone (fine on
+    // Android). Reparent it to <body> so the fixed positioning escapes the scroll container.
+    document.body.appendChild(moreMenu);
     moreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const nowHidden = moreMenu.classList.toggle('hidden');
