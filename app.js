@@ -250,6 +250,21 @@ function emptyState(iconName, title, text) {
 
 const STORAGE_KEY = 'mealPrepAppData';
 
+// First-run gate (R2): sample recipes are starter content for a brand-new install ONLY. Once a cloud
+// doc OR a localStorage record exists, an empty recipe list is the user's deliberate choice and must be
+// respected — we must never re-inject the samples over it.
+var FIRST_RUN_KEY = 'mealPrepInitialized';
+function isFirstRun() { try { return !localStorage.getItem(FIRST_RUN_KEY); } catch (e) { return false; } }
+function markInitialized() { try { localStorage.setItem(FIRST_RUN_KEY, '1'); } catch (e) {} }
+function ensureStarterRecipes() {
+  if (!isFirstRun()) return;                 // existing install → respect whatever's there (incl. empty)
+  if (!AppState.recipes || AppState.recipes.length === 0) {
+    AppState.recipes = [...sampleRecipes];
+    patchMissingNutrition(AppState.recipes);
+  }
+  markInitialized();
+}
+
 function saveToLocalStorage() {
   try {
     const dataToSave = {
@@ -273,6 +288,7 @@ function saveToLocalStorage() {
     };
     AppState.localSavedAt = dataToSave.lastSaved;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    markInitialized(); // a save means we're past first run — never auto-seed samples again
     console.log('Data saved to local storage');
   } catch (error) {
     console.error('Error saving to local storage:', error);
@@ -286,8 +302,7 @@ function loadFromLocalStorage() {
     if (saved) {
       const data = JSON.parse(saved);
       AppState.recipes = data.recipes || [];
-      if (AppState.recipes.length === 0) AppState.recipes = [...sampleRecipes];
-      patchMissingNutrition(AppState.recipes);
+      patchMissingNutrition(AppState.recipes); // R2: do NOT re-seed samples over a saved (possibly empty) record
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -319,6 +334,7 @@ function loadFromLocalStorage() {
       AppState.deletions = data.deletions || {};
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
+      markInitialized();   // a saved record exists → not first run
 
       console.log('Data loaded from local storage');
       return true;
@@ -1638,6 +1654,7 @@ function initApp() {
       } else {
         // User is signed out
         loadFromLocalStorage();
+        ensureStarterRecipes(); // R2: first-run starter content (respects an existing empty local record)
         seedPantryIfEmpty();
         renderRecipes();
         renderWeeklyPlanner();
@@ -5261,8 +5278,7 @@ async function loadFromFirestore() {
       AppState.dataVersion = data.version || 0;
       AppState.cloudSavedAt = data.lastSaved || data.lastUpdated || null;
       AppState.recipes = data.recipes || [];
-      if (AppState.recipes.length === 0) AppState.recipes = [...sampleRecipes];
-      const didPatch = patchMissingNutrition(AppState.recipes);
+      const didPatch = patchMissingNutrition(AppState.recipes); // R2: respect the cloud doc — never re-seed samples over an existing (possibly empty) account
       AppState.weeklyPlan = data.weeklyPlan || {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -5294,6 +5310,7 @@ async function loadFromFirestore() {
       AppState.deletions = data.deletions || {};
       purgeOldTombstones();
       applyTombstones(); // honour the cloud doc's own tombstones on the data it just delivered
+      markInitialized(); // the account's cloud doc exists → not first run, never auto-seed samples
 
       // Photos: legacy data may have them inline in this doc; new photos live in
       // the photos subcollection. Cache both, attach to recipes, and migrate any
@@ -5386,8 +5403,9 @@ async function loadUserData() {
     }
   }
 
-  seedPantryIfEmpty(); // first-time: pre-fill common staples to set stock on
-  applyTombstones();    // honour tombstones on every path (loaded / empty / error)
+  ensureStarterRecipes(); // R2: seed samples only on a genuine first run — never over a deliberate empty
+  seedPantryIfEmpty();    // first-time: pre-fill common staples to set stock on
+  applyTombstones();      // honour tombstones on every path (loaded / empty / error)
   purgeOldTombstones();
   snapshotIdBaseline(); // baseline AFTER seeding — so any future delete (incl. of a staple) is detected
 

@@ -78,7 +78,7 @@ Legend: ❌ broken · ⚠️ works-but-fragile/edge · 🎛️ intended-but-conf
 | ID | Failure mode | Path | Status |
 |---|---|---|---|
 | **F1** | **Clear All Data returns** *(reported)* | `clearLocalStorage` deletes the doc, but (a) a 2nd signed-in device re-pushes its copy and re-creates the doc, and/or (b) `deleteDoc` fails offline (caught) → doc survives → reload reloads it. Deleting the doc never propagates the *intent* to clear. | ❌ |
-| **F2** | **Defaults overwrite user data** | `recipes.length===0 → sampleRecipes` fires in *both* `loadFromLocalStorage` and `loadFromFirestore`. A user who deleted all recipes (or a just-cleared account) gets samples injected, which then save up. Tombstones only remove sample ids the user *previously* deleted. | ❌/🎛️ |
+| **F2** | **Defaults overwrite user data** | `recipes.length===0 → sampleRecipes` fired in *both* `loadFromLocalStorage` and `loadFromFirestore`. A user who deleted all recipes (or a just-cleared account) got samples injected, which then saved up. | **✅ FIXED (R2)** — first-run gate (`isFirstRun`/`markInitialized`/`ensureStarterRecipes`): samples seed only when no cloud doc *and* no local record exists; a saved/empty account is respected. *Device-pending.* |
 | **F3** | **Cross-device duplication** | The same logical item added independently on two devices gets two different ids (`Date.now()+random`); `unionById` keeps both. The name-dup check in `addToPantry` is local-only. | ⚠️ |
 | **F4** | **Double load on sign-in** | `signIn()` calls `loadUserData()` **and** `onAuthStateChanged(user)` calls it again → two union+save passes; `dataVersion` race window. | ⚠️ |
 | **F5** | **Signed-in / signed-out share one key** | Single `STORAGE_KEY`. Scratch edits made signed-out persist and are then merged into the next account by the sign-in union. | ⚠️ |
@@ -104,7 +104,7 @@ Legend: ❌ broken · ⚠️ works-but-fragile/edge · 🎛️ intended-but-conf
 | 8 | Sign in; cloud is genuinely empty (new account) | local pushed up | 'empty' → saveToFirestore | ✅ |
 | 9 | **Clear All Data, 2nd device signed in** | stays cleared everywhere | 2nd device re-pushes → returns | ❌ (F1) |
 | 10 | **Clear All Data, offline** | clears when back online | deleteDoc fails → reload restores | ❌ (F1) |
-| 11 | **Delete ALL recipes** | list stays empty | sampleRecipes re-injected | ❌ (F2) |
+| 11 | **Delete ALL recipes** | list stays empty | first-run gate respects empty | ✅ **R2** (analysis; device-pending) |
 | 12 | **Same item added on 2 devices independently** | one item | two (different ids) | ⚠️ (F3) |
 | 13 | Restore Backup of a previously-deleted item | item restored | restored then removed on reload | ⚠️ (F10) |
 | 14 | One device on old build | full guarantee | partial (no tombstones) | ⚠️ (F7) |
@@ -145,6 +145,23 @@ Ordered by impact. The first three "finish" the correctness story; the rest are 
 
 **The minimum to call sync "finished":** R1 + R2 + R3 (+ R5). R3 is the keystone — with explicit tombstones,
 "always merge" removes the last data-loss/race surface and makes the remaining fixes small.
+
+---
+
+## 6a. Sync V1 Complete — progress
+
+Milestone = R1 + R2 + R3 + R5, one at a time, full matrix re-run after each, device-verified before the next.
+
+| Rec | What | Code | Self Review / QA | Matrix (analysis) | Device-verified |
+|---|---|---|---|---|---|
+| **R2** | defaults only on true first run | ✅ done | ✅ pass | ✅ row 11 →✅, no regressions | ⏳ **you** |
+| **R5** | single sign-in entry | ⏳ next | — | — | — |
+| **R1** | Clear propagates via tombstones | ⏳ | — | — | — |
+| **R3** | always-merge + tombstones (retire version-replace) | ⏳ | — | — | — |
+
+**R2 device checks (please verify):** (a) a brand-new user still sees the sample recipes; (b) delete **all**
+recipes, refresh → they **stay gone** (no samples reappear); (c) on a 2nd device signed into the same account
+with 0 recipes → stays empty. If all three hold, row 11 flips from analysis-✅ to device-✅ and I proceed to R5.
 
 ---
 
