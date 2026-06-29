@@ -33,6 +33,7 @@ const AppState = {
   cookedMeals: [],
   cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
+  deletions: {},              // { id: deletedAtISO } tombstones — sync deletes so a union can't resurrect them
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
@@ -266,6 +267,7 @@ function saveToLocalStorage() {
       cookedMeals: AppState.cookedMeals,
       cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
+      deletions: AppState.deletions || {},
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
@@ -314,6 +316,7 @@ function loadFromLocalStorage() {
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      AppState.deletions = data.deletions || {};
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
 
@@ -390,7 +393,8 @@ function snapshotData() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
-    recentRecipes: AppState.recentRecipes
+    recentRecipes: AppState.recentRecipes,
+    deletions: AppState.deletions || {}
   };
 }
 
@@ -5076,6 +5080,60 @@ async function recheckVerification() {
 
 // Builds the cloud payload from AppState. Photos are stripped (they live in the
 // photos subcollection). Returns a plain object WITHOUT a version field.
+// ── Delete-aware sync (tombstones) ───────────────────────────────────────────
+// Whole-document sync makes a missing item ambiguous: deleted, or not-yet-synced? We resolve it
+// by recording deletions as tombstones (id -> time) that sync like any other field and are honoured
+// in every merge. Deletions are detected by DIFFING the curated lists against a per-session baseline
+// (refreshed after each load/merge) — so no delete handler needs instrumenting. groceryList is
+// excluded: it's regenerated from the plan, so a "missing" grocery item isn't a real deletion.
+var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients'];
+var _idBaseline = null; // map of ids present right after the last load/merge
+
+function collectSyncedIds() {
+  var s = {};
+  TOMBSTONE_KEYS.forEach(function (key) {
+    (AppState[key] || []).forEach(function (it) { if (it && it.id != null) s[String(it.id)] = true; });
+  });
+  return s;
+}
+
+// Remember the current id set so the next save can tell which ids the USER removed on this device.
+function snapshotIdBaseline() { _idBaseline = collectSyncedIds(); }
+
+// At save time: an id that was in the baseline but is gone now was deleted here → tombstone it.
+function recordLocalDeletions() {
+  if (!_idBaseline) { snapshotIdBaseline(); return; }
+  var now = collectSyncedIds();
+  var when = new Date().toISOString();
+  Object.keys(_idBaseline).forEach(function (id) { if (!now[id]) AppState.deletions[id] = when; });
+  _idBaseline = now;
+}
+
+// Union two tombstone maps; the later deletedAt wins.
+function mergeDeletions(remote) {
+  remote = remote || {};
+  if (!AppState.deletions) AppState.deletions = {};
+  Object.keys(remote).forEach(function (id) {
+    if (!AppState.deletions[id] || remote[id] > AppState.deletions[id]) AppState.deletions[id] = remote[id];
+  });
+}
+
+// Drop any tombstoned item from the curated lists. A re-add makes a NEW id, so it isn't suppressed.
+function applyTombstones() {
+  var dels = AppState.deletions || {};
+  if (!Object.keys(dels).length) return;
+  TOMBSTONE_KEYS.forEach(function (key) {
+    AppState[key] = (AppState[key] || []).filter(function (it) { return !it || it.id == null || !dels[String(it.id)]; });
+  });
+}
+
+// Keep the tombstone map bounded — forget markers older than 180 days.
+function purgeOldTombstones() {
+  if (!AppState.deletions) { AppState.deletions = {}; return; }
+  var cutoff = new Date(Date.now() - 180 * 864e5).toISOString();
+  Object.keys(AppState.deletions).forEach(function (id) { if (AppState.deletions[id] < cutoff) delete AppState.deletions[id]; });
+}
+
 function buildFirestorePayload() {
   return {
     recipes: AppState.recipes.map(function(r) {
@@ -5097,6 +5155,7 @@ function buildFirestorePayload() {
     cookedMeals: AppState.cookedMeals,
     cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
+    deletions: AppState.deletions || {},
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
   };
@@ -5130,6 +5189,7 @@ async function saveToFirestore() {
   // overwrite good cloud data with a default/empty AppState — the deploy/reload data-loss bug.
   // localStorage still has everything; the cloud syncs once cloudReady flips true.
   if (!AppState.cloudReady) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
+  recordLocalDeletions(); // tombstone anything the user removed on this device since the last sync
   AppState.syncStatus = 'saving'; updateSyncIndicator();
 
   const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
@@ -5157,7 +5217,12 @@ async function saveToFirestore() {
         const remote = snap.data();
         const remoteVersion = remote.version || 0;
         if (remoteVersion > (AppState.dataVersion || 0)) {
+          mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
+          payload.deletions = AppState.deletions; // carry the merged tombstones
+          TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
+            payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !AppState.deletions[String(it.id)]; });
+          });
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
         payload.version = remoteVersion + 1;
@@ -5226,6 +5291,9 @@ async function loadFromFirestore() {
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      AppState.deletions = data.deletions || {};
+      purgeOldTombstones();
+      applyTombstones(); // honour the cloud doc's own tombstones on the data it just delivered
 
       // Photos: legacy data may have them inline in this doc; new photos live in
       // the photos subcollection. Cache both, attach to recipes, and migrate any
@@ -5292,20 +5360,25 @@ async function loadUserData() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const local = JSON.parse(raw) || {};
-        let before = 0, after = 0;
-        ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'].forEach(function (key) {
+        const cloudDelN = Object.keys(AppState.deletions || {}).length;
+        const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'];
+        let before = 0;
+        UKEYS.forEach(function (key) {
           before += (AppState[key] || []).length;
           AppState[key] = unionById(AppState[key] || [], local[key] || []);
-          after += AppState[key].length;
         });
         patchMissingNutrition(AppState.recipes);
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
         AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
-        if (after > before) {
-          console.log('loadUserData: merged ' + (after - before) + ' local-only item(s) up to the cloud');
-          saveData(); // persist the merged superset to BOTH local + cloud so the account has everything
+        mergeDeletions(local.deletions); // combine this device's tombstones with the cloud's
+        applyTombstones();               // then drop anything either side deleted — a delete sticks, no resurrection
+        let after = 0;
+        UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
+        if (after !== before || Object.keys(AppState.deletions).length !== cloudDelN) {
+          console.log('loadUserData: reconciled local data/tombstones — syncing the merged set up');
+          saveData(); // persist the reconciled superset to BOTH local + cloud so the account has everything
         }
       }
     } catch (e) {
@@ -5314,6 +5387,9 @@ async function loadUserData() {
   }
 
   seedPantryIfEmpty(); // first-time: pre-fill common staples to set stock on
+  applyTombstones();    // honour tombstones on every path (loaded / empty / error)
+  purgeOldTombstones();
+  snapshotIdBaseline(); // baseline AFTER seeding — so any future delete (incl. of a staple) is detected
 
   // Update UI
   renderRecipes();
@@ -5424,6 +5500,9 @@ function setupRealtimeListeners() {
         AppState.cookedMeals = data.cookedMeals || [];
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
+        AppState.deletions = data.deletions || {}; // adopt the remote tombstones...
+        applyTombstones();                          // ...so a delete made on another device lands here too
+        snapshotIdBaseline();
 
         // Update UI
         renderRecipes();
