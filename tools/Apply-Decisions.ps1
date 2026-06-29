@@ -44,6 +44,29 @@ foreach ($f in $files) {
     if ($raw -notmatch '(?m)^status:\s*new\s*$') { continue }   # only fresh decisions
     $body = ($raw -split '(?ms)^---\s*$', 3)[2]                  # frontmatter ... --- ... body
 
+    # Convenience commands: expand "accept" / "<verb> all" into an explicit verb+numbers string the
+    # clause parser already understands. "accept" applies each pending proposal's own recommended
+    # verdict; "<verb> all" applies that verb to every pending proposal.
+    if ($body -match '(?i)\baccept\b' -or $body -match '(?i)\b(approve|park|reject|clarify)\s+all\b') {
+        $pend = @{}   # pending PROP number -> its recommended verdict (from the ▶ Decision line)
+        foreach ($m in [regex]::Matches($propText, '(?ms)^###\s+PROP-0*(?<n>\d+)\s+\p{Pd}\s+.+?\r?\n(?<b>.*?)(?=^###\s|\z)')) {
+            if ($m.Groups['b'].Value -notmatch '\*\*status:\*\*\s*pending') { continue }
+            $rec = ([regex]::Match($m.Groups['b'].Value, 'Decision:\s*(?<v>\w+)')).Groups['v'].Value.ToLower()
+            $pend[[int]$m.Groups['n'].Value] = $rec
+        }
+        $keys = $pend.Keys | Sort-Object
+        if ($body -match '(?i)\baccept\b') {
+            $expanded = foreach ($v in 'approve','park','reject','clarify') {
+                $ns = @($keys | Where-Object { $pend[$_] -eq $v })
+                if ($ns) { "$v " + ($ns -join ' ') }
+            }
+            $body = ($expanded -join ' ')
+        } else {
+            $verb = ([regex]::Match($body, '(?i)\b(approve|park|reject|clarify)\s+all\b')).Groups[1].Value.ToLower()
+            $body = "$verb " + ($keys -join ' ')
+        }
+    }
+
     # Parse clauses: a verb followed immediately by numbers, ranges, spaces or commas.
     # Supports "approve 2 3", "approve 1-10", "approve 2,3 5-7". Prose like "tell me more
     # about 5" has no verb before the number, so it is ignored.

@@ -33,9 +33,13 @@ Reject 12
 ```
 
 The body is the **raw reply text**. The applier scans it for the verbs `approve | park | reject |
-clarify` followed by proposal numbers (e.g. `2 3 4`), in any order, across lines. Numbers map to
-`PROP-00N`. Anything that isn't a verb+number (a question like "tell me more about 5") is ignored —
-those are for a human/Claude to answer, not the gate.
+clarify` followed by proposal numbers (e.g. `2 3 4`) or ranges (`1-10`), in any order, across lines.
+Numbers map to `PROP-00N`. Anything that isn't a verb+number (a question like "tell me more about 5")
+is ignored — those are for a human/Claude to answer, not the gate.
+
+**Batch shortcuts** (operate on every *pending* proposal):
+- `accept` — apply each pending proposal's **recommended** verdict (approves the Approves, parks the Parks). "I trust your triage."
+- `approve all` / `park all` / `reject all` — apply that one verb to **all** pending proposals (literal — `approve all` also approves the ones recommended for parking).
 
 ## What the applier does per verb
 | reply | PROPOSALS.md status | BUILD_QUEUE.md |

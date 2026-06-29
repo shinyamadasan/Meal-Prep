@@ -1,5 +1,5 @@
 🌅 *Meal Prep — Morning Digest*
-Sun 28 Jun · 10 proposals waiting · 🎯 Objective: *Alpha stability*
+Mon 29 Jun · 10 proposals waiting · 🎯 Objective: *Alpha stability*
 
 ✅ *RECOMMEND APPROVE (6)*
 *14* · Missing button variants render as invisible/unstyled (btn--ghost, btn--danger, btn--success)
@@ -26,5 +26,5 @@ Sun 28 Jun · 10 proposals waiting · 🎯 Objective: *Alpha stability*
    → Mostly polish — but the mobile-footer-stacking subset (action buttons cramped side-by-side on phone) is worth pulling forward.
 
 —
-*Reply naturally:* `Approve 1-10` · `Approve 2 3` · `Park 7` · `Reject 12`
+*Reply:* `Accept` (take all my recs) · `Approve all` · `Approve 14-19` · `Park 7` · `Reject 12`
 Approved → built next run. Silence → nothing happens.
