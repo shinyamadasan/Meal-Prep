@@ -5181,7 +5181,11 @@ async function saveToFirestore() {
 // Returns 'loaded' (cloud data applied), 'empty' (no cloud doc yet), or
 // 'error' (offline / read failed). The caller seeds the cloud only on 'empty'.
 async function loadFromFirestore() {
-  if (!AppState.currentUser || !AppState.isOnline) return 'error';
+  // Don't gate the cloud READ on navigator.onLine — iOS Safari reports it unreliably (often false
+  // right after login), which silently skipped the read and left a device showing empty/seeded data
+  // while the real data sat in the cloud. Attempt the read; a genuine offline/failure is caught below
+  // and returns 'error', so cloudReady stays false and we never overwrite the cloud doc (D-010 holds).
+  if (!AppState.currentUser || !window.firebase) return 'error';
 
   try {
     const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
@@ -5264,6 +5268,7 @@ async function initializeUserData() {
 }
 
 async function loadUserData() {
+  AppState.isOnline = navigator.onLine; // refresh the (iOS-flaky) flag — it's only read once at startup
   // Try to load from Firestore first, fallback to local storage
   const status = await loadFromFirestore();
   // We now know the cloud baseline (its data, or that it's confirmed-empty) → writes are safe.
@@ -5277,24 +5282,34 @@ async function loadUserData() {
     // confirmed-empty doc (not a transient error) to avoid overwriting good data.
     if (status === 'empty') saveToFirestore();
   } else {
-    // Firestore loaded, but check if localStorage has newer data that didn't
-    // finish syncing (e.g. import followed by a SW-triggered page reload before
-    // the async Firestore write completed).
+    // Firestore loaded. UNION this device's local data into the cloud copy so signing in can
+    // never SHADOW or lose data you built on this device (e.g. items added while signed out, or
+    // before the account's cloud doc existed). Mirrors the Import merge: union list fields by id
+    // (cloud wins a true duplicate), fill empty plan slots only — non-destructive. The merged
+    // superset is then pushed back up, so a near-empty session adopts the cloud instead of
+    // overwriting it, and a data-rich device gets its items into the account.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const local = JSON.parse(raw);
-        const localTime = local.lastSaved ? new Date(local.lastSaved).getTime() : 0;
-        const cloudTime = AppState.cloudSavedAt ? new Date(AppState.cloudSavedAt).getTime() : 0;
-        if (localTime > cloudTime + 3000) {
-          // localStorage is more than 3 seconds newer — it has an unsynchronised save
-          console.log('loadUserData: localStorage is newer than Firestore — restoring and re-syncing');
-          loadFromLocalStorage();
-          saveToFirestore();
+        const local = JSON.parse(raw) || {};
+        let before = 0, after = 0;
+        ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'].forEach(function (key) {
+          before += (AppState[key] || []).length;
+          AppState[key] = unionById(AppState[key] || [], local[key] || []);
+          after += AppState[key].length;
+        });
+        patchMissingNutrition(AppState.recipes);
+        if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
+        AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
+        AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
+        AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
+        if (after > before) {
+          console.log('loadUserData: merged ' + (after - before) + ' local-only item(s) up to the cloud');
+          saveData(); // persist the merged superset to BOTH local + cloud so the account has everything
         }
       }
     } catch (e) {
-      console.warn('loadUserData: staleness check failed', e);
+      console.warn('loadUserData: local-merge on sign-in failed', e);
     }
   }
 
