@@ -476,11 +476,15 @@ async function clearLocalStorage() {
   if (AppState.currentUser && window.firebase && window.firebase.db) {
     try {
       const ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+      console.log('[CLEAR-DIAG] deleting users/' + AppState.currentUser.uid + ' at ' + new Date().toISOString()); // DIAGNOSTIC — remove with R1
       await window.firebase.deleteDoc(ref);
+      console.log('[CLEAR-DIAG] deleteDoc SUCCEEDED');                                 // DIAGNOSTIC — remove with R1
     } catch (e) {
-      console.error('Firebase clear failed:', e);
+      console.error('[CLEAR-DIAG] deleteDoc FAILED:', (e && e.code), (e && e.message)); // DIAGNOSTIC — remove with R1
       // Still reload — localStorage is gone, fresh defaults will load
     }
+  } else {
+    console.warn('[CLEAR-DIAG] SKIPPED deleteDoc — no currentUser at clear time (signed out / auth not ready)'); // DIAGNOSTIC — remove with R1
   }
 
   location.reload();
@@ -5229,6 +5233,7 @@ async function saveToFirestore() {
     // don't silently overwrite their changes. Firestore auto-retries on contention.
     await window.firebase.runTransaction(window.firebase.db, async function(tx) {
       const snap = await tx.get(userDocRef);
+      if (!snap.exists()) console.warn('[SAVE-DIAG] doc did NOT exist → this save RE-CREATES it (version 1) at ' + new Date().toISOString()); // DIAGNOSTIC — remove with R1
       let payload = buildFirestorePayload();
 
       if (snap.exists()) {
@@ -5276,6 +5281,7 @@ async function loadFromFirestore() {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
+      console.log('[LOAD-DIAG] doc EXISTS at reload: version=' + data.version + ' lastSaved=' + data.lastSaved + ' recipes=' + ((data.recipes || []).length) + ' pantry=' + ((data.pantry || []).length)); // DIAGNOSTIC — remove with R1
       AppState.dataVersion = data.version || 0;
       AppState.cloudSavedAt = data.lastSaved || data.lastUpdated || null;
       AppState.recipes = data.recipes || [];
@@ -5337,6 +5343,7 @@ async function loadFromFirestore() {
       console.log('Data loaded from Firestore');
       return 'loaded';
     }
+    console.log('[LOAD-DIAG] doc ABSENT at reload → status empty (clear stuck)'); // DIAGNOSTIC — remove with R1
     return 'empty'; // signed in, but no data saved to the cloud yet
   } catch (error) {
     console.error('Error loading from Firestore:', error);
