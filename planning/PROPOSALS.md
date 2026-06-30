@@ -203,7 +203,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none
 - **why now vs later:** now — invisible primary controls on a core alpha screen.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -216,7 +216,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none — standardize on dark text on light-sage.
 - **why now vs later:** now — readability blocker.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -229,7 +229,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** keep glyphs visually small but pad the hit area.
 - **why now vs later:** now — directly causes mis-taps incl. accidental deletes.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -242,7 +242,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** high (aliases) / med (safe deletion of the duplicate block) · **ambiguity:** which copy of the duplicated block to keep — verify they're identical first.
 - **why now vs later:** aliases now (low-risk, high-leverage); duplicate-block deletion now-ish with care.
 - **AI-recommended priority:** **P1**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -255,7 +255,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** none — reuse `.empty-state*`, delete orphaned inline styles.
 - **why now vs later:** now-ish — first-run polish, no new CSS.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -268,7 +268,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** none — replace `outline:none` with `var(--focus-outline)`.
 - **why now vs later:** now — small a11y fix. (Unifying all bespoke inputs to `.form-control` = later.)
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -281,7 +281,7 @@
 - **effort:** M · **dependencies:** overlaps PROP-017 (token aliases) · **confidence:** med · **ambiguity:** none.
 - **why now vs later:** later — cosmetic; revisit after the alpha usability fixes.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -294,7 +294,7 @@
 - **effort:** L (full) / S (just normalize radius+size) · **dependencies:** none · **confidence:** med · **ambiguity:** scope.
 - **why now vs later:** later — incremental polish.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -307,7 +307,7 @@
 - **effort:** L · **dependencies:** none · **confidence:** high · **ambiguity:** none — mechanical token mapping.
 - **why now vs later:** later — large surgical diff; not blocking alpha.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
@@ -320,7 +320,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** none — add `.modal-content--sm/--md`, ensure action rows use `.modal-footer`.
 - **why now vs later:** mobile-footer subset now-ish; full modal refactor later.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-06-30 (via digest reply)
 
 ---
 
