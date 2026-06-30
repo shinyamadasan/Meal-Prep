@@ -77,7 +77,7 @@ Legend: ❌ broken · ⚠️ works-but-fragile/edge · 🎛️ intended-but-conf
 
 | ID | Failure mode | Path | Status |
 |---|---|---|---|
-| **F1** | **Clear All Data returns** *(reported)* | `clearLocalStorage` deletes the doc, but (a) a 2nd signed-in device re-pushes its copy and re-creates the doc, and/or (b) `deleteDoc` fails offline (caught) → doc survives → reload reloads it. Deleting the doc never propagates the *intent* to clear. | ❌ |
+| **F1** | **Clear All Data returns** *(reported)* | `clearLocalStorage` *deleted the doc*, so a 2nd live client re-created it (proven Path B, INV-2) and/or the `'empty'`-path auto-recreated it; reload then reloaded it. | **✅ FIXED (R1)** — Clear now tombstones every id + writes an explicit **empty versioned doc** (no `deleteDoc`); the wipe propagates and sticks, and reload reads `'loaded'`-empty so nothing auto-recreates. *Caveat F7: needs all clients on the new build. Device-pending.* |
 | **F2** | **Defaults overwrite user data** | `recipes.length===0 → sampleRecipes` fired in *both* `loadFromLocalStorage` and `loadFromFirestore`. A user who deleted all recipes (or a just-cleared account) got samples injected, which then saved up. | **✅ FIXED (R2)** — first-run gate (`isFirstRun`/`markInitialized`/`ensureStarterRecipes`): samples seed only when no cloud doc *and* no local record exists; a saved/empty account is respected. *Device-pending.* |
 | **F3** | **Cross-device duplication** | The same logical item added independently on two devices gets two different ids (`Date.now()+random`); `unionById` keeps both. The name-dup check in `addToPantry` is local-only. | ⚠️ |
 | **F4** | **Double load on sign-in** | `signIn()` called `loadUserData()` **and** `onAuthStateChanged(user)` called it again → two union+save passes; `dataVersion` race window. | **✅ FIXED (R5)** — `signIn` no longer loads; `onAuthStateChanged` is the single entry. *Residual:* `signUp`→`initializeUserData`→`loadUserData` (new-account path, low-frequency) is a separate double-init, not in F4 scope — noted for a follow-up. *Device-pending.* |
@@ -110,6 +110,16 @@ non-correctness only: 2–3 redundant writes on signup, a benign `cloudReady` fl
 **Related (not caused by this):** `signUp` pushes shared-localStorage data to the new account — that is
 **F5**, fixed by **R6 (namespace localStorage by uid)**, already a post-V1 item.
 
+### INV-2 — Clear-All-Data resurrection: which path? **(proven: B)**
+Instrumented (`[CLEAR-DIAG]/[LOAD-DIAG]/[SAVE-DIAG]`) and reproduced on real devices.
+**Proven Path B — a second still-live client re-creates the document.** Evidence from the user's console:
+(1) `[LOAD-DIAG] doc ABSENT at reload` → `deleteDoc` **succeeded** (rules out A); (2) the clearing client's
+own re-create was `[SAVE-DIAG] … RE-CREATES (version 1)` — **empty**; (3) the data that returned came back as
+`version=2, recipes=27, pantry=78`, and the version sequence the PC logged had **gaps** (v4/v7/v10/v13/v16
+missing) — the fingerprint of a **second concurrent writer** re-pushing the full data. So a second signed-in
+client (phone/tab/PWA not fully closed) re-pushed after the delete. **Fix = R1.** (Also surfaced, separate:
+a write storm / version inflation, and Firebase config errors — `profiles` rules + OAuth authorized domain.)
+
 ## 4. Sync Verification Matrix
 
 | # | Scenario | Expected | Current | Status |
@@ -122,8 +132,8 @@ non-correctness only: 2–3 redundant writes on signup, a benign `cloudReady` fl
 | 6 | Sign in on device w/ local data; cloud has *different* data | union, nothing lost | union-on-sign-in | ✅ |
 | 7 | Near-empty session signs in over populated cloud | adopts cloud (no clobber) | union keeps cloud | ✅ |
 | 8 | Sign in; cloud is genuinely empty (new account) | local pushed up | 'empty' → saveToFirestore | ✅ |
-| 9 | **Clear All Data, 2nd device signed in** | stays cleared everywhere | 2nd device re-pushes → returns | ❌ (F1) |
-| 10 | **Clear All Data, offline** | clears when back online | deleteDoc fails → reload restores | ❌ (F1) |
+| 9 | **Clear All Data, 2nd device (both new build)** | stays cleared everywhere | tombstones + empty doc propagate the wipe | ✅ **R1** (analysis; device-pending) |
+| 10 | **Clear All Data, offline** | clears when back online | empty+tombstones written locally; syncs on reconnect; no `deleteDoc` | ✅ **R1** (analysis; device-pending) |
 | 11 | **Delete ALL recipes** | list stays empty | first-run gate respects empty | ✅ **R2** (analysis; device-pending) |
 | 12 | **Same item added on 2 devices independently** | one item | two (different ids) | ⚠️ (F3) |
 | 13 | Restore Backup of a previously-deleted item | item restored | restored then removed on reload | ⚠️ (F10) |
@@ -176,7 +186,7 @@ Milestone = R1 + R2 + R3 + R5, one at a time, full matrix re-run after each, dev
 |---|---|---|---|---|---|
 | **R2** | defaults only on true first run | ✅ done | ✅ pass | ✅ row 11 →✅, no regressions | ⏳ **you** |
 | **R5** | single sign-in entry | ✅ done | ✅ pass | ✅ F4 (signIn) resolved, no regressions | ⏳ **you** |
-| **R1** | Clear propagates via tombstones | ⏳ | — | — | — |
+| **R1** | Clear propagates via tombstones | ✅ done | ✅ pass | ✅ rows 9,10 + single-device-clear →✅, no regressions | ⏳ **you** |
 | **R3** | always-merge + tombstones (retire version-replace) | ⏳ | — | — | — |
 
 **R2 device checks (please verify):** (a) a brand-new user still sees the sample recipes; (b) delete **all**

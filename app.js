@@ -465,26 +465,45 @@ function restoreBackup() {
 }
 
 async function clearLocalStorage() {
-  if (!confirm('Clear ALL saved data and reset to defaults?\n\nA backup is saved first — you can undo this with the "Restore Backup" button.')) return;
+  if (!confirm('Clear ALL your saved data (recipes, pantry, plan, lists)?\n\nThis wipes it on every signed-in device. A backup is saved first — undo with the "Restore Backup" button.')) return;
 
   createBackup('Clear All Data');
 
-  // Wipe localStorage (the backup key is kept)
-  localStorage.removeItem(STORAGE_KEY);
+  // R1: PROPAGATE the wipe via tombstones + an explicit EMPTY document — never deleteDoc.
+  // Deleting the doc just lets another live client (or our own 'empty'-path save) re-create it
+  // (SYNC_AUDIT F1, proven Path B). Tombstoning every current id makes the deletion survive the merge,
+  // and writing an empty (not deleted) doc means loadFromFirestore returns 'loaded' on reload — so the
+  // 'empty'-path auto-recreate never fires either.
+  var when = new Date().toISOString();
+  if (!AppState.deletions) AppState.deletions = {};
+  TOMBSTONE_KEYS.forEach(function (key) {
+    (AppState[key] || []).forEach(function (it) { if (it && it.id != null) AppState.deletions[String(it.id)] = when; });
+    AppState[key] = [];
+  });
+  AppState.groceryList = [];
+  AppState.recentRecipes = [];
+  AppState.ingredientPrices = {};
+  AppState.myStores = [];
+  AppState.customStores = [];
+  AppState.cookHistory = [];
+  AppState.weeklyPlan = {
+    Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+    Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+  };
 
-  // Delete the entire Firestore document so it can't sync old data back on reload
-  if (AppState.currentUser && window.firebase && window.firebase.db) {
+  // Persist the empty + tombstoned state to BOTH local and cloud (a real versioned doc, not a deletion).
+  saveToLocalStorage();
+  if (AppState.currentUser && window.firebase) {
     try {
-      const ref = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
-      console.log('[CLEAR-DIAG] deleting users/' + AppState.currentUser.uid + ' at ' + new Date().toISOString()); // DIAGNOSTIC — remove with R1
-      await window.firebase.deleteDoc(ref);
-      console.log('[CLEAR-DIAG] deleteDoc SUCCEEDED');                                 // DIAGNOSTIC — remove with R1
+      await saveToFirestore(); // writes empty + tombstones; surfaces its own error on failure
     } catch (e) {
-      console.error('[CLEAR-DIAG] deleteDoc FAILED:', (e && e.code), (e && e.message)); // DIAGNOSTIC — remove with R1
-      // Still reload — localStorage is gone, fresh defaults will load
+      showErrorMessage('Could not sync the wipe to the cloud: ' + (e && e.message));
     }
-  } else {
-    console.warn('[CLEAR-DIAG] SKIPPED deleteDoc — no currentUser at clear time (signed out / auth not ready)'); // DIAGNOSTIC — remove with R1
   }
 
   location.reload();
@@ -5233,7 +5252,6 @@ async function saveToFirestore() {
     // don't silently overwrite their changes. Firestore auto-retries on contention.
     await window.firebase.runTransaction(window.firebase.db, async function(tx) {
       const snap = await tx.get(userDocRef);
-      if (!snap.exists()) console.warn('[SAVE-DIAG] doc did NOT exist → this save RE-CREATES it (version 1) at ' + new Date().toISOString()); // DIAGNOSTIC — remove with R1
       let payload = buildFirestorePayload();
 
       if (snap.exists()) {
@@ -5281,7 +5299,6 @@ async function loadFromFirestore() {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
-      console.log('[LOAD-DIAG] doc EXISTS at reload: version=' + data.version + ' lastSaved=' + data.lastSaved + ' recipes=' + ((data.recipes || []).length) + ' pantry=' + ((data.pantry || []).length)); // DIAGNOSTIC — remove with R1
       AppState.dataVersion = data.version || 0;
       AppState.cloudSavedAt = data.lastSaved || data.lastUpdated || null;
       AppState.recipes = data.recipes || [];
@@ -5343,7 +5360,6 @@ async function loadFromFirestore() {
       console.log('Data loaded from Firestore');
       return 'loaded';
     }
-    console.log('[LOAD-DIAG] doc ABSENT at reload → status empty (clear stuck)'); // DIAGNOSTIC — remove with R1
     return 'empty'; // signed in, but no data saved to the cloud yet
   } catch (error) {
     console.error('Error loading from Firestore:', error);
