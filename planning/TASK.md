@@ -10,5 +10,5 @@
 
 ## Status: NO ACTIVE TASK
 
-2026-06-27 sprint (BQ-001 through BQ-006) fully built and committed.
-Add new items to `ROADMAP.md`, then promote a batch to `planning/BUILD_QUEUE.md` to activate the next run.
+2026-06-30 sprint (BQ-007 through BQ-012) built. BQ-013–016 (P3) deferred per build notes.
+Push commit manually, then promote next batch to activate the next run.

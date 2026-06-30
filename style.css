@@ -81,6 +81,22 @@
   --surface-secondary: var(--color-secondary);
   --border-color: var(--color-border);
   --primary: var(--color-primary);
+  /* Extended aliases — components use these legacy / shorthand names */
+  --color-text-primary: var(--color-text);
+  --color-text-muted: var(--color-text-secondary);
+  --color-bg: var(--color-background);
+  --surface: var(--color-surface);
+  --border: var(--color-border);
+  --color-surface-2: var(--color-secondary);
+  --border-radius: var(--radius-base);
+  --border-radius-sm: var(--radius-sm);
+  --color-danger: var(--color-error);
+  --color-danger-dark: var(--color-error);
+  --color-danger-light: rgba(var(--color-error-rgb), 0.12);
+  --color-warning-light: rgba(var(--color-warning-rgb), 0.12);
+  --color-warning-dark: var(--color-warning);
+  --color-success-light: rgba(var(--color-success-rgb), 0.12);
+  --color-success-dark: var(--color-success);
 
   /* Common style patterns */
   --focus-ring: 0 0 0 3px var(--color-focus-ring);
@@ -348,6 +364,34 @@ pre code {
 
 .btn--outline:hover {
   background: var(--color-secondary);
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.btn--ghost:hover {
+  background: var(--color-secondary);
+}
+
+.btn--danger {
+  background: var(--color-error);
+  color: var(--color-white);
+  border: 1px solid var(--color-error);
+}
+.btn--danger:hover {
+  filter: brightness(0.9);
+}
+
+.btn--success {
+  background: var(--color-success);
+  color: var(--color-btn-primary-text);
+  border: 1px solid var(--color-success);
+}
+.btn--success:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .btn--sm {
@@ -2193,7 +2237,7 @@ select.form-control {
 /* Highlighted "Paste" button shown on other days while a day is copied */
 .day-action-paste {
   background: var(--color-primary, var(--color-success));
-  color: #fff;
+  color: var(--color-btn-primary-text);
   font-weight: 600;
 }
 .day-action-paste:hover {
@@ -2206,7 +2250,7 @@ select.form-control {
   top: 20px;
   right: 20px;
   background: var(--color-success);
-  color: white;
+  color: var(--color-btn-primary-text);
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-base);
   font-size: var(--font-size-sm);
@@ -3197,9 +3241,20 @@ select.form-control {
     flex-direction: column;
     gap: var(--space-8);
   }
-  
+
   .modal-footer .btn {
     width: 100%;
+  }
+
+  /* 44px minimum tap targets for small interactive controls */
+  .modal-close,
+  .recipe-fav-btn,
+  .pantry-remove,
+  .cooked-remove,
+  .day-action-btn,
+  .detail-scaler-btn {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
@@ -3524,7 +3579,7 @@ select.form-control {
 }
 .detail-scaler-btn {
   background: var(--color-primary, #3b82f6);
-  color: #fff;
+  color: var(--color-btn-primary-text);
   border: none;
   border-radius: 4px;
   width: 24px;
@@ -4262,7 +4317,7 @@ select.form-control {
   align-items: center;
   gap: 0.25rem;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-btn-primary-text);
   border-radius: 20px;
   padding: 0.2rem 0.6rem 0.2rem 0.75rem;
   font-size: 0.78rem;
@@ -4272,14 +4327,14 @@ select.form-control {
 .ingcat-store-remove {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.8);
+  color: rgba(31, 33, 33, 0.65);
   cursor: pointer;
   font-size: 0.9rem;
   line-height: 1;
   padding: 0;
   margin-left: 0.1rem;
 }
-.ingcat-store-remove:hover { color: #fff; }
+.ingcat-store-remove:hover { color: var(--color-charcoal-700); }
 
 /* Search bar */
 .ingcat-search-bar {
@@ -4378,7 +4433,7 @@ select.form-control {
 }
 .ingcat-unit-select:focus,
 .ingcat-price-input:focus {
-  outline: none;
+  outline: var(--focus-outline);
   border-color: var(--color-primary);
 }
 
@@ -4420,7 +4475,7 @@ select.form-control {
 
 .ingcat-custom-badge {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-btn-primary-text);
   font-size: 0.65rem;
   border-radius: 10px;
   padding: 0.1rem 0.45rem;
@@ -4561,7 +4616,7 @@ select.form-control {
 }
 .cooked-storage-toggle button.active {
   background: var(--color-success);
-  color: #fff;
+  color: var(--color-btn-primary-text);
 }
 .cooked-remove {
   font: inherit;
@@ -4574,7 +4629,7 @@ select.form-control {
   color: var(--color-text);
   cursor: pointer;
 }
-.cooked-remove:hover { background: var(--color-success); color: #fff; }
+.cooked-remove:hover { background: var(--color-success); color: var(--color-btn-primary-text); }
 
 /* On-open freshness banner */
 .freshness-banner {
@@ -4669,7 +4724,7 @@ select.form-control {
 }
 .storage-toggle button.active {
   background: var(--color-success);
-  color: #fff;
+  color: var(--color-btn-primary-text);
 }
 
 .pantry-staple {
@@ -4710,7 +4765,7 @@ select.form-control {
 .planner-day-chip.active {
   background: var(--color-primary, var(--color-success));
   border-color: var(--color-primary, var(--color-success));
-  color: #fff;
+  color: var(--color-btn-primary-text);
 }
 .planner-day-all { font-weight: 600; }
 
@@ -4739,11 +4794,11 @@ select.form-control {
 }
 .slot-cooked-btn:hover {
   background: var(--color-success);
-  color: #fff;
+  color: var(--color-btn-primary-text);
 }
 .slot-cooked-btn--done {
   background: var(--color-success);
-  color: #fff;
+  color: var(--color-btn-primary-text);
   border-color: var(--color-success);
   opacity: 0.8;
   cursor: default;
@@ -4869,7 +4924,7 @@ select.form-control {
 .settings-row:hover { background: var(--color-border); }
 .settings-row--info { cursor: default; color: var(--color-text-secondary); font-size: 0.875rem; }
 .settings-row--info:hover { background: var(--color-secondary); }
-.settings-row--primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); font-weight: 600; }
+.settings-row--primary { background: var(--color-primary); color: var(--color-btn-primary-text); border-color: var(--color-primary); font-weight: 600; }
 .settings-row--primary:hover { background: var(--color-primary-dark, var(--color-primary)); opacity: 0.9; }
 .settings-row--danger { color: var(--color-error); }
 .settings-row--danger:hover { background: rgba(var(--color-error-rgb), 0.08); }
@@ -4951,7 +5006,7 @@ select.form-control {
   border: 1px solid var(--color-primary, var(--color-success));
   border-radius: 6px;
   background: var(--color-primary, var(--color-success));
-  color: #fff;
+  color: var(--color-btn-primary-text);
   cursor: pointer;
 }
 .email-verify-banner button:last-child {
@@ -5503,7 +5558,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 0.85rem;
-  background: var(--color-primary); color: #fff;
+  background: var(--color-primary); color: var(--color-btn-primary-text);
 }
 .gs-step.done .gs-num { background: var(--color-success); }
 .gs-body { flex: 1; min-width: 0; }

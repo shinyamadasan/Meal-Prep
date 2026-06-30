@@ -3,6 +3,8 @@
 > Append-only. The agent adds an entry here at **Task Completion** (newest at top). Full diffs live
 > in `git log`; this is the human-readable "what shipped and when". Prune freely — git is the archive.
 
+- ✅ BQ-007–BQ-012 sprint — button variants (ghost/danger/success), white-on-sage contrast (WCAG), 44px tap targets (modal-close, fav, pantry-remove, cooked-remove, day-action, scaler), CSS variable aliases (15 undefined tokens resolved), empty state for ingredient browser, focus outline on ingcat inputs (2026-06-30)
+- ⏭ BQ-013–BQ-016 (P3) — deferred per build notes: color token consistency, badge consolidation, spacing scale, modal sizing. All say "defer past stabilize phase" in their build notes. Stays in BUILD_QUEUE for next human review. (2026-06-30)
 - ✅ BQ-001–BQ-006 sprint — bulk add parser (no-comma format), pantry card stays open on edit, storage guide hides for unrecognized items, recently added at top, bulk add expiry date field, unit input datalist (2026-06-27)
 - ✅ BQ-001 — Price Book subtitle reframed as personal price reference (honest expectations; no store-compare promise) (2026-06-27)
 - ✅ BQ-002 — Dashboard renders on first open: added `renderDashboard()` to signed-out, Firebase-unavailable, and `loadUserData()` init paths (2026-06-27)

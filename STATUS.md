@@ -5,6 +5,129 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-06-30 — BQ-007..012 sprint built (UX/a11y fixes)
+
+**Built (6 items, all from approved BUILD_QUEUE):**
+
+- **BQ-007 (P1) — Missing button variants added.** `.btn--ghost` (transparent + border, fills on hover),
+  `.btn--danger` (error-red bg + white text + brightness hover), `.btn--success` (sage bg + dark text).
+  All wired at the CSS level — no HTML/JS changes needed. "Browse", "Bulk add", "Skip", "Back", and
+  "Delete Account" now have visible affordances.
+
+- **BQ-008 (P1) — White-on-sage contrast fixed.** 13 elements that used `color: #fff` or `color: white`
+  on sage/primary background now use `color: var(--color-btn-primary-text)` (= charcoal-700, dark text).
+  Affected: `.day-action-paste`, `.success-message`, `.detail-scaler-btn`, `.ingcat-custom-badge`,
+  `.ingcat-store-tag` + `.ingcat-store-remove`, `.cooked-storage-toggle button.active`,
+  `.cooked-remove:hover`, `.storage-toggle button.active`, `.planner-day-chip.active`,
+  `.slot-cooked-btn:hover`/`--done`, `.settings-row--primary`, `.email-verify-banner button`, `.gs-num`.
+
+- **BQ-009 (P1) — 44px tap targets on mobile.** Added inside `@media (max-width: 768px)`:
+  `min-height: 44px; min-width: 44px` for `.modal-close`, `.recipe-fav-btn`, `.pantry-remove`,
+  `.cooked-remove`, `.day-action-btn`, `.detail-scaler-btn`. (`.btn`/`.tab-btn` already had 44px.)
+
+- **BQ-010 (P1) — CSS variable aliases added.** Added 15 undefined-variable aliases to `:root`:
+  `--color-text-primary`, `--color-text-muted`, `--color-bg`, `--surface`, `--border`,
+  `--color-surface-2`, `--border-radius`, `--border-radius-sm`, `--color-danger`, `--color-danger-dark`,
+  `--color-danger-light`, `--color-warning-light`, `--color-warning-dark`, `--color-success-light`,
+  `--color-success-dark`. Fixes transparent `.member-status.pending`, `.warning-message` styling, and
+  dozens of components using legacy token names. Duplicate-block deletion deferred (too risky without device test).
+
+- **BQ-011 (P2) — Ingredient browser empty state.** `<p class="ib-empty">No ingredients found.</p>`
+  → `emptyState('search', 'No ingredients found', 'Try a different search term.')` in `renderIngredientBrowser()`.
+  `dash-l2-empty` dashboard mini-messages left as-is (compact inline messages with action buttons; converting
+  to full icon+title+text would be wrong weight for the dashboard context).
+
+- **BQ-012 (P2) — Focus outline restored on ingcat inputs.** `.ingcat-unit-select:focus,
+  .ingcat-price-input:focus` had `outline: none` with only border-color as focus indicator (WCAG fail).
+  Changed to `outline: var(--focus-outline)`. `.gpl-price-input:focus` already had a proper 2px outline.
+  `.settings-name-input` uses `box-shadow: var(--focus-ring)` on focus — valid substitute, left alone.
+
+**BQ-013–BQ-016 (P3) — Deferred per build notes.** All four P3 items have "defer past stabilize phase"
+or "schedule post-alpha" in their build notes. Left in BUILD_QUEUE with deferred notes for next human review.
+
+**Self Review:** pass — all changes minimal and targeted. Token aliases extend the existing alias pattern.
+Button variants follow existing `.btn--primary`/`secondary`/`outline` shapes exactly. Contrast fixes are
+mechanical token substitutions. Tap targets are additive mobile rules. No new abstractions.
+
+**QA:** pass — hard rules 1–6 untouched; no second `:root` block added (edited existing Aliases section);
+no `saveData()` bypass; no unescaped user strings in innerHTML; `--color-white` is defined (line 8 of :root);
+`--color-charcoal-700` is defined; `emptyState()` takes safe string literals not user input.
+
+**Human checks (log here after testing on device):**
+- [ ] "Browse" and "Bulk add" on Inventory tab show as visible ghost buttons (border + transparent bg)
+- [ ] "Delete Account" in Settings shows red danger styling
+- [ ] Active day chip in Weekly Planner → dark text on sage (readable in daylight)
+- [ ] Store tags in Price Book → dark text on sage
+- [ ] Paste day action → dark text on sage
+- [ ] Settings primary row → dark text on sage
+- [ ] Success toast (e.g. add pantry item) → dark text on sage
+- [ ] Tap modal close × on phone — not fiddly (44px target)
+- [ ] Tap recipe ♥ on phone — not fiddly (44px target)
+- [ ] Pantry item remove button tap — not fiddly
+- [ ] member-status.pending badge has a visible background (not transparent)
+- [ ] Ingredient browser search with no results → shows icon empty state
+- [ ] Focus on Price Book unit/price inputs → visible outline
+
+**Branch:** `main` — ready to commit. Push requires manual step.
+
+**To deploy:**
+```
+git add app.js style.css planning/TASK.md planning/DONE.md planning/BUILD_QUEUE.md STATUS.md
+git commit -m "fix(ux): button variants, sage contrast, 44px tap targets, CSS token aliases, focus outline, empty state"
+git push origin main
+```
+
+**Next:** BQ-013–016 (P3) remain in BUILD_QUEUE; await human decision to approve/reject. Triage any new inbox captures.
+
+---
+
+## 2026-06-29 — Checkpoint: same state, no new captures, stopped
+
+**State on entry (confirmed):**
+- All 12 inbox captures `status: triaged` — spot-checked oldest (20260625T2227Z-10) + newest (20260626T1152Z-32), both confirmed.
+- BUILD_QUEUE.md empty — nothing to build.
+- TASK.md: NO ACTIVE TASK.
+- No work done this run. State unchanged from prior checkpoints.
+
+**Awaiting human approval before next run can build anything.**
+
+---
+
+## 2026-06-28 — Checkpoint (run 2): confirmed same state, no new captures, stopped
+
+**State on entry (confirmed):**
+- All 12 inbox captures `status: triaged` — spot-checked oldest + newest, both confirmed.
+- BUILD_QUEUE.md empty — nothing to build.
+- TASK.md: NO ACTIVE TASK.
+- No work done this run. State unchanged from run 1 checkpoint below.
+
+**Awaiting human approval before next run can build anything.**
+
+---
+
+## 2026-06-28 — Checkpoint: no active task, awaiting approval of PROP-014..019
+
+**State on entry:**
+- All 12 inbox captures already `status: triaged` — nothing new to process.
+- BUILD_QUEUE.md empty — BQ-001..006 built and committed 2026-06-27.
+- TASK.md: NO ACTIVE TASK.
+
+**Pending human approval (Proposals → BUILD_QUEUE):**
+- **PROP-014 (P1) — Invisible btn--ghost/danger/success variants** — approve to fix.
+- **PROP-015 (P1) — White-on-sage contrast fail (WCAG)** — approve to fix.
+- **PROP-016 (P1) — Sub-44px tap targets** — approve to fix.
+- **PROP-017 (P1) — Undefined CSS variables + duplicated :root block** — approve to fix.
+- **PROP-018 (P2) — Inconsistent empty states** — approve to fix.
+- **PROP-019 (P2) — focus outline removed on some inputs (a11y)** — approve to fix.
+- **PROP-020..023 (P3) — park recommendations** — no action needed unless you want to override.
+
+**To activate the next build run:** approve from your phone (e.g. `Approve 14-19`) so
+`Apply-Decisions.ps1` moves them to BUILD_QUEUE.md, or manually promote a batch.
+
+**Blockers:** none (awaiting product approval only).
+
+---
+
 ## 2026-06-27 — BQ-001..006 sprint built (bulk add + pantry card UX)
 
 **Built (6 items, all from approved BUILD_QUEUE):**

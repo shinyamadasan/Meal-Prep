@@ -7009,7 +7009,7 @@ function renderIngredientBrowserContent(filter) {
   });
 
   if (!keys.length) {
-    container.innerHTML = '<p class="ib-empty">No ingredients found.</p>';
+    container.innerHTML = emptyState('search', 'No ingredients found', 'Try a different search term.');
     return;
   }
 
