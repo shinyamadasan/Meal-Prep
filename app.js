@@ -4971,7 +4971,8 @@ async function signIn(email, password) {
     AppState.currentUser = userCredential.user;
     showSuccessMessage('Signed in successfully!');
     closeLoginModal();
-    loadUserData();
+    // R5: do NOT load here. onAuthStateChanged(user) is the SINGLE entry point for loadUserData()
+    // + setupRealtimeListeners(). Loading here too ran the sign-in union/save twice (audit F4).
   } catch (error) {
     console.error('Sign in error:', error);
     showErrorMessage('Failed to sign in: ' + error.message);

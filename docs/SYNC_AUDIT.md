@@ -80,7 +80,7 @@ Legend: ❌ broken · ⚠️ works-but-fragile/edge · 🎛️ intended-but-conf
 | **F1** | **Clear All Data returns** *(reported)* | `clearLocalStorage` deletes the doc, but (a) a 2nd signed-in device re-pushes its copy and re-creates the doc, and/or (b) `deleteDoc` fails offline (caught) → doc survives → reload reloads it. Deleting the doc never propagates the *intent* to clear. | ❌ |
 | **F2** | **Defaults overwrite user data** | `recipes.length===0 → sampleRecipes` fired in *both* `loadFromLocalStorage` and `loadFromFirestore`. A user who deleted all recipes (or a just-cleared account) got samples injected, which then saved up. | **✅ FIXED (R2)** — first-run gate (`isFirstRun`/`markInitialized`/`ensureStarterRecipes`): samples seed only when no cloud doc *and* no local record exists; a saved/empty account is respected. *Device-pending.* |
 | **F3** | **Cross-device duplication** | The same logical item added independently on two devices gets two different ids (`Date.now()+random`); `unionById` keeps both. The name-dup check in `addToPantry` is local-only. | ⚠️ |
-| **F4** | **Double load on sign-in** | `signIn()` calls `loadUserData()` **and** `onAuthStateChanged(user)` calls it again → two union+save passes; `dataVersion` race window. | ⚠️ |
+| **F4** | **Double load on sign-in** | `signIn()` called `loadUserData()` **and** `onAuthStateChanged(user)` called it again → two union+save passes; `dataVersion` race window. | **✅ FIXED (R5)** — `signIn` no longer loads; `onAuthStateChanged` is the single entry. *Residual:* `signUp`→`initializeUserData`→`loadUserData` (new-account path, low-frequency) is a separate double-init, not in F4 scope — noted for a follow-up. *Device-pending.* |
 | **F5** | **Signed-in / signed-out share one key** | Single `STORAGE_KEY`. Scratch edits made signed-out persist and are then merged into the next account by the sign-in union. | ⚠️ |
 | **F6** | **Auto-depletion tombstones** | `deductIngredientsForRecipe` removes depleted items → `recordLocalDeletions` tombstones them. Semantically ok (depleted = gone on a shared pantry) but inflates the tombstone map and conflates auto-removal with user-delete. | 🎛️ |
 | **F7** | **Old-code devices ignore tombstones** | A device on the pre-D-018 build neither writes nor honors `deletions` → it can resurrect on union and won't propagate deletes. The guarantee holds only once **all** devices update. | ⚠️ |
@@ -155,7 +155,7 @@ Milestone = R1 + R2 + R3 + R5, one at a time, full matrix re-run after each, dev
 | Rec | What | Code | Self Review / QA | Matrix (analysis) | Device-verified |
 |---|---|---|---|---|---|
 | **R2** | defaults only on true first run | ✅ done | ✅ pass | ✅ row 11 →✅, no regressions | ⏳ **you** |
-| **R5** | single sign-in entry | ⏳ next | — | — | — |
+| **R5** | single sign-in entry | ✅ done | ✅ pass | ✅ F4 (signIn) resolved, no regressions | ⏳ **you** |
 | **R1** | Clear propagates via tombstones | ⏳ | — | — | — |
 | **R3** | always-merge + tombstones (retire version-replace) | ⏳ | — | — | — |
 
