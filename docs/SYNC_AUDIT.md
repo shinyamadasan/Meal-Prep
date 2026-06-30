@@ -90,6 +90,26 @@ Legend: ❌ broken · ⚠️ works-but-fragile/edge · 🎛️ intended-but-conf
 
 ---
 
+## 3a. Investigation log
+
+### INV-1 — `signUp → initializeUserData` double-initialization (R5 residual)
+**Question:** is the signup double-init harmless, a design decision, or a real sync defect?
+**Trace:** on signup, `initializeUserData()` (cloudReady=true → saveToFirestore → loadUserData) **and**
+`onAuthStateChanged(user)` (cloudReady=false → loadUserData → setupRealtimeListeners) both run, order
+non-deterministic.
+**Verdict: vestigial redundancy — NOT a data-integrity defect, NOT a deliberate design decision.** It
+converges in every interleaving because: (1) `createUser` only succeeds for a brand-new email → no
+existing cloud doc to clobber; (2) both paths operate on the same `AppState` → repeated writes produce
+the same doc (no loss); (3) `unionById` dedups by id (no duplication), new account has no tombstones (no
+resurrection), `saveToFirestore` is an atomic transaction (no corruption); (4) worst case a write is
+*skipped* (benign — `cloudReady` guard), self-recovered by the next `'empty'`-path save. Costs are
+non-correctness only: 2–3 redundant writes on signup, a benign `cloudReady` flicker, extra renders.
+**Decision: NOT in Sync V1.** V1's bar is data integrity; "new users initialize correctly" is met. →
+**Post-V1 cleanup task:** apply the R5 pattern to `signUp` (drop `initializeUserData`; let
+`onAuthStateChanged`'s `'empty'` path seed the account) for a single clean init.
+**Related (not caused by this):** `signUp` pushes shared-localStorage data to the new account — that is
+**F5**, fixed by **R6 (namespace localStorage by uid)**, already a post-V1 item.
+
 ## 4. Sync Verification Matrix
 
 | # | Scenario | Expected | Current | Status |
