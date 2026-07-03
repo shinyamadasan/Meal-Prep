@@ -144,6 +144,13 @@ Why: One system per concern — n8n = messaging, code = deterministic transforms
 Trade-off: The single-gate shortcut means an approved proposal skips a separate sprint-batching review — acceptable while the backlog is small; revisit if batches grow. `DIGEST.md` is a generated artifact committed to the repo so n8n can fetch it.
 Supersedes: the `Generate-Digest -Send` (PC-side messaging) approach from earlier in Phase 2.
 
+## D-019 — Explicit import overrides tombstone (import intent wins over prior deletion)
+Date: 2026-07-02 · Status: Active
+Context: `applyTombstones()` runs on every signed-in load and removes any item whose ID is in `AppState.deletions`. If a user imports a file containing IDs that were previously tombstoned (e.g. via Clear All Data), `buildFirestorePayload()` writes those tombstones back to Firestore alongside the re-imported items. On the next signed-in refresh, `applyTombstones()` silently removes the re-imported items — the user sees empty data after what appeared to be a successful import. The signed-out path never calls `applyTombstones()`, so the same import survives on a signed-out device, hiding the bug.
+Decision: In `importData()`, before any `unionById()` call, delete `AppState.deletions` entries for every ID present in the import file. The rule: **explicit re-import overrides a prior deletion**. The alternative — requiring the user to manually clear tombstones or use a fresh ID — is invisible and unrecoverable, making it a data-loss bug, not a feature.
+Why: An import is an explicit user intent to restore or add data. Silently discarding it because of a tombstone from a previous Clear All Data violates that intent. The cost is minimal: a deliberate re-import that wins over a prior deletion is correct behaviour.
+Trade-off: If the user deleted an item intentionally, then imports a file that includes that same ID, the item reappears. This is the correct trade-off — a file-based import is a stronger signal than a prior interactive deletion. Tombstone semantics (delete propagates across devices) are unchanged for all other operations.
+
 ## D-018 — Delete-aware sync via tombstones (removes the union "resurrection" trade-off)
 Date: 2026-06-29 · Status: Active
 Context: Whole-document sync makes a *missing* item ambiguous — deleted, or not-yet-synced? An earlier fix (union local into cloud on sign-in) stopped data loss but could **resurrect** a deleted item, and a near-empty session could still clobber a populated cloud. A user (dogfooding) rightly pushed back: real apps don't have this trade-off.

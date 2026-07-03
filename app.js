@@ -4844,6 +4844,17 @@ function importData() {
             // Snapshot current data first so this can be undone via "Restore Backup".
             createBackup('Import');
 
+            // Explicit import overrides prior deletion — a re-imported item should
+            // not be silently filtered on the next signed-in reload by a tombstone
+            // left over from a previous Clear All Data that included it.
+            if (AppState.deletions) {
+              ['recipes', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
+                (importedData[key] || []).forEach(function(it) {
+                  if (it && it.id != null) delete AppState.deletions[String(it.id)];
+                });
+              });
+            }
+
             // MERGE, don't replace — union list-type data by id (existing items
             // win on a collision, so re-importing your own backup is a no-op).
             AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);

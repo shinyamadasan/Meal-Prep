@@ -5,6 +5,52 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-02 — fix(import): tombstone-override + save-race fixes committed
+
+**Root cause (proven by code trace):** Signed-in import data disappeared on every refresh because:
+1. `clearLocalStorage()` tombstones all current IDs when "Clear All Data" runs.
+2. On re-import, `buildFirestorePayload()` wrote the tombstones back to Firestore alongside the re-imported items.
+3. On every signed-in refresh, `applyTombstones()` silently removed the re-imported items.
+4. Signed-out path never calls `applyTombstones()`, which is why signed-out imports survived.
+
+**Fix 1 (committed 4634c43):** `saveData()` returns the Firestore Promise; `importData()` awaits it before showing the success toast — correct for the signed-out race, but not the root cause of the signed-in failure.
+
+**Fix 2 (this commit):** In `importData()`, before any `unionById()` call, delete `AppState.deletions` entries for every ID in the import file. Explicit re-import overrides prior deletion (D-019). One block, 8 lines, inserted after `createBackup()` and before the union operations.
+
+**Self Review:** pass — minimum code, correct placement, consistent patterns.
+**QA:** all AI checks pass. No CSS, no new DOM elements, no new AppState fields, no handler registrations. `createBackup()` still runs first (backup preserves pre-import tombstones for undo). `patchMissingNutrition()` and `saveData()` unchanged.
+
+**Human checks (verify on phone after push):**
+- [ ] Signed in: import `cpb-diet-import.json` → refresh immediately → 4 recipes still visible
+- [ ] Signed in: import → wait for toast → refresh → 4 recipes still visible
+- [ ] Signed out: import → refresh → recipes visible (regression check; was already working)
+- [ ] Clear All Data after import → data clears (tombstones still created on clear, not on import)
+
+**Branch:** `main` — commit pending (local only; push after device verification).
+
+---
+
+## 2026-07-02 — Checkpoint: no active task, awaiting human decision on BQ-013..016
+
+**State on entry (confirmed):**
+- All 12 inbox captures `status: triaged` — spot-checked oldest (20260625T2227Z-10) + newest (20260626T1152Z-32), both confirmed.
+- Both decision files `status: applied` — no new decisions to process.
+- BUILD_QUEUE has BQ-013–016, but ALL are marked **Deferred by Builder 2026-06-30** — each requires a human scope decision before building.
+- TASK.md: NO ACTIVE TASK.
+- No work done this run. State unchanged from last build run (2026-06-30).
+
+**Deferred items awaiting human decision:**
+- **BQ-013** (P3) — Hardcoded hex colors: build note says "defer past stabilize phase". Ready to build the quick-subset (point reds/ambers at semantic tokens) if approved.
+- **BQ-014** (P3) — Badge/pill consolidation: full consolidation deferred; quick-win (`--radius-full` + `--font-size-xs` normalization) available if a slot opens.
+- **BQ-015** (P3) — Spacing scale drift: deferred post-alpha, convert per-component.
+- **BQ-016** (P3) — Modal sizing variance: needs human to specify which modals to fix (Prep Mode / Username / Custom-Ingredient) before building.
+
+**To activate next run:** promote a batch from `planning/ROADMAP.md` to BUILD_QUEUE, or scope one of BQ-013..016 and remove the deferred note. Also consider approving PROP-024+ if any new captures have come in.
+
+**Blockers:** none (awaiting product approval only).
+
+---
+
 ## 2026-06-30 — BQ-007..012 sprint built (UX/a11y fixes)
 
 **Built (6 items, all from approved BUILD_QUEUE):**
