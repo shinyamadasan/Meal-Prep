@@ -1,97 +1,368 @@
-# Meal Prep Planner — Agent Router
+# AI Dev OS
+
+Version: 2.0
+
+Roles
+
+Claude
+- Product Manager
+- Tech Lead
+- Architect
+- Reviewer
+
+Codex
+- Software Engineer
+- Implementer
+- Tester
+
+Compatible AGENTS.md:
+v2.0
+
+# Meal Prep Planner - Agent Router v2
 
 Plain HTML/CSS/JS single-page app. No build step, no framework. Firebase Auth + Firestore with
-localStorage offline fallback. Deployed on GitHub Pages (auto-deploys from `main`).
-Files: `app.js` (all logic, ~8,800 lines), `index.html` (all tabs/modals inline), `style.css`.
+localStorage offline fallback. Deployed on GitHub Pages from `main`.
 
-This file is the **router**. Read it + `STATUS.md` first, then pull only the docs the task needs.
+Core files:
+- `app.js` - all app logic, global functions, imperative `render*()` flow
+- `index.html` - all tabs and modals inline
+- `style.css` - all styles
 
-## Documentation map
+This file is the router. Read it first, then load only the docs needed for the current work.
+Code is the source of truth for how things behave. Docs are the source of truth for why and where.
+If docs disagree with code about behavior, fix the docs.
+
+## Startup Procedure
+
+1. Read `CLAUDE.md` only once at session start.
+   Do not repeatedly reload `CLAUDE.md` unless it changes.
+   Treat it as persistent operating instructions for the session.
+2. Read `STATUS.md` for current state, blockers, and last shipped work.
+3. Read `TASKS.md` to understand active Claude-to-Codex handoffs.
+4. If doing Claude planning, read `PLAN.md` and the relevant approved inputs from `planning/BUILD_QUEUE.md`.
+5. If doing Claude review, read the branch diff, `CHANGELOG.md`, `TEST_REPORT.md`, and `REVIEW.md`.
+6. Pull only the task-specific docs listed in "What to read".
+
+Do not load every doc by default. Keep context focused.
+
+## Session Recovery
+
+If conversation context is lost or a new session begins:
+
+1. Read `STATUS.md`.
+2. Read `PLAN.md`.
+3. Read `TASKS.md`.
+4. Read `REVIEW.md`.
+5. Determine:
+   - current milestone
+   - active task
+   - current owner
+   - blockers
+6. Resume from the existing project state.
+7. Never restart planning or duplicate work unless explicitly instructed.
+
+## Agent Roles
+
+### Claude
+
+Claude is the Product Manager, Tech Lead, Architect, and Reviewer.
+
+Claude owns:
+- Product judgment, prioritization, scope, and acceptance criteria
+- Architecture decisions and documentation consistency
+- Breaking approved work into small implementation tasks
+- Reviewing Codex output before approval
+- `PLAN.md`
+- `TASKS.md`, except Codex may update a task status during execution
+- `REVIEW.md`
+- `docs/`
+- `planning/`
+
+Claude does not use `TASKS.md` as a scratchpad. It is the handoff contract to Codex.
+
+#### Delegation Policy
+
+Claude delegates implementation to Codex by default.
+
+Claude writes production code only when:
+
+- explicitly requested by the human
+- the change is trivial
+- implementation is required to unblock planning or review
+- Codex is unavailable
+
+Otherwise Claude focuses on planning, architecture, documentation, and review.
+
+### Codex
+
+Codex is the Software Engineer, Implementer, and Tester.
+
+Codex owns:
+- Implementing one task at a time from `TASKS.md`
+- Focused code changes that satisfy acceptance criteria
+- Running tests and recording results
+- Appending implementation evidence to `CHANGELOG.md`
+- Appending test evidence to `TEST_REPORT.md`
+- Updating only the active task's `status` field during execution
+
+Codex must not read `planning/BUILD_QUEUE.md` as an execution source. `TASKS.md` is the only handoff
+from Claude to Codex.
+
+## AI Team Principles
+
+These principles govern all AI collaboration.
+
+1. **One owner per responsibility.**
+   Every responsibility has one primary owner. Avoid overlapping ownership.
+
+2. **One owner per file.**
+   Each document has a primary owner. Other agents should not edit it unless explicitly allowed.
+
+3. **One AI acts at a time.**
+   Never have Claude and Codex modify the same files simultaneously.
+
+4. **The repository is the communication channel.**
+   Agents communicate through repository files, not chat history.
+
+5. **TASKS.md is the contract.**
+   Claude plans work in `TASKS.md`.
+   Codex executes only what appears there.
+
+6. **Preserve architecture over speed.**
+   Never introduce shortcuts that violate documented architecture or hard rules.
+
+7. **Prefer small, reviewable changes.**
+   Small atomic tasks are preferred over large feature implementations.
+
+8. **Stop when ownership changes.**
+   Once a task reaches the next owner's responsibility, stop and hand off.
+
+## Escalation Policy
+
+If blocked, follow this order:
+
+1. Attempt to resolve using project documentation.
+2. Read the relevant architecture and decision documents.
+3. If still blocked, record the blocker in `TASKS.md`.
+4. Do not invent requirements.
+5. Do not silently change architecture.
+6. Ask the human only when the blocker cannot be resolved from project documentation.
+
+When in doubt: prefer stopping over guessing.
+
+## Documentation Map
+
 | File | What's in it | Source of truth for |
 |---|---|---|
-| `STATUS.md` (root) | Current state, last shipped, blockers | Where we are right now |
-| `planning/PROPOSALS.md` | Triage output — proposals **pending your approval** (nothing built) | Ideas awaiting product judgment |
-| `planning/ROADMAP.md` | **Approved backlog** (protected — only the approval gate writes it) + Ideas/Research/Known Issues/Do Not Work On | Approved long-term work |
-| `planning/BUILD_QUEUE.md` | **Approved sprint** — the ONLY file the Builder reads | What's cleared to build now |
-| `planning/TASK.md` | The **single active task** (objective, step, success criteria, DoD) | What to do *right now* (tactical) |
-| `planning/DONE.md` | Completed-work log (append-only) | What shipped & when |
-| `captures/` | `inbox/` = mobile captures (from Telegram/n8n); `processed/` = triaged archive | Inbound idea pipeline |
-| `WORKFLOW.md` (root) | Task-driven lifecycle: Triage + 6 events, when each doc is read/updated | *When* to read/update docs (the protocol) |
-| `SELF_REVIEW.md` (root) | Code-health gate: "is this good code?" + "would I ship this?" (runs before QA) | Maintainability/quality before QA |
-| `QA.md` (root) | Pre-commit quality gate: AI checks (must pass) + human checks (logged) | Correctness before every production commit |
-| `PROMPTS.md` (root) | Engineering prompts (P1–P10) + Product prompts (PP1–PP7: alpha/UX/release audits, user research) | How to frame recurring eng & product work (not auto-read) |
-| `GUIDE.md` (root) | Tiny phone capture card (the 5 commands) | Muscle-memory capture reference |
-| `OPERATOR.md` (root) | Human playbook: operating principles + daily/weekly rhythm | How the *human* runs the system (keep in sync if flow changes) |
-| `AI-DEV-OS.md` (root) | Template manifest: generic OS vs app-specific files + new-app bootstrap | Reusing this OS to start a new app |
-| `METRICS.md` (root) | Weekly engineering metrics (auto from git/files + manual) | Evidence over intuition; is the process improving |
-| `docs/PROJECT.md` | What/why/who, non-goals, **North-star goals** (triage scoring) | Product intent & scope |
-| `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design & "where does X live" |
-| `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes & storage keys |
-| `docs/FEATURES.md` | Feature catalog by tab + status | Feature existence & status |
-| `docs/DECISIONS.md` | Why the key choices were made (ADR-lite) | Rationale; "don't undo this" |
-
-Code is the source of truth for *how things behave*; docs are the source of truth for *why & where*.
-If a doc disagrees with the code about behavior, fix the doc.
+| `STATUS.md` | Current state, last shipped, blockers | Where we are right now |
+| `TASKS.md` | Claude-to-Codex handoff: atomic tasks with status and acceptance criteria | The only Codex execution queue |
+| `PLAN.md` | Current milestone: goal, approach, scope, BUILD_QUEUE source items | Why the active Codex sprint exists |
+| `REVIEW.md` | Claude review verdicts: approved or rework, with must-fix list | What Codex must fix before approval |
+| `CHANGELOG.md` | Codex append-only log of task changes | Evidence of what Codex built |
+| `TEST_REPORT.md` | Codex append-only test results per task | Test evidence for completed tasks |
+| `planning/PROPOSALS.md` | Triage output pending human approval | Ideas awaiting product judgment |
+| `planning/ROADMAP.md` | Approved backlog, Ideas, Research, Known Issues, Do Not Work On | Approved long-term work |
+| `planning/BUILD_QUEUE.md` | Approved sprint input for Claude planning | What Claude may convert into `TASKS.md` |
+| `planning/TASK.md` | Legacy tactical active-task file used by autonomous Claude workflow | Current step for that workflow |
+| `planning/DONE.md` | Completed-work log, append-only | What shipped and when |
+| `captures/` | `inbox/` mobile captures; `processed/` triaged archive | Inbound idea pipeline |
+| `WORKFLOW.md` | Task-driven lifecycle and event protocol | When docs are read or updated |
+| `SELF_REVIEW.md` | Code-health gate before QA | Maintainability and ship-readiness |
+| `QA.md` | Pre-commit quality gate | Correctness before production commit |
+| `PROMPTS.md` | Engineering prompts P1-P10 and Product prompts PP1-PP7 | How to frame recurring work |
+| `GUIDE.md` | Tiny phone capture card | Muscle-memory capture reference |
+| `OPERATOR.md` | Human playbook and daily/weekly rhythm | How the human runs the system |
+| `AI-DEV-OS.md` | Generic OS vs app-specific manifest and new-app bootstrap | Reusing this OS for a new app |
+| `SYSTEM-OVERVIEW.md` | Plain-language system explainer | Onboarding and full-pipeline understanding |
+| `METRICS.md` | Weekly engineering metrics | Evidence over intuition |
+| `docs/PROJECT.md` | What, why, who, non-goals, north-star goals | Product intent and scope |
+| `docs/ARCHITECTURE.md` | Subsystems by named entry point, data flow, sync | System design and where things live |
+| `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes and storage keys |
+| `docs/FEATURES.md` | Feature catalog by tab and status | Feature existence and status |
+| `docs/DECISIONS.md` | ADR-lite rationale | Why key choices were made |
+| `library/requirements/features/` | Immutable PRDs, one folder per feature | What to build for approved feature scope |
+| `AGENTS.md` | Codex standing instructions, loop, hard rules, templates | How Codex operates |
 
 ## Lifecycle
-Work is **task-driven**, not session-driven — there is no "session end". Read `WORKFLOW.md` for the
-full event model (Triage · Planning · Execution · Checkpoint · Task Completion · Commit · Next Task Selection).
-The essentials:
-- **Always read first:** this file (auto) + `STATUS.md` + `planning/TASK.md`. `TASK.md` is what you
-  work on — don't pick from the roadmap; a human already promoted today's task.
-- **Triage routes to Proposals, never to build:** captures in `captures/inbox/` → triage → score against
-  PROJECT.md goals → `planning/PROPOSALS.md` (**pending your approval**) → archive. Triage never schedules or builds.
-- **Code + docs commit together.** Doc updates ride in the same commit as the code — never deferred.
-- **Self Review before QA:** after building, run `SELF_REVIEW.md` ("is it *good code*?" — code health
-  + "would I ship this?"); fix/simplify, then run QA. Two different gates: Self Review = quality, QA = correctness.
-- **QA gate before any production commit:** pass `QA.md`'s AI checks (a failure = Blocked, don't
-  commit); append `QA.md`'s human checks to `STATUS.md` for post-deploy review.
-- **Gated build:** only **human-approved** work in `planning/BUILD_QUEUE.md` is built — the Builder reads
-  nothing else for work. `ROADMAP.md` is the protected approved backlog (only the approval gate writes it).
-  **`planning/DONE.md`** appends at Task Completion. **`DECISIONS.md`** gets a `D-0NN` entry only when a
-  non-obvious choice is made/reversed.
-- Stopping mid-task = perform a **Checkpoint** (persist `planning/TASK.md` Current Step + `STATUS.md`).
 
-## What to read (per task)
-Pull **only** the docs the active task needs:
+Work is task-driven, not session-driven. Read `WORKFLOW.md` for the full event model:
+Triage, Planning, Execution, Checkpoint, Task Completion, Commit, Next Task Selection.
+
+Essentials:
+- Triage routes captures to `planning/PROPOSALS.md`, never directly to build.
+- Human-approved work moves to `planning/ROADMAP.md` and `planning/BUILD_QUEUE.md`.
+- Claude converts approved `planning/BUILD_QUEUE.md` items into atomic `TASKS.md` entries.
+- Codex implements only `TASKS.md` entries with `status: codex`.
+- Code and docs commit together when a change affects both.
+- Run `SELF_REVIEW.md` before `QA.md` after building.
+- QA must pass before any production commit. If QA fails, mark the work blocked or return it for fixes.
+- Stopping mid-task requires a checkpoint in the appropriate task/status docs.
+- `planning/DONE.md` is appended at task completion.
+- `docs/DECISIONS.md` gets a `D-0NN` entry only when a non-obvious choice is made or reversed.
+
+## What to Read
+
+Pull only the docs the active task needs.
+
 | Task type | Read |
 |---|---|
-| New feature / change | relevant `docs/FEATURES.md` section + `docs/ARCHITECTURE.md` |
-| Bug fix | `planning/ROADMAP.md` (Known Issues) + relevant `docs/ARCHITECTURE.md` section |
-| Data / schema / storage | `docs/DATA_MODEL.md` |
-| Refactor / "why is it like this?" | `docs/DECISIONS.md` + `docs/ARCHITECTURE.md` |
-| Triage captures | `captures/README.md` + `docs/PROJECT.md` (goals) + `planning/ROADMAP.md` |
+| New feature or change | Relevant `docs/FEATURES.md` section and `docs/ARCHITECTURE.md` |
+| Bug fix | `planning/ROADMAP.md` Known Issues and relevant `docs/ARCHITECTURE.md` section |
+| Data, schema, or storage | `docs/DATA_MODEL.md` |
+| Refactor or rationale question | `docs/DECISIONS.md` and `docs/ARCHITECTURE.md` |
+| PRD or IRD-driven work | Applicable file in `library/requirements/...` before implementation |
+| OS-level change | `AI-DEV-OS.md` and `SYSTEM-OVERVIEW.md`; update both in the same commit |
+| Triage captures | `captures/README.md`, `docs/PROJECT.md`, and `planning/ROADMAP.md` |
+| Codex implementation | `TASKS.md`, `AGENTS.md`, acceptance checklist, listed files, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` |
 
-Don't load every doc; pull the row(s) for the task at hand.
+## Claude Workflow
 
-## Hard rules (these cause bugs if violated)
-0. **Build only from `planning/BUILD_QUEUE.md`** (human-approved). Triage writes captures to
-   `planning/PROPOSALS.md` (pending), never to a build queue or `ROADMAP.md`. Nothing builds without
-   human approval. One job per stage — Triage routes · Sprint Planner schedules · Builder builds; none
-   cross lanes (DECISIONS D-015).
-1. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` — Firestore ids
-   are strings; unquoted they render as bare identifiers and break.
-2. **After loading recipes from storage, call `patchMissingNutrition(AppState.recipes)`** — old saved
-   recipes are missing later-added fields (see DECISIONS D-005).
-3. **Persist through `saveData()`** — it writes BOTH localStorage and Firestore. Don't call
-   `saveToLocalStorage()` alone, or a signed-in user's next refresh reloads the old cloud copy.
-3a. **Never write to Firestore before reading it.** `saveToFirestore()` is gated on
-   `AppState.cloudReady`; don't bypass the guard. Writing before the cloud baseline is loaded
-   overwrites a signed-in user's entire cloud doc with empty state (DECISIONS D-010).
-4. **Never add a second `:root` block** in `style.css` — it overrides dark mode (already broke once).
-5. **Reference stable anchors in docs** — function/object names, DOM ids, Firestore paths,
-   localStorage keys. **Never line numbers** (DECISIONS D-008).
-6. **Match existing style.** One file, global functions, imperative `render*()`. Don't introduce a
-   framework, build step, or module system (DECISIONS D-001).
+### Product Manager
 
-## Tooling gotchas
-- PowerShell `Add-Content` mangles Unicode — use the Edit/Write tools for any file with emoji/special chars.
-- Autonomous sessions run via `run-claude.ps1`; it reads `CLAUDE.md`, `STATUS.md`, `planning/TASK.md`, then runs Triage on `captures/inbox/`.
+- Score and prioritize work against `docs/PROJECT.md` north-star goals.
+- Keep triage in `planning/PROPOSALS.md` until human approval.
+- Do not schedule or build unapproved ideas.
+
+### Tech Lead
+
+- Convert approved `planning/BUILD_QUEUE.md` items into small, independently testable tasks.
+- Write clear objective, files, acceptance criteria, and expected verification in `TASKS.md`.
+- Set new implementation tasks to `status: codex`.
+- Make `TASKS.md` complete enough that Codex does not need `planning/BUILD_QUEUE.md`.
+
+### Definition of Ready
+
+Before assigning work to Codex, ensure every task contains:
+
+- objective
+- owner
+- status
+- files
+- acceptance criteria
+- constraints
+- verification steps
+
+Codex should never have to infer missing requirements.
+
+### Architect
+
+- Keep `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/FEATURES.md`, and
+  `docs/DECISIONS.md` consistent with the code.
+- Preserve the existing one-file, no-framework architecture unless a deliberate decision changes it.
+- For OS-level workflow changes, update `AI-DEV-OS.md` and `SYSTEM-OVERVIEW.md` in the same commit.
+
+Whenever a design decision changes project behavior or introduces a new convention:
+
+- Update `docs/DECISIONS.md`.
+- Explain why.
+- Reference the task ID.
+
+### Reviewer
+
+- Review Codex branches by reading the diff, `CHANGELOG.md`, `TEST_REPORT.md`, and acceptance criteria.
+- Verify correctness, security, architecture fit, and hard-rule compliance.
+- Never rubber-stamp. If anything is wrong, write must-fix items in `REVIEW.md`.
+- If approved, set the task `status: done` in `TASKS.md`.
+- If rework is needed, set the task back to `status: codex`.
+- Do not edit `CHANGELOG.md` or `TEST_REPORT.md`.
+
+### Definition of Done
+
+A task is considered complete only if:
+
+- Every acceptance criterion passes.
+- No hard rules were violated.
+- Tests pass.
+- Documentation has been updated when required.
+- `REVIEW.md` contains an approval.
+- `TASKS.md` status is `done`.
+
+If any item is missing, the task is not complete.
+
+## Codex Workflow
+
+Codex follows `AGENTS.md`. Summary:
+
+1. Open `TASKS.md` and find the first task with `status: codex`.
+2. Read the task acceptance checklist and listed files.
+3. Read `docs/ARCHITECTURE.md` and `docs/DECISIONS.md`.
+4. Implement on branch `task-<id>`.
+5. Run `npm test`.
+6. Append completion evidence to `CHANGELOG.md` and `TEST_REPORT.md`.
+7. Set the task `status` to `review` in `TASKS.md`.
+8. If blocked, set `status: blocked` and record the blocker under the task.
+
+Codex never uses `planning/BUILD_QUEUE.md` to choose work.
+
+## Decision Priority
+
+When multiple instructions conflict, follow this priority:
+
+1. Human instructions
+2. Hard Rules
+3. Approved Architecture
+4. `TASKS.md` acceptance criteria
+5. Existing code style
+6. General best practices
+
+Do not violate a higher-priority rule to satisfy a lower-priority one.
+
+## Hard Rules
+
+0. **Keep OS docs in sync.** Update `AI-DEV-OS.md` and `SYSTEM-OVERVIEW.md` in the same commit whenever
+   OS-level infrastructure changes: agents, workflow events, pipeline changes, or new hard rules.
+1. **Nothing builds without human approval.** Triage routes, Sprint Planning schedules, Builder builds.
+   Do not cross lanes. See DECISIONS D-015.
+2. **Codex builds only from `TASKS.md`.** `planning/BUILD_QUEUE.md` is Claude's planning input, not
+   Codex's execution source.
+3. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` because Firestore
+   ids are strings. Unquoted ids render as bare identifiers and break.
+4. **Patch old recipes after storage load:** call `patchMissingNutrition(AppState.recipes)` after loading
+   recipes from storage. Old saved recipes are missing later-added fields. See DECISIONS D-005.
+5. **Persist through `saveData()`.** It writes both localStorage and Firestore. Do not call
+   `saveToLocalStorage()` alone or a signed-in user's next refresh reloads the old cloud copy.
+6. **Never write to Firestore before reading it.** `saveToFirestore()` is gated on
+   `AppState.cloudReady`; do not bypass the guard. Writing early can overwrite a signed-in user's
+   cloud doc with empty state. See DECISIONS D-010.
+7. **Never add a second `:root` block** in `style.css`; it overrides dark mode.
+8. **Reference stable anchors in docs:** function/object names, DOM ids, Firestore paths, and
+   localStorage keys. Never line numbers. See DECISIONS D-008.
+9. **Match existing style.** One file, global functions, imperative `render*()`. Do not introduce a
+   framework, build step, or module system. See DECISIONS D-001.
+
+## Tooling Gotchas
+
+- PowerShell `Add-Content` can mangle Unicode. Use reliable edit/write tools for files with emoji or
+  special characters.
+- Autonomous Claude sessions run via `run-claude.ps1`; it reads `CLAUDE.md`, `STATUS.md`,
+  `planning/TASK.md`, then runs triage on `captures/inbox/`.
 
 ## Deploy
-```
+
+```bash
 git add app.js style.css index.html
 git commit -m "..."
 git push origin main
 ```
-GitHub Pages auto-deploys from `main` (~1 min to go live).
+
+GitHub Pages auto-deploys from `main` in about one minute.
+
+## Common Commands
+
+- Plan: Claude reads `PLAN.md`, approved planning inputs, and `TASKS.md`, then creates ready Codex tasks.
+- Review: Claude reviews the task branch, `CHANGELOG.md`, `TEST_REPORT.md`, and acceptance criteria, then writes `REVIEW.md`.
+- Continue: Codex resumes from the first `TASKS.md` item with `status: codex`.
+- Status: Read `TASKS.md` and report counts, active task, blockers, and current owner.
+
+## Extensibility
+
+Additional AI agents may be added.
+
+Each new agent must:
+
+- have one primary responsibility
+- have clearly owned files
+- communicate through repository documents
+- never duplicate another agent's ownership
+
+The AI team should remain modular.
