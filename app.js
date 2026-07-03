@@ -4839,7 +4839,7 @@ function importData() {
         var bodyMsg = newRecipeCount > 0
           ? 'Add <strong>' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + '</strong> and any other data from this file to your collection?<br><br>Nothing is removed — imported items are merged into what you already have.'
           : 'Merge this file\'s data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.';
-        showConfirmDialog('Import data?', bodyMsg, 'Import', 'Cancel', function() {
+        showConfirmDialog('Import data?', bodyMsg, 'Import', 'Cancel', async function() {
           try {
             // Snapshot current data first so this can be undone via "Restore Backup".
             createBackup('Import');
@@ -4864,9 +4864,9 @@ function importData() {
             AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
             cacheInlinePhotos();
 
-            saveData();
+            var savePromise = saveData();
 
-            // Refresh every view
+            // Refresh every view immediately — AppState is already updated
             renderRecipes();
             renderWeeklyPlanner();
             renderStorageGuide();
@@ -4878,6 +4878,9 @@ function importData() {
             updateFreshnessBadges();
             renderFreshnessBanner();
 
+            // Wait for Firestore to commit before declaring success — closes the race
+            // window where a refresh could land on the pre-import cloud version.
+            await savePromise;
             showSuccessMessage(newRecipeCount > 0
               ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
               : 'Imported and merged into your data.');
@@ -5502,8 +5505,9 @@ function closeUsernameModal() {
 // Enhanced save function that saves to both local storage and Firestore
 function saveData() {
   saveToLocalStorage();
-  saveToFirestore();
+  const p = saveToFirestore(); // async — callers that need cloud durability can await the returned Promise
   updateFreshnessBadges();
+  return p;
 }
 
 // Setup real-time listeners
