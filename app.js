@@ -4844,14 +4844,6 @@ function importData() {
             // Snapshot current data first so this can be undone via "Restore Backup".
             createBackup('Import');
 
-            // [SYNC-DIAG] — remove after diagnosis
-            console.log('[SYNC-DIAG] import START: recipes=' + AppState.recipes.length
-              + ' recipeIds=' + JSON.stringify(AppState.recipes.map(function(r){return r.id;}))
-              + ' deletionKeys=' + JSON.stringify(Object.keys(AppState.deletions || {}))
-              + ' importRecipes=' + (importedData.recipes || []).length
-              + ' importRecipeIds=' + JSON.stringify((importedData.recipes || []).map(function(r){return r.id;}))
-              + ' dataVersion=' + AppState.dataVersion);
-
             // Explicit import overrides prior deletion — a re-imported item should
             // not be silently filtered on the next signed-in reload by a tombstone
             // left over from a previous Clear All Data that included it.
@@ -4866,10 +4858,6 @@ function importData() {
             // MERGE, don't replace — union list-type data by id (existing items
             // win on a collision, so re-importing your own backup is a no-op).
             AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
-            // [SYNC-DIAG] — remove after diagnosis
-            console.log('[SYNC-DIAG] import AFTER UNION: recipes=' + AppState.recipes.length
-              + ' recipeIds=' + JSON.stringify(AppState.recipes.map(function(r){return r.id;}))
-              + ' deletionKeys=' + JSON.stringify(Object.keys(AppState.deletions || {})));
             patchMissingNutrition(AppState.recipes);
             AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
             AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
@@ -5283,22 +5271,13 @@ async function saveToFirestore() {
       if (snap.exists()) {
         const remote = snap.data();
         const remoteVersion = remote.version || 0;
-        // [SYNC-DIAG] — remove after diagnosis
-        console.log('[SYNC-DIAG] tx.get: remoteV=' + remoteVersion + ' localV=' + (AppState.dataVersion||0)
-          + ' → ' + (remoteVersion > (AppState.dataVersion||0) ? 'CONFLICT PATH' : 'no conflict')
-          + ' remoteDels=' + JSON.stringify(Object.keys(remote.deletions||{}))
-          + ' remoteRecipeIds=' + JSON.stringify((remote.recipes||[]).map(function(r){return r.id;})));
         if (remoteVersion > (AppState.dataVersion || 0)) {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
-          // [SYNC-DIAG] — remove after diagnosis
-          console.log('[SYNC-DIAG] CONFLICT merged dels now=' + JSON.stringify(Object.keys(AppState.deletions||{})));
           payload = mergeCloudConflict(remote, payload);
           payload.deletions = AppState.deletions; // carry the merged tombstones
           TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
             payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !AppState.deletions[String(it.id)]; });
           });
-          // [SYNC-DIAG] — remove after diagnosis
-          console.log('[SYNC-DIAG] CONFLICT after filter: recipeIds=' + JSON.stringify((payload.recipes||[]).map(function(r){return r.id;})));
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
         payload.version = remoteVersion + 1;
@@ -5393,10 +5372,6 @@ async function loadFromFirestore() {
       if (didPatch || migratedAnyPhoto) { setTimeout(saveToFirestore, 800); }
 
       console.log('Data loaded from Firestore');
-      // [SYNC-DIAG] — remove after diagnosis
-      console.log('[SYNC-DIAG] loadFromFirestore: v=' + AppState.dataVersion
-        + ' recipeIds=' + JSON.stringify(AppState.recipes.map(function(r){return r.id;}))
-        + ' deletionKeys=' + JSON.stringify(Object.keys(AppState.deletions||{})));
       return 'loaded';
     }
     return 'empty'; // signed in, but no data saved to the cloud yet
@@ -5562,10 +5537,6 @@ function setupRealtimeListeners() {
       // because local recipes are normalized/photo-attached and would look
       // "different" forever, causing constant re-syncs.)
       var remoteVersion = data.version || 0;
-      // [SYNC-DIAG] — remove after diagnosis
-      console.log('[SYNC-DIAG] onSnapshot: remoteV=' + remoteVersion + ' localV=' + AppState.dataVersion
-        + ' → ' + (remoteVersion > AppState.dataVersion ? 'APPLIES (recipes=' + (data.recipes||[]).length + ' dels=' + Object.keys(data.deletions||{}).length + ')' : 'SKIP')
-        + ' cloudRecipeIds=' + JSON.stringify((data.recipes||[]).map(function(r){return r.id;})));
       if (remoteVersion > AppState.dataVersion) {
         AppState.dataVersion = remoteVersion;
         AppState.recipes = data.recipes || [];

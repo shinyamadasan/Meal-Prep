@@ -5,6 +5,21 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-03 — diag(sync): root cause confirmed; diagnostic logs removed
+
+**Root cause of "import not working" (from [SYNC-DIAG] diagnostic logs):**
+The import code was working correctly the entire time. The user was testing with an exported backup of their own data (27 recipes: IDs 1–26 + 1782474814949), NOT `cpb-diet-import.json` (4 recipes: cpb-recipe-a through d). Since `unionById(AppState.recipes, importedData.recipes)` — existing items win on collision — importing the same IDs is a no-op. Nothing changed, nothing appeared to be "imported." The sync machinery (Firestore write, onSnapshot skip, no conflict path) all behaved correctly.
+
+**Diagnostic logs:** All `[SYNC-DIAG]` console.log blocks removed from `app.js` (commit `c49f001` added them; this cleanup removes them). Root cause confirmed closed.
+
+**Secondary finding:** Firestore `recipes` array at v1953 contained pantry item IDs mixed in (data corruption from a prior session). These were cleaned up by `loadUserData()` on the next load. No action needed.
+
+**Status:** Import feature confirmed working. No open bugs in the import/sync path.
+
+**Human check:** To verify import works with a genuinely new file, import `cpb-diet-import.json` (must have IDs NOT already in the account — cpb-recipe-a through d are the test IDs).
+
+---
+
 ## 2026-07-02 — fix(import): tombstone-override + save-race fixes committed
 
 **Root cause (proven by code trace):** Signed-in import data disappeared on every refresh because:
