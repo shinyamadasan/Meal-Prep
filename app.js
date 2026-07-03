@@ -5178,7 +5178,13 @@ function applyTombstones() {
   var dels = AppState.deletions || {};
   if (!Object.keys(dels).length) return;
   TOMBSTONE_KEYS.forEach(function (key) {
-    AppState[key] = (AppState[key] || []).filter(function (it) { return !it || it.id == null || !dels[String(it.id)]; });
+    AppState[key] = (AppState[key] || []).filter(function (it) {
+      if (!it || it.id == null) return true;
+      var tombAt = dels[String(it.id)];
+      if (!tombAt) return true;        // no tombstone — keep
+      if (!it.updatedAt) return false; // legacy item without timestamp — tombstone wins
+      return it.updatedAt > tombAt;    // LWW: keep item only if it's newer than the tombstone
+    });
   });
 }
 
@@ -5347,7 +5353,18 @@ async function loadFromFirestore() {
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.deletions = data.deletions || {};
       purgeOldTombstones();
-      applyTombstones(); // honour the cloud doc's own tombstones on the data it just delivered
+      // Stamp items that pre-date this feature with the document's save time.
+      // applyTombstones() uses LWW: a tombstone only removes an item if the tombstone
+      // is newer than the item's updatedAt. Without this patch, legacy items have no
+      // updatedAt and tombstones would always win — same as the old behaviour. With it,
+      // stale tombstones (older than the last Firestore save) lose to existing items.
+      var firestoreSavedAt = data.lastSaved || data.lastUpdated || new Date().toISOString();
+      TOMBSTONE_KEYS.forEach(function(key) {
+        (AppState[key] || []).forEach(function(it) {
+          if (it && it.updatedAt == null) it.updatedAt = firestoreSavedAt;
+        });
+      });
+      applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt
       markInitialized(); // the account's cloud doc exists → not first run, never auto-seed samples
 
       // Photos: legacy data may have them inline in this doc; new photos live in
@@ -5418,8 +5435,13 @@ async function loadUserData() {
         const cloudDelN = Object.keys(AppState.deletions || {}).length;
         const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'];
         let before = 0;
+        var localNow = new Date().toISOString();
         UKEYS.forEach(function (key) {
           before += (AppState[key] || []).length;
+          // Stamp local-only items with the current time so LWW can compare them
+          // against tombstones. Firestore items already have updatedAt from the
+          // firestoreSavedAt patch in loadFromFirestore(); the union keeps those.
+          (local[key] || []).forEach(function(it) { if (it && it.updatedAt == null) it.updatedAt = localNow; });
           AppState[key] = unionById(AppState[key] || [], local[key] || []);
         });
         patchMissingNutrition(AppState.recipes);
@@ -5427,11 +5449,8 @@ async function loadUserData() {
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
         AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
-        // Do NOT merge local tombstones here. Firestore is the authority when signed in;
-        // its tombstones were already loaded by loadFromFirestore(). Merging stale local
-        // tombstones (e.g. from a Clear All Data run on another device months ago) would
-        // wipe cloud data that was added after that deletion. See D-020.
-        applyTombstones(); // honour Firestore tombstones over any items added from local storage above
+        mergeDeletions(local.deletions); // safe now: LWW in applyTombstones() means stale tombstones lose to newer items
+        applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt (D-020)
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
         if (after !== before || Object.keys(AppState.deletions).length !== cloudDelN) {
