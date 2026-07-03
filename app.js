@@ -5427,8 +5427,11 @@ async function loadUserData() {
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
         AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
-        mergeDeletions(local.deletions); // combine this device's tombstones with the cloud's
-        applyTombstones();               // then drop anything either side deleted — a delete sticks, no resurrection
+        // Do NOT merge local tombstones here. Firestore is the authority when signed in;
+        // its tombstones were already loaded by loadFromFirestore(). Merging stale local
+        // tombstones (e.g. from a Clear All Data run on another device months ago) would
+        // wipe cloud data that was added after that deletion. See D-020.
+        applyTombstones(); // honour Firestore tombstones over any items added from local storage above
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
         if (after !== before || Object.keys(AppState.deletions).length !== cloudDelN) {

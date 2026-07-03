@@ -144,6 +144,13 @@ Why: One system per concern — n8n = messaging, code = deterministic transforms
 Trade-off: The single-gate shortcut means an approved proposal skips a separate sprint-batching review — acceptable while the backlog is small; revisit if batches grow. `DIGEST.md` is a generated artifact committed to the repo so n8n can fetch it.
 Supersedes: the `Generate-Digest -Send` (PC-side messaging) approach from earlier in Phase 2.
 
+## D-020 — Do not merge localStorage tombstones when Firestore data is loaded
+Date: 2026-07-03 · Status: Active
+Context: `loadUserData()` unions localStorage into Firestore data, then called `mergeDeletions(local.deletions)` to propagate offline deletions. When a second device (e.g. phone) signs in after having previously run Clear All Data, its localStorage contains tombstones for every recipe ID. Merging those stale tombstones wiped all Firestore data — the reconciliation `saveData()` wrote the tombstoned state back to Firestore, and the PC's `onSnapshot` picked it up, deleting everything on the PC.
+Decision: Remove `mergeDeletions(local.deletions)` from the `status === 'loaded'` path in `loadUserData()`. When Firestore returns valid data, treat it as the authority. Its tombstones were already loaded by `loadFromFirestore()` and applied by `applyTombstones()`. Local tombstones are not merged.
+Why: A stale localStorage tombstone set (from a previous device's Clear All Data) cannot be distinguished from a legitimate offline deletion by timestamp alone — tombstones have timestamps but the Firestore document has only a version counter. The only safe rule is: **Firestore wins when it has data**. Local tombstones are a cache artifact and must not override the cloud.
+Trade-off: If a user deletes an item on device A while offline, then signs in, the deletion is not propagated to Firestore. The item reappears and must be deleted again online. This is acceptable — the alternative is silent full data loss when a second device signs in.
+
 ## D-019 — Explicit import overrides tombstone (import intent wins over prior deletion)
 Date: 2026-07-02 · Status: Active
 Context: `applyTombstones()` runs on every signed-in load and removes any item whose ID is in `AppState.deletions`. If a user imports a file containing IDs that were previously tombstoned (e.g. via Clear All Data), `buildFirestorePayload()` writes those tombstones back to Firestore alongside the re-imported items. On the next signed-in refresh, `applyTombstones()` silently removes the re-imported items — the user sees empty data after what appeared to be a successful import. The signed-out path never calls `applyTombstones()`, so the same import survives on a signed-out device, hiding the bug.
