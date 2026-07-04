@@ -3,18 +3,51 @@
 > The reusable operating system this app runs on. Everything listed as **generic** is product-agnostic:
 > clone it to start a new app, fill in the app-specific files, and you inherit the whole pipeline:
 >
-> **Capture → Plan → Build → Self Review → QA → Document → Commit → Deploy → Human Review.**
+> **Capture → Plan → PRD → Build → Guardian Gauntlet → Document → Commit → Deploy → Human Review.**
 >
 > Two checklists gate every commit — **Self Review** (`SELF_REVIEW.md`, "is it good code?") and
 > **QA** (`QA.md`, "does it work?"). AI-verifiable checks block commits; human-only checks are logged,
-> never faked. (DECISIONS D-009, D-011, D-012, D-014.)
+> never faked. (DECISIONS D-009, D-011, D-012, D-014, D-015.)
+>
+> See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.0 — locked 2026-06-25.** The OS is good enough to build products on. Further changes
-should be *deliberate* (a real friction surfaced during use), not reflexive. The success test isn't
-how many docs it has — it's whether, months from now, a brand-new app is productive on **day one**
-because the whole engineering workflow comes with it.
+**Version: v1.4 — updated 2026-07-03.** Added: Sprint Execution Mode — risk-gated task chaining
+(`Risk: Low/Medium/High`, `Execution: Chained/Solo`) with semantic `checkpoint:` review boundaries
+and partial-sprint continuation on blocked tasks (D-023). v1.3 added overnight automation gated
+behind `$AUTOMATION_ENABLED`, never building app code (D-022). v1.2 added the `Next` command —
+read-only default entry point for both Claude and Codex sessions (D-021). v1.1 added agents +
+skills workforce, `library/requirements/` PRD layer, Guardian Gauntlet, gated pipeline (D-015),
+2026-06-29. v1.0 locked 2026-06-25.
+
+> **Living document rule:** Update this file and `SYSTEM-OVERVIEW.md` in the same commit whenever OS-level infrastructure changes — new agents, new workflow events, pipeline changes, or new hard rules.
+
+---
+
+## The Pipeline
+
+```
+Telegram capture
+    → Triage (scores against North-star goals)
+    → PROPOSALS.md (pending human approval)
+    → [human approves via Telegram reply] → BUILD_QUEUE.md (deterministic: Apply-Decisions.ps1)
+    → Claude converts approved items → PLAN.md + TASKS.md (status: codex)
+      -- gated behind $AUTOMATION_ENABLED in run-claude.ps1 (default OFF); same conversion also
+         available interactively via the "Plan" command. Claude never builds app code in this step.
+    → Telegram notified (CODEX_READY.md, sent only when a status: codex task exists)
+    → [human runs Codex locally, says "Continue"] → Codex implements from TASKS.md
+    → Review (Claude) → merge → docs/ + DONE + DECISIONS updated
+```
+
+> **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
+> build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that
+> path predates the Claude/Codex split and hasn't been reconciled with it yet (flagged in D-022, not
+> fixed there). `TASKS.md` + Codex is the current path for build-queue items; see `docs/09-automation.md`.
+
+---
 
 ## Generic — the OS (clone as-is into a new app)
+
+### Process files
 | File / folder | Role | Per-app change |
 |---|---|---|
 | `CLAUDE.md` | Router: doc map + read/update protocol + hard rules | Replace the project summary + hard rules |
@@ -24,14 +57,56 @@ because the whole engineering workflow comes with it.
 | `PROMPTS.md` | Engineering (P1–P10) + Product (PP1–PP7) reusable prompts | none |
 | `OPERATOR.md` | Human playbook (principles + rhythm) | none |
 | `GUIDE.md` | Phone capture card | none |
-| `run-claude.ps1` · `setup-task-scheduler.ps1` | Scheduled autonomous runs | set project path |
+| `AI-DEV-OS.md` | This file — OS manifest + bootstrap guide | none |
+| `SYSTEM-OVERVIEW.md` | Plain-language system explainer | none |
+
+### Automation files
+| File / folder | Role | Per-app change |
+|---|---|---|
+| `run-claude.ps1` · `setup-task-scheduler.ps1` | Scheduled autonomous runs — gated by `$AUTOMATION_ENABLED` (default off) at the top of `run-claude.ps1` | set project path; flip the flag once validated |
 | `n8n-telegram-inbox.json` | Mobile capture workflow | set repo, bot token, user id |
-| `captures/` (inbox · processed · README) | Capture pipeline scaffold | start empty |
-| `planning/` (ROADMAP · TASK · DONE) | Strategy/tactics scaffold | start empty |
-| `STATUS.md` | Working-memory scaffold | start empty |
-| `docs/DECISIONS.md` | ADR-lite scaffold | keep D-001 (no-framework) if it applies |
+| `n8n-telegram-digest.json` | Morning digest + Codex-ready notification | set repo, bot token, user id |
+| `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
+
+### Scaffold folders (start empty)
+| Folder | Role |
+|---|---|
+| `captures/` (inbox · processed · README) | Capture pipeline scaffold |
+| `planning/` (ROADMAP · TASK · DONE · PROPOSALS · BUILD_QUEUE) | Strategy/tactics scaffold |
+| `STATUS.md` | Working-memory scaffold |
+| `docs/DECISIONS.md` | ADR-lite scaffold — keep D-001 (no-framework) if it applies |
+
+### Build workforce (the agents + skills)
+| Folder | Role | Per-app change |
+|---|---|---|
+| `.claude/agents/` | Specialist sub-agents — each owns a domain | Swap agents for your stack's domains |
+| `.claude/skills/` | Deep playbooks each agent wields (guides, research, templates) | Swap skills to match your agents |
+
+**Standard agent roster for a JS/TS web app:**
+
+| Agent | Domain |
+|---|---|
+| `library-guardian` | PRD + IRD authorship |
+| `thanos-gauntlet-glove` | PRD execution orchestrator (skill-only, no agent) |
+| `security-guardian` | Security audit after every build |
+| `quality-guardian` | AC verification against PRD after every build |
+| `auth-guardian` | Authentication implementation |
+| `db-guardian` | Database schema + queries |
+| `ux-ui-guardian` | Design system + UI review |
+| `modal-toast-dialog-guardian` | Accessible overlays |
+| `image-optimization-guardian` | Image delivery + performance |
+| `lighthouse-pagespeed-guardian` | Performance audits |
+| `github-repo-health-guardian` | Repo hygiene |
+| `dark-mode-theming-guardian` | Theming + dark mode |
+| `csv-xlsx-import-export-guardian` | Spreadsheet import/export |
+
+Swap any of these for your stack. A Python/Django app would replace several with `python-guardian`, `react-guardian`, etc.
+
+---
 
 ## App-specific — fill in per app
+
+### Docs
 | File | What you write |
 |---|---|
 | `CLAUDE.md` project block + hard rules | Stack, the 3 files, and the bug-causing rules |
@@ -41,21 +116,35 @@ because the whole engineering workflow comes with it.
 | `docs/FEATURES.md` | Feature catalog by area + status |
 | `QA.md` `[app]` items | The app's hard-rule greps |
 
+### Implementation specs
+| Folder | What you write |
+|---|---|
+| `library/requirements/features/` | PRDs — one folder per feature, written before building |
+| `library/requirements/issues/` | IRDs — one folder per bug, written before fixing |
+
+PRDs and IRDs are **immutable implementation contracts**. Changes after work begins = amendment blocks or new revisions. Never rewrite accepted sections.
+
+---
+
 ## Bootstrap a new app
+
 1. **Copy** the generic file set into the new repo.
 2. **Empty** the instance files: `planning/*`, `STATUS.md`, `captures/inbox/*`; clear `docs/PROJECT|ARCHITECTURE|DATA_MODEL|FEATURES`. Keep `docs/DECISIONS.md` as a starting log.
 3. **Write `docs/PROJECT.md` first** — especially the North-star goals; triage ranking depends on them.
 4. **Fill `CLAUDE.md`'s** project summary + hard rules.
 5. **Swap the `[app]` checks** in `QA.md` for the new app's hard-rule greps.
-6. **Wire capture:** import `n8n-telegram-inbox.json` (new repo + bot token + your Telegram id); register `run-claude.ps1` in Task Scheduler.
-7. **Seed work:** write the first task into `planning/TASK.md` (or the `ROADMAP.md` queue) and go.
+6. **Install agents + skills** — copy the `.claude/agents/` and `.claude/skills/` folders; swap any agents that don't match your stack.
+7. **Wire capture** — import `n8n-telegram-inbox.json` (new repo + bot token + your Telegram id); register `run-claude.ps1` in Task Scheduler.
+8. **Seed work** — write the first PRD in `library/requirements/features/`, add it to `planning/BUILD_QUEUE.md`, and go.
+
+---
 
 ## What "generic vs app-specific" buys you
-The boundary is the whole point: the **protocol** (how work flows, how quality is gated) is identical
-across products, while the **content** (what the app is, its rules) is per-app. New apps start with a
-mature pipeline on day one instead of re-inventing process.
+
+The boundary is the whole point: the **protocol** (how work flows, how quality is gated, how the workforce is orchestrated) is identical across products, while the **content** (what the app is, its rules, its agents) is per-app. New apps start with a mature pipeline on day one instead of re-inventing process.
+
+---
 
 ## Not yet done — true extraction (parked)
-Today the OS and this app share one repo. To make cloning real, lift the generic set into its own
-`ai-dev-os/` repo and consume it via template-repo / submodule / copy-on-init. See ROADMAP → Research.
-This file is the manifest that extraction will follow.
+
+Today the OS and this app share one repo. To make cloning real, lift the generic set into its own `ai-dev-os/` repo and consume it via template-repo / submodule / copy-on-init. See ROADMAP → Research. This file is the manifest that extraction will follow.

@@ -7,7 +7,11 @@
 ## Status legend
 
 `todo` → `codex` → `in-progress` → `review` → `approved` / `rework` → `done`
-`blocked` = Codex hit an ambiguity; Claude must resolve before work continues.
+`blocked` = Codex hit an ambiguity; Claude must resolve before work continues. Under Sprint
+Execution Mode (a group header marked `Risk: Low/Medium · Execution: Chained` — see
+CLAUDE.md/AGENTS.md), a blocked task doesn't halt the whole group by default: Codex skips only
+tasks that depend on it and keeps building independent ones, unless the blocker is architecture/
+scope-level or file-overlapping. See DECISIONS D-023.
 
 ---
 
@@ -16,11 +20,15 @@
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-001 · Add CSS modal size modifier classes
-status: codex
+status: done
 owner: codex
 source: BQ-016
 depends-on: none
 files: style.css
+
+blocker:
+  - 2026-07-03: CSS change implemented, but required Playwright verification could not be completed. `npm test` failed in sandbox with `spawn EPERM`, then approved runs timed out after 124s and 304s. Diagnostic `npx playwright test tests/mobile-layout.spec.js --workers=1 --reporter=list --timeout=60000` failed before reaching the CSS overflow assertion because `#kitchen-setup-modal` intercepted the tab click.
+  - 2026-07-03 (resolved by Claude review, see REVIEW.md): failure traced to a pre-existing gap in `tests/mobile-layout.spec.js` (missing `pantryOnboardingDone` seed / `closeAllModals()` call), unrelated to this task's CSS-only diff. CSS verified correct by direct code trace. Approved; split off TASK-004 to fix the test fixture.
 
 acceptance:
   - [ ] Three new modifier classes exist in style.css immediately after the last `.modal-content` block (around line 3015): `.modal-content--sm`, `.modal-content--md`, `.modal-content--lg`
@@ -42,7 +50,7 @@ test steps:
 ---
 
 ### TASK-002 · Fix #username-modal: convert button row to .modal-footer + apply size class
-status: codex
+status: done
 owner: codex
 source: BQ-016
 depends-on: TASK-001
@@ -79,7 +87,7 @@ test steps:
 ---
 
 ### TASK-003 · Sweep 4 remaining modals: inline max-width → CSS modifier class
-status: codex
+status: done
 owner: codex
 source: BQ-016
 depends-on: TASK-001
@@ -113,6 +121,35 @@ test steps:
   - [ ] Open each of the 4 modals at desktop width; confirm they render at the same width as before (420 / 480 / 480 / 600px) — visual check
   - [ ] Open each at mobile width (DevTools); confirm buttons still stack vertically (they already used .modal-footer, so this should pass without change)
   - [ ] Confirm #prep-mode-modal is unchanged: open Prep Mode, confirm layout is identical to before
+
+### TASK-004 · Fix mobile-layout.spec.js onboarding-modal interception
+status: done
+owner: codex
+source: TASK-001 review (see REVIEW.md)
+depends-on: none
+files: tests/mobile-layout.spec.js
+
+context:
+  On a fresh Playwright profile, `seedPantryIfEmpty()` (app.js:6921) auto-opens
+  `#kitchen-setup-modal` because the pantry is empty and `pantryOnboardingDone` is unset.
+  `mobile-layout.spec.js` only seeds `mealPrepHelpSeen` and never seeds `pantryOnboardingDone`
+  or force-closes modals, so the wizard intercepts the first tab-button click. Every other spec
+  in this suite (e.g. `button-smoke.spec.js`) survives the same condition via a `closeAllModals()`
+  helper called right after page load — `mobile-layout.spec.js` is the one file missing it.
+
+acceptance:
+  - [ ] `mobile-layout.spec.js`'s `addInitScript` also seeds `localStorage.setItem('pantryOnboardingDone', '1')` (or equivalent), matching the pattern in the other specs
+  - [ ] Add a `closeAllModals()`-style call (or reuse the one in `button-smoke.spec.js`) immediately after `page.goto` / initial wait, before the tab loop
+  - [ ] `npx playwright test tests/mobile-layout.spec.js` runs past the onboarding modal and reaches the overflow assertion for every tab
+  - [ ] No other spec files changed
+
+constraints:
+  - Do not change app.js or style.css — this is a test-fixture-only fix
+  - If `npm test` / sandboxed runs still fail with `spawn EPERM` or time out, record that separately as an environment blocker rather than treating it as a code defect
+
+test steps:
+  - [ ] Run `npx playwright test tests/mobile-layout.spec.js --reporter=list`; confirm it completes (pass or a real overflow finding) instead of failing on modal interception
+  - [ ] Run the full `npm test` suite once the environment allows it; confirm no regressions in the other specs
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
