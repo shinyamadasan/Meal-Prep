@@ -94,6 +94,8 @@ claude -p $prompt `
     --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
     | Tee-Object -FilePath $logFile -Append
 if ($LASTEXITCODE -ne 0) {
+    # Deliberately do NOT checkout main -- Claude's session may have left partial, uncommitted edits;
+    # leave $branchName exactly as it is for inspection rather than risk carrying stray changes onto main.
     Write-Result "$taskId review FAILED: claude -p exited with code $LASTEXITCODE. See claude-session.log."
     exit 1
 }
@@ -104,10 +106,13 @@ $changed = @(git -C $root status --porcelain | ForEach-Object { $_.Substring(3).
 $violations = @($changed | Where-Object { $path = $_; -not ($allowedPatterns | Where-Object { $path -match $_ }) })
 
 if ($violations.Count -gt 0) {
+    # Same reasoning as above -- leave the dirty tree on $branchName for a human, never auto-switch.
     Write-Result "$taskId review HALTED: touched file(s) outside the review surface: $($violations -join ', '). NOT committed/pushed -- inspect $branchName by hand."
     exit 1
 }
 if ($changed.Count -eq 0) {
+    # Nothing changed at all -- tree is clean, safe to return to main.
+    git -C $root checkout main | Out-Null
     Write-Result "$taskId review produced no changes -- investigate; a real review should at least update REVIEW.md."
     exit 1
 }
@@ -115,6 +120,7 @@ if ($changed.Count -eq 0) {
 git -C $root add -- $changed
 git -C $root commit -m "${taskId}: Claude review" | Out-Null
 git -C $root push origin $branchName | Out-Null
+git -C $root checkout main | Out-Null
 
 $newStatus = Get-TaskStatus -TaskId $taskId
 if ($newStatus -eq 'done') {

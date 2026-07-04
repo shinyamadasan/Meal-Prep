@@ -156,6 +156,10 @@ $changed = @(git -C $root status --porcelain | ForEach-Object { $_.Substring(3).
 $violations = @($changed | Where-Object { $path = $_; ($deniedPatterns | Where-Object { $path -match $_ }) })
 
 if ($violations.Count -gt 0) {
+    # Deliberately do NOT checkout main here -- the whole point is leaving the dirty tree exactly as
+    # Codex left it, on $branchName, for a human to inspect. Switching branches now could either be
+    # refused by git (dirty tree) or silently carry the stray edits onto main. Both are worse than
+    # just staying put.
     Write-Result "$($first.Id) build HALTED: touched file(s) outside Codex's allowed surface: $($violations -join ', '). NOT committed/pushed -- inspect $branchName by hand."
     exit 1
 }
@@ -173,6 +177,7 @@ if ($codexExit -ne 0) {
     git -C $root diff --cached --quiet
     if ($LASTEXITCODE -ne 0) { git -C $root commit -m "$($first.Id): codex exec failed (exit $codexExit), marked blocked" | Out-Null }
     git -C $root push origin $branchName | Out-Null
+    git -C $root checkout main | Out-Null
     Write-Result "$($first.Id) build FAILED: codex exec exited $codexExit after $([int]$duration.TotalSeconds)s. Marked blocked on $branchName. See claude-session.log."
     exit 1
 }
@@ -190,18 +195,25 @@ $anyReview  = @($statuses | Where-Object { $_.Status -eq 'review' })
 $noChange   = @($statuses | Where-Object { $_.Status -eq 'codex' })
 
 if ($anyBlocked.Count -gt 0) {
+    git -C $root checkout main | Out-Null
     Write-Result "$($first.Id) build reached BLOCKED ($($anyBlocked.Count) of $($tracked.Count) tracked task(s)) after $([int]$duration.TotalSeconds)s. See the blocker note(s) in TASKS.md on $branchName."
     exit 1
 }
 
 if ($anyReview.Count -gt 0) {
     $buildMsg = "$($first.Id) build reached REVIEW ($($anyReview.Count) of $($tracked.Count) tracked task(s)) after $([int]$duration.TotalSeconds)s, pushed to $branchName."
-    Write-Result $buildMsg
-    # Auto-chain: goal 6 -- no separate manual /review step needed after a clean build.
+    Add-Content -Path $logFile -Value "[Run-Codex-Build] $buildMsg"
+    # Auto-chain: goal 6 -- no separate manual /review step needed after a clean build. Stay on
+    # $branchName for this call (Run-Claude-Review.ps1 checks it out itself, harmless no-op since
+    # we're already there) -- it returns the repo to main itself when it finishes.
     Add-Content -Path $logFile -Value "[Run-Codex-Build] auto-chaining into Run-Claude-Review.ps1 for $branchName."
     & (Join-Path $root 'tools\Run-Claude-Review.ps1')
     $reviewResultFile = Join-Path $root '.last-phase-result.txt'
     $reviewMsg = if (Test-Path $reviewResultFile) { $r = Get-Content $reviewResultFile -Raw; Remove-Item $reviewResultFile -Force; $r } else { "Review phase runner exited $LASTEXITCODE with no result -- check claude-session.log." }
+    # Defensive: ensure main regardless of what the review runner left behind (idempotent if it
+    # already returned there itself).
+    $curBranch = git -C $root branch --show-current 2>$null
+    if ($curBranch -ne 'main') { git -C $root checkout main | Out-Null }
     Write-Result "$buildMsg`n`n-> auto-review: $reviewMsg"
     exit 0
 }
@@ -214,5 +226,6 @@ foreach ($t in $noChange) {
 git -C $root add TASKS.md
 git -C $root diff --cached --quiet
 if ($LASTEXITCODE -ne 0) { git -C $root commit -m "$($first.Id): codex exec made no tracked progress, marked blocked" | Out-Null; git -C $root push origin $branchName | Out-Null }
+git -C $root checkout main | Out-Null
 Write-Result "$($first.Id) build FAILED: codex exec exited 0 after $([int]$duration.TotalSeconds)s but no tracked task changed status. Marked blocked on $branchName. See claude-session.log."
 exit 1

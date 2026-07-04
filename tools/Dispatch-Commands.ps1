@@ -203,9 +203,23 @@ try {
         $id  = $mId.Groups['v'].Value
         $cmd = $mCmd.Groups['v'].Value.ToLower()
 
-        # Every outcome (including this refusal) flows through the single write-reply/commit/push
-        # block below -- nothing here returns or commits early, so there is exactly one path that
-        # ever marks a command applied and pushes its reply.
+        # Mark this command applied and commit it to main BEFORE dispatching to any phase runner.
+        # This matters: run-claude.ps1 and Run-Codex-Build.ps1 both require a CLEAN main as their
+        # first Preflight check. The incoming command file is itself an uncommitted change the moment
+        # n8n writes it -- if we dispatched first and committed after (the original, buggy order),
+        # every real /run or /build would abort at Preflight seeing its own not-yet-committed command
+        # file as "dirty tree." Committing it first means Preflight sees a clean main, as intended.
+        if (-not $DryRun) {
+            $newRaw = $raw -replace '(?m)^status:\s*new\s*$', "status: applied`napplied: $(Get-Date -Format o)"
+            [System.IO.File]::WriteAllText($f.FullName, $newRaw, $utf8)
+            git -C $root add "captures/commands/$($f.Name)"
+            git -C $root diff --cached --quiet
+            if ($LASTEXITCODE -ne 0) {
+                git -C $root commit -m "command: /$cmd ($id) received" | Out-Null
+                git -C $root push origin main | Out-Null
+            }
+        }
+
         $reply = if ($cmd -in @('run', 'build', 'review', 'go') -and -not (Test-AutomationEnabled)) {
             "Automation is disabled (`$AUTOMATION_ENABLED = `$false) -- /$cmd refused to act. Send /enable first if you want this to run."
         } else {
@@ -244,13 +258,22 @@ try {
         Write-Reply -Id $id -Text $reply
 
         if (-not $DryRun) {
-            $newRaw = $raw -replace '(?m)^status:\s*new\s*$', "status: applied`napplied: $(Get-Date -Format o)"
-            [System.IO.File]::WriteAllText($f.FullName, $newRaw, $utf8)
-            git -C $root add "captures/commands/$($f.Name)" $outboxFile 2>$null
-            git -C $root diff --cached --quiet
-            if ($LASTEXITCODE -ne 0) {
-                git -C $root commit -m "command: /$cmd ($id)" | Out-Null
-                git -C $root push origin main | Out-Null
+            # Defensive: Run-Codex-Build.ps1 / Run-Claude-Review.ps1 return to main themselves on every
+            # clean exit path (see their own comments), but a violation-halt or a claude -p failure
+            # deliberately leaves a dirty task branch checked out for human inspection -- in that one
+            # case, skip committing the reply to main rather than force a branch switch over dirty
+            # files. The reply text itself already explains what happened; it'll be picked up (and the
+            # OUTBOX.md entry pushed) on the next tick once a human has resolved that branch by hand.
+            $curBranch = git -C $root branch --show-current 2>$null
+            if ($curBranch -eq 'main') {
+                git -C $root add $outboxFile 2>$null
+                git -C $root diff --cached --quiet
+                if ($LASTEXITCODE -ne 0) {
+                    git -C $root commit -m "reply: /$cmd ($id)" | Out-Null
+                    git -C $root push origin main | Out-Null
+                }
+            } else {
+                Write-Host "Not on main (on '$curBranch') after /$cmd -- likely a halted build/review left for inspection. Reply written locally to OUTBOX.md but not committed/pushed this tick."
             }
         }
         Write-Host "Processed /$cmd ($id)."
