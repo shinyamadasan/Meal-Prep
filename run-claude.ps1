@@ -15,7 +15,7 @@
 # completed/idle run, 1 = mid-run halt (something failed after work started), 2 = preflight abort
 # (environment/state problem -- nothing was attempted). See docs/09-automation.md.
 
-$AUTOMATION_ENABLED = $false   # flip to $true to re-enable overnight automation
+$AUTOMATION_ENABLED = $true   # flip to $true to re-enable overnight automation
 
 $projectPath = "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 $logFile = "$projectPath\claude-session.log"
