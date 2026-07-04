@@ -11,14 +11,19 @@ test('no horizontal overflow on any tab (mobile)', async ({ page }) => {
   test.setTimeout(60000);
   await page.addInitScript(() => {
     try { localStorage.setItem('mealPrepHelpSeen', '1'); } catch (e) {}
+    try { localStorage.setItem('pantryOnboardingDone', '1'); } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    document.querySelectorAll('.modal:not(.hidden)').forEach((m) => m.classList.add('hidden'));
+    document.body.style.overflow = '';
+  });
 
   const tabs = ['recipes', 'planner', 'grocery', 'fridge', 'hacks', 'nutrition', 'ingredients'];
   const bad = [];
   for (const t of tabs) {
-    const inMore = ['ingredients', 'hacks'].includes(t); // under the "More" menu
+    const inMore = ['nutrition', 'ingredients', 'hacks'].includes(t); // under the "More" menu
     if (inMore) await page.locator('.tab-more-btn').click();
     const btn = page.locator((inMore ? '.tab-more-menu ' : '') + '.tab-btn[data-tab="' + t + '"]');
     if (await btn.count()) { await btn.click(); await page.waitForTimeout(300); }
