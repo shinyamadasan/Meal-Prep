@@ -153,8 +153,12 @@ if ($branchExists) {
 $stdoutFile = Join-Path $root '.codex-stdout.tmp'
 $stderrFile = Join-Path $root '.codex-stderr.tmp'
 $startTime = Get-Date
+# Start-Process -ArgumentList, given an array, does not reliably quote elements containing spaces
+# (confirmed live: $root's "Meal prep app" path split into separate positional args, and codex
+# rejected 'prep' as an unexpected argument). A single pre-quoted command-line string avoids this.
+$codexArgs = "exec -C `"$root`" --sandbox workspace-write `"Continue`""
 $proc = Start-Process -FilePath 'codex' `
-    -ArgumentList @('exec', '-C', $root, '--sandbox', 'workspace-write', 'Continue') `
+    -ArgumentList $codexArgs `
     -WorkingDirectory $root -NoNewWindow -Wait -PassThru `
     -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
 $duration = (Get-Date) - $startTime
