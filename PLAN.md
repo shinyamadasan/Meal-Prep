@@ -39,4 +39,4 @@ No visual changes on desktop. On mobile, `#username-modal` buttons will stack fu
 
 ## Status
 
-in-progress
+done — TASK-001 through TASK-005 all complete (2026-07-04)

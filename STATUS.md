@@ -5,6 +5,43 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-04 — Triage: 6 captures → PROP-024..028 confirmed; BQ-016/017 milestone closed
+
+**Triage complete (6 captures, 2026-07-02 batch):**
+
+All 6 inbox captures from 2026-07-02 already had proposals written by a prior run (PROP-024..028);
+only the inbox `status` fields were still `new`. This run marks all 6 as `triaged`, writes archives
+to `captures/processed/2026/07/`, and closes the milestone.
+
+**Captures → Proposals (all parked, pending your judgment):**
+- **msg-45 → PROP-024 (P2):** Bulk add: default storage location selector (counter/fridge). ▶ Park.
+- **msg-47 → PROP-025 (P2):** Bulk add: per-item expiry date per line (supersedes shared-date from BQ-005). ▶ Park.
+- **msg-49 → PROP-026 (P3):** Recipe card: compact header + always-expanded detail. ▶ Park.
+- **msg-51 → PROP-027 (P2):** Cook confirmation: optional serving multiplier for accurate pantry deduction. ▶ Park.
+- **msg-53 → dropped:** Duplicate of msg-55 (malformed `/also` prefix; unknown type).
+- **msg-55 → PROP-028 (P3):** Long-press bulk multi-select mode (move + delete). ▶ Park.
+
+**Milestone closed:** BQ-016 (modal mobile-footer-stacking) + BQ-017 (planner overflow) — all 5 tasks
+done. PLAN.md updated to `done`. BUILD_QUEUE has no new approved items (BQ-013/014/015 remain deferred P3).
+
+**Next command output:**
+```
+NEXT
+milestone : Fix mobile modal action buttons + planner overflow [done]
+task      : — (all done)
+owner     : Claude
+why       : No approved BUILD_QUEUE items; milestone complete. Await human to promote next batch.
+run       : Status
+```
+
+**To activate the next run:** approve PROP-024..028 from your phone (digest), or promote a
+different item from ROADMAP.md to BUILD_QUEUE.md. Recommend reviewing PROP-027 (cook multiplier,
+P2) — it directly improves core pantry accuracy with M effort.
+
+**Blockers:** none (awaiting product approval only).
+
+---
+
 ## 2026-07-03 — diag(sync): root cause confirmed; diagnostic logs removed
 
 **Root cause of "import not working" (from [SYNC-DIAG] diagnostic logs):**
