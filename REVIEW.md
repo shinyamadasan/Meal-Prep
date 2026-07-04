@@ -143,6 +143,42 @@ silently left for someone to notice later.
 
 → TASK-004 status set to `done` in TASKS.md.
 
+## Review TASK-005 — APPROVED
+branch: task-001
+verdict: approved
+
+### Findings
+
+**1. CSS change — correct, matches all 4 acceptance criteria.** Verified at `style.css:5483-5492`
+(the `@media (max-width: 768px)` block commented "compact scrollable pill row"):
+- `.planner-controls` gains exactly `width: 100%;` and `max-width: 100%;`, inserted after `gap: 6px;`
+  and before `overflow-x: auto;` — alongside the existing declarations, as required.
+- No other property in that block changed; the other two `.planner-controls` blocks (`style.css:3316`,
+  `style.css:3715`) are untouched — neither sets `width`/`max-width`, confirming the constraint's
+  claim that ordinary cascade/source-order (this block loads last) is sufficient without `!important`.
+- `git diff --stat` for `index.html`/`tests/mobile-layout.spec.js` matches exactly what TASK-002/003/004
+  already had reviewed and approved — nothing new leaked in from this task. No `app.js` diff exists.
+
+**2. The fix is verified live, not just code-traced — and I can confirm the result.**
+`TEST_REPORT.md`'s TASK-005 entry reports `npx playwright test tests/mobile-layout.spec.js` now
+**passes (1 passed)** — this is the same spec TASK-004 got running, and it was failing on exactly
+`planner (+23px)` before this fix (per TASK-004's own TEST_REPORT entry). Going from "1 failure:
+planner overflow" to "1 passed" is direct evidence the fix works across all 7 tabs, not just the
+planner tab in isolation.
+
+**3. Constraints held.** Two-line addition only; no `!important` added; no JS changes; the two
+other duplicate `.planner-controls` blocks were deliberately left alone (tracked debt, per PLAN.md
+Scope — Out).
+
+**4. Test evidence honestly reported.** `npm test` (full suite) timing out at 304s is disclosed as
+unverified rather than silently skipped or claimed passing — consistent with the pattern across
+TASK-001–004; this is a known sandbox/environment limitation (see TASK-001's review), not something
+this task introduced or could fix.
+
+→ TASK-005 status set to `done` in TASKS.md.
+
+BQ-017 is now fully built — `PLAN.md`'s milestone can be marked complete at the next `Plan`/`Next` pass.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
