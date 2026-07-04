@@ -226,6 +226,37 @@ test steps:
   - [ ] Tap/click each of the 4 buttons on the Planner tab at mobile width; confirm they still work
         (Clear Week clears, Save Week / Load Saved Week / Prep Mode open their respective flows)
 
+### TASK-006 · TEMPORARY — end-to-end pipeline verification (to be reverted immediately after test)
+status: codex
+owner: codex
+source: manual-e2e-verification
+depends-on: none
+files: tests/e2e-pipeline-verification.spec.js
+
+context:
+  This is a TEMPORARY, throwaway task created solely to verify the /build -> codex exec -> /review
+  Telegram automation pipeline works end-to-end. It will be reverted immediately after verification,
+  regardless of outcome. Do exactly what is described below and nothing more.
+
+acceptance:
+  - [ ] Create a new file `tests/e2e-pipeline-verification.spec.js` containing exactly one trivial
+        Playwright test that always passes, e.g.:
+          const { test, expect } = require('@playwright/test');
+          test('e2e pipeline verification placeholder', async () => { expect(true).toBe(true); });
+  - [ ] Add a one-line comment at the top of the new file noting it is a temporary pipeline-verification
+        artifact and safe to delete.
+  - [ ] No other file is created, modified, or deleted.
+
+constraints:
+  - Do not modify app.js, index.html, or style.css.
+  - Do not modify any existing test file.
+  - Keep the new file under 15 lines.
+  - Do not touch CLAUDE.md, AGENTS.md, docs/, planning/, captures/, tools/, or any automation script.
+
+test steps:
+  - [ ] The new file exists at tests/e2e-pipeline-verification.spec.js.
+  - [ ] Running `npx playwright test tests/e2e-pipeline-verification.spec.js` passes.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
