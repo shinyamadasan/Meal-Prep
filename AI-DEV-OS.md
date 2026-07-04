@@ -11,13 +11,17 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.4 — updated 2026-07-03.** Added: Sprint Execution Mode — risk-gated task chaining
-(`Risk: Low/Medium/High`, `Execution: Chained/Solo`) with semantic `checkpoint:` review boundaries
-and partial-sprint continuation on blocked tasks (D-023). v1.3 added overnight automation gated
-behind `$AUTOMATION_ENABLED`, never building app code (D-022). v1.2 added the `Next` command —
-read-only default entry point for both Claude and Codex sessions (D-021). v1.1 added agents +
-skills workforce, `library/requirements/` PRD layer, Guardian Gauntlet, gated pipeline (D-015),
-2026-06-29. v1.0 locked 2026-06-25.
+**Version: v1.5 — updated 2026-07-04.** Added: Telegram remote control — `/status /next /go /run
+/build /review /stop /enable /disable`, dispatched via a new ~2-min-polling "Meal Prep Command
+Dispatcher" Scheduled Task (no `-WakeToRun`) reading `captures/commands/` and replying through
+`captures/replies/OUTBOX.md`; `/build`/`/review` run on isolated `task-<id>` branches with their own
+commit-scope guards and never touch/merge `main` (D-024). v1.4 added Sprint Execution Mode —
+risk-gated task chaining (`Risk: Low/Medium/High`, `Execution: Chained/Solo`) with semantic
+`checkpoint:` review boundaries and partial-sprint continuation on blocked tasks (D-023). v1.3 added
+overnight automation gated behind `$AUTOMATION_ENABLED`, never building app code (D-022). v1.2 added
+the `Next` command — read-only default entry point for both Claude and Codex sessions (D-021). v1.1
+added agents + skills workforce, `library/requirements/` PRD layer, Guardian Gauntlet, gated pipeline
+(D-015), 2026-06-29. v1.0 locked 2026-06-25.
 
 > **Living document rule:** Update this file and `SYSTEM-OVERVIEW.md` in the same commit whenever OS-level infrastructure changes — new agents, new workflow events, pipeline changes, or new hard rules.
 
@@ -34,9 +38,16 @@ Telegram capture
       -- gated behind $AUTOMATION_ENABLED in run-claude.ps1 (default OFF); same conversion also
          available interactively via the "Plan" command. Claude never builds app code in this step.
     → Telegram notified (CODEX_READY.md, sent only when a status: codex task exists)
-    → [human runs Codex locally, says "Continue"] → Codex implements from TASKS.md
-    → Review (Claude) → merge → docs/ + DONE + DECISIONS updated
+    → [human runs Codex locally, says "Continue" -- OR sends /build or /go from Telegram, which
+       stages a task-<id> branch and does the same if a headless Codex invocation is configured,
+       otherwise stages + notifies] → Codex implements from TASKS.md
+    → Review (Claude, interactively or via /review from Telegram) → merge (always manual)
+    → docs/ + DONE + DECISIONS updated
 ```
+
+Telegram also doubles as a remote control panel — `/status /next /go /run /build /review /stop
+/enable /disable` — for triggering any of the above on demand instead of waiting for the twice-daily
+schedule. See DECISIONS D-024 and `docs/09-automation.md`'s "Telegram remote control" section.
 
 > **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
 > build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that
@@ -64,9 +75,12 @@ Telegram capture
 | File / folder | Role | Per-app change |
 |---|---|---|
 | `run-claude.ps1` · `setup-task-scheduler.ps1` | Scheduled autonomous runs — gated by `$AUTOMATION_ENABLED` (default off) at the top of `run-claude.ps1` | set project path; flip the flag once validated |
-| `n8n-telegram-inbox.json` | Mobile capture workflow | set repo, bot token, user id |
+| `n8n-telegram-inbox.json` | Mobile capture workflow + Telegram control-command recognition | set repo, bot token, user id |
 | `n8n-telegram-digest.json` | Morning digest + Codex-ready notification | set repo, bot token, user id |
+| `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
 | `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
+| `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, ~2-min Scheduled Task, no `-WakeToRun` | set project path |
+| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards | none |
 
 ### Scaffold folders (start empty)
 | Folder | Role |

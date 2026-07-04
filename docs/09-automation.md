@@ -32,9 +32,14 @@ n8n (always-on, cloud)
     └── Workflow 2: DIGEST.md + CODEX_READY.md → Telegram (daily at 07:00)
 
 You (human)
-    └── Run Codex locally, say "Continue" — the ONLY way TASKS.md work ever gets built.
-        Nothing in this stack invokes Codex automatically.
+    └── Run Codex locally, say "Continue" — the default way TASKS.md work gets built.
+        See "Telegram remote control" below for the /build command, which can trigger this
+        remotely — but still only when YOU send /build or /go, never on a schedule alone.
 ```
+
+Everything above is the twice-daily, planning-only pipeline. See
+[Telegram remote control](#telegram-remote-control) below for the on-demand layer built on top of it
+(`/status /next /go /run /build /review /stop /enable /disable`).
 
 **Fail-fast, pipeline-wide:** every phase boundary above is a hard stop. A Preflight failure, a halted
 guard, a failed `git commit`/`git push`, or an errored deterministic script all immediately end the run
@@ -596,3 +601,151 @@ Run these in order after any change to `run-claude.ps1`, `tools/Generate-Codex-N
 - **Scheduled Task kill-switch:** `Disable-ScheduledTask -TaskName "Meal Prep Claude Overnight"` (as
   Administrator) stops the physical trigger regardless of any code state — use this if you need to be
   certain nothing fires while you investigate, independent of the `$AUTOMATION_ENABLED` flag.
+
+---
+
+## Telegram remote control
+
+Everything above runs twice a day, on a schedule, and only ever plans. This layer adds an on-demand
+control panel: approve ideas, trigger planning, trigger a Codex build, trigger Claude's review, and
+get results, from Telegram — without touching the PC. See DECISIONS D-024 for the full rationale.
+
+### Why there's a delay, and why that's a deliberate trade-off
+
+n8n (cloud-hosted) has **no way to execute anything on your PC directly** — it only reads/writes
+files via the GitHub API. So a Telegram command can't instantly *cause* anything; your PC has to
+independently notice a new command file and act on it. This design polls every **~2 minutes** (a new
+Scheduled Task, not tied to the twice-daily one) rather than opening an inbound path to your PC for
+true instant push — that would mean a listener process on your PC reachable from the internet (via a
+tunnel like Cloudflare Tunnel/ngrok), its own auth, and its own monitoring. This system has had zero
+inbound network exposure this entire session; a couple of minutes of latency was judged worth keeping
+it that way. If the PC is asleep, commands wait until it wakes — either on its own, or at the next
+9PM/2AM run of "Meal Prep Claude Overnight" (which still has `-WakeToRun`).
+
+### The 9 commands
+
+| Command | What it does | Branch | Mutates? |
+|---|---|---|---|
+| `/status` | Automation on/off, current branch + tree state, last log line, Codex-ready + review-ready counts | none | no |
+| `/next` | Reports whose turn it is (same priority table as the `Next` command, D-021) | none | no |
+| `/go` | Does whatever `/next` recommends — runs planning, build, or review as appropriate. The everyday command. | depends on what it dispatches to | depends |
+| `/run` | Manual override: runs planning right now (Triage + BUILD_QUEUE→TASKS.md), same as `run-claude.ps1` without `-Scheduled` | `main` | same allow-list as the scheduled run |
+| `/build` | Manual override: builds the first `status: codex` task on its own `task-<id>` branch | `task-<id>` (never `main`) | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
+| `/review` | Manual override: reviews the first `status: review` task's branch | that `task-<id>` (never `main`) | `REVIEW.md` + `TASKS.md` status only |
+| `/stop` | Kill switch: disables automation, tries to stop an in-progress run | `main` | flag line only |
+| `/enable` | Enables automation | `main` | flag line only |
+| `/disable` | Disables automation (does not interrupt anything already running) | `main` | flag line only |
+
+No command ever merges a `task-<id>` branch into `main`. That's always a manual step you do yourself,
+the same way every task branch in this repo has been merged so far.
+
+### Architecture
+
+```
+Telegram (/status /next /go /run /build /review /stop /enable /disable)
+    → n8n (n8n-telegram-inbox.json — extended to recognize these, alongside existing
+      captures/decisions verbs and captures/inbox capture types)
+    → captures/commands/<id>.md (status: new)
+
+"Meal Prep Command Dispatcher" Scheduled Task, every ~2 min, NO -WakeToRun
+    → tools/Dispatch-Commands.ps1
+        lock-protected (automation.lock, shared with run-claude.ps1 and the phase runners below)
+        routes each new command to:
+            /run              → run-claude.ps1 (no -Scheduled)
+            /build             → tools/Run-Codex-Build.ps1
+            /review            → tools/Run-Claude-Review.ps1
+            /go                → whichever of the above /next recommends
+            /status /next      → computed directly, read-only
+            /stop /enable /disable → flips $AUTOMATION_ENABLED, commits + pushes main
+        marks the command status: applied
+        appends the result to captures/replies/OUTBOX.md
+
+n8n-telegram-replies.json, every ~2 min
+    → fetches OUTBOX.md, sends it to Telegram if it's not just the placeholder,
+      clears it back to the placeholder via a GitHub PUT
+```
+
+### `/build`: headless Codex, or "prepare and notify"
+
+`tools/Run-Codex-Build.ps1` never guesses at a Codex CLI invocation. If you set
+`$env:CODEX_CLI_COMMAND` yourself (a full command you know actually invokes your Codex tool
+non-interactively), it runs that, checks the result against its own commit-scope guard, and pushes
+the `task-<id>` branch. **As of this writing there is no `codex` CLI on this machine's `PATH` and
+`$env:CODEX_CLI_COMMAND` is unset**, so `/build` runs in its fallback mode: it creates/checks out the
+`task-<id>` branch from `main`, marks the task `in-progress`, pushes the branch, and tells you to open
+Codex yourself and say "Continue" — it stages the work and shortens the trip, but doesn't remove the
+manual step. This is expected, not a bug; re-check this section if you ever configure a real headless
+Codex invocation.
+
+### Safety gates (all reused/extended from the planning pipeline, none invented fresh)
+
+- **Preflight**, per phase: `/run` reuses today's exact Preflight (must be on `main`, clean). `/build`
+  requires `main` clean before branching; `/review` requires the target `task-<id>` branch to exist
+  and be clean.
+- **Never on a dirty tree / never on the wrong branch** — same `AUTOMATION ABORTED` format, reused verbatim.
+- **Never auto-merge** — structurally impossible: no command's logic ever checks out or pushes `main`
+  except the flag-only commands, and none of them touch a `task-<id>` branch.
+- **Claude never writes app code** — `/review`'s `claude -p` call uses the same restricted
+  `--allowedTools` pattern as the planning session, plus its own commit-scope guard whose allow-list
+  is only `REVIEW.md`/`TASKS.md`.
+- **Codex never touches planning/architecture docs** — `/build`'s commit-scope guard is a deny-list
+  (Codex's legitimate surface, app code, is open-ended) blocking `CLAUDE.md`/`AGENTS.md`/`docs/`/
+  `planning/`/`captures/`/`library/`/`config/`/`.claude/`/`tools/` and this repo's own automation
+  scripts. Any violation halts with no commit/push, exactly like the planning guard.
+- **Codex only builds `status: codex` items** — `/build` picks the first one, same FIFO rule as
+  Codex's own documented "Continue" behavior.
+- **Claude reviews before anything is "done"** — only `/review` can set a task to `status: done`.
+- **Notify after every phase** — every command appends exactly one entry to `OUTBOX.md`.
+- **Repeat-safety** — `/build`/`/review` check the current task status before acting (already
+  building/reviewed/done → reply and no-op); `/enable`/`/disable`/`/stop` just set a flag;
+  `/status`/`/next` are pure reads.
+- **Concurrency** — the shared `automation.lock` (PID + timestamp, stale after 2 hours) means a
+  command arriving while another run is active gets "busy" instead of overlapping.
+
+### Setting it up
+
+1. **Re-import `n8n-telegram-inbox.json`** into its existing workflow — it now also recognizes the 9
+   control commands (routes them to `captures/commands/`, alongside its existing capture/decision behavior).
+2. **Import `n8n-telegram-replies.json`** as a new workflow. Fill the 3 `REPLACE_WITH_*` placeholders
+   (GitHub PAT, your Telegram user id, Telegram credential id) and activate it.
+3. **Register the dispatcher task** (as Administrator):
+   ```powershell
+   .\setup-command-dispatcher-scheduler.ps1
+   ```
+4. Verify, the same way you'd verify "Meal Prep Claude Overnight":
+   ```powershell
+   Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher" | Select-Object TaskName, State
+   (Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher").Actions | Select-Object Execute, Arguments
+   ```
+   Confirm `State: Ready` and the action points at `tools\Dispatch-Commands.ps1` with no `-Scheduled`
+   flag (that flag is specific to `run-claude.ps1`; the dispatcher doesn't take it).
+
+### Testing
+
+1. **Dry-run everything first:** `.\tools\Dispatch-Commands.ps1 -DryRun`,
+   `.\tools\Run-Codex-Build.ps1 -DryRun`, `.\tools\Run-Claude-Review.ps1 -DryRun` — confirm routing
+   and safety gates without any real mutation.
+2. **Synthetic command test:** hand-craft a `captures/commands/<id>.md` file (see
+   `captures/commands/README.md` for the exact format) with `command: status`, run
+   `.\tools\Dispatch-Commands.ps1 -DryRun`, confirm the reply looks right, delete the test file.
+3. **Live `/status`/`/next`** — read-only, verify accuracy against real repo state.
+4. **Live `/go`/`/run`/`/build`/`/review`** — one at a time, watching `claude-session.log` and
+   `OUTBOX.md`, confirming branch discipline (never `main` for build/review) and the commit-scope
+   guards (simulate a violation the same way `run-claude.ps1`'s guard was verified, if you want to be thorough).
+5. **Repeat-safety:** send the same command twice; confirm the second is a safe no-op.
+6. **Concurrency:** trigger two commands back-to-back; confirm the second gets "busy."
+7. **Kill switch:** `/stop` mid-run; confirm it actually halts and the flag is off afterward.
+8. **No stray Codex invocation:** the earlier grep test (`Select-String -Pattern "codex "`) will now
+   legitimately match `tools/Run-Codex-Build.ps1`'s `$env:CODEX_CLI_COMMAND` handling — that's expected
+   and fine, since it's gated behind an explicit operator-set environment variable, never a guessed
+   invocation. What the test should still confirm is that no script calls a bare `codex` command
+   without that gate.
+
+### Rollback
+
+Additive on top of an already-additive design — none of it touches `run-claude.ps1`'s own logic
+(only reuses it for `/run`). To fully roll back: `Unregister-ScheduledTask -TaskName "Meal Prep
+Command Dispatcher"`, deactivate `n8n-telegram-replies.json`, revert `n8n-telegram-inbox.json` to
+before this change (or just stop sending the 9 new commands — unrecognized text still falls through
+to the existing capture behavior unchanged). The twice-daily planning pipeline and everything in
+DECISIONS D-022 keeps working exactly as before, regardless of this feature's state.
