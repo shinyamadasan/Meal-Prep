@@ -14,6 +14,14 @@
 # pushes) executes once one has failed. Exit codes: 0 = disabled (expected steady state) or a clean
 # completed/idle run, 1 = mid-run halt (something failed after work started), 2 = preflight abort
 # (environment/state problem -- nothing was attempted). See docs/09-automation.md.
+#
+# -Scheduled: pass this switch ONLY from the Windows Scheduled Task action (see
+# setup-task-scheduler.ps1). It is the sole signal used to decide whether to shut the PC down at the
+# end of a run -- deliberately not inferred from the current time, so a manual/interactive test run
+# (e.g. you running ".\run-claude.ps1" by hand to check something) can never power off your machine.
+param(
+    [switch]$Scheduled
+)
 
 $AUTOMATION_ENABLED = $true   # flip to $true to re-enable overnight automation
 
@@ -279,11 +287,19 @@ if ($LASTEXITCODE -ne 0) {
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="
 
-# Only shut down after the 2AM run, and only if there was actually planning work to commit (an idle
-# run -- nothing in inbox, nothing new in BUILD_QUEUE -- leaves $changed empty, so there's no reason
-# to force a shutdown). We can only reach this line if nothing halted or aborted the run above.
+# Shutdown is gated on -Scheduled, not on the current time -- see the param() comment at the top of
+# this file. Only shuts down after the 2AM run (not 9PM -- you may still be using the PC then), and
+# only if there was actually planning work to commit (an idle run -- nothing in inbox, nothing new in
+# BUILD_QUEUE -- leaves $changed empty, so there's no reason to force a shutdown). We can only reach
+# this line if nothing halted or aborted the run above.
 $hour = (Get-Date).Hour
-if ($hour -lt 6 -and $changed.Count -gt 0) {
+if (-not $Scheduled) {
+    Add-Content -Path $logFile -Value "Automation completed successfully. Shutdown skipped (interactive mode)."
+} elseif ($hour -ge 6) {
+    Add-Content -Path $logFile -Value "Automation completed successfully. Shutdown skipped (scheduled run outside the overnight window)."
+} elseif ($changed.Count -eq 0) {
+    Add-Content -Path $logFile -Value "Automation completed successfully (idle run, nothing to commit). Shutdown skipped."
+} else {
     Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
     shutdown /s /t 60
 }
