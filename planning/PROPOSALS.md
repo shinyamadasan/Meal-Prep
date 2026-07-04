@@ -324,6 +324,84 @@
 
 ---
 
+### PROP-024 — Bulk add: default storage location selector (counter / fridge / pantry)
+- **▶ Decision: Park.** P2 — valid UX gain, but not a blocker during stabilize phase. Approve when P3 queue clears.
+- **type:** feature · **source captures:** 20260702T1815Z-45 (×1)
+- **goal alignment:** supports — North-star #1 (reduce post-add friction). After bulk-adding items from one place (e.g. checking the counter), users must set storage individually per card. A single default-location picker at the top of the bulk-add modal would let "all from counter" flow in one step.
+- **expected user value:** Medium — removes 1 extra edit per item in typical restocking. Most valuable when bulk-adding 5+ items from the same location.
+- **evidence:** 1 capture from active alpha use; user describes the exact workflow friction (counter check → bulk add → per-card storage edit).
+- **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** UI placement: dropdown above the textarea in `#bulk-add-modal`; default = "Auto (infer)"; overrides `inferStorage()` in `confirmBulkAdd()` when set.
+- **why now vs later:** Park — post-stabilize. BQ-016 modal work is more pressing.
+- **AI-recommended priority:** **P2**
+- **status:** pending
+
+---
+
+### PROP-025 — Bulk add: per-item expiry date in the line format (vs single shared date)
+- **▶ Decision: Park.** Valid design evolution of BQ-005, but redesigning the parser + UI is M–L effort. Revisit when alpha feedback is clearer.
+- **type:** feature/UX · **source captures:** 20260702T1816Z-47 (×1)
+- **goal alignment:** supports — North-star #1 (accurate stock tracking) + #2 (data integrity). Current BQ-005 ships one shared expiry for all items in a bulk add; user correctly identifies that items bought in the same trip often have different expiry dates (especially fresh produce + fridge items). Proposed format: `Name qty unit exp-date` per line.
+- **expected user value:** High when implemented — removes the post-bulk-add per-card expiry edit. But the current single-date field is still useful for same-batch restocking (e.g. all cans from the same shop run).
+- **evidence:** 1 capture from active use immediately after BQ-005 shipped — earliest live feedback on that feature.
+- **effort:** M–L · **dependencies:** PROP-024 (storage selector, same modal) if combined · **confidence:** high (the desire) / med (the parser approach) · **ambiguity:** format: append to line (`Coconut cream 200ml 2026-07-20`) vs separate column vs inline date keyword (`exp:2026-07-20`). Also: what happens when the shared date field AND a per-line date are both set?
+- **why now vs later:** Park — redesigning the parser and UX mid-stabilize adds risk. Collect more user feedback first; if the per-item friction keeps appearing, promote to Approve.
+- **AI-recommended priority:** **P2**
+- **status:** pending
+
+---
+
+### PROP-026 — Recipe card: compact header, always-expanded detail view
+- **▶ Decision: Park.** P3 — UX exploration; current expand-on-click is functional and avoids cognitive overload on a long recipe list.
+- **type:** feature/UX · **source captures:** 20260702T1817Z-49 (×1)
+- **goal alignment:** supports (partially) — North-star #1 (reduce taps to access recipe detail). User wants cards to feel tighter visually but show ingredients/instructions by default. These goals conflict: always-expanded detail on every card would make the recipe list very tall and hard to scan.
+- **expected user value:** Low–Medium — current design lets users scan recipes quickly; always-expanded detail would help if users routinely open the same recipe every session.
+- **evidence:** 1 capture. Likely means: (A) header row should be more compact / less whitespace, and (B) opening the detail view should default to the Ingredients tab rather than a blank state. Confirm interpretation at build.
+- **effort:** M (compact header is S; always-open detail is M with a "remember last tab" state) · **dependencies:** none · **confidence:** med · **ambiguity:** "always open" = expand on list render, or just default to expanded when tapping? If the former, the entire recipe list would be a wall of text — almost certainly not what the user means.
+- **why now vs later:** Park — low urgency, needs design clarity before building.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
+### PROP-027 — Cook confirmation: optional serving multiplier for accurate pantry deduction
+- **▶ Decision: Park.** P2 — meaningful accuracy enhancement to the core cook-and-deduct flow. Promote when cook loop is stable.
+- **type:** feature · **source captures:** 20260702T1820Z-51 (×1)
+- **goal alignment:** supports — North-star #1 (accurate core loop) + #2 (data integrity). Currently `markRecipeCooked()` always deducts 1× the recipe's ingredient amounts. If a user cooks double portions, pantry quantities become inaccurate. User also notes that the cook flow is a good moment to surface low staple warnings.
+- **expected user value:** High for accuracy-conscious users; Medium for most — many cook exact recipe portions. Also surfaces a place to check staple depletion (staples aren't deducted automatically).
+- **evidence:** 1 capture from active use. Connects to the existing `deductIngredientsForRecipe()` function which already has a per-ingredient unit conversion system — the multiplier would be trivial to thread in.
+- **effort:** M (add a "How many portions?" step/input to the cook confirmation dialog; pass multiplier to `deductIngredientsForRecipe()`) · **dependencies:** none · **confidence:** high · **ambiguity:** UX: inline in the existing cook-confirm dialog, or a new step? Default to 1× with a stepper. Low-staple warning can be a follow-up.
+- **why now vs later:** Park — not a blocker; promote after alpha stabilize shows cook-loop usage.
+- **AI-recommended priority:** **P2**
+- **status:** pending
+
+---
+
+### PROP-028 — Long-press to enter bulk multi-select mode (bulk move + bulk delete) on pantry/grocery items
+- **▶ Decision: Park.** P3 — power-user shortcut; extends PROP-012. Revisit after alpha stabilize.
+- **type:** feature · **source captures:** 20260702T1827Z-55 (×1), 20260702T1827Z-53 (duplicate, dropped)
+- **goal alignment:** supports — North-star #1 (bulk management friction). User wants to select multiple pantry or grocery items via long-press, then bulk-move them to a different storage location OR bulk-delete them.
+- **expected user value:** Medium — useful for power users doing a big pantry reorg; not needed for daily use. Individual delete via card edit already works.
+- **evidence:** 2 captures (msg-55 + msg-53 which was a duplicate with a malformed "/also" prefix). Related to PROP-012 (long-press to delete, parked 2026-06-27) — this extends that to full multi-select with move support.
+- **effort:** M–L (long-press gesture with 500ms debounce + visual enter-selection-mode state + checkbox UI + bulk action bar + delete + move-to-location modal) · **dependencies:** none · **confidence:** med · **ambiguity:** scope: pantry only, or grocery list too? Move target: storage location picker? Desktop has no long-press — needs a fallback (multi-click?).
+- **why now vs later:** Park — builds on PROP-012 which was P3. Address after stabilize phase.
+- **AI-recommended priority:** **P3**
+- **status:** pending
+
+---
+
+### PROP-029 — Planner tab overflows horizontally on mobile (+23px at 390px width)
+- **▶ Decision: Approve.** P1 — exactly the "looks broken on mobile" bug class the mobile-layout test exists to catch; the test itself now works reliably.
+- **type:** bug · **source:** automated finding (TASK-004 review, `tests/mobile-layout.spec.js` after its fixture fix), not a phone capture
+- **goal alignment:** strongly supports — North-star #1 (core loop friction) + alpha stability. Horizontal scroll on a core tab reads as visibly broken to a first-time phone user.
+- **expected user value:** High — every phone user hits the Planner tab; sideways scroll is an immediate trust hit.
+- **evidence:** `npx playwright test tests/mobile-layout.spec.js` at 390×844 viewport reports `document.documentElement.scrollWidth - window.innerWidth = 23` on the `planner` tab only; all other 6 tabs (recipes, grocery, fridge, hacks, nutrition, ingredients) pass with 0 overflow. Reproducible.
+- **effort:** S–M · **dependencies:** none · **confidence:** high (evidence) / med (root cause — needs a code trace of the planner grid/table markup for a fixed-width element, likely a day-column or table that doesn't wrap/shrink at 390px) · **ambiguity:** exact element responsible not yet identified
+- **why now vs later:** P1 — real, reproducible, affects every mobile user on a core tab. Fix in the next sprint.
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-07-03 (chat)
+
+---
+
 ## Proposal contract
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```

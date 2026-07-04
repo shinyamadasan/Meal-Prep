@@ -26,6 +26,16 @@ or the lifecycle model; read CLAUDE.md for those if you need the wider picture.
 
 Do not read `planning/BUILD_QUEUE.md` — it is Claude's planning input, not an execution source.
 
+## Default Entry Point
+
+Default command: **Next**.
+
+Use `Next` when context is unclear, after an interruption, or at the start of a work session — it
+is the safest thing to run when you don't know what to do.
+
+`Next` only acts on your behalf when the result is `Codex → Continue`. Any other result: report
+and stop.
+
 ## Session Recovery
 
 If context is lost mid-task:
@@ -79,6 +89,65 @@ There is no "ask the human" step here, unlike CLAUDE.md's general escalation pol
 repository is the communication channel. `status: blocked` with a clear note under the task *is*
 the escalation — Claude or the human picks it up from `TASKS.md`, you don't reach for them
 directly.
+
+## Sprint Execution Mode
+
+Default is unchanged: one task per `Continue`, hand off after each. This section only applies when
+a task's group header (the `<!-- BQ-xxx ... -->` divider above it in `TASKS.md`) says `Execution:
+Chained` — check this **fresh at the start of every task**, not just once at the start of a run.
+
+### Before chaining into the next task
+
+Re-verify, at every task boundary:
+- The group header still says exactly `Execution: Chained`.
+- The group header's `Risk` is `Low` or `Medium` — **never** chain if `Risk: High`, even if
+  `Execution` says `Chained` (a contradictory header behaves as Solo — CLAUDE.md Hard Rule 10).
+- The next candidate task shares the same `source:`, is `status: codex`, and — if any task in the
+  group carries a `checkpoint:` label — shares the current task's `checkpoint:` label.
+
+If any of these don't hold, stop and hand off exactly as you would for a single task.
+
+### Checkpoints
+
+`checkpoint:` is a short, semantic label Claude writes on a task ("Modal CSS migration complete"),
+never a count or a timer. When the next ready task's `checkpoint:` differs from the one you just
+finished — or there's no next ready task sharing it — that checkpoint is done: stop and hand off
+for Review there, even if later checkpoints in the same group still have `status: codex` tasks
+waiting. If no task in the group has a `checkpoint:`, treat the whole group as one implicit
+checkpoint (stop only once you run out of ready tasks in it).
+
+### When a task in the group fails
+
+Do not stop the whole group over one failure by default:
+
+1. Set that task's `status: blocked`; write the specific blocker under it, as always.
+2. If you attempted verification, append the `TEST_REPORT.md` entry regardless of the outcome —
+   never skip recording evidence because it failed.
+3. Look at the remaining `status: codex` tasks in the current checkpoint:
+   - Depends (directly or transitively) on the task you just blocked → leave it `status: codex`,
+     untouched. Note the skip in your next `CHANGELOG.md` entry (e.g. "TASK-006 skipped this run —
+     depends on blocked TASK-005"). Move on to the next candidate.
+   - Independent of the blocked task → implement it normally and continue chaining.
+
+Stop the **entire group** — not just the one task — if:
+- the blocked task is a dependency for most/all of what's left (nothing genuinely independent
+  remains to do),
+- the blocker looks like an architecture/scope problem bigger than this one task,
+- a test failure could invalidate assumptions a later task in the group relies on, or
+- the next task touches the same file/region the blocked task's fix was going to touch.
+
+When you stop, hand off exactly as usual — the blocked task's note plus whatever
+`CHANGELOG.md`/`TEST_REPORT.md` entries you've accumulated for tasks completed or skipped this run
+is Claude's full picture. There is no separate "batch summary" file to write.
+
+### What you never do here
+
+- Never decide to chain on your own — no `Execution: Chained` header, no chaining, no matter how
+  similar or mechanical the tasks look to you.
+- Never touch the group header (`Risk:`, `Execution:`, `checkpoint:`) — Claude-owned, like every
+  `TASKS.md` field other than `status:`.
+- Never let a rework task re-enter chained execution — once Claude sends it back to `status:
+  codex` after Review, it's handled solo from there.
 
 ## Definition of Ready (your checklist before coding)
 
@@ -165,11 +234,29 @@ special characters.
 
 ## Common Commands
 
+- **Next:** read-only state check (see below). If it's your turn, behaves like `Continue`. If
+  it's Claude's turn, report and stop — do not act on Claude's behalf.
 - **Continue:** resume from the first `TASKS.md` entry with `status: codex` (or your own
-  `status: blocked` entry, if resuming after a blocker was resolved).
+  `status: blocked` entry, if resuming after a blocker was resolved). Chains through further ready
+  tasks only under Sprint Execution Mode (see below) — otherwise, one task, then hand off.
 - **Test:** `npm test` (Playwright). If it can't run, say so in `TEST_REPORT.md` — don't skip
   silently.
 - **Handoff:** set `status: review`, append to `CHANGELOG.md` and `TEST_REPORT.md`.
+
+## Next Command (read-only)
+
+Run the same state check Claude uses (see `CLAUDE.md` § Next Command) against `TASKS.md` and
+`planning/BUILD_QUEUE.md`. This never edits any file — it only reports.
+
+- Current task's status is `codex` or `in-progress`: it's your turn. Report the task and
+  recommend `Continue` — then proceed as `Continue` would.
+- Current task's status is `blocked`, `review`, or `approved`: it's Claude's turn. Report the
+  task and stop. Do not attempt to resolve, review, or re-implement it yourself.
+- Nothing active (`TASKS.md` empty or every entry `done`): report state and stop — planning and
+  `Status` are Claude's calls, not yours.
+
+You may only ever land on `Continue` for yourself. Every other outcome is a report, not an action.
+See `docs/DECISIONS.md` D-021 for why.
 
 ### CHANGELOG.md entry template
 

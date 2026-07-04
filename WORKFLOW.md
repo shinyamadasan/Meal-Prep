@@ -11,6 +11,15 @@
 > auto-promotion are **legacy**, pending the Phase 5 rewrite; until then **CLAUDE.md hard rule 0 +
 > D-015/D-016 are the source of truth**.
 
+> **⚠ "The Builder" below predates the Claude/Codex split (CLAUDE.md/AGENTS.md v2.0, DECISIONS D-021 /
+> D-022).** Building is now Codex's job, triggered manually ("Continue"), never automatic. What this
+> file still calls "the Builder builds from `BUILD_QUEUE.md`" is now two separate steps: Claude
+> converts an approved `BUILD_QUEUE.md` item into `TASKS.md` entries (`status: codex`) — this can
+> happen interactively (the "Plan" command) or unattended, gated behind `$AUTOMATION_ENABLED` in
+> `run-claude.ps1` (see `docs/09-automation.md`) — and Codex then implements from `TASKS.md`. A full
+> rewrite of this file's "Builder" language to match is a separate follow-up; treat `CLAUDE.md` +
+> `AGENTS.md` as authoritative wherever they disagree with the wording below.
+
 ## Principles
 - One unit of work = one **task**, held in `planning/TASK.md`.
 - Docs change at specific **events**, not on a timer or at a vague "end".

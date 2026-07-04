@@ -1,98 +1,289 @@
-# Autonomous overnight Claude Code session
-# Triggered by Windows Task Scheduler at 2am
-# Claude reads TASK.md (the single active task), implements it, commits and pushes directly to main
+# Overnight automation launcher.
+# Triggered by Windows Task Scheduler ("Meal Prep Claude Overnight", 9PM / 2AM).
+# Gated behind $AUTOMATION_ENABLED below -- disabled by default.
+#
+# Claude's job here is PLANNING ONLY: Triage (captures/inbox -> PROPOSALS.md) and converting approved
+# planning/BUILD_QUEUE.md items into PLAN.md + TASKS.md (status: codex). It NEVER touches
+# app.js / index.html / style.css and NEVER invokes Codex -- that split is enforced two ways:
+#   1. The Claude session's --allowedTools has no git commit/push -- it literally cannot ship anything.
+#   2. This script commits Claude's output itself, but only after checking every changed path against
+#      an explicit allow-list (Phase 2b below). Anything outside that list halts uncommitted.
+#
+# FAIL-FAST: any phase failure (a preflight problem, a halt, a script error, a failed git operation)
+# stops the ENTIRE run immediately -- no later phase (digest generation, Codex-ready notice, commits,
+# pushes) executes once one has failed. Exit codes: 0 = disabled (expected steady state) or a clean
+# completed/idle run, 1 = mid-run halt (something failed after work started), 2 = preflight abort
+# (environment/state problem -- nothing was attempted). See docs/09-automation.md.
+
+$AUTOMATION_ENABLED = $false   # flip to $true to re-enable overnight automation
 
 $projectPath = "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 $logFile = "$projectPath\claude-session.log"
 
 Set-Location $projectPath
 
-# Use Claude Pro subscription instead of API key (temporary — only affects this session)
-Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+function Halt-Automation {
+    param([string]$Reason)
+    Add-Content -Path $logFile -Value "ALERT: $Reason"
+    $statusEntry = @"
+
+## $(Get-Date -Format 'yyyy-MM-dd HH:mm') -- AUTOMATION HALTED: $Reason
+Investigate before the next scheduled run. Nothing further was committed, pushed, or notified this run.
+"@
+    Add-Content -Path "$projectPath\STATUS.md" -Value $statusEntry
+    Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (HALTED) ==="
+    exit 1
+}
+
+function Get-RepoStateSummary {
+    # Best-effort, defensive: this runs even when the failing check is "Repository exists" or "Git
+    # available", so every step here has to tolerate git/the repo itself being unusable.
+    $repoName = Split-Path $projectPath -Leaf
+    $gitOk = [bool](Get-Command git -ErrorAction SilentlyContinue)
+    if ($gitOk) {
+        try {
+            $remoteUrl = git -C $projectPath remote get-url origin 2>$null
+            if ($LASTEXITCODE -eq 0 -and $remoteUrl) {
+                $repoName = ($remoteUrl -replace '\.git$', '') -replace '.*[/:]', ''
+            }
+        } catch {}
+    }
+
+    $branch = "unknown (git unavailable)"
+    $treeSummary = "unknown (git unavailable)"
+    if ($gitOk -and (Test-Path (Join-Path $projectPath ".git"))) {
+        $b = git -C $projectPath branch --show-current 2>$null
+        $branch = if ($LASTEXITCODE -eq 0 -and $b) { $b } else { "unknown" }
+
+        $statusLines = @(git -C $projectPath status --porcelain 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            if ($statusLines.Count -eq 0) {
+                $treeSummary = "clean"
+            } else {
+                $untracked = @($statusLines | Where-Object { $_ -match '^\?\?' }).Count
+                $modified = $statusLines.Count - $untracked
+                $parts = @()
+                if ($modified -gt 0) { $parts += "$modified modified" }
+                if ($untracked -gt 0) { $parts += "$untracked untracked" }
+                $treeSummary = "dirty (" + ($parts -join ", ") + ")"
+            }
+        } else {
+            $treeSummary = "unknown (git status failed)"
+        }
+    }
+
+    [pscustomobject]@{ Repository = $repoName; Branch = $branch; WorkingTree = $treeSummary }
+}
+
+function Abort-Preflight {
+    param([string]$CheckName, [string]$Reason, [string[]]$Action, [string[]]$PassedChecks)
+    $state = Get-RepoStateSummary
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("")
+    $lines.Add("AUTOMATION ABORTED")
+    $lines.Add("")
+    $lines.Add("Repository:")
+    $lines.Add($state.Repository)
+    $lines.Add("")
+    $lines.Add("Branch:")
+    $lines.Add($state.Branch)
+    $lines.Add("")
+    $lines.Add("Working tree:")
+    $lines.Add($state.WorkingTree)
+    $lines.Add("")
+    $lines.Add("Reason:")
+    $lines.Add($Reason)
+    $lines.Add("")
+    $lines.Add("Required action:")
+    foreach ($a in $Action) { $lines.Add($a) }
+    $lines.Add("")
+    $lines.Add("Phase 0 -- Preflight")
+    foreach ($c in $PassedChecks) { $lines.Add("[x] $c") }
+    $lines.Add("[ ] $CheckName  <-- failed here")
+    Add-Content -Path $logFile -Value ($lines -join "`n")
+    Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (ABORTED) ==="
+    exit 2
+}
 
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value ""
 Add-Content -Path $logFile -Value "=== Session started: $timestamp ==="
 
+# Checked first, ahead of the rest of Phase 0 -- this is the normal, expected steady state (disabled
+# every night until deliberately enabled), so it exits calmly and quietly rather than running the
+# other preflight checks and risking a noisy "ABORTED: working tree is dirty" every single night.
+if (-not $AUTOMATION_ENABLED) {
+    Add-Content -Path $logFile -Value "Automation disabled (`$AUTOMATION_ENABLED = `$false in run-claude.ps1) -- exiting without touching the repo."
+    Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (disabled) ==="
+    exit 0
+}
+
+# --- Phase 0: Preflight. All checks must pass before Phase 1 runs -- fail-fast, no partial credit. ---
+$passed = @()
+
+# Repository exists
+if (-not (Test-Path $projectPath)) {
+    Abort-Preflight "Repository exists" "Project path not found: $projectPath" "Verify `$projectPath in run-claude.ps1 points at the actual repository location." $passed
+}
+if (-not (Test-Path (Join-Path $projectPath ".git"))) {
+    Abort-Preflight "Repository exists" "$projectPath is not a git repository (.git not found)." "Verify `$projectPath in run-claude.ps1 points at a valid git checkout." $passed
+}
+$passed += "Repository exists"
+
+# Git available (checked here, ahead of the branch/tree checks below that need it, even though it's
+# listed after them conceptually -- a scheduled task's PATH can be minimal, so this is a real check)
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Abort-Preflight "Git available" "The 'git' command is not available on PATH." "Install Git or ensure it is on PATH for the account/session running this scheduled task." $passed
+}
+$passed += "Git available"
+
+# Correct branch -- aborts rather than auto-checking-out main. Silently switching branches (or
+# checking out over a dirty tree) is exactly the failure mode that let a prior run's commits land on
+# the wrong branch; requiring a human to put the repo on main is safer than guessing.
+$currentBranch = git branch --show-current 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)) {
+    Abort-Preflight "Correct branch" "Could not determine the current git branch." @("git checkout main", "git status") $passed
+}
+if ($currentBranch -ne "main") {
+    Abort-Preflight "Correct branch" "Automation only runs from a clean main branch -- repository is on '$currentBranch'." @("git checkout main", "git status") $passed
+}
+$passed += "Correct branch"
+
+# Working tree clean
+$dirty = git status --porcelain 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Abort-Preflight "Working tree clean" "git status failed unexpectedly." @("Investigate the git repository state manually.") $passed
+}
+if ($dirty) {
+    Abort-Preflight "Working tree clean" "Automation only runs from a clean main branch -- the working tree has uncommitted changes." @("git status", "Commit, stash, or clean the changes shown above before enabling automation.") $passed
+}
+$passed += "Working tree clean"
+
+# Required scripts exist
+foreach ($script in @("tools\Apply-Decisions.ps1", "tools\Generate-Digest.ps1", "tools\Generate-Codex-Notice.ps1")) {
+    if (-not (Test-Path (Join-Path $projectPath $script))) {
+        Abort-Preflight "Required scripts exist" "Missing required script: $script" "Restore $script from version control before enabling automation." $passed
+    }
+}
+$passed += "Required scripts exist"
+
+# Required environment variables exist -- this script's one true external dependency is the `claude`
+# CLI itself being reachable; a Scheduled Task's environment can differ from an interactive shell's.
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Abort-Preflight "Required environment variables exist" "The 'claude' CLI is not available on PATH for this session." "Ensure Claude Code is installed and on PATH for the account/session running this scheduled task." $passed
+}
+$passed += "Required environment variables exist"
+
+Add-Content -Path $logFile -Value "Preflight passed: $($passed -join ', ')."
+
+# Use Claude Pro subscription instead of API key (temporary -- only affects this session)
+Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+
 $prompt = @'
-You are running in autonomous mode. No human is available. Follow WORKFLOW.md. There is no "session
-end": when you stop, perform a Checkpoint first.
+You are running in autonomous mode. No human is available. Follow WORKFLOW.md for the Triage event.
+This run is scoped to two bounded steps below -- you should not need a Checkpoint, but if you must
+stop mid-step, write the precise resume point to STATUS.md first.
 
-Read CLAUDE.md, STATUS.md, and planning/TASK.md first. SINGLE RESPONSIBILITY — do not cross lanes:
-Triage only routes; the Builder only builds. The Builder builds ONLY from planning/BUILD_QUEUE.md
-(human-approved). NEVER build from captures/inbox/, planning/PROPOSALS.md, or planning/ROADMAP.md.
-Never touch the ROADMAP "Do Not Work On" section. Do not delete files (archiving captures is a git mv).
+Read CLAUDE.md, STATUS.md, PLAN.md, and TASKS.md first.
 
-STEP A — TRIAGE (route + enrich only; NEVER build, schedule, or prioritize-for-build): for each
+YOUR ROLE THIS RUN IS PLANNING ONLY -- you are acting as Claude (PM / Tech Lead / Architect), never as
+Codex (the Implementer). You must NEVER edit app.js, index.html, or style.css in this session, and you
+must NEVER invoke Codex or any other build agent. Committing and pushing is handled by the calling
+script, not by you -- do not attempt `git commit` or `git push` (that tool is not available to you this
+run). Do not touch the ROADMAP "Do Not Work On" section. Do not delete files (archiving captures is a
+git mv).
+
+STEP A -- TRIAGE (route + enrich only; never build, schedule, or prioritize-for-build): for each
 captures/inbox/*.md with `status: new` (SKIP any already `status: triaged`), process per WORKFLOW.md
 "Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, then ENRICH into the proposal contract in
-planning/PROPOSALS.md (status: pending) — fill EVERY field. LEAD with **▶ Decision** (the recommended
+planning/PROPOSALS.md (status: pending) -- fill EVERY field. LEAD with **> Decision** (the recommended
 next action: Approve | Park | Reject | Clarify + a one-line why) so it's actionable from a phone digest.
 Then: goal alignment vs the **Current Objective** in ROADMAP.md (supports/conflicts/mixed + which
-North-star goal), expected user value, evidence (recurring friction · dup count · demand signal), effort
+North-star goal), expected user value, evidence (recurring friction, dup count, demand signal), effort
 + dependencies + confidence + ambiguity, why now vs later, and a **goal-adjusted** AI-recommended
-priority (P0..P3 — not raw priority; down-weight work that doesn't serve the Current Objective).
-Archive each capture to captures/processed/YYYY/MM/<id>.md,
-mark the inbox file `status: triaged`, and append a one-line triage summary to STATUS.md. Commit.
-Do NOT write to ROADMAP.md or BUILD_QUEUE.md, and do NOT build.
+priority (P0..P3 -- not raw priority; down-weight work that doesn't serve the Current Objective).
+Archive each capture to captures/processed/YYYY/MM/<id>.md, mark the inbox file `status: triaged`, and
+append a one-line triage summary to STATUS.md. Do NOT write to ROADMAP.md or BUILD_QUEUE.md.
 
-STEP B — BUILD (approved work only): if planning/TASK.md is "NO ACTIVE TASK", promote the top item of
-planning/BUILD_QUEUE.md into it. If BUILD_QUEUE.md is empty, write "No tasks remaining" to STATUS.md
-and stop (do not shut down the PC; do not invent, plan, prioritize, or build unapproved work).
+STEP B -- PLAN CONVERSION (approved work only, into TASKS.md -- never build it): for each item in
+planning/BUILD_QUEUE.md that does NOT yet have a corresponding `source: BQ-<id>` entry in TASKS.md,
+convert it into one or more atomic, independently testable tasks exactly as the interactive "Plan"
+command does (see CLAUDE.md's Tech Lead section and Definition of Ready): each new TASKS.md entry needs
+objective, owner: codex, status: codex, files, acceptance criteria, constraints, and verification/test
+steps -- Codex must never have to infer missing requirements. Update PLAN.md's Goal/Approach/Scope/
+Source/Status to describe the current milestone if this batch changes it. Skip any BUILD_QUEUE item
+already reflected in TASKS.md (do not create duplicates), and skip any item whose build note says
+deferred (leave those for a human decision). Do not change the `status` field of any EXISTING TASKS.md
+entry -- in this step you only ever add new entries. If BUILD_QUEUE.md is empty or everything in it is
+already reflected in TASKS.md, do nothing for this step.
 
-STEP C — loop over the active task:
-1. RESUME: read planning/TASK.md "Current Step" and continue. Read only routed docs.
-2. Ensure you are on main (git checkout main && git pull origin main).
-3. EXECUTION: implement in app.js / index.html / style.css; keep "Current Step" current.
-4. Decide the outcome:
-   - COMPLETED (all Success Criteria verified): FIRST run SELF_REVIEW.md (code health + "would I ship
-     this?") and fix/simplify; then tick criteria in TASK.md; update reference docs
-     (docs/FEATURES|DATA_MODEL|ARCHITECTURE|DECISIONS as applicable); append to planning/DONE.md; update
-     STATUS.md; RUN THE QA GATE in QA.md — every AI check must pass (any failure → BLOCKED: record it,
-     do NOT commit); then COMMIT code+docs together and push; then remove the finished item from
-     planning/BUILD_QUEUE.md and promote the next BUILD_QUEUE item into TASK.md. Continue.
-   - PARTIAL (near context/token limit mid-task): CHECKPOINT — write the precise next action into
-     TASK.md "Current Step" and an in-progress entry at the TOP of STATUS.md; make a `wip:` commit
-     and push; then STOP. Do NOT mark Done.
-   - BLOCKED (ambiguous / missing input / failing gate): record the blocker in TASK.md (Blocker) and
-     STATUS.md; remove it from BUILD_QUEUE.md (note why); promote the next BUILD_QUEUE item; continue.
-     Queue empty → STOP.
-5. Stop when BUILD_QUEUE.md is empty / TASK.md is NO ACTIVE TASK, or you are near your context limit
-   (Checkpoint first).
+Stop after STEP A and STEP B -- there is no STEP C. You are done for this run once both steps are
+addressed (either acted on, or confirmed there was nothing to do).
 '@
 
-# --- Phase 2 (deterministic, pre-build): apply approval replies into BUILD_QUEUE, if any ---
-# n8n only drops raw reply files in captures/decisions/; parsing + applying is code, not the LLM.
+# --- Phase 1 (deterministic, pre-plan): apply approval replies into BUILD_QUEUE, if any ---
 try { & "$projectPath\tools\Apply-Decisions.ps1" | Tee-Object -FilePath $logFile -Append }
-catch { Add-Content -Path $logFile -Value "Apply-Decisions error: $_" }
+catch { Halt-Automation "Apply-Decisions.ps1 threw an error: $_" }
 git add planning/PROPOSALS.md planning/BUILD_QUEUE.md captures/decisions
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     git commit -m "decisions: apply approval replies -> BUILD_QUEUE" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed after Apply-Decisions.ps1" }
     git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed after Apply-Decisions.ps1 commit" }
 }
 
+# --- Phase 2: Claude session -- TRIAGE + PLAN CONVERSION ONLY. No commit/push tool available to it. ---
 claude -p $prompt `
-    --allowedTools "Edit" "Write" "Read" "Glob" "Grep" "Bash(git checkout main)" "Bash(git add *)" "Bash(git mv *)" "Bash(git commit *)" "Bash(git push origin main)" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
+    --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
     | Tee-Object -FilePath $logFile -Append
+if ($LASTEXITCODE -ne 0) { Halt-Automation "claude -p exited with code $LASTEXITCODE" }
 
-# --- Phase 2 (deterministic, post-run): refresh the digest for n8n's next morning send ---
-try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Add-Content -Path $logFile -Value "Generate-Digest error: $_" }
-git add planning/DIGEST.md
+# --- Phase 2b (deterministic): commit-scope guard. The Claude session above cannot commit or push
+#     itself; this script is the only thing that ever commits its output, and only after checking
+#     every changed path against the allow-list below. Anything outside it halts the ENTIRE run --
+#     fail-fast: no digest, no Codex-ready notice, no further commits/pushes happen after a halt. ---
+$allowedPatterns = @(
+    '^PLAN\.md$', '^TASKS\.md$', '^STATUS\.md$',
+    '^planning/BUILD_QUEUE\.md$', '^planning/PROPOSALS\.md$', '^planning/DIGEST\.md$', '^planning/CODEX_READY\.md$',
+    '^captures/'
+)
+$changed = @(git status --porcelain | ForEach-Object { $_.Substring(3).Trim() } | Where-Object { $_ })
+$violations = @($changed | Where-Object { $path = $_; -not ($allowedPatterns | Where-Object { $path -match $_ }) })
+
+if ($violations.Count -gt 0) {
+    Halt-Automation "Claude session touched file(s) outside the allowed planning surface: $($violations -join ', '). NOT committing or pushing -- working tree left as-is for human review."
+} elseif ($changed.Count -gt 0) {
+    git add -- $changed
+    git commit -m "plan: triage + BUILD_QUEUE -> PLAN/TASKS (automated)" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed for plan-conversion changes" }
+    git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed for plan-conversion changes" }
+} else {
+    Add-Content -Path $logFile -Value "No planning changes this run."
+}
+
+# --- Phase 3 (deterministic, post-run): only reached if nothing above halted. Refreshes the
+#     proposals digest + Codex-ready notice for n8n's next morning send. ---
+try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Halt-Automation "Generate-Digest.ps1 threw an error: $_" }
+try { & "$projectPath\tools\Generate-Codex-Notice.ps1" | Out-Null } catch { Halt-Automation "Generate-Codex-Notice.ps1 threw an error: $_" }
+git add planning/DIGEST.md planning/CODEX_READY.md
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
-    git commit -m "digest: refresh from latest proposals" | Out-Null
+    git commit -m "digest: refresh proposals digest + codex-ready notice" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed for digest/codex-ready refresh" }
     git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed for digest/codex-ready refresh" }
 }
 
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="
 
-# Only shut down after the 6pm run, and only if tasks were actually completed
-# Claude writes "No tasks remaining" to the log if queue was empty — skip shutdown in that case
+# Only shut down after the 2AM run, and only if there was actually planning work to commit (an idle
+# run -- nothing in inbox, nothing new in BUILD_QUEUE -- leaves $changed empty, so there's no reason
+# to force a shutdown). We can only reach this line if nothing halted or aborted the run above.
 $hour = (Get-Date).Hour
-$logContent = Get-Content -Path $logFile -Raw -ErrorAction SilentlyContinue
-if ($hour -lt 6 -and $logContent -notlike "*No tasks remaining*") {
+if ($hour -lt 6 -and $changed.Count -gt 0) {
     Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
     shutdown /s /t 60
 }

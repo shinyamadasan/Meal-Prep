@@ -831,7 +831,7 @@
 
     <!-- Username / display-name modal -->
     <div id="username-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content modal-content--sm">
             <div class="modal-header">
                 <h3>Choose your display name</h3>
                 <button class="modal-close" onclick="closeUsernameModal()">&times;</button>
@@ -839,7 +839,7 @@
             <div class="modal-body">
                 <p style="color: var(--color-text-secondary); margin-top: 0;">This is how you'll appear in the community feed — not your email.</p>
                 <input type="text" id="username-input" class="form-control" maxlength="30" placeholder="e.g. Chef Maria, BatchCookDad…" autocomplete="off">
-                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+                <div class="modal-footer">
                     <button class="btn btn--outline" onclick="closeUsernameModal()">Cancel</button>
                     <button class="btn btn--primary" onclick="saveUsername()">Save name</button>
                 </div>
@@ -902,7 +902,7 @@
     <!-- CSV Import Preview Modal -->
     <!-- Add Custom Grocery Item Modal -->
     <div id="custom-item-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content modal-content--sm">
             <div class="modal-header">
                 <h3>Add Custom Item</h3>
                 <button class="modal-close" onclick="closeCustomItemModal()">&times;</button>
@@ -960,7 +960,7 @@
 
     <!-- Paste Recipe Modal -->
     <div id="paste-recipe-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content modal-content--lg">
             <div class="modal-header">
                 <h3><span class="ic" data-icon="square-pen"></span> Paste Recipe Text</h3>
                 <button class="modal-close" onclick="closePasteRecipeModal()">&times;</button>
@@ -982,7 +982,7 @@
 
     <!-- Custom Ingredient Modal -->
     <div id="user-ingredient-modal" class="modal hidden">
-        <div class="modal-content" style="max-width:480px">
+        <div class="modal-content modal-content--md">
             <div class="modal-header">
                 <h3 id="user-ingredient-modal-title">Add Custom Ingredient</h3>
                 <button class="modal-close" onclick="closeUserIngredientModal()">&times;</button>
@@ -1122,7 +1122,7 @@
     <!-- Kitchen Setup Wizard Modal -->
     <!-- Bulk Add Pantry Modal -->
     <div id="bulk-add-modal" class="modal hidden">
-        <div class="modal-content" style="max-width:480px">
+        <div class="modal-content modal-content--md">
             <div class="modal-header">
                 <h3>Bulk Add to Pantry</h3>
                 <button class="modal-close" onclick="closeBulkAddModal()">&times;</button>

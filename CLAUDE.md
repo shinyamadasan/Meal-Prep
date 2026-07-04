@@ -45,6 +45,16 @@ If docs disagree with code about behavior, fix the docs.
 
 Do not load every doc by default. Keep context focused.
 
+## Default Entry Point
+
+Default command: **Next**.
+
+Use `Next` when context is unclear, after an interruption, or at the start of a work session — it
+is the safest thing to run when you don't know what to do. If the human's message is just "Next",
+run the Next Command (see `## Next Command` below) before anything else.
+
+`Next` is read-only — it never modifies files.
+
 ## Session Recovery
 
 If conversation context is lost or a new session begins:
@@ -132,7 +142,9 @@ These principles govern all AI collaboration.
    Never introduce shortcuts that violate documented architecture or hard rules.
 
 7. **Prefer small, reviewable changes.**
-   Small atomic tasks are preferred over large feature implementations.
+   Small atomic tasks are preferred over large feature implementations. Sprint Execution Mode is a
+   narrow, explicitly Claude-granted exception for Low/Medium-risk task groups — never a default,
+   never Codex's call.
 
 8. **Stop when ownership changes.**
    Once a task reaches the next owner's responsibility, stop and hand off.
@@ -180,6 +192,7 @@ When in doubt: prefer stopping over guessing.
 | `docs/DATA_MODEL.md` | AppState, Recipe, Firestore, localStorage, hardcoded DBs | Data shapes and storage keys |
 | `docs/FEATURES.md` | Feature catalog by tab and status | Feature existence and status |
 | `docs/DECISIONS.md` | ADR-lite rationale | Why key choices were made |
+| `docs/AI_OS_NOTES.md` | Append-only friction log — one line per workflow awkwardness noticed | Candidate improvements to the OS itself, pending promotion |
 | `library/requirements/features/` | Immutable PRDs, one folder per feature | What to build for approved feature scope |
 | `AGENTS.md` | Codex standing instructions, loop, hard rules, templates | How Codex operates |
 
@@ -329,6 +342,9 @@ Do not violate a higher-priority rule to satisfy a lower-priority one.
    localStorage keys. Never line numbers. See DECISIONS D-008.
 9. **Match existing style.** One file, global functions, imperative `render*()`. Do not introduce a
    framework, build step, or module system. See DECISIONS D-001.
+10. **High-risk sprints are never chained.** `Risk: High` forces solo execution regardless of what
+    `Execution:` says in a `TASKS.md` group header — Codex re-verifies both fields fresh at every
+    task boundary. See DECISIONS D-023.
 
 ## Tooling Gotchas
 
@@ -349,10 +365,138 @@ GitHub Pages auto-deploys from `main` in about one minute.
 
 ## Common Commands
 
-- Plan: Claude reads `PLAN.md`, approved planning inputs, and `TASKS.md`, then creates ready Codex tasks.
-- Review: Claude reviews the task branch, `CHANGELOG.md`, `TEST_REPORT.md`, and acceptance criteria, then writes `REVIEW.md`.
-- Continue: Codex resumes from the first `TASKS.md` item with `status: codex`.
+- Next: Read-only. Determines the active milestone, current task, and current owner, then
+  recommends the exact next command (`Continue`, `Plan`, `Review`, or `Status`). Never modifies files.
+- Plan: Claude reads `PLAN.md`, approved planning inputs, and `TASKS.md`, then creates ready Codex
+  tasks — and, for a task group, may classify `Risk` and set `Execution: Chained` with semantic
+  `checkpoint:` labels (Sprint Execution Mode).
+- Review: Claude reviews the task branch, `CHANGELOG.md`, `TEST_REPORT.md`, and acceptance criteria,
+  then writes `REVIEW.md` — for a chained group, one entry per checkpoint, bucketed into
+  approved/blocked/rework/skipped.
+- Continue: Codex resumes from the first `TASKS.md` item with `status: codex` — chaining through a
+  group only when its header says `Risk: Low` or `Medium` and `Execution: Chained`.
 - Status: Read `TASKS.md` and report counts, active task, blockers, and current owner.
+
+## Next Command
+
+`Next` answers "who acts, and with what command?" — read-only, no file writes.
+
+Reads: `STATUS.md`, `PLAN.md`, `TASKS.md`, `REVIEW.md`, `planning/BUILD_QUEUE.md`.
+
+Priority order for the current task in `TASKS.md` (first match wins; ties broken by file order):
+
+1. `blocked` → Claude → Review
+2. `review` → Claude → Review
+3. `approved` → Claude → Review
+4. `codex` → Codex → Continue
+5. `in-progress` → Codex → Continue
+6. `todo` → Claude → Plan
+
+If every task is `done`, or `TASKS.md` has no entries: check `planning/BUILD_QUEUE.md`.
+- An approved item not yet reflected in `TASKS.md` → Claude → Plan.
+- Nothing approved (queue empty, or everything left is `Deferred`) → Status.
+
+This also covers a milestone whose tasks are all `done` but whose `PLAN.md` `Status` still says
+`in-progress`: `Next` reports the milestone as complete but does not edit `PLAN.md` — that update
+happens when Claude actually runs `Plan`.
+
+Output is exactly:
+```
+NEXT
+milestone : <goal> [<status>]
+task      : <id — title> [<status>]
+owner     : Claude | Codex
+why       : <one sentence>
+run       : <Continue | Plan | Review | Status>
+```
+
+`Next` never edits `TASKS.md`, `PLAN.md`, `REVIEW.md`, or any other file — it only reports. See
+DECISIONS D-021 for why it stays read-only.
+
+## Sprint Execution Mode
+
+Default behavior is unchanged: Codex builds one `TASKS.md` task per `Continue`, Claude reviews
+each one solo. Sprint Execution Mode is an opt-in exception Claude grants explicitly to a group of
+already-Ready tasks sharing one `source:` — it changes *when* Codex hands off for review, never
+what evidence each task produces. Every task still gets its own acceptance criteria, its own
+`CHANGELOG.md`/`TEST_REPORT.md` entry, and its own verdict.
+
+### Risk (no task-count cap, at any tier)
+
+Claude classifies the whole task group by its single highest-risk member:
+
+- **Low** — mechanical, repetitive, single-concern edits (the same proven pattern applied across
+  multiple files/elements), test-fixture-only fixes, docs-only edits. May contain many tasks.
+- **Medium** — real logic changes (new function, new state, non-trivial conditionals), but nothing
+  touching a Hard Rule surface. Keep the group to one coherent, dependency-chained slice.
+- **High** — any task touches a Hard Rule surface (Firestore write/read-guard code, `saveData()`
+  call sites, recipe-id `onclick` handlers, the `:root` CSS block) or touches architecture, auth,
+  security, database/schema, or the AI Dev OS/workflow files themselves. **Never chained** — see
+  Hard Rule 10.
+
+A mixed-risk group is classified at its highest risk. Split a High-risk task into its own group
+rather than carving out an exception for it inside a Low/Medium one.
+
+### Marking a group for chained execution
+
+One extended header on the existing `TASKS.md` section-divider comment. No new file, no new
+per-task field beyond an optional `checkpoint:` label:
+
+```
+<!-- ═══════════════════════════════════════════════════════
+     BQ-016 · Modal mobile-footer-stacking fix
+     Risk: Low · Execution: Chained
+     ═══════════════════════════════════════════════════════ -->
+```
+
+Each task may carry:
+
+```
+checkpoint: Modal CSS migration complete
+```
+
+A checkpoint is a **semantic** label Claude writes after a real engineering boundary — "Modal CSS
+migration complete", "Playwright stabilization complete", "Authentication UI complete" — never a
+count or a duration. Codex chains through same-`source:`, same-`checkpoint:` tasks; once the next
+ready task's `checkpoint:` differs (or there is no next ready task sharing it), that checkpoint is
+complete — Codex stops and hands off for Review there, even if later checkpoints in the same group
+still have `status: codex` tasks waiting. If no task in the group carries a `checkpoint:`, the
+whole group is one implicit checkpoint (stop only once it runs out of ready tasks — today's
+end-of-run behavior).
+
+Absent `Risk`/`Execution` entirely = today's behavior exactly: one task per `Continue`.
+
+### When a task inside a chained group fails
+
+Codex does not stop the whole group just because one task is blocked:
+
+1. Mark that task `status: blocked`; record the blocker under it, same as always.
+2. If verification was attempted, append the `TEST_REPORT.md` entry regardless of outcome.
+3. For each remaining `status: codex` task in the current checkpoint:
+   - Depends (directly or transitively) on the blocked task → leave it `status: codex` untouched;
+     note the skip in `CHANGELOG.md`; move to the next candidate.
+   - Independent of the blocked task → implement it normally, continuing the chain.
+
+Codex must stop the **entire group** — not just skip one task — if:
+- the blocked task is a dependency for most/all of what's left (nothing genuinely independent
+  remains),
+- the blocker looks like an architecture/scope issue affecting the whole group, not just one task,
+- a test failure could invalidate assumptions a later task in the group relies on, or
+- the next task touches the same file/region the blocked task's fix was going to touch.
+
+### How Claude reviews a chained group
+
+One `REVIEW.md` entry per checkpoint, bucketed — never a single bulk stamp:
+
+- **Approved** — acceptance criteria and evidence hold up → `status: done`.
+- **Blocked** — still needs Claude's resolution → stays `blocked`.
+- **Rework** — fully attempted but doesn't pass review → `status: codex`, and permanently exits
+  chained execution (no re-entry — handled solo from here).
+- **Skipped (dependency)** — untouched because it depends on a blocked task → stays `status:
+  codex`, reconsidered once that dependency clears.
+
+A group is a scheduling optimization, not a package deal: one task failing review never
+invalidates its already-correct siblings. See DECISIONS D-023.
 
 ## Extensibility
 
