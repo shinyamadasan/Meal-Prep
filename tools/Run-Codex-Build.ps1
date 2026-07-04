@@ -124,9 +124,17 @@ if ($DryRun) {
 }
 
 # --- Branch: create if new, checkout if it already exists (a retried /build after a prior attempt,
-#     or a chained group already partway through on this branch) ---
-git -C $root rev-parse --verify $branchName 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
+#     or a chained group already partway through on this branch). "Doesn't exist yet" is the normal
+#     first-build case, but under $ErrorActionPreference = 'Stop', git's stderr for a nonexistent ref
+#     can be promoted to a terminating PowerShell exception even with 2>$null -- so this is wrapped in
+#     try/catch rather than relying on $LASTEXITCODE alone, which a thrown exception would skip past. ---
+$branchExists = $false
+try {
+    git -C $root rev-parse --verify $branchName 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $branchExists = $true }
+} catch { $branchExists = $false }
+
+if ($branchExists) {
     git -C $root checkout $branchName | Out-Null
 } else {
     git -C $root checkout -b $branchName | Out-Null

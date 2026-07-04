@@ -62,9 +62,16 @@ if ($DryRun) {
     exit 0
 }
 
-# --- Preflight: the task branch must exist and be clean before Claude reviews it ---
-git -C $root rev-parse --verify $branchName 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) {
+# --- Preflight: the task branch must exist and be clean before Claude reviews it. Wrapped in
+#     try/catch, not just a $LASTEXITCODE check -- under $ErrorActionPreference = 'Stop', git's stderr
+#     for a nonexistent ref can be promoted to a terminating exception even with 2>$null, which a bare
+#     $LASTEXITCODE check would never see (execution stops at the throw before reaching it). ---
+$branchExists = $false
+try {
+    git -C $root rev-parse --verify $branchName 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $branchExists = $true }
+} catch { $branchExists = $false }
+if (-not $branchExists) {
     Write-Result "ABORTED: branch '$branchName' for $taskId does not exist. Nothing to review."
     exit 2
 }
