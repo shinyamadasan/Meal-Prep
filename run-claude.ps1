@@ -35,17 +35,67 @@ Investigate before the next scheduled run. Nothing further was committed, pushed
     exit 1
 }
 
+function Get-RepoStateSummary {
+    # Best-effort, defensive: this runs even when the failing check is "Repository exists" or "Git
+    # available", so every step here has to tolerate git/the repo itself being unusable.
+    $repoName = Split-Path $projectPath -Leaf
+    $gitOk = [bool](Get-Command git -ErrorAction SilentlyContinue)
+    if ($gitOk) {
+        try {
+            $remoteUrl = git -C $projectPath remote get-url origin 2>$null
+            if ($LASTEXITCODE -eq 0 -and $remoteUrl) {
+                $repoName = ($remoteUrl -replace '\.git$', '') -replace '.*[/:]', ''
+            }
+        } catch {}
+    }
+
+    $branch = "unknown (git unavailable)"
+    $treeSummary = "unknown (git unavailable)"
+    if ($gitOk -and (Test-Path (Join-Path $projectPath ".git"))) {
+        $b = git -C $projectPath branch --show-current 2>$null
+        $branch = if ($LASTEXITCODE -eq 0 -and $b) { $b } else { "unknown" }
+
+        $statusLines = @(git -C $projectPath status --porcelain 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            if ($statusLines.Count -eq 0) {
+                $treeSummary = "clean"
+            } else {
+                $untracked = @($statusLines | Where-Object { $_ -match '^\?\?' }).Count
+                $modified = $statusLines.Count - $untracked
+                $parts = @()
+                if ($modified -gt 0) { $parts += "$modified modified" }
+                if ($untracked -gt 0) { $parts += "$untracked untracked" }
+                $treeSummary = "dirty (" + ($parts -join ", ") + ")"
+            }
+        } else {
+            $treeSummary = "unknown (git status failed)"
+        }
+    }
+
+    [pscustomobject]@{ Repository = $repoName; Branch = $branch; WorkingTree = $treeSummary }
+}
+
 function Abort-Preflight {
-    param([string]$CheckName, [string]$Reason, [string]$Action, [string[]]$PassedChecks)
+    param([string]$CheckName, [string]$Reason, [string[]]$Action, [string[]]$PassedChecks)
+    $state = Get-RepoStateSummary
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add("")
     $lines.Add("AUTOMATION ABORTED")
+    $lines.Add("")
+    $lines.Add("Repository:")
+    $lines.Add($state.Repository)
+    $lines.Add("")
+    $lines.Add("Branch:")
+    $lines.Add($state.Branch)
+    $lines.Add("")
+    $lines.Add("Working tree:")
+    $lines.Add($state.WorkingTree)
     $lines.Add("")
     $lines.Add("Reason:")
     $lines.Add($Reason)
     $lines.Add("")
     $lines.Add("Required action:")
-    $lines.Add($Action)
+    foreach ($a in $Action) { $lines.Add($a) }
     $lines.Add("")
     $lines.Add("Phase 0 -- Preflight")
     foreach ($c in $PassedChecks) { $lines.Add("[x] $c") }
@@ -92,20 +142,20 @@ $passed += "Git available"
 # the wrong branch; requiring a human to put the repo on main is safer than guessing.
 $currentBranch = git branch --show-current 2>$null
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)) {
-    Abort-Preflight "Correct branch" "Could not determine the current git branch." "Check out main manually (git checkout main) and re-run." $passed
+    Abort-Preflight "Correct branch" "Could not determine the current git branch." @("git checkout main", "git status") $passed
 }
 if ($currentBranch -ne "main") {
-    Abort-Preflight "Correct branch" "Repository is on branch '$currentBranch', not 'main'." "Check out main manually (git checkout main) before enabling automation -- this script never switches branches for you." $passed
+    Abort-Preflight "Correct branch" "Automation only runs from a clean main branch -- repository is on '$currentBranch'." @("git checkout main", "git status") $passed
 }
 $passed += "Correct branch"
 
 # Working tree clean
 $dirty = git status --porcelain 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Abort-Preflight "Working tree clean" "git status failed unexpectedly." "Investigate the git repository state manually." $passed
+    Abort-Preflight "Working tree clean" "git status failed unexpectedly." @("Investigate the git repository state manually.") $passed
 }
 if ($dirty) {
-    Abort-Preflight "Working tree clean" "Working tree is dirty." "Commit, stash, or clean the repository before enabling automation." $passed
+    Abort-Preflight "Working tree clean" "Automation only runs from a clean main branch -- the working tree has uncommitted changes." @("git status", "Commit, stash, or clean the changes shown above before enabling automation.") $passed
 }
 $passed += "Working tree clean"
 
