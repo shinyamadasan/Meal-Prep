@@ -43,6 +43,20 @@ $resultFile = Join-Path $root '.last-phase-result.txt'
 $tasksFile  = Join-Path $root 'TASKS.md'
 $utf8       = New-Object System.Text.UTF8Encoding($false)
 
+# Under $ErrorActionPreference = 'Stop', ANY stderr text from a native command -- even a benign
+# warning like git's LF-will-be-replaced-by-CRLF notice, on a call that otherwise succeeds -- gets
+# promoted to a terminating exception, regardless of whether stderr is redirected to $null. This
+# showed up twice in live testing on different git calls (rev-parse --verify, then add), so every
+# git invocation is routed through here rather than patched one call site at a time: EAP is lowered
+# to 'Continue' only for the duration of the native call, which stops the promotion, while
+# $LASTEXITCODE still reflects git's real exit code exactly as before.
+function Invoke-Git {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & git @args 2>$null }
+    finally { $ErrorActionPreference = $prevEAP }
+}
+
 # DENY-list (not allow-list): Codex's legitimate surface (app code) is open-ended, so this blocks the
 # specific planning/architecture/automation surfaces it must never touch, and allows everything else.
 $deniedPatterns = @(
@@ -93,12 +107,12 @@ function Get-TrackedTasks {
 }
 
 # --- Preflight: main must be clean before branching off it; codex must actually be invokable ---
-$branch = git -C $root branch --show-current 2>$null
+$branch = Invoke-Git -C $root branch --show-current
 if ($branch -ne 'main') {
     Write-Result "ABORTED: expected to start from 'main', found '$branch'. Run 'git checkout main' and retry."
     exit 2
 }
-$dirty = @(git -C $root status --porcelain 2>$null)
+$dirty = @(Invoke-Git -C $root status --porcelain)
 if ($dirty.Count -gt 0) {
     Write-Result "ABORTED: main has $($dirty.Count) uncommitted change(s). Commit/stash/clean before building."
     exit 2
@@ -125,19 +139,14 @@ if ($DryRun) {
 
 # --- Branch: create if new, checkout if it already exists (a retried /build after a prior attempt,
 #     or a chained group already partway through on this branch). "Doesn't exist yet" is the normal
-#     first-build case, but under $ErrorActionPreference = 'Stop', git's stderr for a nonexistent ref
-#     can be promoted to a terminating PowerShell exception even with 2>$null -- so this is wrapped in
-#     try/catch rather than relying on $LASTEXITCODE alone, which a thrown exception would skip past. ---
-$branchExists = $false
-try {
-    git -C $root rev-parse --verify $branchName 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $branchExists = $true }
-} catch { $branchExists = $false }
+#     first-build case. ---
+Invoke-Git -C $root rev-parse --verify $branchName | Out-Null
+$branchExists = ($LASTEXITCODE -eq 0)
 
 if ($branchExists) {
-    git -C $root checkout $branchName | Out-Null
+    Invoke-Git -C $root checkout $branchName | Out-Null
 } else {
-    git -C $root checkout -b $branchName | Out-Null
+    Invoke-Git -C $root checkout -b $branchName | Out-Null
 }
 
 # --- Invoke Codex CLI, unattended. Captures stdout/stderr/exit code/duration for the log. ---
@@ -160,7 +169,7 @@ if ($stderr) { Add-Content -Path $logFile -Value "[Run-Codex-Build] --- stderr -
 
 # --- Commit-scope guard: applies regardless of Codex's exit code -- whatever Codex touched, if it's
 #     outside the allowed surface, this halts uncommitted for human inspection, same as always. ---
-$changed = @(git -C $root status --porcelain | ForEach-Object { $_.Substring(3).Trim() } | Where-Object { $_ })
+$changed = @(Invoke-Git -C $root status --porcelain | ForEach-Object { $_.Substring(3).Trim() } | Where-Object { $_ })
 $violations = @($changed | Where-Object { $path = $_; ($deniedPatterns | Where-Object { $path -match $_ }) })
 
 if ($violations.Count -gt 0) {
@@ -175,27 +184,27 @@ if ($violations.Count -gt 0) {
 # --- Failure: Codex CLI itself exited non-zero. Commit whatever safe partial progress exists, mark
 #     every tracked task blocked so the next /build doesn't silently retry the same broken task. ---
 if ($codexExit -ne 0) {
-    if ($changed.Count -gt 0) { git -C $root add -- $changed; git -C $root commit -m "$($first.Id): partial progress before codex exec failure" | Out-Null }
+    if ($changed.Count -gt 0) { Invoke-Git -C $root add -- $changed; Invoke-Git -C $root commit -m "$($first.Id): partial progress before codex exec failure" | Out-Null }
     foreach ($t in $tracked) {
         if ((Get-TaskStatusById $t.Id) -eq 'codex') {
             Set-TaskStatus -TaskId $t.Id -NewStatus 'blocked' -BlockerNote "codex exec exited $codexExit after $([int]$duration.TotalSeconds)s. See claude-session.log for stdout/stderr."
         }
     }
-    git -C $root add TASKS.md
-    git -C $root diff --cached --quiet
-    if ($LASTEXITCODE -ne 0) { git -C $root commit -m "$($first.Id): codex exec failed (exit $codexExit), marked blocked" | Out-Null }
-    git -C $root push origin $branchName | Out-Null
-    git -C $root checkout main | Out-Null
+    Invoke-Git -C $root add TASKS.md
+    Invoke-Git -C $root diff --cached --quiet
+    if ($LASTEXITCODE -ne 0) { Invoke-Git -C $root commit -m "$($first.Id): codex exec failed (exit $codexExit), marked blocked" | Out-Null }
+    Invoke-Git -C $root push origin $branchName | Out-Null
+    Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$($first.Id) build FAILED: codex exec exited $codexExit after $([int]$duration.TotalSeconds)s. Marked blocked on $branchName. See claude-session.log."
     exit 1
 }
 
 # --- codex exec exited 0. Commit whatever it changed, then classify by re-checking the tracked set. ---
 if ($changed.Count -gt 0) {
-    git -C $root add -- $changed
-    git -C $root commit -m "$($first.Id): codex exec build" | Out-Null
+    Invoke-Git -C $root add -- $changed
+    Invoke-Git -C $root commit -m "$($first.Id): codex exec build" | Out-Null
 }
-git -C $root push origin $branchName | Out-Null
+Invoke-Git -C $root push origin $branchName | Out-Null
 
 $statuses = $tracked | ForEach-Object { [pscustomobject]@{ Id = $_.Id; Status = (Get-TaskStatusById $_.Id) } }
 $anyBlocked = @($statuses | Where-Object { $_.Status -eq 'blocked' })
@@ -203,7 +212,7 @@ $anyReview  = @($statuses | Where-Object { $_.Status -eq 'review' })
 $noChange   = @($statuses | Where-Object { $_.Status -eq 'codex' })
 
 if ($anyBlocked.Count -gt 0) {
-    git -C $root checkout main | Out-Null
+    Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$($first.Id) build reached BLOCKED ($($anyBlocked.Count) of $($tracked.Count) tracked task(s)) after $([int]$duration.TotalSeconds)s. See the blocker note(s) in TASKS.md on $branchName."
     exit 1
 }
@@ -220,8 +229,8 @@ if ($anyReview.Count -gt 0) {
     $reviewMsg = if (Test-Path $reviewResultFile) { $r = Get-Content $reviewResultFile -Raw; Remove-Item $reviewResultFile -Force; $r } else { "Review phase runner exited $LASTEXITCODE with no result -- check claude-session.log." }
     # Defensive: ensure main regardless of what the review runner left behind (idempotent if it
     # already returned there itself).
-    $curBranch = git -C $root branch --show-current 2>$null
-    if ($curBranch -ne 'main') { git -C $root checkout main | Out-Null }
+    $curBranch = Invoke-Git -C $root branch --show-current
+    if ($curBranch -ne 'main') { Invoke-Git -C $root checkout main | Out-Null }
     Write-Result "$buildMsg`n`n-> auto-review: $reviewMsg"
     exit 0
 }
@@ -231,9 +240,9 @@ if ($anyReview.Count -gt 0) {
 foreach ($t in $noChange) {
     Set-TaskStatus -TaskId $t.Id -NewStatus 'blocked' -BlockerNote "codex exec exited 0 after $([int]$duration.TotalSeconds)s but made no tracked progress on this task. See claude-session.log."
 }
-git -C $root add TASKS.md
-git -C $root diff --cached --quiet
-if ($LASTEXITCODE -ne 0) { git -C $root commit -m "$($first.Id): codex exec made no tracked progress, marked blocked" | Out-Null; git -C $root push origin $branchName | Out-Null }
-git -C $root checkout main | Out-Null
+Invoke-Git -C $root add TASKS.md
+Invoke-Git -C $root diff --cached --quiet
+if ($LASTEXITCODE -ne 0) { Invoke-Git -C $root commit -m "$($first.Id): codex exec made no tracked progress, marked blocked" | Out-Null; Invoke-Git -C $root push origin $branchName | Out-Null }
+Invoke-Git -C $root checkout main | Out-Null
 Write-Result "$($first.Id) build FAILED: codex exec exited 0 after $([int]$duration.TotalSeconds)s but no tracked task changed status. Marked blocked on $branchName. See claude-session.log."
 exit 1

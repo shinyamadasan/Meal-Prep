@@ -41,6 +41,20 @@ $runClaude    = Join-Path $root 'run-claude.ps1'
 $utf8         = New-Object System.Text.UTF8Encoding($false)
 $NO_REPLIES   = 'No pending replies.'
 
+# Under $ErrorActionPreference = 'Stop', ANY stderr text from a native command -- even a benign
+# warning like git's LF-will-be-replaced-by-CRLF notice, on a call that otherwise succeeds -- gets
+# promoted to a terminating exception, regardless of whether stderr is redirected to $null. This
+# showed up twice in live testing on different git calls (rev-parse --verify, then add), so every
+# git invocation is routed through here rather than patched one call site at a time: EAP is lowered
+# to 'Continue' only for the duration of the native call, which stops the promotion, while
+# $LASTEXITCODE still reflects git's real exit code exactly as before.
+function Invoke-Git {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & git @args 2>$null }
+    finally { $ErrorActionPreference = $prevEAP }
+}
+
 function Write-Reply {
     param([string]$Id, [string]$Text)
     if ($DryRun) { Write-Host "[DRY RUN] would append to OUTBOX.md:`n$Text"; return }
@@ -50,8 +64,8 @@ function Write-Reply {
     [System.IO.File]::WriteAllText($outboxFile, $newContent + "`n", $utf8)
 }
 
-function Get-Branch { (git -C $root branch --show-current 2>$null) }
-function Get-DirtyCount { @(git -C $root status --porcelain 2>$null).Count }
+function Get-Branch { (Invoke-Git -C $root branch --show-current) }
+function Get-DirtyCount { @(Invoke-Git -C $root status --porcelain).Count }
 
 # $AUTOMATION_ENABLED is the one master flag for everything that mutates the repo unattended OR
 # on remote command -- /status, /next, /enable, /disable, and /stop always work regardless of it
@@ -159,11 +173,11 @@ function Set-AutomationFlag {
     $content = Get-Content $runClaude -Raw -Encoding UTF8
     $newContent = [regex]::Replace($content, '\$AUTOMATION_ENABLED\s*=\s*\$(true|false)\s*(#[^\r\n]*)?', "`$AUTOMATION_ENABLED = $newVal   # flip to `$true to re-enable overnight automation")
     [System.IO.File]::WriteAllText($runClaude, $newContent, $utf8)
-    git -C $root add run-claude.ps1
-    git -C $root diff --cached --quiet
+    Invoke-Git -C $root add run-claude.ps1
+    Invoke-Git -C $root diff --cached --quiet
     if ($LASTEXITCODE -ne 0) {
-        git -C $root commit -m "automation: $(if ($Enable) {'enable'} else {'disable'}) via Telegram" | Out-Null
-        git -C $root push origin main | Out-Null
+        Invoke-Git -C $root commit -m "automation: $(if ($Enable) {'enable'} else {'disable'}) via Telegram" | Out-Null
+        Invoke-Git -C $root push origin main | Out-Null
     }
     return "Automation $(if ($Enable) {'enabled'} else {'disabled'})."
 }
@@ -212,11 +226,11 @@ try {
         if (-not $DryRun) {
             $newRaw = $raw -replace '(?m)^status:\s*new\s*$', "status: applied`napplied: $(Get-Date -Format o)"
             [System.IO.File]::WriteAllText($f.FullName, $newRaw, $utf8)
-            git -C $root add "captures/commands/$($f.Name)"
-            git -C $root diff --cached --quiet
+            Invoke-Git -C $root add "captures/commands/$($f.Name)"
+            Invoke-Git -C $root diff --cached --quiet
             if ($LASTEXITCODE -ne 0) {
-                git -C $root commit -m "command: /$cmd ($id) received" | Out-Null
-                git -C $root push origin main | Out-Null
+                Invoke-Git -C $root commit -m "command: /$cmd ($id) received" | Out-Null
+                Invoke-Git -C $root push origin main | Out-Null
             }
         }
 
@@ -264,13 +278,13 @@ try {
             # case, skip committing the reply to main rather than force a branch switch over dirty
             # files. The reply text itself already explains what happened; it'll be picked up (and the
             # OUTBOX.md entry pushed) on the next tick once a human has resolved that branch by hand.
-            $curBranch = git -C $root branch --show-current 2>$null
+            $curBranch = Invoke-Git -C $root branch --show-current
             if ($curBranch -eq 'main') {
-                git -C $root add $outboxFile 2>$null
-                git -C $root diff --cached --quiet
+                Invoke-Git -C $root add $outboxFile
+                Invoke-Git -C $root diff --cached --quiet
                 if ($LASTEXITCODE -ne 0) {
-                    git -C $root commit -m "reply: /$cmd ($id)" | Out-Null
-                    git -C $root push origin main | Out-Null
+                    Invoke-Git -C $root commit -m "reply: /$cmd ($id)" | Out-Null
+                    Invoke-Git -C $root push origin main | Out-Null
                 }
             } else {
                 Write-Host "Not on main (on '$curBranch') after /$cmd -- likely a halted build/review left for inspection. Reply written locally to OUTBOX.md but not committed/pushed this tick."

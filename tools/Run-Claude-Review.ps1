@@ -26,6 +26,20 @@ $resultFile = Join-Path $root '.last-phase-result.txt'
 $tasksFile  = Join-Path $root 'TASKS.md'
 $utf8       = New-Object System.Text.UTF8Encoding($false)
 
+# Under $ErrorActionPreference = 'Stop', ANY stderr text from a native command -- even a benign
+# warning like git's LF-will-be-replaced-by-CRLF notice, on a call that otherwise succeeds -- gets
+# promoted to a terminating exception, regardless of whether stderr is redirected to $null. This
+# showed up twice in live testing on different git calls (rev-parse --verify, then add), so every
+# git invocation is routed through here rather than patched one call site at a time: EAP is lowered
+# to 'Continue' only for the duration of the native call, which stops the promotion, while
+# $LASTEXITCODE still reflects git's real exit code exactly as before.
+function Invoke-Git {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & git @args 2>$null }
+    finally { $ErrorActionPreference = $prevEAP }
+}
+
 function Write-Result {
     param([string]$Text)
     if (-not $DryRun) { [System.IO.File]::WriteAllText($resultFile, $Text, $utf8) }
@@ -62,21 +76,14 @@ if ($DryRun) {
     exit 0
 }
 
-# --- Preflight: the task branch must exist and be clean before Claude reviews it. Wrapped in
-#     try/catch, not just a $LASTEXITCODE check -- under $ErrorActionPreference = 'Stop', git's stderr
-#     for a nonexistent ref can be promoted to a terminating exception even with 2>$null, which a bare
-#     $LASTEXITCODE check would never see (execution stops at the throw before reaching it). ---
-$branchExists = $false
-try {
-    git -C $root rev-parse --verify $branchName 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $branchExists = $true }
-} catch { $branchExists = $false }
-if (-not $branchExists) {
+# --- Preflight: the task branch must exist and be clean before Claude reviews it. ---
+Invoke-Git -C $root rev-parse --verify $branchName | Out-Null
+if ($LASTEXITCODE -ne 0) {
     Write-Result "ABORTED: branch '$branchName' for $taskId does not exist. Nothing to review."
     exit 2
 }
-git -C $root checkout $branchName | Out-Null
-$dirty = @(git -C $root status --porcelain 2>$null)
+Invoke-Git -C $root checkout $branchName | Out-Null
+$dirty = @(Invoke-Git -C $root status --porcelain)
 if ($dirty.Count -gt 0) {
     Write-Result "ABORTED: $branchName has $($dirty.Count) uncommitted change(s). Commit/stash/clean before reviewing."
     exit 2
@@ -109,7 +116,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # --- Commit-scope guard: ONLY REVIEW.md and TASKS.md allowed ---
 $allowedPatterns = @('^REVIEW\.md$', '^TASKS\.md$')
-$changed = @(git -C $root status --porcelain | ForEach-Object { $_.Substring(3).Trim() } | Where-Object { $_ })
+$changed = @(Invoke-Git -C $root status --porcelain | ForEach-Object { $_.Substring(3).Trim() } | Where-Object { $_ })
 $violations = @($changed | Where-Object { $path = $_; -not ($allowedPatterns | Where-Object { $path -match $_ }) })
 
 if ($violations.Count -gt 0) {
@@ -119,15 +126,15 @@ if ($violations.Count -gt 0) {
 }
 if ($changed.Count -eq 0) {
     # Nothing changed at all -- tree is clean, safe to return to main.
-    git -C $root checkout main | Out-Null
+    Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$taskId review produced no changes -- investigate; a real review should at least update REVIEW.md."
     exit 1
 }
 
-git -C $root add -- $changed
-git -C $root commit -m "${taskId}: Claude review" | Out-Null
-git -C $root push origin $branchName | Out-Null
-git -C $root checkout main | Out-Null
+Invoke-Git -C $root add -- $changed
+Invoke-Git -C $root commit -m "${taskId}: Claude review" | Out-Null
+Invoke-Git -C $root push origin $branchName | Out-Null
+Invoke-Git -C $root checkout main | Out-Null
 
 $newStatus = Get-TaskStatus -TaskId $taskId
 if ($newStatus -eq 'done') {
