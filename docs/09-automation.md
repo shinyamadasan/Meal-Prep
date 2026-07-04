@@ -15,12 +15,15 @@ The system is self-operating during off-hours. No human needs to be present for 
 ```
 Windows Task Scheduler
     └── fires run-claude.ps1 (9PM and 2AM)
-            ├── [$AUTOMATION_ENABLED gate — exits immediately if false]
+            ├── [$AUTOMATION_ENABLED gate — exits 0 immediately if false, before anything else]
+            ├── Phase 0: Preflight        (deterministic: repo/branch/tree/git/scripts/claude CLI —
+            │                                any failure aborts with exit 2, nothing below runs)
             ├── Apply-Decisions.ps1       (deterministic: decisions → BUILD_QUEUE)
             ├── claude -p "..."            (AI: triage + BUILD_QUEUE → PLAN.md/TASKS.md — PLANNING ONLY,
             │                                never edits app.js/index.html/style.css, no commit/push tool)
             ├── [commit-scope guard]       (deterministic: only commits if the LLM stayed inside the
-            │                                allowed planning-doc surface — see below)
+            │                                allowed planning-doc surface — any violation halts with
+            │                                exit 1, nothing below runs)
             ├── Generate-Digest.ps1       (deterministic: proposals → DIGEST.md)
             └── Generate-Codex-Notice.ps1 (deterministic: TASKS.md → CODEX_READY.md)
 
@@ -32,6 +35,13 @@ You (human)
     └── Run Codex locally, say "Continue" — the ONLY way TASKS.md work ever gets built.
         Nothing in this stack invokes Codex automatically.
 ```
+
+**Fail-fast, pipeline-wide:** every phase boundary above is a hard stop. A Preflight failure, a halted
+guard, a failed `git commit`/`git push`, or an errored deterministic script all immediately end the run
+— no later phase (digest generation, Codex-ready notice, further commits, further pushes) executes
+once one has failed. Exit codes: `0` = disabled (expected steady state) or a clean completed/idle run,
+`1` = mid-run halt (something failed after real work started), `2` = preflight abort (an environment
+or repo-state problem — nothing was attempted).
 
 ---
 
@@ -90,11 +100,54 @@ if (-not $AUTOMATION_ENABLED) {
     exit 0
 }
 ```
-The master safe-gate. Default `$false`. While disabled, the script logs one line and exits before
-touching git, the repo, or calling Claude at all — no `Apply-Decisions.ps1`, no Claude session, no
-digest generation. See [Enabling / disabling automation](#enabling--disabling-automation).
+The master safe-gate. Default `$false`. Checked *first*, ahead of every other Preflight check below —
+if it's off, the script logs one line and exits (code `0`) before touching git, the repo, or calling
+Claude at all. This ordering is deliberate: `$AUTOMATION_ENABLED = $false` is the normal, expected
+state every single night until you deliberately turn it on, so it exits calmly and quietly rather than
+running the rest of Preflight and risking a noisy "ABORTED: working tree is dirty" every night the
+repo happens to have uncommitted work sitting around (which, realistically, is most nights). See
+[Enabling / disabling automation](#enabling--disabling-automation).
 
-### Phase 0b: Setup (only reached if the gate is open)
+### Phase 0: Preflight (only reached if the gate above is open)
+
+Six checks, each of which **aborts the entire run** (exit code `2`, nothing below runs) on failure:
+
+| Check | What it verifies | Typical failure |
+|---|---|---|
+| Repository exists | `$projectPath` exists and contains a `.git` folder | Path in the script is wrong, or the checkout was deleted |
+| Git available | `git` resolves on `PATH` | A Scheduled Task's environment can have a stripped-down `PATH` compared to an interactive shell |
+| Correct branch | `git branch --show-current` equals `main` | Someone (you, Codex, a prior session) left a `task-<id>` branch checked out |
+| Working tree clean | `git status --porcelain` is empty | Uncommitted work — yours, Codex's, or a prior run's — is sitting in the repo |
+| Required scripts exist | `tools\Apply-Decisions.ps1`, `tools\Generate-Digest.ps1`, `tools\Generate-Codex-Notice.ps1` all present | One was deleted, renamed, or never restored after a clone |
+| Required environment variables exist | `claude` resolves on `PATH` | Same "Scheduled Task PATH is smaller than yours" problem as `git` above |
+
+Each failure writes this exact shape to `claude-session.log` and exits immediately:
+
+```
+AUTOMATION ABORTED
+
+Reason:
+Working tree is dirty.
+
+Required action:
+Commit, stash, or clean the repository before enabling automation.
+
+Phase 0 -- Preflight
+[x] Repository exists
+[x] Git available
+[x] Correct branch
+[ ] Working tree clean  <-- failed here
+```
+
+**Why abort instead of auto-fixing (e.g., auto-`git checkout main`, auto-stash):** this is exactly the
+class of "silently do something reasonable-sounding" behavior that caused a real incident during
+development — an earlier version of this script had no branch check at all, so a test run's commits
+silently landed on whatever branch happened to be checked out (`task-001`) instead of `main`, and were
+never pushed to `origin/main` as intended. Requiring a human to put the repo in a known-good state
+before automation touches it is the safer default; auto-remediation would just move the same class of
+bug one level deeper.
+
+### Phase 0b: Setup (only reached once Preflight passes)
 ```powershell
 $projectPath = "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 Set-Location $projectPath
@@ -132,12 +185,16 @@ $violations = @($changed | Where-Object { $path = $_; -not ($allowedPatterns | W
 This is the real safety boundary, not the prompt. After the Claude session returns, the script itself
 checks every changed file against an explicit allow-list of planning/doc surfaces.
 - **Any violation** (e.g. `app.js`, `index.html`, `style.css`, `CLAUDE.md`, `AGENTS.md` changed):
-  logs an `ALERT`, appends a warning block to the top of `STATUS.md`, and **stops without committing
-  or pushing anything** — the working tree is left dirty for you to inspect. Nothing is auto-discarded.
+  logs an `ALERT`, appends a warning block to the top of `STATUS.md`, and **halts the entire run —
+  fail-fast, exit code `1`.** Phase 3 (digest refresh, Codex-ready notice) never runs, nothing further
+  is committed or pushed or sent to Telegram. The working tree is left dirty for you to inspect —
+  nothing is auto-discarded.
 - **Clean:** the script (not Claude) stages exactly the changed files, commits, and pushes.
 
 This mirrors how `Apply-Decisions.ps1` and `Generate-Digest.ps1` already work: the deterministic
-script owns every commit; the LLM only ever proposes file edits.
+script owns every commit; the LLM only ever proposes file edits. Every `git commit`/`git push` in this
+script — across all phases, not just this one — checks its own exit code and halts the same way on
+failure; a failed push (e.g. remote diverged) stops the run exactly like an out-of-scope file would.
 
 ### Phase 3: Generate-Digest.ps1 + Generate-Codex-Notice.ps1
 ```powershell
@@ -400,8 +457,9 @@ Open `planning/DIGEST.md` or wait for the 7AM Telegram message.
 
 | Failure | Symptom | Diagnosis | Fix |
 |---|---|---|---|
-| Automation disabled (expected default) | No commits at all, log says "Automation disabled" | Check top of `run-claude.ps1` | Set `$AUTOMATION_ENABLED = $true` if you meant to run it |
-| Commit-scope guard halted the run | `claude-session.log` has an `ALERT` line; `STATUS.md` has an "AUTOMATION HALTED" block; nothing committed | Read the `ALERT` message — it names the out-of-scope file(s) | Inspect the working tree by hand; either revert the stray edit or, if it's legitimate, decide manually whether to commit it (this should not happen — investigate why the LLM edited that file) |
+| Automation disabled (expected default) | No commits at all, log says "Automation disabled"; exit code `0` | Check top of `run-claude.ps1` | Set `$AUTOMATION_ENABLED = $true` if you meant to run it |
+| Preflight aborted | Log has an "AUTOMATION ABORTED" block naming a failed check; exit code `2`; nothing was attempted | Read the "Reason" line — it names exactly which of the 6 checks failed | Take the "Required action" line literally (e.g. `git checkout main`, commit/stash the tree) — Preflight never auto-fixes anything, it only tells you what to fix |
+| Commit-scope guard halted the run | `claude-session.log` has an `ALERT` line; `STATUS.md` has an "AUTOMATION HALTED" block; exit code `1`; nothing committed, no digest/Codex-ready refresh happened either (fail-fast) | Read the `ALERT` message — it names the out-of-scope file(s) | Inspect the working tree by hand; either revert the stray edit or, if it's legitimate, decide manually whether to commit it (this should not happen — investigate why the LLM edited that file) |
 | PC didn't wake | No commits after 9PM (with automation enabled) | Task Scheduler: `LastTaskResult = 267011` | Re-enable "Wake to run"; check power settings |
 | Claude Pro quota exhausted | `claude-session.log` contains "rate limit" or "quota exceeded" | Check log | Wait for monthly reset; or set `ANTHROPIC_API_KEY` |
 | Claude logged out | `claude-session.log` contains "not authenticated" | Check log | Run `claude login` manually |
@@ -485,9 +543,17 @@ Run these in order after any change to `run-claude.ps1`, `tools/Generate-Codex-N
 
 1. **Gate off (default state):** with `$AUTOMATION_ENABLED = $false`, run `run-claude.ps1` manually
    (`.\run-claude.ps1` from the project root) with an approved item sitting in `BUILD_QUEUE.md`.
-   Verify: `claude-session.log` shows the "Automation disabled" line; `git status` shows zero changes;
-   no commits, no pushes.
-2. **Gate on, clean case:** flip to `$true`, run manually again. Verify:
+   Verify: `claude-session.log` shows the "Automation disabled" line; exit code `0`; `git status` shows
+   zero changes; no commits, no pushes.
+2. **Preflight abort cases:** with `$AUTOMATION_ENABLED = $true`, deliberately trigger each check and
+   confirm the run aborts before Phase 1 ever starts (exit code `2`, "AUTOMATION ABORTED" block in the
+   log naming the right check and the right "Required action"):
+   - On a `task-<id>` branch instead of `main` → "Correct branch" fails.
+   - With any uncommitted change present (even an unrelated one) → "Working tree clean" fails.
+   - With `tools/Generate-Codex-Notice.ps1` temporarily renamed → "Required scripts exist" fails.
+   Confirm in each case that `git status` is unchanged afterward — Preflight only ever reads state.
+3. **Gate on, clean case:** on `main`, with a clean working tree, flip to `$true` and run. Verify:
+   - Exit code `0`.
    - `git diff --stat` against `HEAD~1` shows only allow-listed files changed (`PLAN.md`, `TASKS.md`,
      `STATUS.md`, `planning/*`, `captures/*`).
    - `app.js`, `index.html`, `style.css` are byte-identical to before (`git diff --stat` shows nothing
@@ -495,18 +561,22 @@ Run these in order after any change to `run-claude.ps1`, `tools/Generate-Codex-N
    - New `TASKS.md` entries have `status: codex` and meet the Definition of Ready (objective, files,
      acceptance criteria, constraints, verification steps).
    - `planning/CODEX_READY.md` lists exactly those `status: codex` tasks.
-3. **Gate on, violation case (simulated):** before running, hand-edit `style.css` (e.g. add a trailing
-   comment) so the working tree is already dirty outside the allow-list, then run `run-claude.ps1`
-   manually. Verify: the commit-scope guard logs an `ALERT`, appends a warning block to `STATUS.md`,
-   and makes **no commit** — `git status` still shows your hand-edit uncommitted.
-   Clean up afterward: `git checkout -- style.css`.
-4. **Codex-ready notice, empty case:** with no `status: codex` tasks in `TASKS.md`, run
+4. **Fail-fast, violation case (simulated):** on `main` with a clean tree, let Preflight pass, then —
+   before Phase 2b's guard runs — get `style.css` dirty (e.g. via a throwaway edit made mid-run isn't
+   practical to script; the realistic version of this test is: confirm via code reading that if the
+   guard *would* fire, everything after it — Phase 3's digest refresh, its commits, its pushes, the
+   shutdown logic — is structurally unreachable, since `Halt-Automation` calls `exit 1` unconditionally).
+   If you do reproduce a real violation (e.g. from a stray concurrent edit), verify: `claude-session.log`
+   has an `ALERT` + exit code `1`; `STATUS.md` has an "AUTOMATION HALTED" block; **no** commit for
+   `DIGEST.md`/`CODEX_READY.md` happened this run (check `git log` timestamps); the working tree still
+   shows the offending file uncommitted.
+5. **Codex-ready notice, empty case:** with no `status: codex` tasks in `TASKS.md`, run
    `.\tools\Generate-Codex-Notice.ps1` directly. Verify `planning/CODEX_READY.md` contains exactly
    `No Codex-ready tasks right now.`.
-5. **n8n:** in the n8n UI, manually execute the digest workflow twice — once with `CODEX_READY.md`
+6. **n8n:** in the n8n UI, manually execute the digest workflow twice — once with `CODEX_READY.md`
    populated, once with the placeholder. Verify the Codex-ready Telegram message sends only in the
    first case, and the regular digest sends in both.
-6. **No stray Codex invocation:**
+7. **No stray Codex invocation:**
    ```powershell
    Select-String -Path run-claude.ps1, n8n-telegram-*.json, tools\*.ps1 -Pattern "codex " -SimpleMatch -CaseSensitive:$false
    ```

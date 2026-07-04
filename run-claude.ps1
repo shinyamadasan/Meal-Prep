@@ -7,8 +7,13 @@
 # app.js / index.html / style.css and NEVER invokes Codex -- that split is enforced two ways:
 #   1. The Claude session's --allowedTools has no git commit/push -- it literally cannot ship anything.
 #   2. This script commits Claude's output itself, but only after checking every changed path against
-#      an explicit allow-list (Phase 2b below). Anything outside that list halts the run uncommitted.
-# See docs/09-automation.md for the full design, enable/disable instructions, and rollback plan.
+#      an explicit allow-list (Phase 2b below). Anything outside that list halts uncommitted.
+#
+# FAIL-FAST: any phase failure (a preflight problem, a halt, a script error, a failed git operation)
+# stops the ENTIRE run immediately -- no later phase (digest generation, Codex-ready notice, commits,
+# pushes) executes once one has failed. Exit codes: 0 = disabled (expected steady state) or a clean
+# completed/idle run, 1 = mid-run halt (something failed after work started), 2 = preflight abort
+# (environment/state problem -- nothing was attempted). See docs/09-automation.md.
 
 $AUTOMATION_ENABLED = $false   # flip to $true to re-enable overnight automation
 
@@ -17,15 +22,109 @@ $logFile = "$projectPath\claude-session.log"
 
 Set-Location $projectPath
 
+function Halt-Automation {
+    param([string]$Reason)
+    Add-Content -Path $logFile -Value "ALERT: $Reason"
+    $statusEntry = @"
+
+## $(Get-Date -Format 'yyyy-MM-dd HH:mm') -- AUTOMATION HALTED: $Reason
+Investigate before the next scheduled run. Nothing further was committed, pushed, or notified this run.
+"@
+    Add-Content -Path "$projectPath\STATUS.md" -Value $statusEntry
+    Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (HALTED) ==="
+    exit 1
+}
+
+function Abort-Preflight {
+    param([string]$CheckName, [string]$Reason, [string]$Action, [string[]]$PassedChecks)
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("")
+    $lines.Add("AUTOMATION ABORTED")
+    $lines.Add("")
+    $lines.Add("Reason:")
+    $lines.Add($Reason)
+    $lines.Add("")
+    $lines.Add("Required action:")
+    $lines.Add($Action)
+    $lines.Add("")
+    $lines.Add("Phase 0 -- Preflight")
+    foreach ($c in $PassedChecks) { $lines.Add("[x] $c") }
+    $lines.Add("[ ] $CheckName  <-- failed here")
+    Add-Content -Path $logFile -Value ($lines -join "`n")
+    Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (ABORTED) ==="
+    exit 2
+}
+
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value ""
 Add-Content -Path $logFile -Value "=== Session started: $timestamp ==="
 
+# Checked first, ahead of the rest of Phase 0 -- this is the normal, expected steady state (disabled
+# every night until deliberately enabled), so it exits calmly and quietly rather than running the
+# other preflight checks and risking a noisy "ABORTED: working tree is dirty" every single night.
 if (-not $AUTOMATION_ENABLED) {
     Add-Content -Path $logFile -Value "Automation disabled (`$AUTOMATION_ENABLED = `$false in run-claude.ps1) -- exiting without touching the repo."
     Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (disabled) ==="
     exit 0
 }
+
+# --- Phase 0: Preflight. All checks must pass before Phase 1 runs -- fail-fast, no partial credit. ---
+$passed = @()
+
+# Repository exists
+if (-not (Test-Path $projectPath)) {
+    Abort-Preflight "Repository exists" "Project path not found: $projectPath" "Verify `$projectPath in run-claude.ps1 points at the actual repository location." $passed
+}
+if (-not (Test-Path (Join-Path $projectPath ".git"))) {
+    Abort-Preflight "Repository exists" "$projectPath is not a git repository (.git not found)." "Verify `$projectPath in run-claude.ps1 points at a valid git checkout." $passed
+}
+$passed += "Repository exists"
+
+# Git available (checked here, ahead of the branch/tree checks below that need it, even though it's
+# listed after them conceptually -- a scheduled task's PATH can be minimal, so this is a real check)
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Abort-Preflight "Git available" "The 'git' command is not available on PATH." "Install Git or ensure it is on PATH for the account/session running this scheduled task." $passed
+}
+$passed += "Git available"
+
+# Correct branch -- aborts rather than auto-checking-out main. Silently switching branches (or
+# checking out over a dirty tree) is exactly the failure mode that let a prior run's commits land on
+# the wrong branch; requiring a human to put the repo on main is safer than guessing.
+$currentBranch = git branch --show-current 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)) {
+    Abort-Preflight "Correct branch" "Could not determine the current git branch." "Check out main manually (git checkout main) and re-run." $passed
+}
+if ($currentBranch -ne "main") {
+    Abort-Preflight "Correct branch" "Repository is on branch '$currentBranch', not 'main'." "Check out main manually (git checkout main) before enabling automation -- this script never switches branches for you." $passed
+}
+$passed += "Correct branch"
+
+# Working tree clean
+$dirty = git status --porcelain 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Abort-Preflight "Working tree clean" "git status failed unexpectedly." "Investigate the git repository state manually." $passed
+}
+if ($dirty) {
+    Abort-Preflight "Working tree clean" "Working tree is dirty." "Commit, stash, or clean the repository before enabling automation." $passed
+}
+$passed += "Working tree clean"
+
+# Required scripts exist
+foreach ($script in @("tools\Apply-Decisions.ps1", "tools\Generate-Digest.ps1", "tools\Generate-Codex-Notice.ps1")) {
+    if (-not (Test-Path (Join-Path $projectPath $script))) {
+        Abort-Preflight "Required scripts exist" "Missing required script: $script" "Restore $script from version control before enabling automation." $passed
+    }
+}
+$passed += "Required scripts exist"
+
+# Required environment variables exist -- this script's one true external dependency is the `claude`
+# CLI itself being reachable; a Scheduled Task's environment can differ from an interactive shell's.
+if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Abort-Preflight "Required environment variables exist" "The 'claude' CLI is not available on PATH for this session." "Ensure Claude Code is installed and on PATH for the account/session running this scheduled task." $passed
+}
+$passed += "Required environment variables exist"
+
+Add-Content -Path $logFile -Value "Preflight passed: $($passed -join ', ')."
 
 # Use Claude Pro subscription instead of API key (temporary -- only affects this session)
 Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
@@ -74,22 +173,26 @@ addressed (either acted on, or confirmed there was nothing to do).
 
 # --- Phase 1 (deterministic, pre-plan): apply approval replies into BUILD_QUEUE, if any ---
 try { & "$projectPath\tools\Apply-Decisions.ps1" | Tee-Object -FilePath $logFile -Append }
-catch { Add-Content -Path $logFile -Value "Apply-Decisions error: $_" }
+catch { Halt-Automation "Apply-Decisions.ps1 threw an error: $_" }
 git add planning/PROPOSALS.md planning/BUILD_QUEUE.md captures/decisions
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     git commit -m "decisions: apply approval replies -> BUILD_QUEUE" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed after Apply-Decisions.ps1" }
     git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed after Apply-Decisions.ps1 commit" }
 }
 
 # --- Phase 2: Claude session -- TRIAGE + PLAN CONVERSION ONLY. No commit/push tool available to it. ---
 claude -p $prompt `
     --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
     | Tee-Object -FilePath $logFile -Append
+if ($LASTEXITCODE -ne 0) { Halt-Automation "claude -p exited with code $LASTEXITCODE" }
 
 # --- Phase 2b (deterministic): commit-scope guard. The Claude session above cannot commit or push
 #     itself; this script is the only thing that ever commits its output, and only after checking
-#     every changed path against the allow-list below. Anything outside it halts uncommitted. ---
+#     every changed path against the allow-list below. Anything outside it halts the ENTIRE run --
+#     fail-fast: no digest, no Codex-ready notice, no further commits/pushes happen after a halt. ---
 $allowedPatterns = @(
     '^PLAN\.md$', '^TASKS\.md$', '^STATUS\.md$',
     '^planning/BUILD_QUEUE\.md$', '^planning/PROPOSALS\.md$', '^planning/DIGEST\.md$', '^planning/CODEX_READY\.md$',
@@ -99,42 +202,38 @@ $changed = @(git status --porcelain | ForEach-Object { $_.Substring(3).Trim() } 
 $violations = @($changed | Where-Object { $path = $_; -not ($allowedPatterns | Where-Object { $path -match $_ }) })
 
 if ($violations.Count -gt 0) {
-    $msg = "ALERT: Claude session touched file(s) outside the allowed planning surface: $($violations -join ', '). NOT committing or pushing -- working tree left as-is for human review."
-    Add-Content -Path $logFile -Value $msg
-    $statusEntry = @"
-
-## $(Get-Date -Format 'yyyy-MM-dd HH:mm') -- AUTOMATION HALTED: out-of-scope file change detected
-$msg
-Investigate before the next scheduled run. Nothing was committed or pushed.
-"@
-    Add-Content -Path "$projectPath\STATUS.md" -Value $statusEntry
+    Halt-Automation "Claude session touched file(s) outside the allowed planning surface: $($violations -join ', '). NOT committing or pushing -- working tree left as-is for human review."
 } elseif ($changed.Count -gt 0) {
     git add -- $changed
     git commit -m "plan: triage + BUILD_QUEUE -> PLAN/TASKS (automated)" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed for plan-conversion changes" }
     git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed for plan-conversion changes" }
 } else {
     Add-Content -Path $logFile -Value "No planning changes this run."
 }
 
-# --- Phase 3 (deterministic, post-run): refresh the proposals digest + Codex-ready notice for n8n's
-#     next morning send ---
-try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Add-Content -Path $logFile -Value "Generate-Digest error: $_" }
-try { & "$projectPath\tools\Generate-Codex-Notice.ps1" | Out-Null } catch { Add-Content -Path $logFile -Value "Generate-Codex-Notice error: $_" }
+# --- Phase 3 (deterministic, post-run): only reached if nothing above halted. Refreshes the
+#     proposals digest + Codex-ready notice for n8n's next morning send. ---
+try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Halt-Automation "Generate-Digest.ps1 threw an error: $_" }
+try { & "$projectPath\tools\Generate-Codex-Notice.ps1" | Out-Null } catch { Halt-Automation "Generate-Codex-Notice.ps1 threw an error: $_" }
 git add planning/DIGEST.md planning/CODEX_READY.md
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     git commit -m "digest: refresh proposals digest + codex-ready notice" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed for digest/codex-ready refresh" }
     git push origin main | Out-Null
+    if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed for digest/codex-ready refresh" }
 }
 
 $endTime = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 Add-Content -Path $logFile -Value "=== Session ended: $endTime ==="
 
-# Only shut down after the 2AM run, only if the guard didn't halt the run, and only if there was
-# actually planning work to commit (an idle run -- nothing in inbox, nothing new in BUILD_QUEUE --
-# leaves $changed empty, so there's no reason to force a shutdown).
+# Only shut down after the 2AM run, and only if there was actually planning work to commit (an idle
+# run -- nothing in inbox, nothing new in BUILD_QUEUE -- leaves $changed empty, so there's no reason
+# to force a shutdown). We can only reach this line if nothing halted or aborted the run above.
 $hour = (Get-Date).Hour
-if ($hour -lt 6 -and $violations.Count -eq 0 -and $changed.Count -gt 0) {
+if ($hour -lt 6 -and $changed.Count -gt 0) {
     Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
     shutdown /s /t 60
 }
