@@ -11,6 +11,11 @@
 
 ## Approved sprint
 
+### BQ-017 — Planner tab overflows horizontally on mobile (+23px at 390px width)
+- source: PROP-029 · priority: P1 · approved: 2026-07-03 (chat)
+- build: Real, reproducible bug caught by `tests/mobile-layout.spec.js` after its TASK-004 fixture fix — Planner is the only tab (of 7) with nonzero horizontal overflow at a 390px viewport. Root cause not yet traced; likely a fixed-width element in the planner day-grid/table that doesn't shrink/wrap below a breakpoint. Start with a code trace of the planner tab markup/CSS before proposing a fix.
+- detail: see PROP-029 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
 ### BQ-013 — Hardcoded hex colors bypass the token system (amber/red appear as 4+ shades)
 - source: PROP-020 · priority: P3 · approved: 2026-06-30 (digest reply)
 - build: Valid consistency debt, but pure cosmetic — defer past the stabilize phase. (Quick subset: point status reds/ambers at the existing semantic tokens.)
