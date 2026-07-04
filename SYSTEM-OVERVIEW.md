@@ -57,10 +57,11 @@ n8n can't reach into your PC directly, so commands are dispatched by a new Sched
 every ~2 minutes (not tied to the twice-daily automation) rather than an instant push — that
 trade-off was deliberate: true instant push would mean opening an inbound path to your PC for the
 first time in this whole system. `/build` and `/review` each work on their own `task-<id>` branch and
-never touch or merge `main`; merging stays a manual step, same as always. `/build` invokes Codex
-headlessly only if you've explicitly configured how (`$env:CODEX_CLI_COMMAND`) — today, with nothing
-configured, it stages the branch and asks you to run Codex yourself. See DECISIONS D-024 and
-`docs/09-automation.md`'s "Telegram remote control" section for the full design.
+never touch or merge `main`; merging stays a manual step, same as always. `/build` runs Codex CLI for
+real, unattended (`codex exec ... "Continue"`, verified working) — and if it reaches
+`status: review`, it automatically triggers `/review` too, so a clean build doesn't need a second
+Telegram message. See DECISIONS D-024/D-025 and `docs/09-automation.md`'s "Telegram remote control"
+section for the full design.
 
 ---
 
@@ -180,7 +181,7 @@ When enabled:
 Claude never touches app code in this loop, and Codex only ever runs when triggered — by you, either
 saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate ~2-min-polling
 "Meal Prep Command Dispatcher" task, see the Telegram Remote Control section above). See
-`docs/09-automation.md` (enable/disable, rollback, test checklist) and DECISIONS D-022/D-024.
+`docs/09-automation.md` (enable/disable, rollback, test checklist) and DECISIONS D-022/D-024/D-025.
 
 ---
 
@@ -253,7 +254,7 @@ The rule: AI handles mechanical work. Humans make commitments.
 | Capture pipeline | Live (Telegram → n8n → inbox) |
 | Planning pipeline | Operational (D-015 gated pipeline; Claude→TASKS.md conversion added D-022) |
 | Overnight build automation | Built, disabled by default (`$AUTOMATION_ENABLED = $false` in `run-claude.ps1`) — see `docs/09-automation.md` |
-| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable`); `/build` falls back to "stage + notify" since no headless Codex CLI is configured on this machine — see D-024 |
+| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable`); `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success — see D-024/D-025 |
 | Agent + skill workforce | Installed (12 agents, 13 skills) |
 | PRD system | First PRD written (PRD-001: Firebase Auth) |
 | Firebase Auth + Firestore | Planned — PRD-001 ready to build |

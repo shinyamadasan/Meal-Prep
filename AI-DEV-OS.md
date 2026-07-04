@@ -11,11 +11,16 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.5 — updated 2026-07-04.** Added: Telegram remote control — `/status /next /go /run
-/build /review /stop /enable /disable`, dispatched via a new ~2-min-polling "Meal Prep Command
-Dispatcher" Scheduled Task (no `-WakeToRun`) reading `captures/commands/` and replying through
-`captures/replies/OUTBOX.md`; `/build`/`/review` run on isolated `task-<id>` branches with their own
-commit-scope guards and never touch/merge `main` (D-024). v1.4 added Sprint Execution Mode —
+**Version: v1.6 — updated 2026-07-04.** `/build` now runs Codex CLI for real —
+`codex exec -C <root> --sandbox workspace-write "Continue"`, unattended, with its own `codex`-on-PATH
+Preflight check, result classification (review/blocked/failure/no-work), and an automatic chain into
+`/review` when a task reaches `status: review` — superseding v1.5's "stage a branch and ask a human to
+open Codex" fallback, now that headless execution is verified working (D-025). v1.5 added Telegram
+remote control — `/status /next /go /run /build /review /stop /enable /disable`, dispatched via a new
+~2-min-polling "Meal Prep Command Dispatcher" Scheduled Task (no `-WakeToRun`) reading
+`captures/commands/` and replying through `captures/replies/OUTBOX.md`; `/build`/`/review` run on
+isolated `task-<id>` branches with their own commit-scope guards and never touch/merge `main` (D-024).
+v1.4 added Sprint Execution Mode —
 risk-gated task chaining (`Risk: Low/Medium/High`, `Execution: Chained/Solo`) with semantic
 `checkpoint:` review boundaries and partial-sprint continuation on blocked tasks (D-023). v1.3 added
 overnight automation gated behind `$AUTOMATION_ENABLED`, never building app code (D-022). v1.2 added
@@ -38,16 +43,17 @@ Telegram capture
       -- gated behind $AUTOMATION_ENABLED in run-claude.ps1 (default OFF); same conversion also
          available interactively via the "Plan" command. Claude never builds app code in this step.
     → Telegram notified (CODEX_READY.md, sent only when a status: codex task exists)
-    → [human runs Codex locally, says "Continue" -- OR sends /build or /go from Telegram, which
-       stages a task-<id> branch and does the same if a headless Codex invocation is configured,
-       otherwise stages + notifies] → Codex implements from TASKS.md
-    → Review (Claude, interactively or via /review from Telegram) → merge (always manual)
+    → [human runs Codex locally, says "Continue" -- OR sends /build or /go from Telegram, which runs
+       Codex CLI unattended on a task-<id> branch (codex exec ... "Continue") and auto-chains into
+       Review if it reaches status: review] → Codex implements from TASKS.md
+    → Review (Claude, automatically after a successful /build, interactively, or via /review from
+       Telegram) → merge (always manual)
     → docs/ + DONE + DECISIONS updated
 ```
 
 Telegram also doubles as a remote control panel — `/status /next /go /run /build /review /stop
 /enable /disable` — for triggering any of the above on demand instead of waiting for the twice-daily
-schedule. See DECISIONS D-024 and `docs/09-automation.md`'s "Telegram remote control" section.
+schedule. See DECISIONS D-024/D-025 and `docs/09-automation.md`'s "Telegram remote control" section.
 
 > **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
 > build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that
@@ -80,7 +86,7 @@ schedule. See DECISIONS D-024 and `docs/09-automation.md`'s "Telegram remote con
 | `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
 | `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
 | `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, ~2-min Scheduled Task, no `-WakeToRun` | set project path |
-| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards | none |
+| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards | none |
 
 ### Scaffold folders (start empty)
 | Folder | Role |

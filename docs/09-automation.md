@@ -630,8 +630,8 @@ it that way. If the PC is asleep, commands wait until it wakes — either on its
 | `/next` | Reports whose turn it is (same priority table as the `Next` command, D-021) | none | no |
 | `/go` | Does whatever `/next` recommends — runs planning, build, or review as appropriate. The everyday command. | depends on what it dispatches to | depends |
 | `/run` | Manual override: runs planning right now (Triage + BUILD_QUEUE→TASKS.md), same as `run-claude.ps1` without `-Scheduled` | `main` | same allow-list as the scheduled run |
-| `/build` | Manual override: builds the first `status: codex` task on its own `task-<id>` branch | `task-<id>` (never `main`) | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
-| `/review` | Manual override: reviews the first `status: review` task's branch | that `task-<id>` (never `main`) | `REVIEW.md` + `TASKS.md` status only |
+| `/build` | Builds the first `status: codex` task on its own `task-<id>` branch by running Codex CLI unattended (`codex exec ... "Continue"`) — auto-chains into `/review` if it reaches `status: review` | `task-<id>` (never `main`) | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
+| `/review` | Reviews the first `status: review` task's branch — runs automatically after a successful `/build`, or on its own as a manual override | that `task-<id>` (never `main`) | `REVIEW.md` + `TASKS.md` status only |
 | `/stop` | Kill switch: disables automation, tries to stop an in-progress run | `main` | flag line only |
 | `/enable` | Enables automation | `main` | flag line only |
 | `/disable` | Disables automation (does not interrupt anything already running) | `main` | flag line only |
@@ -652,7 +652,8 @@ Telegram (/status /next /go /run /build /review /stop /enable /disable)
         lock-protected (automation.lock, shared with run-claude.ps1 and the phase runners below)
         routes each new command to:
             /run              → run-claude.ps1 (no -Scheduled)
-            /build             → tools/Run-Codex-Build.ps1
+            /build             → tools/Run-Codex-Build.ps1 (runs `codex exec` for real;
+                                  auto-chains into Run-Claude-Review.ps1 if a task reaches status: review)
             /review            → tools/Run-Claude-Review.ps1
             /go                → whichever of the above /next recommends
             /status /next      → computed directly, read-only
@@ -665,17 +666,36 @@ n8n-telegram-replies.json, every ~2 min
       clears it back to the placeholder via a GitHub PUT
 ```
 
-### `/build`: headless Codex, or "prepare and notify"
+### `/build`: real unattended Codex execution
 
-`tools/Run-Codex-Build.ps1` never guesses at a Codex CLI invocation. If you set
-`$env:CODEX_CLI_COMMAND` yourself (a full command you know actually invokes your Codex tool
-non-interactively), it runs that, checks the result against its own commit-scope guard, and pushes
-the `task-<id>` branch. **As of this writing there is no `codex` CLI on this machine's `PATH` and
-`$env:CODEX_CLI_COMMAND` is unset**, so `/build` runs in its fallback mode: it creates/checks out the
-`task-<id>` branch from `main`, marks the task `in-progress`, pushes the branch, and tells you to open
-Codex yourself and say "Continue" — it stages the work and shortens the trip, but doesn't remove the
-manual step. This is expected, not a bug; re-check this section if you ever configure a real headless
-Codex invocation.
+`tools/Run-Codex-Build.ps1` invokes Codex CLI for real:
+```
+codex exec -C <repo root> --sandbox workspace-write "Continue"
+```
+Verified (see DECISIONS D-025) to read `AGENTS.md`/`TASKS.md`, follow the AI Dev OS, and refuse to act
+when no `status: codex` task exists — the same contract as a human typing "Continue" interactively.
+There is no more "prepare branch and ask a human to open Codex" fallback; that design (D-024) is
+superseded now that headless execution is confirmed working.
+
+Before invoking, the script snapshots every `TASK-<id>` currently `status: codex` (the "tracked set" —
+plural, because a Sprint Execution Mode / D-023 chained group can legitimately advance more than one
+task in a single invocation; the chaining logic itself lives in `AGENTS.md`, which Codex reads on its
+own — this wrapper only checks outcomes afterward, never assumes exactly one task changed). stdout,
+stderr, exit code, and duration are all captured and logged to `claude-session.log`.
+
+After the run, results are classified against the tracked set:
+
+| Outcome | Condition | What happens |
+|---|---|---|
+| **no codex work available** | tracked set was empty before invoking | exits 0, Codex is never actually invoked |
+| **success → review** | exit 0, at least one tracked task now `status: review` | commits/pushes the branch, then **automatically invokes `tools/Run-Claude-Review.ps1`** (no separate manual `/review` needed), folds both results into one reply |
+| **blocked** | exit 0, at least one tracked task now `status: blocked` | commits/pushes whatever's safe (Codex wrote its own blocker note per `AGENTS.md`), reports it, no auto-chain |
+| **failure (Codex exited non-zero)** | `codex exec` itself exited non-zero | commits any safe partial progress, marks every still-`codex` tracked task `blocked` with the exit code, reports the failure |
+| **failure (no progress)** | exit 0 but no tracked task changed status at all | marks the task(s) `blocked` with a "no tracked progress" note rather than silently reporting success |
+
+The commit-scope guard (unchanged deny-list — see Safety gates below) runs **regardless of exit
+code**, before any of the above commits happen — a violation halts everything uncommitted, exactly
+like the planning guard.
 
 ### Safety gates (all reused/extended from the planning pipeline, none invented fresh)
 
@@ -695,6 +715,8 @@ Codex invocation.
 - **Codex only builds `status: codex` items** — `/build` picks the first one, same FIFO rule as
   Codex's own documented "Continue" behavior.
 - **Claude reviews before anything is "done"** — only `/review` can set a task to `status: done`.
+  `/build` reaching `status: review` auto-chains into `/review`, but the review step itself is never
+  skipped, and only `/review`'s own commit-scope guard (`REVIEW.md`/`TASKS.md` only) governs it.
 - **Notify after every phase** — every command appends exactly one entry to `OUTBOX.md`.
 - **Repeat-safety** — `/build`/`/review` check the current task status before acting (already
   building/reviewed/done → reply and no-op); `/enable`/`/disable`/`/stop` just set a flag;
@@ -718,7 +740,12 @@ Codex invocation.
    (Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher").Actions | Select-Object Execute, Arguments
    ```
    Confirm `State: Ready` and the action points at `tools\Dispatch-Commands.ps1` with no `-Scheduled`
-   flag (that flag is specific to `run-claude.ps1`; the dispatcher doesn't take it).
+   flag (that flag is specific to `run-claude.ps1`; the dispatcher doesn't take it). The task's
+   `ExecutionTimeLimit` is 2 hours (matching "Meal Prep Claude Overnight") — a real Codex build can
+   legitimately take a while.
+5. **Confirm `codex` is installed, authenticated, and on `PATH`** for the account/session Task
+   Scheduler runs under — `Run-Codex-Build.ps1`'s Preflight checks this the same way `run-claude.ps1`
+   checks for `claude`, and aborts (exit 2) with a clear message if it's missing.
 
 ### Testing
 
@@ -735,11 +762,18 @@ Codex invocation.
 5. **Repeat-safety:** send the same command twice; confirm the second is a safe no-op.
 6. **Concurrency:** trigger two commands back-to-back; confirm the second gets "busy."
 7. **Kill switch:** `/stop` mid-run; confirm it actually halts and the flag is off afterward.
-8. **No stray Codex invocation:** the earlier grep test (`Select-String -Pattern "codex "`) will now
-   legitimately match `tools/Run-Codex-Build.ps1`'s `$env:CODEX_CLI_COMMAND` handling — that's expected
-   and fine, since it's gated behind an explicit operator-set environment variable, never a guessed
-   invocation. What the test should still confirm is that no script calls a bare `codex` command
-   without that gate.
+8. **Codex invocation is exactly the verified command, nowhere else:**
+   ```powershell
+   Select-String -Path run-claude.ps1, n8n-telegram-*.json, tools\*.ps1 -Pattern "codex " -SimpleMatch -CaseSensitive:$false
+   ```
+   should show `codex exec ...` used **only** inside `tools/Run-Codex-Build.ps1`, and nowhere else in
+   the automation surface — confirms `run-claude.ps1` (the twice-daily planning run) still never
+   invokes Codex, and no other script has grown a second, uncontrolled invocation path.
+9. **Result classification:** craft `TASKS.md` states to exercise each outcome in the classification
+   table above (no codex-ready task, a task that reaches `review`, one Codex marks `blocked` itself,
+   and — if you can force it — a non-zero `codex exec` exit) and confirm each produces the right
+   `OUTBOX.md` message and TASKS.md state, and that reaching `review` actually triggers `/review`
+   automatically without you sending it.
 
 ### Rollback
 

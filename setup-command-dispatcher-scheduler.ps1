@@ -24,7 +24,7 @@ $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionDuration ([TimeSpan]::MaxValue)
 
 $settings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 10) `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
     -StartWhenAvailable `
     -MultipleInstances IgnoreNew
 
