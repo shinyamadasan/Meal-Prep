@@ -245,14 +245,16 @@ acceptance:
           test('e2e pipeline verification placeholder', async () => { expect(true).toBe(true); });
   - [ ] Add a one-line comment at the top of the new file noting it is a temporary pipeline-verification
         artifact and safe to delete.
-  - [ ] Update this task's own `status` field in TASKS.md as your workflow normally requires upon
-        completion. No other file is created, modified, or deleted.
+  - [ ] Follow your normal handoff workflow exactly: set this task's `status` to `review` in TASKS.md,
+        and append your standard completion evidence to CHANGELOG.md and TEST_REPORT.md.
 
 constraints:
   - Do not modify app.js, index.html, or style.css.
   - Do not modify any existing test file.
   - Keep the new file under 15 lines.
-  - Do not touch CLAUDE.md, AGENTS.md, docs/, planning/, captures/, tools/, or any automation script.
+  - The only files you may touch are: tests/e2e-pipeline-verification.spec.js, TASKS.md (this task's
+    status field only), CHANGELOG.md, and TEST_REPORT.md. Do not touch CLAUDE.md, AGENTS.md, docs/,
+    planning/, captures/, tools/, or any automation script.
 
 test steps:
   - [ ] The new file exists at tests/e2e-pipeline-verification.spec.js.
