@@ -19,22 +19,33 @@ $action = New-ScheduledTaskAction `
 
 # A single "Once" trigger with a repetition interval is Task Scheduler's standard way to express
 # "run every N minutes, indefinitely" -- StartBoundary is "now" so it begins immediately.
+# RepetitionDuration is deliberately NOT [TimeSpan]::MaxValue: that serializes to an ISO-8601
+# duration (P99999999DT23H59M59S) that Task Scheduler's XML schema rejects as out of range --
+# confirmed live, and Register-ScheduledTask throws but doesn't stop the script, so a prior run of
+# this file printed a false "Task registered" success message while nothing was actually created.
+# 10 years is comfortably "indefinite" for a task meant to be re-registered if ever changed anyway.
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 2) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+    -RepetitionDuration (New-TimeSpan -Days 3650)
 
 $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
     -StartWhenAvailable `
     -MultipleInstances IgnoreNew
 
-Register-ScheduledTask `
-    -TaskName $taskName `
-    -Action $action `
-    -Trigger $trigger `
-    -Settings $settings `
-    -Description "Polls captures/commands/ for new Telegram control commands (/status /next /go /run /build /review /stop /enable /disable) every 2 minutes and dispatches them. See docs/09-automation.md." `
-    -Force
+try {
+    Register-ScheduledTask `
+        -TaskName $taskName `
+        -Action $action `
+        -Trigger $trigger `
+        -Settings $settings `
+        -Description "Polls captures/commands/ for new Telegram control commands (/status /next /go /run /build /review /stop /enable /disable) every 2 minutes and dispatches them. See docs/09-automation.md." `
+        -Force -ErrorAction Stop | Out-Null
+} catch {
+    Write-Host ""
+    Write-Host "FAILED to register '$taskName': $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host ""
 Write-Host "Task registered: '$taskName'" -ForegroundColor Green
