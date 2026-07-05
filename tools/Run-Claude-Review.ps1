@@ -145,9 +145,13 @@ if ($changed.Count -eq 0) {
 Invoke-Git -C $root add -- $changed
 Invoke-Git -C $root commit -m "${taskId}: Claude review" | Out-Null
 Invoke-Git -C $root push origin $branchName | Out-Null
-Invoke-Git -C $root checkout main | Out-Null
-
+# Read the final status BEFORE switching back to main -- checking out main first would make this
+# read main's untouched TASKS.md (task-006 was never merged there), always reporting the task's
+# pre-review status regardless of what Claude actually decided. Confirmed live: a real APPROVED
+# review with status correctly set to `done` on $branchName was misreported as "needs REWORK"
+# because $tasksFile was read after the branch switch.
 $newStatus = Get-TaskStatus -TaskId $taskId
+Invoke-Git -C $root checkout main | Out-Null
 if ($newStatus -eq 'done') {
     Write-Result "$taskId APPROVED. Merge $branchName into main when you're ready."
 } elseif ($newStatus -eq 'codex') {
