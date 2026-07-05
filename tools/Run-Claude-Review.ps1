@@ -104,9 +104,20 @@ Write a REVIEW.md entry: verdict (APPROVED or REWORK), must-fix items if any, ni
 $taskId's status in TASKS.md: `done` if approved, back to `codex` if rework is needed. Never rubber-stamp.
 "@
 
-claude -p $prompt `
-    --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
-    | Tee-Object -FilePath $logFile -Append
+# Piping empty stdin gives claude an immediate EOF instead of it stalling ~3s waiting for input it
+# will never get. Lowering EAP to 'Continue' for the call prevents claude's own benign stdin-warning
+# text on stderr from being promoted to a terminating exception (confirmed live: this crashed the
+# whole auto-chain into review with no [Run-Claude-Review] log output at all, before Write-Result
+# even ran once) -- same class of bug as the git EAP-Stop issue Invoke-Git already guards against.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    "" | claude -p $prompt `
+        --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
+        2>$null | Tee-Object -FilePath $logFile -Append
+} finally {
+    $ErrorActionPreference = $prevEAP
+}
 if ($LASTEXITCODE -ne 0) {
     # Deliberately do NOT checkout main -- Claude's session may have left partial, uncommitted edits;
     # leave $branchName exactly as it is for inspection rather than risk carrying stray changes onto main.
