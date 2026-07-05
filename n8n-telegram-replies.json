@@ -97,7 +97,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"message\": \"replies: cleared after send\",\n  \"content\": \"{{ Buffer.from('No pending replies.\\n').toString('base64') }}\",\n  \"sha\": \"{{ $('Decode OUTBOX.md').item.json.sha }}\",\n  \"branch\": \"main\"\n}",
+        "jsonBody": "={\n  \"message\": \"replies: cleared after send\",\n  \"content\": \"Tm8gcGVuZGluZyByZXBsaWVzLgo=\",\n  \"sha\": \"{{ $('Decode OUTBOX.md').item.json.sha }}\",\n  \"branch\": \"main\"\n}",
         "options": {}
       },
       "id": "github-clear-outbox",
