@@ -226,6 +226,39 @@ test steps:
   - [ ] Tap/click each of the 4 buttons on the Planner tab at mobile width; confirm they still work
         (Clear Week clears, Save Week / Load Saved Week / Prep Mode open their respective flows)
 
+### TASK-006 · TEMPORARY — autopilot end-to-end verification (revert immediately after test)
+status: codex
+owner: codex
+source: manual-autopilot-verification
+priority: P1
+depends-on: none
+files: tests/autopilot-verification.spec.js
+
+context:
+  TEMPORARY throwaway task to verify the /go mission autopilot end-to-end (plan-skip -> build ->
+  auto-review -> mark done on main -> summary). Reverted immediately after, regardless of outcome.
+  Do exactly what is described and nothing more.
+
+acceptance:
+  - [ ] Create a new file `tests/autopilot-verification.spec.js` with exactly one trivial always-passing
+        Playwright test, and a top-of-file comment noting it is a temporary artifact safe to delete:
+          const { test, expect } = require('@playwright/test');
+          test('autopilot verification placeholder', async () => { expect(true).toBe(true); });
+  - [ ] Follow your normal handoff workflow: set this task's `status` to `review` in TASKS.md and
+        append your standard completion evidence to CHANGELOG.md and TEST_REPORT.md.
+
+constraints:
+  - Do not modify app.js, index.html, or style.css.
+  - Do not modify any existing test file.
+  - Keep the new file under 15 lines.
+  - The only files you may touch are: tests/autopilot-verification.spec.js, TASKS.md (this task's
+    status field only), CHANGELOG.md, and TEST_REPORT.md. Do not touch CLAUDE.md, AGENTS.md, docs/,
+    planning/, captures/, tools/, or any automation script.
+
+test steps:
+  - [ ] The new file exists at tests/autopilot-verification.spec.js.
+  - [ ] Running `npx playwright test tests/autopilot-verification.spec.js` passes.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
