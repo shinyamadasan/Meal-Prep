@@ -119,8 +119,13 @@ function Get-NextAction {
             }
         }
     }
+    # Per-item check, not whole-file: BUILD_QUEUE.md routinely accumulates old deferred entries
+    # alongside genuinely ready ones (confirmed live -- 4 unrelated "Deferred by Builder" notes
+    # masked 6 real approved, non-deferred items including a P1 bug, making /go always conclude
+    # "nothing approved waiting". A block only counts as deferred if ITS OWN note says so.
     $bqText = Get-Content (Join-Path $root 'planning/BUILD_QUEUE.md') -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-    if ($bqText -match '(?m)^###\s+BQ-\d+' -and $bqText -notmatch '(?i)deferred') {
+    $bqBlocks = if ($bqText) { [regex]::Matches($bqText, '(?ms)^###\s+BQ-\d+.*?(?=^###\s+BQ-\d+|\z)') } else { @() }
+    if ($bqBlocks | Where-Object { $_.Value -notmatch '(?i)\*\*Deferred' } | Select-Object -First 1) {
         return @{ Action = 'run'; Owner = 'Claude'; Message = 'An approved BUILD_QUEUE item is waiting to be converted.' }
     }
     return @{ Action = 'status'; Owner = 'you'; Message = 'No active task, nothing approved waiting.' }
@@ -196,6 +201,17 @@ if (Test-Path $lockFile) {
 if (-not $DryRun) { "$PID`n$(Get-Date -Format o)" | Out-File -FilePath $lockFile -Encoding ascii }
 
 try {
+    # n8n pushes new command files straight to origin/main -- this local clone never sees them until
+    # something pulls. Without this, the scheduled task ran successfully every 2 minutes but always
+    # found "no new commands" because the file only existed on GitHub, not on disk here (confirmed
+    # live: a real /go sat unprocessed for 10+ minutes until a human manually ran `git pull`).
+    # --ff-only is deliberate: if local ever diverges from origin (shouldn't happen given every phase
+    # runner pushes immediately after each commit), fail loud rather than silently merge-committing.
+    $pullOutput = Invoke-Git -C $root pull origin main --ff-only
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: git pull --ff-only failed (exit $LASTEXITCODE): $pullOutput -- proceeding with possibly-stale local state."
+    }
+
     if (-not (Test-Path $cmdDir)) { Write-Host "No captures/commands/ folder found."; return }
     $files = Get-ChildItem -Path $cmdDir -Filter '*.md' -File | Where-Object { $_.Name -ne 'README.md' } | Sort-Object Name
     $new = @()
