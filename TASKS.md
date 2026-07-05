@@ -227,7 +227,7 @@ test steps:
         (Clear Week clears, Save Week / Load Saved Week / Prep Mode open their respective flows)
 
 ### TASK-006 · TEMPORARY — autopilot end-to-end verification (revert immediately after test)
-status: codex
+status: done
 owner: codex
 source: manual-autopilot-verification
 priority: P1
