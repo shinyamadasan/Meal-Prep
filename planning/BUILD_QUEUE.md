@@ -41,3 +41,28 @@
 - detail: see PROP-023 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
 
 Promote a new batch from `planning/ROADMAP.md` to activate the next run.
+
+### BQ-018 — Bulk add: default storage location selector (counter / fridge / pantry)
+- source: PROP-024 · priority: P2 · approved: 2026-07-04 (digest reply)
+- build: P2 — valid UX gain, but not a blocker during stabilize phase. Approve when P3 queue clears.
+- detail: see PROP-024 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-019 — Bulk add: per-item expiry date in the line format (vs single shared date)
+- source: PROP-025 · priority: P2 · approved: 2026-07-04 (digest reply)
+- build: Valid design evolution of BQ-005, but redesigning the parser + UI is M–L effort. Revisit when alpha feedback is clearer.
+- detail: see PROP-025 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-020 — Recipe card: compact header, always-expanded detail view
+- source: PROP-026 · priority: P3 · approved: 2026-07-04 (digest reply)
+- build: P3 — UX exploration; current expand-on-click is functional and avoids cognitive overload on a long recipe list.
+- detail: see PROP-026 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-021 — Cook confirmation: optional serving multiplier for accurate pantry deduction
+- source: PROP-027 · priority: P2 · approved: 2026-07-04 (digest reply)
+- build: P2 — meaningful accuracy enhancement to the core cook-and-deduct flow. Promote when cook loop is stable.
+- detail: see PROP-027 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-022 — Long-press to enter bulk multi-select mode (bulk move + bulk delete) on pantry/grocery items
+- source: PROP-028 · priority: P3 · approved: 2026-07-04 (digest reply)
+- build: P3 — power-user shortcut; extends PROP-012. Revisit after alpha stabilize.
+- detail: see PROP-028 in planning/PROPOSALS.md (evidence, ambiguity, likely files)

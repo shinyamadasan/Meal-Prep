@@ -333,7 +333,7 @@
 - **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** UI placement: dropdown above the textarea in `#bulk-add-modal`; default = "Auto (infer)"; overrides `inferStorage()` in `confirmBulkAdd()` when set.
 - **why now vs later:** Park — post-stabilize. BQ-016 modal work is more pressing.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-07-04 (via digest reply)
 
 ---
 
@@ -346,7 +346,7 @@
 - **effort:** M–L · **dependencies:** PROP-024 (storage selector, same modal) if combined · **confidence:** high (the desire) / med (the parser approach) · **ambiguity:** format: append to line (`Coconut cream 200ml 2026-07-20`) vs separate column vs inline date keyword (`exp:2026-07-20`). Also: what happens when the shared date field AND a per-line date are both set?
 - **why now vs later:** Park — redesigning the parser and UX mid-stabilize adds risk. Collect more user feedback first; if the per-item friction keeps appearing, promote to Approve.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-07-04 (via digest reply)
 
 ---
 
@@ -359,7 +359,7 @@
 - **effort:** M (compact header is S; always-open detail is M with a "remember last tab" state) · **dependencies:** none · **confidence:** med · **ambiguity:** "always open" = expand on list render, or just default to expanded when tapping? If the former, the entire recipe list would be a wall of text — almost certainly not what the user means.
 - **why now vs later:** Park — low urgency, needs design clarity before building.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-07-04 (via digest reply)
 
 ---
 
@@ -372,7 +372,7 @@
 - **effort:** M (add a "How many portions?" step/input to the cook confirmation dialog; pass multiplier to `deductIngredientsForRecipe()`) · **dependencies:** none · **confidence:** high · **ambiguity:** UX: inline in the existing cook-confirm dialog, or a new step? Default to 1× with a stepper. Low-staple warning can be a follow-up.
 - **why now vs later:** Park — not a blocker; promote after alpha stabilize shows cook-loop usage.
 - **AI-recommended priority:** **P2**
-- **status:** pending
+- **status:** approved 2026-07-04 (via digest reply)
 
 ---
 
@@ -385,7 +385,7 @@
 - **effort:** M–L (long-press gesture with 500ms debounce + visual enter-selection-mode state + checkbox UI + bulk action bar + delete + move-to-location modal) · **dependencies:** none · **confidence:** med · **ambiguity:** scope: pantry only, or grocery list too? Move target: storage location picker? Desktop has no long-press — needs a fallback (multi-click?).
 - **why now vs later:** Park — builds on PROP-012 which was P3. Address after stabilize phase.
 - **AI-recommended priority:** **P3**
-- **status:** pending
+- **status:** approved 2026-07-04 (via digest reply)
 
 ---
 
