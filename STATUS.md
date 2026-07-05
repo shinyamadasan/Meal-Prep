@@ -5,6 +5,51 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-05 — Triage: 2 captures (msg-67, msg-309) — both dropped as noise
+
+**Triage complete (2 new captures):**
+
+- **msg-67 (2026-07-04T17:56Z) — body `yes`:** stray Telegram reply with no command/context. Cross-references
+  `planning/PROPOSALS.md`: PROP-024..028 all carry `status: approved 2026-07-04 (via digest reply)`, so this
+  capture was the digest-reply that already flipped them to approved. Effect already applied upstream — no
+  new PROPOSAL entry needed. Same drop-without-PROP treatment as msg-53 last batch. ▶ Dropped (already
+  actioned).
+- **msg-309 (2026-07-05T08:04Z) — body `status`:** bare "status" word, no `/command` prefix. Reads as a
+  stray system-command word typed into the capture channel, not a product idea/bug/feature. No actionable
+  signal. ▶ Dropped (noise).
+
+**Files changed:** both inbox files flipped `status: new → triaged`; archives written to
+`captures/processed/2026/07/`. PROPOSALS.md, ROADMAP.md, BUILD_QUEUE.md, PLAN.md, TASKS.md untouched (nothing
+approved, nothing to schedule, no build work created).
+
+**State on entry unchanged from 2026-07-04:**
+- BQ-016/017 milestone `done` (TASK-001..005 all done).
+- BUILD_QUEUE has no new approved items (BQ-013/014/015 remain deferred P3).
+- PROP-024..028 already approved via digest; not yet reflected in `ROADMAP.md`'s Approved Backlog section
+  (still says "*(empty — approve a proposal to populate this)*"). That sync is a follow-up ROADMAP write —
+  out of scope this run (autonomous instructions said not to touch ROADMAP).
+
+**Next command output:**
+```
+NEXT
+milestone : Fix mobile modal action buttons + planner overflow [done]
+task      : — (all done)
+owner     : Claude
+why       : No approved items in BUILD_QUEUE.md; PROP-024..028 approved but not yet promoted to ROADMAP
+            Approved Backlog. Await human to promote next batch or run a Plan pass.
+run       : Status
+```
+
+**Recommended human actions (when you're next at the keyboard):**
+- Promote PROP-024..028 from `PROPOSALS.md` into `ROADMAP.md` "Approved Backlog" (approvals happened via
+  digest reply 2026-07-04 but ROADMAP wasn't synced).
+- Consider approving PROP-029 (Planner mobile overflow, P1) — auto-found by the mobile-layout test,
+  reproducible; would be the next concrete build sprint.
+
+**Blockers:** none.
+
+---
+
 ## 2026-07-04 — Triage: 6 captures → PROP-024..028 confirmed; BQ-016/017 milestone closed
 
 **Triage complete (6 captures, 2026-07-02 batch):**
