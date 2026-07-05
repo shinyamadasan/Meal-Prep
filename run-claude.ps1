@@ -23,7 +23,7 @@ param(
     [switch]$Scheduled
 )
 
-$AUTOMATION_ENABLED = $true   # flip to $true to re-enable overnight automation
+$AUTOMATION_ENABLED = $false   # flip to $true to re-enable overnight automation
 
 $projectPath = "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 $logFile = "$projectPath\claude-session.log"
