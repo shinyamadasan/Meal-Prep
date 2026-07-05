@@ -150,36 +150,46 @@ if ($branchExists) {
 }
 
 # --- Invoke Codex CLI, unattended. Captures stdout/stderr/exit code/duration for the log. ---
-$stdoutFile = Join-Path $root '.codex-stdout.tmp'
-$stderrFile = Join-Path $root '.codex-stderr.tmp'
-$stdinFile  = Join-Path $root '.codex-stdin.tmp'
+# Driven via System.Diagnostics.Process directly rather than the Start-Process cmdlet: confirmed
+# live that Start-Process -PassThru (without -Wait) never reliably populates .ExitCode even after
+# the process exits and Refresh() is called, which this wrapper's whole classification logic
+# depends on. The two other live-confirmed fixes carry over: closing StandardInput immediately
+# gives codex an instant EOF (without it, codex exec hung indefinitely reading "additional input
+# from stdin" -- 7+ hours, 0.1s of CPU used, holding automation.lock the whole time and silently
+# refusing every real Telegram command); the WaitForExit timeout is a second, independent safety
+# net against any other cause of a hang.
 $CODEX_TIMEOUT_MINUTES = 20   # tune per how long a real build/chained group legitimately takes
-"" | Out-File -FilePath $stdinFile -Encoding ascii -NoNewline
 $startTime = Get-Date
 # Start-Process -ArgumentList, given an array, does not reliably quote elements containing spaces
 # (confirmed live: $root's "Meal prep app" path split into separate positional args, and codex
 # rejected 'prep' as an unexpected argument). A single pre-quoted command-line string avoids this.
 $codexArgs = "exec -C `"$root`" --sandbox workspace-write `"Continue`""
-# -RedirectStandardInput to an empty file gives codex an immediately-EOF stdin (the literal 'NUL'
-# device name does not work here -- .NET resolves it as a relative file path, not the null device).
-# Without this, codex exec hung indefinitely reading "additional input from stdin" (confirmed live:
-# 7+ hours, 0.1s of CPU used, holding automation.lock the whole time and silently refusing every
-# real Telegram command). The WaitForExit timeout below is a second, independent safety net in case
-# anything else causes a hang.
-$proc = Start-Process -FilePath 'codex' `
-    -ArgumentList $codexArgs `
-    -WorkingDirectory $root -NoNewWindow -PassThru `
-    -RedirectStandardInput $stdinFile -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = 'codex'
+$psi.Arguments = $codexArgs
+$psi.WorkingDirectory = $root
+$psi.UseShellExecute = $false
+$psi.RedirectStandardInput = $true
+$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardError = $true
+
+$proc = New-Object System.Diagnostics.Process
+$proc.StartInfo = $psi
+$proc.Start() | Out-Null
+$proc.StandardInput.Close()
+$stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+$stderrTask = $proc.StandardError.ReadToEndAsync()
 $exited = $proc.WaitForExit($CODEX_TIMEOUT_MINUTES * 60 * 1000)
 if (-not $exited) {
     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     Add-Content -Path $logFile -Value "[Run-Codex-Build] codex exec for $($first.Id) TIMED OUT after $CODEX_TIMEOUT_MINUTES minute(s) -- killed."
+    $proc.WaitForExit()
 }
 $duration = (Get-Date) - $startTime
-$codexExit = if ($exited) { $proc.ExitCode } else { -1 }
-$stdout = Get-Content $stdoutFile -Raw -ErrorAction SilentlyContinue
-$stderr = Get-Content $stderrFile -Raw -ErrorAction SilentlyContinue
-Remove-Item $stdoutFile, $stderrFile, $stdinFile -Force -ErrorAction SilentlyContinue
+$codexExit = $proc.ExitCode
+$stdout = $stdoutTask.Result
+$stderr = $stderrTask.Result
 
 Add-Content -Path $logFile -Value "[Run-Codex-Build] codex exec for $($first.Id) -- exit $codexExit, duration $([int]$duration.TotalSeconds)s"
 Add-Content -Path $logFile -Value "[Run-Codex-Build] --- stdout ---`n$stdout"
