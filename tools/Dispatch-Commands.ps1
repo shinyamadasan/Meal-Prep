@@ -141,34 +141,255 @@ function Get-NextReply {
     return "owner: $($n.Owner)`nrun: $($n.Action)`nnote: $($n.Message)"
 }
 
-# Shared by /build and /go's build-action so there's exactly one way a task actually gets built.
+# Shared by /build and /go's autopilot. Returns BOTH the human result string and the runner's exit
+# code -- the autopilot loop classifies on the exit code, standalone /build just uses .Result.
+# ($a, not $args: $args is a PowerShell automatic variable and must not be shadowed.)
 function Invoke-BuildPhase {
-    $args = @(); if ($DryRun) { $args += '-DryRun' }
-    & (Join-Path $root 'tools\Run-Codex-Build.ps1') @args
+    $a = @(); if ($DryRun) { $a += '-DryRun' }
+    & (Join-Path $root 'tools\Run-Codex-Build.ps1') @a
+    $code = $LASTEXITCODE
     $resultFile = Join-Path $root '.last-phase-result.txt'
-    if (Test-Path $resultFile) { $r = Get-Content $resultFile -Raw; Remove-Item $resultFile -Force; $r }
-    else { "Build phase runner exited with code $LASTEXITCODE and left no result -- check claude-session.log." }
+    $res = if (Test-Path $resultFile) { $r = (Get-Content $resultFile -Raw).Trim(); Remove-Item $resultFile -Force; $r }
+           else { "Build phase runner exited with code $code and left no result -- check claude-session.log." }
+    [pscustomobject]@{ Result = $res; ExitCode = $code }
 }
 
-# Shared by /review and /go's review-action.
+# Shared by /review and /go's autopilot.
 function Invoke-ReviewPhase {
-    $args = @(); if ($DryRun) { $args += '-DryRun' }
-    & (Join-Path $root 'tools\Run-Claude-Review.ps1') @args
+    $a = @(); if ($DryRun) { $a += '-DryRun' }
+    & (Join-Path $root 'tools\Run-Claude-Review.ps1') @a
+    $code = $LASTEXITCODE
     $resultFile = Join-Path $root '.last-phase-result.txt'
-    if (Test-Path $resultFile) { $r = Get-Content $resultFile -Raw; Remove-Item $resultFile -Force; $r }
-    else { "Review phase runner exited with code $LASTEXITCODE and left no result -- check claude-session.log." }
+    $res = if (Test-Path $resultFile) { $r = (Get-Content $resultFile -Raw).Trim(); Remove-Item $resultFile -Force; $r }
+           else { "Review phase runner exited with code $code and left no result -- check claude-session.log." }
+    [pscustomobject]@{ Result = $res; ExitCode = $code }
 }
 
-# Shared by /run and /go's run-action.
+# Shared by /run and /go's autopilot.
 function Invoke-RunPhase {
-    if ($DryRun) { return "[DRY RUN] would run: $runClaude (no -Scheduled)" }
+    if ($DryRun) { return [pscustomobject]@{ Result = "[DRY RUN] would run planning ($runClaude, no -Scheduled)"; ExitCode = 0 } }
     & $runClaude
-    switch ($LASTEXITCODE) {
+    $code = $LASTEXITCODE
+    $res = switch ($code) {
         0 { "Planning run completed (exit 0). See claude-session.log for detail." }
         1 { "Planning run HALTED mid-run (exit 1) -- a safety guard caught something out of scope. See STATUS.md / claude-session.log." }
         2 { "Planning run ABORTED at Preflight (exit 2) -- an environment/repo-state problem. See claude-session.log." }
-        default { "Planning run exited with unexpected code $LASTEXITCODE. See claude-session.log." }
+        default { "Planning run exited with unexpected code $code. See claude-session.log." }
     }
+    [pscustomobject]@{ Result = $res; ExitCode = $code }
+}
+
+# ===================== AUTOPILOT (mission-based /go) ==========================================
+# /go owns "missions", not phases. A mission = one approved item driven to "ready to merge". The loop
+# calls the same phase runners as /run /build /review -- it only SEQUENCES them, so every preflight,
+# fail-fast halt, and commit-scope guard inside those runners is preserved untouched. Ownership flips
+# (Claude plan -> Codex build -> Claude review) are internal and never a stop; only real external
+# conditions end a run. See docs/DECISIONS.md D-026.
+
+$AUTOPILOT_MAX_ACTIONS = 10           # Plan / Build / Review each count as one AI action
+$AUTOPILOT_MAX_MINUTES  = 30          # wall-clock budget; whichever limit trips first ends the run
+$AUTO_NOTE = 'auto:'                  # prefix marking blocker notes AUTOPILOT itself wrote (never touch human-set blocks)
+
+# Parse every task block once: id, title, status, priority (P1<P2<P3, default P3), depends-on list,
+# and its blocker note (first line). This is the single source the loop reasons over.
+function Get-TaskTable {
+    if (-not (Test-Path $tasksFile)) { return @() }
+    $text = Get-Content $tasksFile -Raw -Encoding UTF8
+    $body = ($text -split '<!-- TASK TEMPLATE')[0]
+    $blocks = [regex]::Matches($body, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[·•]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
+    $out = @()
+    foreach ($b in $blocks) {
+        $rest = $b.Groups['rest'].Value
+        $status = ([regex]::Match($rest, '(?m)^status:\s*(?<s>[\w-]+)')).Groups['s'].Value
+        $pm = [regex]::Match($rest, '(?m)^priority:\s*P(?<p>[0-9])')
+        $priority = if ($pm.Success) { [int]$pm.Groups['p'].Value } else { 3 }
+        $dm = [regex]::Match($rest, '(?m)^depends-on:\s*(?<d>.+)$')
+        $deps = @()
+        if ($dm.Success -and $dm.Groups['d'].Value.Trim() -notmatch '^(none|n/a|-)$') {
+            $deps = @($dm.Groups['d'].Value -split '[,\s]+' | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^TASK-\d+$' })
+        }
+        $bn = [regex]::Match($rest, '(?ms)^blocker:\s*\r?\n\s*-\s*(?<n>.+?)$')
+        $note = if ($bn.Success) { $bn.Groups['n'].Value.Trim() } else { '' }
+        $out += [pscustomobject]@{
+            Id = $b.Groups['id'].Value; Title = $b.Groups['title'].Value.Trim()
+            Status = $status; Priority = $priority; Deps = $deps; Note = $note
+        }
+    }
+    $out
+}
+
+# A dependency is satisfied only if its task branch is already merged into main (nothing auto-merges,
+# so a dep built-but-unmerged this run would not be present when a dependent builds from clean main).
+function Test-DepsSatisfied {
+    param($Task, $MergedBranches)
+    foreach ($d in $Task.Deps) {
+        $depBranch = ($d -replace 'TASK-', 'task-').ToLower()
+        if ($depBranch -notin $MergedBranches) { return $false }
+    }
+    $true
+}
+
+# Isolate ONE task's block from the whole file so per-task edits can never bleed into a neighbouring
+# task (a `.*?` over the full file will happily cross `###` boundaries and grab another task's
+# blocker line -- exactly the bug this guards against). Returns Pre/Block/Post substrings, or $null.
+function Split-TaskBlock {
+    param([string]$Text, [string]$TaskId)
+    $m = [regex]::Match($Text, "(?ms)^###\s+$TaskId\b.*?(?=^###\s|^<!--|\z)")
+    if (-not $m.Success) { return $null }
+    @{ Pre = $Text.Substring(0, $m.Index); Block = $m.Value; Post = $Text.Substring($m.Index + $m.Length) }
+}
+
+# AUTOPILOT's own escalation: pull a task out of Codex's candidate set by setting it blocked with an
+# `auto:` note. This is how skip-and-continue works despite Codex self-selecting the first status:codex
+# task -- and the note doubles as persistent, human-visible state (strike count / merge-wait reason).
+function Set-TaskBlockedAuto {
+    param([string]$TaskId, [string]$Note)
+    $text = Get-Content $tasksFile -Raw -Encoding UTF8
+    $s = Split-TaskBlock -Text $text -TaskId $TaskId
+    if (-not $s) { return }
+    $blk = [regex]::Replace($s.Block, '(?m)^status:[^\r\n]*', 'status: blocked')
+    if ($blk -match '(?m)^blocker:\s*$') {
+        # replace the first bullet under an existing blocker: header (bounded to this block)
+        $blk = [regex]::Replace($blk, '(?ms)(^blocker:\s*\r?\n\s*-\s*).+?(\r?\n)', "`${1}$AUTO_NOTE $Note`$2")
+    } else {
+        # no blocker yet -> insert one immediately after the (now blocked) status line
+        $blk = [regex]::Replace($blk, '(?m)^(status:\s*blocked[^\r\n]*\r?\n)', "`$1blocker:`n  - $AUTO_NOTE $Note`n", 1)
+    }
+    if (-not $DryRun) { [System.IO.File]::WriteAllText($tasksFile, ($s.Pre + $blk + $s.Post), $utf8) }
+}
+
+# Set a task's status field only (no blocker manipulation). Used to reflect a build outcome onto
+# main -- e.g. an APPROVED build sets the task `done` on main (= ready to merge; the code itself
+# stays on the unmerged task branch until a human merges), so a later /go advances to the next task
+# instead of Codex re-picking this one. See docs/DECISIONS.md D-026.
+function Set-TaskStatus {
+    param([string]$TaskId, [string]$NewStatus)
+    $text = Get-Content $tasksFile -Raw -Encoding UTF8
+    $s = Split-TaskBlock -Text $text -TaskId $TaskId
+    if (-not $s) { return }
+    $blk = [regex]::Replace($s.Block, '(?m)^status:[^\r\n]*', "status: $NewStatus")
+    if (-not $DryRun) { [System.IO.File]::WriteAllText($tasksFile, ($s.Pre + $blk + $s.Post), $utf8) }
+}
+
+# Count of approved, non-deferred BUILD_QUEUE items not yet reflected as a task (i.e. still to plan).
+function Get-UnconvertedBQCount {
+    $bqText = Get-Content (Join-Path $root 'planning/BUILD_QUEUE.md') -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+    if (-not $bqText) { return 0 }
+    $tasksText = if (Test-Path $tasksFile) { Get-Content $tasksFile -Raw -Encoding UTF8 } else { '' }
+    $n = 0
+    foreach ($m in [regex]::Matches($bqText, '(?ms)^###\s+(?<id>BQ-\d+).*?(?=^###\s+BQ-\d+|\z)')) {
+        if ($m.Value -match '(?i)\*\*Deferred') { continue }
+        if ($tasksText -notmatch [regex]::Escape("source: $($m.Groups['id'].Value)")) { $n++ }
+    }
+    $n
+}
+
+# Commit + push a TASKS.md status change autopilot just made (no-op in DryRun / when nothing staged).
+function Publish-TasksChange {
+    param([string]$Message)
+    if ($DryRun) { return }
+    Invoke-Git -C $root add TASKS.md | Out-Null
+    Invoke-Git -C $root diff --cached --quiet
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Git -C $root commit -m $Message | Out-Null
+        Invoke-Git -C $root push origin main | Out-Null
+    }
+}
+
+# ONE mission per /go: release retryable auto-blocks -> plan once if nothing is build-ready ->
+# build exactly one dependency-satisfied task (auto-blocking any dep-blocked higher-priority ones
+# ahead of it) -> reflect the outcome onto main -> report. The build runner auto-chains its own
+# review internally; every preflight/guard inside it is untouched. See docs/DECISIONS.md D-026.
+function Invoke-Autopilot {
+    $start = Get-Date
+    $actions = 0
+
+    # --- Release AUTOPILOT's own past auto-blocks that are ready to retry. Rework strikes < 3 get
+    #     another attempt; merge-waiters clear once their dependency branch is merged. Human-set
+    #     blocks (no `auto:` prefix) are never touched. ---
+    $merged = @(Invoke-Git -C $root branch --merged main | ForEach-Object { $_.TrimStart('*').Trim() } | Where-Object { $_ })
+    $released = $false
+    foreach ($t in (Get-TaskTable | Where-Object { $_.Status -eq 'blocked' -and $_.Note -like "$AUTO_NOTE*" })) {
+        if ($t.Note -match 'waiting on merge of (?<dep>TASK-\d+)') {
+            if ((($Matches['dep'] -replace 'TASK-', 'task-').ToLower()) -in $merged) { Set-TaskStatus -TaskId $t.Id -NewStatus 'codex'; $released = $true }
+        } elseif ($t.Note -match 'strike (?<n>\d)/3' -and [int]$Matches['n'] -lt 3) {
+            Set-TaskStatus -TaskId $t.Id -NewStatus 'codex'; $released = $true
+        }
+    }
+    if ($released) { Publish-TasksChange 'autopilot: release auto-blocked task(s) for retry' }
+
+    # --- Plan once if there is approved work but nothing build-ready yet. ---
+    $planned = 0
+    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and (Get-UnconvertedBQCount) -gt 0) {
+        if (-not (Test-AutomationEnabled)) { return "Autopilot: automation disabled -- nothing done." }
+        $before = @(Get-TaskTable | Where-Object { $_.Status -eq 'codex' }).Count
+        $rp = Invoke-RunPhase; $actions++
+        if ($rp.ExitCode -ne 0) { return "Autopilot stopped in planning: $($rp.Result)" }
+        $planned = @(Get-TaskTable | Where-Object { $_.Status -eq 'codex' }).Count - $before
+    }
+
+    # --- Build exactly ONE dependency-satisfied task. Codex self-selects the first status:codex task
+    #     (AGENTS.md), and planning keeps file order == priority order, so the first codex task is the
+    #     highest-priority one. If its dependencies are not yet merged, auto-block it (so Codex skips
+    #     to the next satisfied one) and try again -- but still build only ONE task total. ---
+    $waiting = @()
+    $built = $null
+    while ($actions -lt $AUTOPILOT_MAX_ACTIONS -and ((Get-Date) - $start).TotalMinutes -lt $AUTOPILOT_MAX_MINUTES) {
+        $next = Get-TaskTable | Where-Object { $_.Status -eq 'codex' } | Select-Object -First 1
+        if (-not $next) { break }
+        $mergedNow = @(Invoke-Git -C $root branch --merged main | ForEach-Object { $_.TrimStart('*').Trim() } | Where-Object { $_ })
+        if (-not (Test-DepsSatisfied -Task $next -MergedBranches $mergedNow)) {
+            $depList = ($next.Deps -join ', ')
+            Set-TaskBlockedAuto -TaskId $next.Id -Note "waiting on merge of $depList"
+            Publish-TasksChange "autopilot: $($next.Id) waiting on merge of $depList"
+            $waiting += "$($next.Id) needs $depList merged"
+            continue
+        }
+        if ($DryRun) { return "[DRY RUN] would build $($next.Id) ($($next.Title)) [P$($next.Priority)] next." }
+
+        $r = Invoke-BuildPhase; $actions++
+        if ($r.Result -match '-> auto-review:') { $actions++ }
+        if ($r.ExitCode -eq 2) { return "Autopilot stopped -- systemic: $($r.Result)" }   # preflight/dirty/wrong-branch
+
+        if ($r.Result -match '(?im)\bAPPROVED\b') {
+            Set-TaskStatus -TaskId $next.Id -NewStatus 'done'
+            Publish-TasksChange "autopilot: $($next.Id) approved, ready to merge"
+            $built = [pscustomobject]@{ Id = $next.Id; P = $next.Priority; Outcome = 'approved' }
+        } elseif ($r.Result -match '(?im)REWORK') {
+            $prev = if ($next.Note -match 'strike (?<n>\d)/3') { [int]$Matches['n'] } else { 0 }
+            $strike = $prev + 1
+            $why = if ($r.Result -match '(?ms)REWORK[^\r\n]*?[-:]\s*(?<w>[^\r\n]+)') { ($Matches['w'] -replace '^[-\s]+', '').Trim() } else { 'see REVIEW.md on the branch' }
+            Set-TaskBlockedAuto -TaskId $next.Id -Note "review rework, strike $strike/3 -- $why"
+            Publish-TasksChange "autopilot: $($next.Id) rework strike $strike/3"
+            $built = [pscustomobject]@{ Id = $next.Id; P = $next.Priority; Outcome = "rework (strike $strike/3): $why" }
+        } else {   # exit 1: blocked / test-fail / no-progress on this task
+            Set-TaskBlockedAuto -TaskId $next.Id -Note "build stopped -- $(($r.Result -replace '\s+',' ').Trim())"
+            Publish-TasksChange "autopilot: $($next.Id) build stopped"
+            $built = [pscustomobject]@{ Id = $next.Id; P = $next.Priority; Outcome = "build stopped: $(($r.Result -replace '\s+',' ').Trim())" }
+        }
+        break   # ONE mission per /go
+    }
+
+    # --- Summary ---
+    $remaining = @(Get-TaskTable | Where-Object { $_.Status -in @('codex','in-progress','todo') }).Count + (Get-UnconvertedBQCount)
+    $out = @()
+    if ($built) {
+        if ($built.Outcome -eq 'approved') {
+            $out += "APPROVED: $($built.Id) [P$($built.P)] built + reviewed, ready to merge (branch $(($built.Id -replace 'TASK-','task-').ToLower()))."
+        } else {
+            $out += "NEEDS YOU: $($built.Id) [P$($built.P)] -- $($built.Outcome)"
+            $out += "Branch $(($built.Id -replace 'TASK-','task-').ToLower()) left for inspection."
+        }
+    } elseif ($waiting.Count -gt 0) {
+        $out += "Nothing built -- top task(s) waiting on a merge."
+    } else {
+        $out += "Nothing to do -- no approved work is build-ready."
+    }
+    if ($planned -gt 0) { $out += "(planned $planned new task(s) this run.)" }
+    if ($waiting.Count) { $out += "Waiting on merge: " + ($waiting -join '; ') }
+    $out += "Remaining approved work: $remaining."
+    $out += if ($built -and $built.Outcome -eq 'approved') { "Next: merge $($built.Id), then /go." } else { "Next: /go (after resolving the above)." }
+    ($out -join "`n")
 }
 
 function Set-AutomationFlag {
@@ -269,17 +490,13 @@ try {
                     }
                     $msg
                 }
-                'run'    { Invoke-RunPhase }
-                'build'  { Invoke-BuildPhase }
-                'review' { Invoke-ReviewPhase }
-                'go' {
-                    $n = Get-NextAction
-                    switch ($n.Action) {
-                        'run'    { "-> planning: " + (Invoke-RunPhase) }
-                        'build'  { "-> build: " + (Invoke-BuildPhase) }
-                        'review' { "-> review: " + (Invoke-ReviewPhase) }
-                        'status' { "Nothing for /go to do. $($n.Message)`n`n" + (Get-StatusReply) }
-                    }
+                'run'    { (Invoke-RunPhase).Result }
+                'build'  { (Invoke-BuildPhase).Result }
+                'review' { (Invoke-ReviewPhase).Result }
+                'go'     { Invoke-Autopilot }
+                'log' {
+                    $logTail = Get-Content "$root\claude-session.log" -Tail 40 -ErrorAction SilentlyContinue
+                    if ($logTail) { "Last session log (40 lines):`n" + ($logTail -join "`n") } else { "No session log yet." }
                 }
                 default { "Unrecognized command: '$cmd'." }
             }

@@ -217,13 +217,20 @@ STEP B -- PLAN CONVERSION (approved work only, into TASKS.md -- never build it):
 planning/BUILD_QUEUE.md that does NOT yet have a corresponding `source: BQ-<id>` entry in TASKS.md,
 convert it into one or more atomic, independently testable tasks exactly as the interactive "Plan"
 command does (see CLAUDE.md's Tech Lead section and Definition of Ready): each new TASKS.md entry needs
-objective, owner: codex, status: codex, files, acceptance criteria, constraints, and verification/test
-steps -- Codex must never have to infer missing requirements. Update PLAN.md's Goal/Approach/Scope/
-Source/Status to describe the current milestone if this batch changes it. Skip any BUILD_QUEUE item
-already reflected in TASKS.md (do not create duplicates), and skip any item whose build note says
-deferred (leave those for a human decision). Do not change the `status` field of any EXISTING TASKS.md
-entry -- in this step you only ever add new entries. If BUILD_QUEUE.md is empty or everything in it is
-already reflected in TASKS.md, do nothing for this step.
+objective, owner: codex, status: codex, a `priority: P<n>` field carried verbatim from the source
+BUILD_QUEUE item's priority, `depends-on:` (list the TASK ids it needs, or `none`), files, acceptance
+criteria, constraints, and verification/test steps -- Codex must never have to infer missing
+requirements. PRIORITY ORDER MATTERS: Codex builds the FIRST `status: codex` task in file order, and
+the /go autopilot relies on file order == priority order to build P1 before P2 before P3. So when you
+add new tasks, place/keep the pending (`status: codex`) tasks in ascending priority order (P1 first,
+then P2, then P3; preserve existing relative order within a priority). You may reorder ONLY pending
+`status: codex` task blocks to achieve this; never reorder or restatus done/review/blocked/in-progress
+tasks. Update PLAN.md's Goal/Approach/Scope/Source/Status to describe the current milestone if this
+batch changes it. Skip any BUILD_QUEUE item already reflected in TASKS.md (do not create duplicates),
+and skip any item whose build note says deferred (leave those for a human decision). Do not change the
+`status` field of any EXISTING TASKS.md entry -- in this step you only ever add new entries (and may
+reorder pending codex blocks for priority). If BUILD_QUEUE.md is empty or everything in it is already
+reflected in TASKS.md, do nothing for this step.
 
 Stop after STEP A and STEP B -- there is no STEP C. You are done for this run once both steps are
 addressed (either acted on, or confirmed there was nothing to do).

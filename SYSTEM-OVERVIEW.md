@@ -49,9 +49,14 @@ and keeps building whatever else in the group is independent. See DECISIONS D-02
 ## Telegram Remote Control
 
 Beyond approving proposals, Telegram is a control panel: `/status`, `/next`, `/go`, `/run`, `/build`,
-`/review`, `/stop`, `/enable`, `/disable`. `/go` is the everyday one — it does whatever `/next`
-recommends, so you don't have to remember which phase comes next. The others exist as manual
-overrides for forcing a specific phase out of order.
+`/review`, `/stop`, `/enable`, `/disable` (plus `/log`). **`/go` is the everyday one — a mission
+autopilot (D-026): one press drives the whole plan→build→review span for one task and replies with a
+single summary** (e.g. "APPROVED: TASK-051 [P1] ready to merge" or "NEEDS YOU: TASK-051 — rework
+(strike 1/3): …"), so you never have to think about which internal phase comes next or whose turn it
+is. It builds the highest-priority task whose dependencies are already merged, marks it `done` on
+`main` (ready to merge — the code waits on its branch until you merge) so your next `/go` moves on,
+and auto-parks rework (with a strike, retried until 3) and dependency-blocked tasks with a clear
+reason. The other commands force a specific phase for power-user/debug use.
 
 n8n can't reach into your PC directly, so commands are dispatched by a new Scheduled Task polling
 every ~2 minutes (not tied to the twice-daily automation) rather than an instant push — that
@@ -254,7 +259,7 @@ The rule: AI handles mechanical work. Humans make commitments.
 | Capture pipeline | Live (Telegram → n8n → inbox) |
 | Planning pipeline | Operational (D-015 gated pipeline; Claude→TASKS.md conversion added D-022) |
 | Overnight build automation | Built, disabled by default (`$AUTOMATION_ENABLED = $false` in `run-claude.ps1`) — see `docs/09-automation.md` |
-| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable`); `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success — see D-024/D-025 |
+| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable /log`); `/go` is a mission autopilot driving plan→build→review per press with a single summary; `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success — see D-024/D-025/D-026 |
 | Agent + skill workforce | Installed (12 agents, 13 skills) |
 | PRD system | First PRD written (PRD-001: Firebase Auth) |
 | Firebase Auth + Firestore | Planned — PRD-001 ready to build |

@@ -622,13 +622,14 @@ inbound network exposure this entire session; a couple of minutes of latency was
 it that way. If the PC is asleep, commands wait until it wakes — either on its own, or at the next
 9PM/2AM run of "Meal Prep Claude Overnight" (which still has `-WakeToRun`).
 
-### The 9 commands
+### The commands
 
 | Command | What it does | Branch | Mutates? |
 |---|---|---|---|
 | `/status` | Automation on/off, current branch + tree state, last log line, Codex-ready + review-ready counts | none | no |
 | `/next` | Reports whose turn it is (same priority table as the `Next` command, D-021) | none | no |
-| `/go` | Does whatever `/next` recommends — runs planning, build, or review as appropriate. The everyday command. | depends on what it dispatches to | depends |
+| `/go` | **Mission autopilot (the everyday command, D-026).** One `/go` = one mission: plan if needed → build the single highest-priority dependency-satisfied task → auto-review → report. Marks the built task `done` on `main` (= ready to merge) so the next `/go` advances. Rework auto-blocks with a strike (retries until 3/3, then stays blocked); a task whose dependency isn't merged is parked "waiting on merge". Returns an aggregate summary, detail only on failure. | `main` (plus the `task-<id>` its build runs on) | `TASKS.md` status/notes on `main`; app code etc. on the `task-<id>` branch |
+| `/log` | Tails the last 40 lines of `claude-session.log` (power-user/debug) | none | no |
 | `/run` | Manual override: runs planning right now (Triage + BUILD_QUEUE→TASKS.md), same as `run-claude.ps1` without `-Scheduled` | `main` | same allow-list as the scheduled run |
 | `/build` | Builds the first `status: codex` task on its own `task-<id>` branch by running Codex CLI unattended (`codex exec ... "Continue"`) — auto-chains into `/review` if it reaches `status: review` | `task-<id>` (never `main`) | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
 | `/review` | Reviews the first `status: review` task's branch — runs automatically after a successful `/build`, or on its own as a manual override | that `task-<id>` (never `main`) | `REVIEW.md` + `TASKS.md` status only |
@@ -655,7 +656,8 @@ Telegram (/status /next /go /run /build /review /stop /enable /disable)
             /build             → tools/Run-Codex-Build.ps1 (runs `codex exec` for real;
                                   auto-chains into Run-Claude-Review.ps1 if a task reaches status: review)
             /review            → tools/Run-Claude-Review.ps1
-            /go                → whichever of the above /next recommends
+            /go                → Invoke-Autopilot: one mission (plan-if-needed → build one
+                                  dependency-satisfied task → auto-review → reflect outcome onto main)
             /status /next      → computed directly, read-only
             /stop /enable /disable → flips $AUTOMATION_ENABLED, commits + pushes main
         marks the command status: applied

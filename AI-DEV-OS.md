@@ -11,7 +11,16 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.6 — updated 2026-07-04.** `/build` now runs Codex CLI for real —
+**Version: v1.7 — updated 2026-07-05.** `/go` is now a **mission autopilot** (D-026): one Telegram
+command drives plan→build→review to a verdict and returns an aggregate summary, keeping the
+Claude/Codex split fully intact internally but invisible from Telegram. One `/go` = one mission —
+plan if needed, build the single highest-priority dependency-satisfied task (priority = P1→P2→P3 file
+order, which planning maintains), auto-review it, mark it `done` on `main` (= ready to merge) so the
+next `/go` advances, and report. Rework auto-blocks with an `auto:` strike note (retries until 3/3),
+and a task whose dependency isn't merged is parked "waiting on merge"; both share one mechanism and
+carry their state in the task's own blocker note (no side file). It's a thin orchestration layer over
+the **unchanged** phase runners, so every preflight/guard is preserved by construction. Budget: 30 min
+or 10 AI actions. v1.6 made `/build` run Codex CLI for real —
 `codex exec -C <root> --sandbox workspace-write "Continue"`, unattended, with its own `codex`-on-PATH
 Preflight check, result classification (review/blocked/failure/no-work), and an automatic chain into
 `/review` when a task reaches `status: review` — superseding v1.5's "stage a branch and ask a human to
@@ -52,8 +61,10 @@ Telegram capture
 ```
 
 Telegram also doubles as a remote control panel — `/status /next /go /run /build /review /stop
-/enable /disable` — for triggering any of the above on demand instead of waiting for the twice-daily
-schedule. See DECISIONS D-024/D-025 and `docs/09-automation.md`'s "Telegram remote control" section.
+/enable /disable` (plus `/log`). **`/go` is the everyday driver: a mission autopilot that runs the
+whole plan→build→review span above for one task per press and returns a single summary** (D-026), so
+the pipeline's internal handoffs are invisible from Telegram; the other commands force a specific
+phase for power-user/debug use. See DECISIONS D-024/D-025/D-026 and `docs/09-automation.md`.
 
 > **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
 > build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that
