@@ -245,7 +245,8 @@ acceptance:
           test('e2e pipeline verification placeholder', async () => { expect(true).toBe(true); });
   - [ ] Add a one-line comment at the top of the new file noting it is a temporary pipeline-verification
         artifact and safe to delete.
-  - [ ] No other file is created, modified, or deleted.
+  - [ ] Update this task's own `status` field in TASKS.md as your workflow normally requires upon
+        completion. No other file is created, modified, or deleted.
 
 constraints:
   - Do not modify app.js, index.html, or style.css.
