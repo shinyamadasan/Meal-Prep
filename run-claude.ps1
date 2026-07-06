@@ -249,9 +249,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # --- Phase 2: Claude session -- TRIAGE + PLAN CONVERSION ONLY. No commit/push tool available to it. ---
-claude -p $prompt `
-    --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
-    | Tee-Object -FilePath $logFile -Append
+# The prompt is piped via STDIN, not passed as `claude -p $prompt`: under Windows PowerShell 5.1
+# (which the scheduled task runs) a long multi-line string passed as a native-command argument loses
+# its tail -- confirmed live, Claude received only the head of this prompt and never saw STEP B, so it
+# triaged but never converted BUILD_QUEUE items into tasks. Piping via stdin delivers it intact.
+# EAP is lowered to 'Continue' for the call so claude's stderr can't be promoted to a terminating
+# exception under $ErrorActionPreference = 'Stop'; $LASTEXITCODE is still checked below.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $prompt | claude -p `
+        --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
+        2>$null | Tee-Object -FilePath $logFile -Append
+} finally {
+    $ErrorActionPreference = $prevEAP
+}
 if ($LASTEXITCODE -ne 0) { Halt-Automation "claude -p exited with code $LASTEXITCODE" }
 
 # --- Phase 2b (deterministic): commit-scope guard. The Claude session above cannot commit or push

@@ -104,15 +104,15 @@ Write a REVIEW.md entry: verdict (APPROVED or REWORK), must-fix items if any, ni
 $taskId's status in TASKS.md: `done` if approved, back to `codex` if rework is needed. Never rubber-stamp.
 "@
 
-# Piping empty stdin gives claude an immediate EOF instead of it stalling ~3s waiting for input it
-# will never get. Lowering EAP to 'Continue' for the call prevents claude's own benign stdin-warning
-# text on stderr from being promoted to a terminating exception (confirmed live: this crashed the
-# whole auto-chain into review with no [Run-Claude-Review] log output at all, before Write-Result
-# even ran once) -- same class of bug as the git EAP-Stop issue Invoke-Git already guards against.
+# Pipe the PROMPT itself via stdin (not `claude -p $prompt`): under Windows PowerShell 5.1 a long
+# multi-line prompt passed as a native-command argument loses its tail -- confirmed live in the
+# planner, where Claude only received the head of the prompt. Piping via stdin delivers it intact
+# AND gives claude an immediate EOF (no ~3s stall). Lowering EAP to 'Continue' for the call prevents
+# claude's benign stderr from being promoted to a terminating exception under EAP = 'Stop'.
 $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-    "" | claude -p $prompt `
+    $prompt | claude -p `
         --allowedTools "Read" "Glob" "Grep" "Edit" "Write" "Bash(git status)" "Bash(git diff *)" "Bash(git log *)" `
         2>$null | Tee-Object -FilePath $logFile -Append
 } finally {
