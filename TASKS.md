@@ -300,7 +300,9 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-007 · Add portion multiplier to cook confirmation + scale pantry deduction
-status: codex
+status: blocked
+blocker:
+  - auto: build stopped -- TASK-007 build reached REVIEW (1 of 5 tracked task(s)) after 851s, pushed to task-007. -> auto-review: TASK-007 review FAILED: claude -p exited with code 1. See claude-session.log.
 owner: codex
 source: BQ-021
 priority: P2
