@@ -1129,6 +1129,15 @@
             </div>
             <div class="modal-body">
                 <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong> or <strong>Name qty unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; <code>Coconut cream 200ml</code> &nbsp; or just <code>Garlic</code></p>
+                <div class="bulk-storage-row" style="margin-bottom:0.75rem">
+                  <label class="form-label">Storage <span style="font-weight:400;color:var(--text-secondary)">(optional — applies to all items)</span></label>
+                  <select id="bulk-add-default-storage" class="form-control" style="max-width:12rem">
+                    <option value="">Auto (infer per item)</option>
+                    <option value="counter">Counter</option>
+                    <option value="fridge">Fridge</option>
+                    <option value="freezer">Freezer</option>
+                  </select>
+                </div>
                 <div class="bulk-voice-row">
                   <button id="bulk-voice-btn" class="voice-btn" onclick="toggleVoiceInput()" title="Speak items one at a time">🎙 Speak</button>
                   <span id="bulk-voice-status" class="voice-status"></span>

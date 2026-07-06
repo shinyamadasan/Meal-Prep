@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-006 · 2026-07-05
+suite: npm test -- --reporter=list; npx playwright test --reporter=list --workers=1 --timeout=60000 --global-timeout=300000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; static QA/code trace for `#bulk-add-default-storage`
+result: targeted mobile-layout spec passed (1/1). Full single-worker run passed `button-smoke.spec.js`, then failed/timeboxed in `buttons-functional.spec.js` (1 passed, 3 failed, 17 did not run) because `#kitchen-setup-modal` intercepted nav clicks and `#add-recipe-btn` was hidden. Initial npm test timed out after 244s without reporter output. No failure traced to TASK-006 changes.
+untested: full Playwright suite completion remains unverified; direct selector browser check could not run because direct `chromium.launch` failed with `spawn EPERM` and a temporary-spec command was sandbox-blocked; real-device rendering remains human verification
+
 ## TASK-004 · 2026-07-03
 suite: npx playwright test tests/mobile-layout.spec.js --reporter=list; npm test -- --reporter=list
 result: mobile-layout spec ran past onboarding/nav fixture blockers and failed on a real overflow finding: `planner (+23px)`; full suite timed out after 304s

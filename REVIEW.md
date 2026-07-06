@@ -179,6 +179,81 @@ this task introduced or could fix.
 
 BQ-017 is now fully built — `PLAN.md`'s milestone can be marked complete at the next `Plan`/`Next` pass.
 
+## Review TASK-006 — APPROVED
+branch: task-006
+verdict: approved
+
+### Findings
+
+**1. HTML change — correct, all listed sub-criteria met.** Verified at `index.html:1132-1140`:
+- New row inserted inside `#bulk-add-modal .modal-body`, immediately before the existing
+  `.bulk-voice-row` at line 1141, as required.
+- Label matches the AC verbatim: `<label class="form-label">Storage <span
+  style="font-weight:400;color:var(--text-secondary)">(optional — applies to all items)</span></label>`.
+- `<select id="bulk-add-default-storage" class="form-control" style="max-width:12rem">` with the
+  four options in the exact required order: `""` (Auto), `counter`, `fridge`, `freezer`. Option
+  labels match the AC ("Auto (infer per item)", "Counter", "Fridge", "Freezer").
+- `#custom-item-modal` (index.html:904) is untouched — no drift outside the target modal.
+
+**2. `openBulkAddModal()` reset — correct.** At `app.js:7559-7560`:
+```
+const storage = document.getElementById('bulk-add-default-storage');
+if (storage) storage.value = '';
+```
+Same shape as the existing `bulk-add-expiry` reset two lines above (7557-7558), as the AC
+explicitly requested.
+
+**3. `confirmBulkAdd()` selector wiring — correct.** Read once at the top (`app.js:7577-7578`):
+```
+const defaultStorageInput = document.getElementById('bulk-add-default-storage');
+const defaultStorage = defaultStorageInput ? defaultStorageInput.value.trim() : '';
+```
+Applied at `app.js:7616`:
+```
+const storage = defaultStorage || inferStorage(name, category);
+```
+This matches the AC's specified substitution shape. When the selector is empty (`""`), the
+`||` short-circuits to the existing per-item `inferStorage()` call — the "Auto" path is
+byte-identical to today's behavior. When non-empty, every item's pantry `storage` field is
+set to the chosen value.
+
+**4. Constraints held.**
+- `inferStorage()` at `app.js:115-142` is untouched (verified by direct read).
+- No per-line storage keyword added in the textarea parser (that would collide with TASK-008's
+  scope).
+- No `#custom-item-modal` where-selector or any other pantry-add path touched.
+- Style matches existing app conventions: global function, `document.getElementById(...)`, no
+  framework primitives, no new state.
+- Storage values `counter | fridge | freezer` line up with `inferStorage()`'s three-value model
+  (verified against its category-fallback returns at app.js:140-141 and its explicit-check keys
+  at 128-131). No blocker needed.
+
+**5. Behavior when Auto is left in place — preserved.** `defaultStorage` is `''` (falsy), so
+line 7616 falls through to `inferStorage(name, category)` identically to the pre-change code
+path at (formerly) that same line. Shared-expiry field, textarea parsing, `NO_COMMA_RE`, warning
+surface, and duplicate-name skip logic are all untouched.
+
+**6. Test evidence honestly disclosed.** `TEST_REPORT.md` reports targeted
+`tests/mobile-layout.spec.js` passing (1/1); a full single-worker run got past `button-smoke.spec.js`
+but stalled in `buttons-functional.spec.js` because `#kitchen-setup-modal` still intercepts nav
+clicks in that spec's fixture (same class of pre-existing test-fixture debt that TASK-004
+addressed only for `mobile-layout.spec.js`). Direct selector browser check could not run because
+sandboxed `chromium.launch` hit `spawn EPERM` — recorded as environment-blocked, not silently
+skipped. Consistent fail-loud discipline with prior tasks' reviews.
+
+### Nits (optional, Codex's call)
+- The row is wrapped in `<div class="bulk-storage-row" style="margin-bottom:0.75rem">`. The AC
+  says "a new row … containing" the label and select without naming a wrapper class; this class
+  is a reasonable, non-behavioral addition that mirrors the sibling `.bulk-voice-row` /
+  `.bulk-expiry-row` structural pattern. Fine to keep as-is; no CSS rule is (or needs to be)
+  added for it.
+- `buttons-functional.spec.js` failing on `#kitchen-setup-modal` interception looks like the
+  same category of fixture debt TASK-004 fixed for `mobile-layout.spec.js` only. Worth filing
+  as a proposal (analogous to PROP-029) so the pattern gets applied across all specs — outside
+  this task's scope.
+
+→ TASK-006 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

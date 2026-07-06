@@ -7556,6 +7556,8 @@ function openBulkAddModal() {
   if (warn) warn.innerHTML = '';
   const exp = document.getElementById('bulk-add-expiry');
   if (exp) exp.value = '';
+  const storage = document.getElementById('bulk-add-default-storage');
+  if (storage) storage.value = '';
   const modal = document.getElementById('bulk-add-modal');
   if (modal) { modal.classList.remove('hidden'); if (ta) setTimeout(() => ta.focus(), 50); }
 }
@@ -7572,6 +7574,8 @@ function confirmBulkAdd() {
 
   const expiryInput = document.getElementById('bulk-add-expiry');
   const bulkExpiry = expiryInput ? expiryInput.value : '';
+  const defaultStorageInput = document.getElementById('bulk-add-default-storage');
+  const defaultStorage = defaultStorageInput ? defaultStorageInput.value.trim() : '';
 
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const added = [];
@@ -7609,7 +7613,7 @@ function confirmBulkAdd() {
       (i.aliases || []).some(a => a.toLowerCase() === name.toLowerCase())
     );
     const category = dbEntry ? dbEntry.category : inferCategory(name);
-    const storage = inferStorage(name, category);
+    const storage = defaultStorage || inferStorage(name, category);
     AppState.pantry.push({
       id: Date.now() + Math.random(),
       name,
