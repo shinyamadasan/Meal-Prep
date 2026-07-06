@@ -5,6 +5,68 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-05 — Autonomous run: Triage no-op; Plan converts BQ-018..022 → TASK-006..011
+
+**Autonomous, planning-only role (Claude as PM/Tech Lead/Architect). Two-step scope: Step A
+Triage, Step B Plan Conversion. Prompt was complete this run (previous run had truncation).
+Zero code edits — app.js / index.html / style.css untouched.**
+
+**Step A — Triage:** all 20 `captures/inbox/*.md` already carry `status: triaged` (nothing with
+`status: new`). Per WORKFLOW.md Triage §0 idempotency, no PROPOSAL/archive writes performed.
+
+**Step B — Plan Conversion:** five approved BUILD_QUEUE items had no `source: BQ-<id>` entry in
+TASKS.md — BQ-018, BQ-019, BQ-020, BQ-021, BQ-022. None carry an explicit `**Deferred by
+Builder**` marker (unlike BQ-013..016), so all five were converted. Authored six new tasks in
+ascending priority order (file order = build order for `/go`):
+
+| Task     | Source | Pri | Shape                                                    |
+|----------|--------|-----|----------------------------------------------------------|
+| TASK-006 | BQ-018 | P2  | Bulk-add default storage selector (index.html + app.js)  |
+| TASK-007 | BQ-021 | P2  | Cook portion multiplier + scaled deduction (app.js)      |
+| TASK-008 | BQ-019 | P2  | Inline `exp:YYYY-MM-DD` per-line expiry (index.html + app.js) |
+| TASK-009 | BQ-020 | P3  | Compact `.recipe-card-header` CSS pass (style.css)       |
+| TASK-010 | BQ-020 | P3  | Decision gate — "always-expanded detail" meaning (no code) |
+| TASK-011 | BQ-022 | P3  | Decision gate — long-press bulk multi-select scope (no code) |
+
+All six at `status: codex`. TASK-010 and TASK-011 are intentional blocker-raisers: PROP-026 and
+PROP-028 flagged design ambiguities that couldn't be defended-defaulted autonomously
+(auto-expand vs remember vs open-modal for BQ-020; pantry vs pantry+grocery + desktop fallback
+for BQ-022). Codex is expected to read them, flip `status: blocked`, and write a one-line
+question with its recommendation for Claude (interactive) to answer.
+
+**Defended defaults in the real-build tasks:**
+- **TASK-006** (BQ-018): storage vocab is `counter | fridge | freezer` — PROP-024's
+  "counter/fridge/pantry" was a misspoke (there is no `pantry` storage in `inferStorage()`).
+- **TASK-007** (BQ-021): reuses existing `showConfirmDialog` primitive with a `<input
+  type="number">` in `bodyHtml`; multiplier scales both `deductIngredientsForRecipe(recipe,
+  m)` and `checkMissingIngredients(recipe, m)` so cook-at-3× can't silently pass a 1× pantry
+  check; cookHistory records `servings * multiplier`; cookedMeals unchanged (still 1 batch).
+- **TASK-008** (BQ-019): inline `exp:YYYY-MM-DD` keyword (chosen over append-date or separate-
+  column because it doesn't collide with the existing comma or no-comma parsers); per-line
+  wins over shared date; malformed dates → warning + fall through to shared.
+
+**PLAN.md updated:** goal/approach/scope/source rewritten around the BQ-018..022 milestone;
+status set to `in-progress`.
+
+**Files not touched:** ROADMAP.md, BUILD_QUEUE.md, PROPOSALS.md, app.js, index.html, style.css,
+captures/**. Only TASKS.md, PLAN.md, and this STATUS.md were written.
+
+**Next command output:**
+```
+NEXT
+milestone : Ship BQ-018..022 P2/P3 UX batch [in-progress]
+task      : TASK-006 — Add default storage selector to #bulk-add-modal [codex]
+owner     : Codex
+why       : TASK-006..011 authored and status: codex; TASK-006 is first in file order (P2,
+            simplest of the batch). /go autopilot picks this up.
+run       : Continue
+```
+
+**Blockers:** none — the two decision-gate tasks (TASK-010, TASK-011) are expected blockers,
+not obstacles to this run.
+
+---
+
 ## 2026-07-05 — Autonomous run: Triage no-op; state audit corrects prior STATUS entry
 
 **Autonomous run, planning-only role (Claude as PM/Tech Lead/Architect). Prompt was truncated
