@@ -391,7 +391,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-008 · Add inline `exp:YYYY-MM-DD` per-line expiry keyword to bulk-add parser
-status: codex
+status: done
 owner: codex
 source: BQ-019
 priority: P2
