@@ -5,6 +5,66 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-05 — Autonomous run: Triage no-op; state audit corrects prior STATUS entry
+
+**Autonomous run, planning-only role (Claude as PM/Tech Lead/Architect). Prompt was truncated
+mid-instruction ("Do not touch the ROADMAP Do…") so Step 2 of the two-step scope was not visible;
+per CLAUDE.md Escalation Policy "prefer stopping over guessing" — completed only the unambiguous
+Step 1 (Triage) and emitted Next without initiating Plan.**
+
+**Triage (Step 1):**
+All 20 captures in `captures/inbox/` already carry `status: triaged`. Zero with `status: new`
+(WORKFLOW.md Triage §0 says "SKIP any already triaged — idempotency"). No PROPOSALS or archive
+writes needed.
+
+**State audit — corrects yesterday's STATUS entry:**
+Yesterday's 2026-07-05 entry (triage of msg-67/msg-309) said "BUILD_QUEUE has no new approved
+items." That was inaccurate: `planning/BUILD_QUEUE.md` currently holds **five approved sprint
+items awaiting Plan** — BQ-018..022, all approved 2026-07-04 via digest reply, none deferred:
+
+| BQ  | Priority | Title                                                            |
+|-----|----------|------------------------------------------------------------------|
+| 018 | P2       | Bulk add: default storage location selector (counter/fridge)     |
+| 019 | P2       | Bulk add: per-item expiry date per line (supersedes BQ-005)      |
+| 021 | P2       | Cook confirmation: optional serving multiplier                    |
+| 020 | P3       | Recipe card: compact header + always-expanded detail              |
+| 022 | P3       | Long-press bulk multi-select mode (move + delete)                 |
+
+Recommended next sprint: **BQ-021** (P2, cook multiplier) — directly improves core pantry-
+deduction accuracy at M effort per the prior recommendation in STATUS 2026-07-04. Alternative
+starter: BQ-018 (P2, simplest of the batch — small UI addition to bulk-add modal, no parser
+changes).
+
+`ROADMAP.md`'s "Approved Backlog" section is still out-of-sync (says "*(empty)*") even though
+these five were approved and landed in BUILD_QUEUE. Sync deferred (autonomous instructions
+included "do not touch the ROADMAP").
+
+**State on entry:**
+- Milestone `Fix mobile modal action buttons + planner overflow` = `done` (TASK-001..005 all done).
+- BQ-013/014/015/016 remain deferred P3 (post-alpha stabilize).
+- BQ-017 built + shipped as TASK-005.
+- No open blockers.
+
+**Next command output:**
+```
+NEXT
+milestone : Fix mobile modal action buttons + planner overflow [done]
+task      : — (all done)
+owner     : Claude
+why       : Milestone complete. BQ-018..022 approved in BUILD_QUEUE.md and not yet converted
+            to TASKS.md — next action is a Plan pass to pick one BQ item and author its tasks.
+run       : Plan
+```
+
+**Recommended human actions (when next at the keyboard):**
+- Run `Plan` to convert BQ-021 (or your pick from BQ-018..022) into `TASKS.md` entries.
+- Optionally sync `ROADMAP.md`'s Approved Backlog section to reflect PROP-024..028 approvals
+  (currently only mirrored in `BUILD_QUEUE.md`).
+
+**Blockers:** none.
+
+---
+
 ## 2026-07-05 — Triage: 2 captures (msg-67, msg-309) — both dropped as noise
 
 **Triage complete (2 new captures):**
