@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-007 · 2026-07-05
+suite: node --check app.js; git diff --check; cook multiplier function probe; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; npx playwright test tests/recipe-actions.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1 --timeout=60000 --global-timeout=300000
+result: syntax and diff checks passed. Cook multiplier function probe passed prompt markup, 2x deduction/history/toast, 0.5x deduction/history/toast, empty invalid fallback to 1x with no `(×1)`, and 3x scaled missing-check flow. mobile-layout passed (1/1). Full suite passed button-smoke (1/1) before timing out in pre-existing `buttons-functional.spec.js` fixture failures (`#kitchen-setup-modal` intercepts nav clicks; `#add-recipe-btn` hidden), leaving 3 failed and 17 not run. recipe-actions local spec also failed before this task's cook flow because recipe-card controls were hidden.
+untested: full Playwright suite completion remains unverified due unrelated fixture failures; direct browser probe could not run because `chromium.launch` failed with `spawn EPERM`; real-device rendering remains human verification
+
 ## TASK-006 · 2026-07-05
 suite: npm test -- --reporter=list; npx playwright test --reporter=list --workers=1 --timeout=60000 --global-timeout=300000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; static QA/code trace for `#bulk-add-default-storage`
 result: targeted mobile-layout spec passed (1/1). Full single-worker run passed `button-smoke.spec.js`, then failed/timeboxed in `buttons-functional.spec.js` (1 passed, 3 failed, 17 did not run) because `#kitchen-setup-modal` intercepted nav clicks and `#add-recipe-btn` was hidden. Initial npm test timed out after 244s without reporter output. No failure traced to TASK-006 changes.

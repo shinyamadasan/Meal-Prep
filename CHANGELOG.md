@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-007 — done (branch: task-007)
+changed:
+  - app.js (`markRecipeCooked()` adds the portion prompt; `checkMissingIngredients()`, `deductIngredientsForRecipe()`, and `_doMarkCooked()` pass and apply the multiplier, 58 loc)
+tests: `node --check app.js` (pass); cook multiplier function probe (prompt markup, 2x, 0.5x, invalid fallback, and scaled missing-check cases pass); `npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000` (1 passed); `npm test -- --reporter=list --workers=1 --timeout=60000 --global-timeout=300000` (button-smoke passed, then `buttons-functional.spec.js` hit unrelated fixture failures)
+blockers: none for TASK-007
+deviations: full suite did not complete because `buttons-functional.spec.js` still opens against fixture state where `#kitchen-setup-modal` intercepts nav clicks and `#add-recipe-btn` is hidden; direct browser probe could not run because `chromium.launch` failed with `spawn EPERM`, so multiplier-specific behavior was verified by executing the changed cook-flow functions with DOM/save/render stubs
+→ status set to `review` in TASKS.md
+
 ## TASK-006 — done (branch: task-006)
 changed:
   - index.html (`#bulk-add-modal` adds the default storage selector above `.bulk-voice-row`, 9 loc)

@@ -300,7 +300,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-007 · Add portion multiplier to cook confirmation + scale pantry deduction
-status: codex
+status: review
 owner: codex
 source: BQ-021
 priority: P2
