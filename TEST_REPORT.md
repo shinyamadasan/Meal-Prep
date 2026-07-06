@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-008 · 2026-07-06
+suite: deterministic parser check for `confirmBulkAdd()` inline expiry preprocessing; git diff --check; npm test; npx playwright test --reporter=list --workers=1 --timeout=30000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=30000; npx playwright test tests/smoke.spec.js --reporter=list --workers=1 --timeout=30000; npx playwright test tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=240000; npx playwright test tests/mobile-layout.spec.js tests/recipe-actions.spec.js --reporter=list --workers=1 --timeout=30000
+result: deterministic parser check passed 5/5 cases (no token, shared expiry, per-line override, invalid matching date fallback warning, spaced `exp:` no-match). `git diff --check` passed with only Git LF-to-CRLF warnings. `mobile-layout.spec.js` passed 1/1; `smoke.spec.js` passed 1/1; `button-smoke.spec.js` passed 1/1. `npm test` timed out after 124s; full single-worker Playwright timed out after 184s; `buttons-functional.spec.js` timed out after 244s without reporter output. Split local run passed `mobile-layout.spec.js` and failed 2/2 `recipe-actions.spec.js` cases because recipe-card controls were hidden in that fixture; no failure traced to TASK-008 changes.
+untested: full Playwright suite completion remains unverified because suite commands timed out; direct browser bulk-add check could not run because direct `chromium.launch` failed with `spawn EPERM`; real-device rendering remains human verification
+
 ## TASK-006 · 2026-07-05
 suite: npm test -- --reporter=list; npx playwright test --reporter=list --workers=1 --timeout=60000 --global-timeout=300000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; static QA/code trace for `#bulk-add-default-storage`
 result: targeted mobile-layout spec passed (1/1). Full single-worker run passed `button-smoke.spec.js`, then failed/timeboxed in `buttons-functional.spec.js` (1 passed, 3 failed, 17 did not run) because `#kitchen-setup-modal` intercepted nav clicks and `#add-recipe-btn` was hidden. Initial npm test timed out after 244s without reporter output. No failure traced to TASK-006 changes.

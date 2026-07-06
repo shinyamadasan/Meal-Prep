@@ -254,6 +254,59 @@ skipped. Consistent fail-loud discipline with prior tasks' reviews.
 
 → TASK-006 status set to `done` in TASKS.md.
 
+## Review TASK-008 — APPROVED
+branch: task-008
+verdict: approved
+
+### Findings
+
+**1. Parser preprocessing — correct, all 7 acceptance criteria met.** Verified at `app.js:7587-7599` inside `confirmBulkAdd()`:
+- `originalLine = line;` captured before any mutation, so the warning shows the raw user input.
+- `perLineExpiry = ''` initialized per line (no leakage across iterations).
+- Regex is exactly the required shape: `line.match(/\bexp:(\d{4}-\d{2}-\d{2})\b/i)` — ISO-only, case-insensitive on `exp`, word-bounded at both ends.
+- Validation uses the specified `!isNaN(new Date(dateStr + 'T00:00:00').getTime())` check; on success `perLineExpiry = dateStr`; on failure the warning is pushed verbatim as `Line ${idx + 1}: "${originalLine}" — invalid exp date, ignored`, matching AC wording exactly.
+- The strip `line = line.replace(/\s*\bexp:\d{4}-\d{2}-\d{2}\b\s*/i, ' ').trim();` runs regardless of validity — so an invalid `exp:` token is removed from the name before the comma/no-comma parser sees it (reasonable choice: the warning already tells the user it was "ignored", and this prevents the token from corrupting the name field). Occurs **before** the existing `parts.split(',')` at 7600, as required.
+- The `NO_COMMA_RE` at 7585 is untouched; parser structure unchanged.
+
+**2. Per-line-wins precedence — correct.** At `app.js:7629`:
+```
+const itemExpiry = perLineExpiry || bulkExpiry;
+```
+And at 7640-7641:
+```
+expiryDate: itemExpiry || null,
+dateMode: itemExpiry ? 'expiry' : undefined
+```
+This is byte-identical to the AC's specified substitution shape. Fall-through paths verified by trace:
+- No `exp:` token, no shared date → `itemExpiry === ''` → `expiryDate: null, dateMode: undefined` (unchanged from today).
+- No `exp:` token, shared date `2026-08-01` → `itemExpiry === '2026-08-01'` → `expiryDate: '2026-08-01', dateMode: 'expiry'` (unchanged from today).
+- Per-line `exp:2026-07-15`, shared `2026-08-01` → per-line wins.
+- Invalid `exp:2026-13-45`, shared `2026-08-01` → warning pushed, `perLineExpiry` stays `''`, item still gets `2026-08-01`.
+
+**3. Constraint discipline — held.**
+- Regex requires `(\d{4}...)` to abut the `:` directly (no `\s*` between them), so `Chicken exp: 2026-07-20` with a space after the colon does not match. Traced: at that point the regex tries `exp:`+digit, sees `exp:`+space, backs off; no other `exp:` in the string; no match; `line` passes through untouched to the parser and `NO_COMMA_RE` fails on `20` (not a unit), so `name` captures the full `Chicken exp: 2026-07-20` string — exactly the AC-required behavior.
+- Alternate keyword forms rejected: `expires:2026-07-20` fails because the regex demands `:` directly after `exp` (next char is `i`); `exp=2026-07-20` fails because `=` isn't `:`.
+- Word boundary at the start rejects intra-word matches (`Bexp:...`, `1exp:...`).
+- No new date library; `NO_COMMA_RE` untouched; only preprocessing added to the parser pipeline.
+
+**4. HTML surfaces — correct.** Verified at `index.html:1131` and `index.html:1145`:
+- Hint gains the exact sentence `<br>Add <code>exp:YYYY-MM-DD</code> anywhere in a line to set that item's expiry (overrides the shared date below).` verbatim, appended after `or just <code>Garlic</code>`.
+- Placeholder third line is `Chicken Thigh 500g exp:2026-07-20`, correctly wedged between `Coconut cream 200ml` and `Garlic` via `&#10;`.
+- No other changes to `#bulk-add-modal` markup; TASK-006's storage selector at 1132-1140 is preserved unchanged.
+
+**5. Non-scope surfaces preserved.** `#bulk-add-warnings` render path (7646-7650), `closeBulkAddModal()` (7564-7568), `openBulkAddModal()` reset (7552-7563), `inferStorage()` and its call at 7628 (TASK-006's turf), duplicate-name skip (7618-7621), and success toast (7656) are all untouched by the diff.
+
+**6. Test evidence — honestly reported.** `TEST_REPORT.md`'s TASK-008 entry:
+- Deterministic parser check (5 cases: no token / shared expiry / per-line override / invalid matching date fallback warning / spaced `exp:` no-match) — all pass. These map 1:1 to the AC test steps.
+- Targeted `mobile-layout.spec.js`, `smoke.spec.js`, `button-smoke.spec.js` — 1/1 each.
+- Full `npm test` and single-worker Playwright timed out under sandbox limits; split runs surfaced pre-existing `recipe-actions.spec.js` fixture failures (recipe-card controls hidden — same class of pre-existing test-fixture debt TASK-004 addressed only for `mobile-layout.spec.js`, and TASK-006's review already flagged for a follow-up proposal). None trace to TASK-008 changes. Disclosed as unverified rather than claimed passing — fail-loud discipline held.
+
+### Nits (optional, Codex's call)
+- The strip regex omits the `g` flag, so if a single line contains two `exp:YYYY-MM-DD` tokens only the first is stripped (and used); the second is left in the name string. AC only specifies single-token behavior; not a must-fix. If a follow-up wants belt-and-braces behavior, adding `g` on the `.replace` line (only) would strip any stragglers without altering which date wins.
+- `recipe-actions.spec.js` and `buttons-functional.spec.js` continue to fail under the same `#kitchen-setup-modal` interception pattern TASK-004 already fixed for `mobile-layout.spec.js`. Worth carrying forward as a fixture-hygiene proposal (analogous to PROP-029) so the pattern gets applied across all specs — outside this task's scope.
+
+→ TASK-008 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

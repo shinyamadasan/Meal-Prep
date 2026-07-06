@@ -1128,7 +1128,7 @@
                 <button class="modal-close" onclick="closeBulkAddModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong> or <strong>Name qty unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; <code>Coconut cream 200ml</code> &nbsp; or just <code>Garlic</code></p>
+                <p style="margin:0 0 0.5rem;font-size:0.875rem;color:var(--text-secondary)">One item per line. Format: <strong>Name, Qty, Unit</strong> or <strong>Name qty unit</strong><br>Example: <code>Eggs, 12, pcs</code> &nbsp; <code>Coconut cream 200ml</code> &nbsp; or just <code>Garlic</code><br>Add <code>exp:YYYY-MM-DD</code> anywhere in a line to set that item's expiry (overrides the shared date below).</p>
                 <div class="bulk-storage-row" style="margin-bottom:0.75rem">
                   <label class="form-label">Storage <span style="font-weight:400;color:var(--text-secondary)">(optional — applies to all items)</span></label>
                   <select id="bulk-add-default-storage" class="form-control" style="max-width:12rem">
@@ -1142,7 +1142,7 @@
                   <button id="bulk-voice-btn" class="voice-btn" onclick="toggleVoiceInput()" title="Speak items one at a time">🎙 Speak</button>
                   <span id="bulk-voice-status" class="voice-status"></span>
                 </div>
-                <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Coconut cream 200ml&#10;Chicken Thigh 500g&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
+                <textarea id="bulk-add-textarea" class="form-control" rows="8" style="width:100%;resize:vertical" placeholder="Eggs, 12, pcs&#10;Coconut cream 200ml&#10;Chicken Thigh 500g exp:2026-07-20&#10;Garlic&#10;Soy Sauce, 1, bottle"></textarea>
                 <div class="bulk-expiry-row" style="margin-top:0.75rem">
                   <label class="form-label" style="margin-bottom:0.25rem">Expiry date <span style="font-weight:400;color:var(--text-secondary)">(optional — applies to all items)</span></label>
                   <input type="date" id="bulk-add-expiry" class="form-control" style="max-width:12rem">
