@@ -109,6 +109,9 @@ $taskId's status in TASKS.md: `done` if approved, back to `codex` if rework is n
 # planner, where Claude only received the head of the prompt. Piping via stdin delivers it intact
 # AND gives claude an immediate EOF (no ~3s stall). Lowering EAP to 'Continue' for the call prevents
 # claude's benign stderr from being promoted to a terminating exception under EAP = 'Stop'.
+# Match run-claude.ps1: prefer the logged-in Claude subscription over API-key billing for reviews.
+Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+
 $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {

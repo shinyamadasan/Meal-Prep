@@ -1093,3 +1093,6 @@ overwritten with un-loaded state. **Recommend a real signed-in deploy test befor
 **Tests:** not run
 **Next task:** Implement pantry auto-deduction in `markRecipeCooked()` per ROADMAP.md Phase C
 **Blockers:** none
+
+## 2026-07-05 21:00 -- AUTOMATION HALTED: claude -p exited with code 1
+Investigate before the next scheduled run. Nothing further was committed, pushed, or notified this run.
