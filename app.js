@@ -7585,6 +7585,18 @@ function confirmBulkAdd() {
   var NO_COMMA_RE = /^(.+?)\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|L|oz|lbs?|pcs?|pieces?|cups?|tbsp|tsp|bunch|bunches|cans?|bottles?|boxes?|bags?|packs?|head|cloves?|stalks?|slices?|liters?|litres?|ltr)\s*$/i;
 
   lines.forEach((line, idx) => {
+    const originalLine = line;
+    let perLineExpiry = '';
+    const expiryMatch = line.match(/\bexp:(\d{4}-\d{2}-\d{2})\b/i);
+    if (expiryMatch) {
+      const dateStr = expiryMatch[1];
+      if (!isNaN(new Date(dateStr + 'T00:00:00').getTime())) {
+        perLineExpiry = dateStr;
+      } else {
+        warnings.push(`Line ${idx + 1}: "${originalLine}" — invalid exp date, ignored`);
+      }
+      line = line.replace(/\s*\bexp:\d{4}-\d{2}-\d{2}\b\s*/i, ' ').trim();
+    }
     const parts = line.split(',').map(p => p.trim());
     let name = parts[0];
     if (!name) { warnings.push(`Line ${idx + 1}: empty name — skipped`); return; }
@@ -7614,6 +7626,7 @@ function confirmBulkAdd() {
     );
     const category = dbEntry ? dbEntry.category : inferCategory(name);
     const storage = defaultStorage || inferStorage(name, category);
+    const itemExpiry = perLineExpiry || bulkExpiry;
     AppState.pantry.push({
       id: Date.now() + Math.random(),
       name,
@@ -7624,8 +7637,8 @@ function confirmBulkAdd() {
       quantity: (qty && qty > 0) ? qty : null,
       unit: unit || (dbEntry ? dbEntry.unit : ''),
       staple: dbEntry ? !!dbEntry.isStaple : undefined,
-      expiryDate: bulkExpiry || null,
-      dateMode: bulkExpiry ? 'expiry' : undefined
+      expiryDate: itemExpiry || null,
+      dateMode: itemExpiry ? 'expiry' : undefined
     });
     added.push(name);
   });
