@@ -231,7 +231,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-006 · Add default storage selector to #bulk-add-modal
-status: codex
+status: review
 owner: codex
 source: BQ-018
 priority: P2
