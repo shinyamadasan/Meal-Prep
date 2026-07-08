@@ -5143,6 +5143,9 @@ async function recheckVerification() {
 // excluded: it's regenerated from the plan, so a "missing" grocery item isn't a real deletion.
 var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients'];
 var _idBaseline = null; // map of ids present right after the last load/merge
+// recordLocalDeletions() treats a bigger simultaneous vanish than this as a transient
+// load-race artifact, not a real user delete — see the guard there.
+var MASS_DELETE_GUARD = 5;
 
 function collectSyncedIds() {
   var s = {};
@@ -5159,8 +5162,20 @@ function snapshotIdBaseline() { _idBaseline = collectSyncedIds(); }
 function recordLocalDeletions() {
   if (!_idBaseline) { snapshotIdBaseline(); return; }
   var now = collectSyncedIds();
+  var vanished = Object.keys(_idBaseline).filter(function (id) { return !now[id]; });
+  // SAFETY GUARD: a real user deletes items one or two at a time, and every edit saves — so a
+  // genuine delete records only a few tombstones per call. A large batch vanishing at once almost
+  // always means AppState was transiently empty during a startup/sync race, NOT a real delete.
+  // Tombstoning those ids would propagate a phantom mass-delete to every device and wipe a whole
+  // category (this is what emptied the pantry after a reload). Skip them and keep the baseline so
+  // the list re-aligns once it repopulates. "Clear All Data" tombstones explicitly in
+  // clearLocalStorage(), so that intentional wipe is unaffected by this guard.
+  if (vanished.length > MASS_DELETE_GUARD) {
+    console.warn('recordLocalDeletions: ignored ' + vanished.length + ' simultaneous disappearances as a suspected transient load state (not tombstoning).');
+    return; // keep _idBaseline unchanged so a real delete is still caught once state settles
+  }
   var when = new Date().toISOString();
-  Object.keys(_idBaseline).forEach(function (id) { if (!now[id]) AppState.deletions[id] = when; });
+  vanished.forEach(function (id) { AppState.deletions[id] = when; });
   _idBaseline = now;
 }
 
