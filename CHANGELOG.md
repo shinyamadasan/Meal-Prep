@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-007 — done (re-applied on main; original branch task-007 not merged)
+changed:
+  - app.js (`markRecipeCooked()` opens a portion-multiplier prompt before the missing-check; `deductIngredientsForRecipe()`, `checkMissingIngredients()`, `_doMarkCooked()` take an optional `multiplier = 1` and scale deduction / missing-check / cookHistory servings, plus a `(×N)` toast suffix, 53 loc)
+re-apply: Codex built this on branch `task-007` (`d8acde3`), but the auto-review crashed (`claude -p` exit 1) and the branch went ~12 commits stale after D-028/029/030. Re-applied the isolated app.js hunks onto current main via `git apply --3way` (clean); the stale branch was NOT merged.
+tests: `node --check` (pass); Playwright `smoke` + `button-smoke` (2 passed; 460 buttons, 0 broken); 8/8 acceptance criteria code-traced (see TEST_REPORT / REVIEW).
+blockers: none — the prior `blocked` state was the crashed auto-review, now resolved.
+→ status set to `done` in TASKS.md (reviewed + approved this cycle).
+
 ## TASK-008 — done (branch: task-008)
 changed:
   - index.html (`#bulk-add-modal` hint and `#bulk-add-textarea` placeholder document inline `exp:YYYY-MM-DD`, 2 loc)

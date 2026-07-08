@@ -307,6 +307,22 @@ This is byte-identical to the AC's specified substitution shape. Fall-through pa
 
 → TASK-008 status set to `done` in TASKS.md.
 
+## Review TASK-007 — APPROVED (re-applied onto main; code-trace + smoke verified)
+branch: task-007 (feature re-applied to main, not merged)
+verdict: approved
+
+### Context
+The original `task-007` build (`d8acde3`) was correct but never reviewed — the automated `claude -p` review crashed (exit 1), and the branch went ~12 commits stale behind the D-028/029/030 data-integrity work. Per the human directive, the isolated `app.js` feature hunks were re-applied onto current `main` via `git apply --3way` (clean, no conflicts) rather than merging the stale branch.
+
+### Findings
+**1. Implementation — correct.** All four functions take `multiplier = 1`, so every existing caller is byte-identical. `deductIngredientsForRecipe` (app.js:7280) and `checkMissingIngredients` (7312) scale `scaledQty *= multiplier` before `toGrams()`; no other math changed. `_doMarkCooked` (7350) records `servings: parseFloat((currentServings * multiplier).toFixed(2))` and adds a `(×N)` toast suffix only when `multiplier !== 1`. `cookedMeals` unchanged (still 1 batch).
+**2. Dialog reuse — correct and non-trivial.** `showConfirmDialog` closes the overlay BEFORE invoking `onConfirm` (app.js:7344). The multiplier input is therefore captured by reference up-front (`multiplierInput = document.getElementById(...)` after the synchronous append, app.js:7428); a detached input keeps its typed `.value`. Reading via `getElementById` inside the callback would return null — the captured-reference pattern is required, not incidental, and is preserved intact.
+**3. Input validation — correct.** `parseFloat`; falls back to `1` on NaN or `<= 0`.
+**4. Constraints held.** Single number input (no stepper), no new global state (multiplier passed by arg), `.slot-cooked-btn` markup untouched, `app.js`-only for the feature.
+
+### Verdict
+Approved → TASKS.md `blocked → done`. Runtime multiplier deductions (2× / 0.5× / invalid) and device rendering are flagged for human verification — the smoke suite does not drive the cook dialog.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

@@ -7277,7 +7277,7 @@ function capList(arr, max) {
 // Subtract a cooked recipe's ingredients from the pantry. Skips staples, items
 // not in the pantry, and tracked items with no quantity set. Reconciles units
 // through the gram-bridge so kg/g/ml/pieces all line up. Returns a summary.
-function deductIngredientsForRecipe(recipe) {
+function deductIngredientsForRecipe(recipe, multiplier = 1) {
   var ingredients = recipe.baseIngredients || recipe.ingredients || [];
   var deducted = [], outOfStock = [], depleted = [];
   ingredients.forEach(function(ing) {
@@ -7286,6 +7286,7 @@ function deductIngredientsForRecipe(recipe) {
     if (isStaple(p)) return;                           // staple — never deducted
     if (p.quantity == null || isNaN(p.quantity)) return; // tracked but no quantity
     var scaledQty = calculateScaledQuantity(recipe, ing);
+    scaledQty *= multiplier;
     if (!scaledQty || isNaN(scaledQty)) return;
     var gramsUsed = toGrams(scaledQty, ing.unit);
     var gramsPerPantryUnit = toGrams(1, p.unit) || 1;
@@ -7308,7 +7309,7 @@ function deductIngredientsForRecipe(recipe) {
 
 // Returns ingredient names that appear to be missing or insufficient in the pantry.
 // Skips staples (assumed always available) and items with no quantity tracked.
-function checkMissingIngredients(recipe) {
+function checkMissingIngredients(recipe, multiplier = 1) {
   var ingredients = recipe.baseIngredients || recipe.ingredients || [];
   var missing = [];
   ingredients.forEach(function(ing) {
@@ -7317,6 +7318,7 @@ function checkMissingIngredients(recipe) {
     if (isStaple(p)) return;
     if (p.quantity == null || isNaN(p.quantity)) return;
     var scaledQty = calculateScaledQuantity(recipe, ing);
+    scaledQty *= multiplier;
     if (!scaledQty || isNaN(scaledQty)) return;
     var gramsUsed = toGrams(scaledQty, ing.unit);
     var gramsPerPantryUnit = toGrams(1, p.unit) || 1;
@@ -7345,13 +7347,13 @@ function showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm
   overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
 }
 
-function _doMarkCooked(recipe, btn) {
+function _doMarkCooked(recipe, btn, multiplier = 1) {
   AppState.cookHistory = AppState.cookHistory || [];
   AppState.cookHistory.unshift({
     recipeId: String(recipe.id),
     recipeName: recipe.name,
     date: new Date().toISOString(),
-    servings: recipe.currentServings
+    servings: parseFloat((recipe.currentServings * multiplier).toFixed(2))
   });
   if (AppState.cookHistory.length > 100) AppState.cookHistory.length = 100;
 
@@ -7366,7 +7368,7 @@ function _doMarkCooked(recipe, btn) {
     freezerLife: recipe.freezerLife || 0
   });
 
-  var sum = deductIngredientsForRecipe(recipe);
+  var sum = deductIngredientsForRecipe(recipe, multiplier);
   checkAndReplenishLowStock();
 
   saveData();
@@ -7380,7 +7382,8 @@ function _doMarkCooked(recipe, btn) {
     btn.disabled = true;
   }
 
-  var msg = 'Added "' + recipe.name + '" to 🧊 My Fridge.';
+  var multiplierSuffix = multiplier !== 1 ? ' (×' + parseFloat(multiplier.toFixed(2)).toString() + ')' : '';
+  var msg = 'Added "' + recipe.name + '"' + multiplierSuffix + ' to 🧊 My Fridge.';
   if (sum.deducted.length) msg += ' Deducted: ' + capList(sum.deducted, 4) + '.';
   else msg += ' (No tracked pantry items to deduct.)';
   if (sum.outOfStock.length) msg += ' ⚠️ Now out: ' + capList(sum.outOfStock, 4) + '.';
@@ -7393,19 +7396,36 @@ function markRecipeCooked(recipeId, btn) {
   var recipe = AppState.recipes.find(function(r) { return String(r.id) === String(recipeId); });
   if (!recipe) { showErrorMessage('Recipe not found'); return; }
 
-  var missing = checkMissingIngredients(recipe);
-  if (missing.length > 0) {
-    showConfirmDialog(
-      'Not enough ingredients?',
-      '<p>These items may not be in your pantry: <strong>' + escapeHtml(capList(missing, 5)) + '</strong>.</p>' +
-        '<p>Did you already buy them but forgot to add to the app?</p>',
-      'Yes, mark as cooked anyway',
-      'Cancel',
-      function() { _doMarkCooked(recipe, btn); }
-    );
-    return;
-  }
-  _doMarkCooked(recipe, btn);
+  var multiplierInput = null;
+  showConfirmDialog(
+    'How many portions cooked?',
+    '<p style="margin:0 0 0.5rem">Base recipe: <strong>' + recipe.currentServings + ' servings</strong></p>' +
+      '<div style="display:flex;align-items:center;gap:0.5rem">' +
+        '<input id="cook-portion-multiplier" type="number" min="0.25" step="0.25" value="1" class="form-control" style="max-width:6rem">' +
+        '<span>× the recipe</span>' +
+      '</div>',
+    'Continue',
+    'Cancel',
+    function() {
+      var m = multiplierInput ? parseFloat(multiplierInput.value) : 1;
+      if (isNaN(m) || m <= 0) m = 1;
+
+      var missing = checkMissingIngredients(recipe, m);
+      if (missing.length > 0) {
+        showConfirmDialog(
+          'Not enough ingredients?',
+          '<p>These items may not be in your pantry: <strong>' + escapeHtml(capList(missing, 5)) + '</strong>.</p>' +
+            '<p>Did you already buy them but forgot to add to the app?</p>',
+          'Yes, mark as cooked anyway',
+          'Cancel',
+          function() { _doMarkCooked(recipe, btn, m); }
+        );
+        return;
+      }
+      _doMarkCooked(recipe, btn, m);
+    }
+  );
+  multiplierInput = document.getElementById('cook-portion-multiplier');
 }
 
 function cookedShelfLife(m) {

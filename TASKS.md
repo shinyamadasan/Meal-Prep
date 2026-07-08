@@ -300,9 +300,9 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-007 · Add portion multiplier to cook confirmation + scale pantry deduction
-status: blocked
+status: done
 blocker:
-  - auto: build stopped -- TASK-007 build reached REVIEW (1 of 5 tracked task(s)) after 851s, pushed to task-007. -> auto-review: TASK-007 review FAILED: claude -p exited with code 1. See claude-session.log.
+  - RESOLVED 2026-07-08 — the block was a crashed auto-review (`claude -p` exit 1), not a code/design issue. Branch task-007 (d8acde3) went ~12 commits stale behind D-028/029/030; the isolated feature was re-applied onto current main via `git apply --3way` (branch NOT merged), reviewed → APPROVED. See REVIEW.md / CHANGELOG.md / TEST_REPORT.md.
 owner: codex
 source: BQ-021
 priority: P2
