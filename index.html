@@ -13,13 +13,24 @@
     <link rel="apple-touch-icon" href="icon.svg">
     <title>Meal Prep Planner</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Error monitoring (Sentry Loader Script). The hex in the URL is this project's public
-         key — safe to commit. The loader auto-loads + auto-initializes Sentry; app.js
-         reportError() feeds it handled sync-failure signals (failed save / load / merge). -->
-    <script
-      src="https://js.sentry-cdn.com/1d817783d599e3d132bfba8c332f512f.min.js"
-      crossorigin="anonymous"
-    ></script>
+    <!-- Error monitoring (Sentry). DSN is a public client key — safe to commit. Loads the
+         pinned SDK bundle asynchronously (non-blocking), then Sentry.init(); app.js
+         reportError() feeds it handled sync-failure signals (failed save / load / merge).
+         Uses the DSN directly rather than the hosted Loader Script, which no-op'd. -->
+    <script>
+      (function () {
+        var s = document.createElement('script');
+        s.src = 'https://browser.sentry-cdn.com/7.119.0/bundle.min.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = function () {
+          if (window.Sentry) window.Sentry.init({
+            dsn: 'https://63e0a7f3bfdb20825f08cfc7c2604891@o4511700847230976.ingest.us.sentry.io/4511700879867904',
+            tracesSampleRate: 0
+          });
+        };
+        document.head.appendChild(s);
+      })();
+    </script>
     <!-- Light-only release: the app is designed for one polished light theme.
          No theme script — the device's dark-mode setting is intentionally ignored
          (color-scheme:light in <meta> above + :root in style.css). -->
