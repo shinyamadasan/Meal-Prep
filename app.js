@@ -5313,7 +5313,9 @@ async function saveToFirestore() {
     if (!window.firebase.runTransaction) {
       var payload = buildFirestorePayload();
       payload.version = (AppState.dataVersion || 0) + 1;
-      await window.firebase.setDoc(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
+      // Full-document write (see the transaction branch below) — the `deletions` map must be
+      // replaced, not merged, or a cleared tombstone persists in the cloud. See DECISIONS D-031.
+      await window.firebase.setDoc(userDocRef, JSON.parse(JSON.stringify(payload)));
       AppState.dataVersion = payload.version;
       AppState.syncStatus = 'synced'; updateSyncIndicator();
       return;
@@ -5344,9 +5346,11 @@ async function saveToFirestore() {
       }
 
       // Firestore rejects `undefined`; round-trip strips undefined + functions.
-      // merge:true so a field accidentally omitted from buildFirestorePayload() is preserved
-      // rather than wiped on every save (matches the non-transaction fallback path above).
-      tx.set(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
+      // FULL-DOCUMENT write (NOT merge:true): the `deletions` map must be REPLACED so clearing a
+      // tombstone (e.g. on import — D-019) actually removes it from the cloud. Firestore's merge
+      // deep-merges maps and never drops absent keys, so a cleared tombstone would silently persist
+      // and re-delete the re-imported item on the next sync. See DECISIONS D-031 (reverses D-030).
+      tx.set(userDocRef, JSON.parse(JSON.stringify(payload)));
       AppState.dataVersion = payload.version;
     });
     console.log('Data saved to Firestore (v' + AppState.dataVersion + ')');
