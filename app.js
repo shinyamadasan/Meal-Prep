@@ -3517,7 +3517,7 @@ function dismissSuggestedGroceryItem(itemId) {
   var pantryItem = AppState.pantry.find(function(p) {
     return p.name.toLowerCase() === item.name.toLowerCase();
   });
-  if (pantryItem) pantryItem.suggestDismissed = true;
+  if (pantryItem) { pantryItem.suggestDismissed = true; stampUpdated(pantryItem); }
   AppState.groceryList = AppState.groceryList.filter(function(g) { return g.id !== itemId; });
   saveData();
   renderGroceryList();
@@ -5231,6 +5231,32 @@ function unionById(localArr, remoteArr) {
   return Object.keys(map).map(function(k) { return map[k]; });
 }
 
+// Union local into cloud, resolving a duplicate id by last-write-wins: the copy with
+// the newer updatedAt survives. A tie or a missing timestamp keeps the CLOUD copy — the
+// pre-LWW default — so a stale local session never clobbers good cloud data, while a
+// genuine local edit made offline / signed out (newer updatedAt, set by stampUpdated)
+// is no longer silently overwritten by the older cloud copy on reload. stats.localWins
+// counts duplicates the local copy won so the caller can re-sync the merged superset up.
+function unionByIdLWW(cloudArr, localArr, stats) {
+  var map = {};
+  (cloudArr || []).forEach(function(it) { if (it && it.id != null) map[String(it.id)] = it; });
+  (localArr || []).forEach(function(it) {
+    if (!it || it.id == null) return;
+    var key = String(it.id), cloud = map[key];
+    if (!cloud) { map[key] = it; return; }                 // local-only item — keep it
+    if ((it.updatedAt || '') > (cloud.updatedAt || '')) {  // local edited more recently → wins
+      map[key] = it;
+      if (stats) stats.localWins++;
+    }
+  });
+  return Object.keys(map).map(function(k) { return map[k]; });
+}
+
+// Mark a synced list item as just-edited, so the load-merge's last-write-wins
+// (unionByIdLWW) can tell this device's fresh edit from an older cloud copy. Call in
+// every in-place mutator of a synced item (pantry, cooked meals) right before saveData().
+function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(); }
+
 // When the cloud changed since we loaded (another device wrote first), merge
 // instead of clobbering: union list-type fields by id so nothing added
 // elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
@@ -5425,7 +5451,8 @@ async function loadUserData() {
     // Firestore loaded. UNION this device's local data into the cloud copy so signing in can
     // never SHADOW or lose data you built on this device (e.g. items added while signed out, or
     // before the account's cloud doc existed). Mirrors the Import merge: union list fields by id
-    // (cloud wins a true duplicate), fill empty plan slots only — non-destructive. The merged
+    // (last-write-wins on a true duplicate — see unionByIdLWW), fill empty plan slots only —
+    // non-destructive. The merged
     // superset is then pushed back up, so a near-empty session adopts the cloud instead of
     // overwriting it, and a data-rich device gets its items into the account.
     try {
@@ -5436,13 +5463,18 @@ async function loadUserData() {
         const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'];
         let before = 0;
         var localNow = new Date().toISOString();
+        var mergeStats = { localWins: 0 };
         UKEYS.forEach(function (key) {
           before += (AppState[key] || []).length;
-          // Stamp local-only items with the current time so LWW can compare them
-          // against tombstones. Firestore items already have updatedAt from the
-          // firestoreSavedAt patch in loadFromFirestore(); the union keeps those.
-          (local[key] || []).forEach(function(it) { if (it && it.updatedAt == null) it.updatedAt = localNow; });
-          AppState[key] = unionById(AppState[key] || [], local[key] || []);
+          // Union local into the cloud copy with last-write-wins on a duplicate id, so a
+          // fresh local edit made offline / signed out (newer updatedAt) survives sign-in
+          // instead of being overwritten by the older cloud copy. Do this BEFORE the stamp
+          // below, so the synthetic localNow can't fake an edit and win the union.
+          AppState[key] = unionByIdLWW(AppState[key] || [], local[key] || [], mergeStats);
+          // Stamp any still-untimestamped survivors (legacy local-only items) so LWW can
+          // compare them against tombstones. Firestore items already carry updatedAt from
+          // the firestoreSavedAt patch in loadFromFirestore(); the union keeps those.
+          (AppState[key] || []).forEach(function(it) { if (it && it.updatedAt == null) it.updatedAt = localNow; });
         });
         patchMissingNutrition(AppState.recipes);
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
@@ -5453,7 +5485,7 @@ async function loadUserData() {
         applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt (D-020)
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
-        if (after !== before || Object.keys(AppState.deletions).length !== cloudDelN) {
+        if (after !== before || mergeStats.localWins > 0 || Object.keys(AppState.deletions).length !== cloudDelN) {
           console.log('loadUserData: reconciled local data/tombstones — syncing the merged set up');
           saveData(); // persist the reconciled superset to BOTH local + cloud so the account has everything
         }
@@ -6745,6 +6777,7 @@ function setPantryStorage(id, storage) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
   p.storage = storage;
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
 }
@@ -6754,6 +6787,7 @@ function togglePantryStaple(id, checked) {
   if (!p) return;
   p.staple = !!checked;
   syncStapleToGrocery(p);   // un-stapling clears any auto "running low" entry
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
   renderGroceryList();
@@ -6839,6 +6873,7 @@ function cycleStapleLevel(id) {
   var order = ['empty', 'full', 'ok', 'low'];
   p.stockLevel = order[(order.indexOf(p.stockLevel || 'empty') + 1) % order.length];
   syncStapleToGrocery(p);
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
   renderGroceryList();
@@ -6855,6 +6890,7 @@ function updatePantryDate(id, value) {
     p.purchaseDate = value || null;
     if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
   }
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
   refreshFreshnessAlerts();
@@ -6865,6 +6901,7 @@ function togglePantryDateMode(id) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
   p.dateMode = (p.dateMode === 'expiry') ? 'bought' : 'expiry';
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
   refreshFreshnessAlerts();
@@ -6875,6 +6912,7 @@ function updatePantryShelf(id, value) {
   if (!p) return;
   var days = parseInt(value, 10);
   p.shelfLifeDays = isNaN(days) ? null : days;
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
   refreshFreshnessAlerts();
@@ -6886,6 +6924,7 @@ function updatePantryQty(id, value) {
   var q = parseFloat(value);
   p.quantity = isNaN(q) ? null : q;
   checkAndReplenishLowStock();
+  stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
 }
@@ -7155,6 +7194,7 @@ function updateBrowserItemQty(name, value) {
   var qty = parseFloat(value);
   item.quantity = (!isNaN(qty) && qty > 0) ? qty : null;
   checkAndReplenishLowStock();
+  stampUpdated(item);
   saveData();
   renderPantry();
 }
@@ -7165,6 +7205,7 @@ function setBrowserItemLevel(name, level) {
   if (!item) return;
   item.stockLevel = level;
   syncStapleToGrocery(item);
+  stampUpdated(item);
   saveData();
   renderPantry();
   var searchEl = document.getElementById('ib-search');
@@ -7344,6 +7385,7 @@ function setCookedStorage(id, storage) {
   var m = (AppState.cookedMeals || []).find(function(x) { return String(x.id) === String(id); });
   if (!m) return;
   m.storage = storage;
+  stampUpdated(m);
   saveData();
   renderCookedMeals();
   refreshFreshnessAlerts();
@@ -7353,6 +7395,7 @@ function updateCookedDate(id, value) {
   var m = (AppState.cookedMeals || []).find(function(x) { return String(x.id) === String(id); });
   if (!m) return;
   m.cookedDate = value || todayISO();
+  stampUpdated(m);
   saveData();
   renderCookedMeals();
   refreshFreshnessAlerts();
