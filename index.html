@@ -315,11 +315,14 @@
                     <div class="section-header">
                         <h2>Inventory</h2>
                     </div>
-                    <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> to add a prepped meal here.</p>
+                    <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> or add takeout/leftovers here.</p>
 
                     <!-- Cooked / prepped meals -->
-                    <div id="cooked-meals-section" class="cooked-meals-section hidden">
-                        <div class="cooked-meals-header"><span class="ic" data-icon="utensils"></span> Cooked &amp; Stored <span class="cooked-meals-hint">— prepped meals, with days left before they go bad</span></div>
+                    <div id="cooked-meals-section" class="cooked-meals-section">
+                        <div class="cooked-meals-header">
+                            <span><span class="ic" data-icon="utensils"></span> Cooked &amp; Stored <span class="cooked-meals-hint">— prepped meals, takeout, and leftovers</span></span>
+                            <button class="btn btn--secondary btn--sm" onclick="openManualCookedModal()">+ Add meal</button>
+                        </div>
                         <div id="cooked-meals-list"></div>
                     </div>
 
@@ -898,6 +901,57 @@
             <div class="modal-body" id="prep-mode-body" style="overflow-y:auto;flex:1;"></div>
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closePrepMode()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Cooked Meal Modal -->
+    <div id="manual-cooked-modal" class="modal hidden">
+        <div class="modal-content modal-content--md">
+            <div class="modal-header">
+                <h3>Add Takeout or Leftovers</h3>
+                <button class="modal-close" onclick="closeManualCookedModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Meal name *</label>
+                    <input type="text" id="manual-cooked-name" class="form-control" placeholder="e.g. Pizza leftovers, Jollibee takeout" autocomplete="off">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <select id="manual-cooked-source" class="form-control">
+                            <option value="leftovers">Leftovers</option>
+                            <option value="takeout">Takeout</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stored on</label>
+                        <input type="date" id="manual-cooked-date" class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Where</label>
+                        <select id="manual-cooked-storage" class="form-control">
+                            <option value="fridge">Fridge</option>
+                            <option value="freezer">Freezer</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fridge life (days)</label>
+                        <input type="number" id="manual-cooked-fridge-life" class="form-control" min="0" step="1" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Freezer life (days)</label>
+                        <input type="number" id="manual-cooked-freezer-life" class="form-control" min="0" step="1" value="90">
+                    </div>
+                </div>
+                <p style="margin:0;color:var(--text-secondary);font-size:0.875rem">This only tracks storage freshness. It will not deduct pantry ingredients.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closeManualCookedModal()">Cancel</button>
+                <button class="btn btn--primary" onclick="saveManualCookedMeal()">Add meal</button>
             </div>
         </div>
     </div>

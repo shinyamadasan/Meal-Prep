@@ -4691,6 +4691,9 @@ window.togglePantryGuide = togglePantryGuide;
 window.togglePantryExpand = togglePantryExpand;
 window.togglePantryDateMode = togglePantryDateMode;
 window.markRecipeCooked = markRecipeCooked;
+window.openManualCookedModal = openManualCookedModal;
+window.closeManualCookedModal = closeManualCookedModal;
+window.saveManualCookedMeal = saveManualCookedMeal;
 window.setCookedStorage = setCookedStorage;
 window.updateCookedDate = updateCookedDate;
 window.removeCookedMeal = removeCookedMeal;
@@ -7434,6 +7437,74 @@ function markRecipeCooked(recipeId, btn) {
   multiplierInput = document.getElementById('cook-portion-multiplier');
 }
 
+function openManualCookedModal() {
+  var modal = document.getElementById('manual-cooked-modal');
+  if (!modal) return;
+  var nameEl = document.getElementById('manual-cooked-name');
+  if (nameEl) nameEl.value = '';
+  var sourceEl = document.getElementById('manual-cooked-source');
+  if (sourceEl) sourceEl.value = 'leftovers';
+  var dateEl = document.getElementById('manual-cooked-date');
+  if (dateEl) dateEl.value = todayISO();
+  var storageEl = document.getElementById('manual-cooked-storage');
+  if (storageEl) storageEl.value = 'fridge';
+  var fridgeEl = document.getElementById('manual-cooked-fridge-life');
+  if (fridgeEl) fridgeEl.value = '3';
+  var freezerEl = document.getElementById('manual-cooked-freezer-life');
+  if (freezerEl) freezerEl.value = '90';
+  modal.classList.remove('hidden');
+  if (nameEl) setTimeout(function() { nameEl.focus(); }, 50);
+}
+
+function closeManualCookedModal() {
+  var modal = document.getElementById('manual-cooked-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function manualCookedDays(value, fallback) {
+  var days = parseInt(value, 10);
+  if (isNaN(days) || days < 0) return fallback;
+  return days;
+}
+
+function saveManualCookedMeal() {
+  var nameEl = document.getElementById('manual-cooked-name');
+  var name = nameEl ? nameEl.value.trim() : '';
+  if (!name) {
+    showErrorMessage('Add a meal name first.');
+    if (nameEl) nameEl.focus();
+    return;
+  }
+
+  var sourceEl = document.getElementById('manual-cooked-source');
+  var storageEl = document.getElementById('manual-cooked-storage');
+  var dateEl = document.getElementById('manual-cooked-date');
+  var fridgeEl = document.getElementById('manual-cooked-fridge-life');
+  var freezerEl = document.getElementById('manual-cooked-freezer-life');
+
+  var source = sourceEl && sourceEl.value === 'takeout' ? 'takeout' : 'leftovers';
+  var storage = storageEl && storageEl.value === 'freezer' ? 'freezer' : 'fridge';
+  var meal = {
+    id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+    recipeId: null,
+    source: source,
+    name: name,
+    cookedDate: dateEl && dateEl.value ? dateEl.value : todayISO(),
+    storage: storage,
+    fridgeLife: manualCookedDays(fridgeEl ? fridgeEl.value : '', 3),
+    freezerLife: manualCookedDays(freezerEl ? freezerEl.value : '', 90)
+  };
+  stampUpdated(meal);
+
+  AppState.cookedMeals = AppState.cookedMeals || [];
+  AppState.cookedMeals.push(meal);
+  saveData();
+  closeManualCookedModal();
+  renderCookedMeals();
+  refreshFreshnessAlerts();
+  showSuccessMessage('Added "' + name + '" to your stored meals.');
+}
+
 function cookedShelfLife(m) {
   return m.storage === 'freezer' ? (m.freezerLife || 0) : (m.fridgeLife || 0);
 }
@@ -7472,8 +7543,8 @@ function renderCookedMeals() {
   var meals = AppState.cookedMeals || [];
 
   if (meals.length === 0) {
-    if (section) section.classList.add('hidden');
-    list.innerHTML = '';
+    if (section) section.classList.remove('hidden');
+    list.innerHTML = emptyState('utensils', 'No stored meals yet', 'Add takeout, leftovers, or mark a recipe cooked to track fridge/freezer freshness.');
     return;
   }
   if (section) section.classList.remove('hidden');
@@ -7481,9 +7552,10 @@ function renderCookedMeals() {
   function buildCookedCard(m) {
     var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
     var fs = freshnessStatus(dl);
+    var sourceLabel = m.source === 'takeout' ? 'Takeout' : (m.source === 'leftovers' ? 'Leftovers' : '');
     var h = '<div class="cooked-card ' + fs.cls + '">';
     h += '<div class="cooked-card-main">';
-    h += '<span class="cooked-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + '</span>';
+    h += '<span class="cooked-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + (sourceLabel ? ' <span class="cooked-source">' + sourceLabel + '</span>' : '') + '</span>';
     if (fs.label) h += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
     h += '</div>';
     h += '<div class="cooked-card-meta">';
