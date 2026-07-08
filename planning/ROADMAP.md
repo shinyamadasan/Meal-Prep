@@ -111,10 +111,6 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 - **Sentry inactive** — code loads only when `SENTRY_DSN` is set; it's empty.
 
 ### Gaps
-- **Firestore save is a full-document overwrite** (`saveToFirestore` uses `tx.set`; merge only runs
-  on a version conflict, and only unions 7 list fields). The D-010 write guard stops the deploy wipe,
-  but this is still fragile — a new `AppState` field forgotten in `buildFirestorePayload` would be
-  silently dropped on every save. Consider field-level merge on every write.
 - **USDA `DEMO_KEY` rate limit** — ~1000/hr/IP, no retry or user-facing message (DECISIONS D-007).
 - **Snack serving scaling** — snacks use the recipe's global `currentServings`; no per-slot override.
 - **Prep Mode** — no batch-cook ingredient aggregation across the week's recipes.
