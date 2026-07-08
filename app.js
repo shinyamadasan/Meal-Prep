@@ -5283,6 +5283,17 @@ function mergeCloudConflict(remote, local) {
   return out;
 }
 
+// Report a handled error to Sentry (loaded via the Sentry Loader Script in index.html).
+// No-op if the loader hasn't initialized yet. Call at data-integrity failure points so a
+// swallowed sync failure still produces a signal instead of only a console line.
+function reportError(err, context) {
+  try {
+    if (window.Sentry && window.Sentry.captureException) {
+      window.Sentry.captureException(err, context ? { extra: { context: context } } : undefined);
+    }
+  } catch (_) { /* never let error reporting throw */ }
+}
+
 async function saveToFirestore() {
   if (!AppState.currentUser || !window.firebase) return;
   if (!AppState.isOnline) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
@@ -5333,13 +5344,16 @@ async function saveToFirestore() {
       }
 
       // Firestore rejects `undefined`; round-trip strips undefined + functions.
-      tx.set(userDocRef, JSON.parse(JSON.stringify(payload)));
+      // merge:true so a field accidentally omitted from buildFirestorePayload() is preserved
+      // rather than wiped on every save (matches the non-transaction fallback path above).
+      tx.set(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
       AppState.dataVersion = payload.version;
     });
     console.log('Data saved to Firestore (v' + AppState.dataVersion + ')');
     AppState.syncStatus = 'synced'; updateSyncIndicator();
   } catch (error) {
     console.error('Error saving to Firestore:', error);
+    reportError(error, 'saveToFirestore');
     showErrorMessage('Failed to sync data to cloud. Changes saved locally.');
     AppState.syncStatus = 'local'; updateSyncIndicator();
   }
@@ -5435,6 +5449,7 @@ async function loadFromFirestore() {
     return 'empty'; // signed in, but no data saved to the cloud yet
   } catch (error) {
     console.error('Error loading from Firestore:', error);
+    reportError(error, 'loadFromFirestore');
     showErrorMessage('Failed to load cloud data. Using local data.');
   }
   return 'error';
@@ -5507,6 +5522,7 @@ async function loadUserData() {
       }
     } catch (e) {
       console.warn('loadUserData: local-merge on sign-in failed', e);
+      reportError(e, 'loadUserData merge');
     }
   }
 

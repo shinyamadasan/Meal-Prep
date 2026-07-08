@@ -13,21 +13,13 @@
     <link rel="apple-touch-icon" href="icon.svg">
     <title>Meal Prep Planner</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Error monitoring — see crashes from real users in production.
-         SETUP: create a free project at sentry.io, then paste your DSN below.
-         Stays inert (no network calls, no behavior change) until set. -->
-    <script>
-      window.SENTRY_DSN = ""; // <-- paste your Sentry DSN here
-      if (window.SENTRY_DSN) {
-        var _s = document.createElement('script');
-        _s.src = 'https://browser.sentry-cdn.com/7.119.0/bundle.min.js';
-        _s.crossOrigin = 'anonymous';
-        _s.onload = function () {
-          if (window.Sentry) window.Sentry.init({ dsn: window.SENTRY_DSN, tracesSampleRate: 0 });
-        };
-        document.head.appendChild(_s);
-      }
-    </script>
+    <!-- Error monitoring (Sentry Loader Script). The hex in the URL is this project's public
+         key — safe to commit. The loader auto-loads + auto-initializes Sentry; app.js
+         reportError() feeds it handled sync-failure signals (failed save / load / merge). -->
+    <script
+      src="https://js.sentry-cdn.com/1d817783d599e3d132bfba8c332f512f.min.js"
+      crossorigin="anonymous"
+    ></script>
     <!-- Light-only release: the app is designed for one polished light theme.
          No theme script — the device's dark-mode setting is intentionally ignored
          (color-scheme:light in <meta> above + :root in style.css). -->
