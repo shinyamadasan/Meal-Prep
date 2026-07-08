@@ -6857,6 +6857,7 @@ function updatePantryDate(id, value) {
   }
   saveData();
   renderPantryKeepOpen();
+  refreshFreshnessAlerts();
 }
 
 // Flip an item between "bought date + shelf life" and a printed "expiry date".
@@ -6866,6 +6867,7 @@ function togglePantryDateMode(id) {
   p.dateMode = (p.dateMode === 'expiry') ? 'bought' : 'expiry';
   saveData();
   renderPantryKeepOpen();
+  refreshFreshnessAlerts();
 }
 
 function updatePantryShelf(id, value) {
@@ -6875,6 +6877,7 @@ function updatePantryShelf(id, value) {
   p.shelfLifeDays = isNaN(days) ? null : days;
   saveData();
   renderPantryKeepOpen();
+  refreshFreshnessAlerts();
 }
 
 function updatePantryQty(id, value) {
@@ -7018,6 +7021,7 @@ function confirmKitchenSetup() {
   saveData();
   renderPantry();
   renderDashboard();
+  refreshFreshnessAlerts();
   var el = document.getElementById('kitchen-setup-modal');
   if (el) el.classList.add('hidden');
 }
@@ -7139,6 +7143,7 @@ function toggleIngredientFromBrowser(name) {
   }
   saveData();
   renderPantry();
+  refreshFreshnessAlerts();
   var searchEl = document.getElementById('ib-search');
   renderIngredientBrowserContent(searchEl ? searchEl.value : '');
 }
@@ -7295,6 +7300,7 @@ function _doMarkCooked(recipe, btn) {
   saveData();
   renderCookedMeals();
   renderPantry();
+  refreshFreshnessAlerts();
 
   if (btn) {
     btn.textContent = '✓ Added to fridge!';
@@ -7340,6 +7346,7 @@ function setCookedStorage(id, storage) {
   m.storage = storage;
   saveData();
   renderCookedMeals();
+  refreshFreshnessAlerts();
 }
 
 function updateCookedDate(id, value) {
@@ -7348,12 +7355,14 @@ function updateCookedDate(id, value) {
   m.cookedDate = value || todayISO();
   saveData();
   renderCookedMeals();
+  refreshFreshnessAlerts();
 }
 
 function removeCookedMeal(id) {
   AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return String(x.id) !== String(id); });
   saveData();
   renderCookedMeals();
+  refreshFreshnessAlerts();
 }
 
 function renderCookedMeals() {
@@ -7417,8 +7426,7 @@ function renderCookedMeals() {
 function getFreshnessAlerts() {
   var pantry = { expired: 0, expiring: 0 };
   AppState.pantry.forEach(function(p) {
-    var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
-    var dl = daysLeftFrom(p.purchaseDate, shelf);
+    var dl = pantryDaysLeft(p);
     if (dl == null) return;
     if (dl < 0) pantry.expired++;
     else if (dl <= FRESHNESS_WARN_DAYS) pantry.expiring++;
@@ -7489,6 +7497,11 @@ function updateFreshnessBadges() {
   badge.classList.toggle('tab-badge--expired', a.expired > 0);
 }
 
+function refreshFreshnessAlerts() {
+  renderFreshnessBanner();
+  updateFreshnessBadges();
+}
+
 function togglePantryCard(safeId) {
   var detail = document.getElementById('pdetail-' + safeId);
   var btn = detail ? detail.parentElement.querySelector('.pantry-info-btn') : null;
@@ -7545,6 +7558,7 @@ function addToPantry(forceAdd) {
 
   saveData();
   renderPantry();
+  refreshFreshnessAlerts();
   renderGroceryList();
   showSuccessMessage('Added "' + name + '" to your kitchen');
 }
@@ -7652,6 +7666,7 @@ function confirmBulkAdd() {
   if (added.length > 0) {
     saveData();
     renderPantry();
+    refreshFreshnessAlerts();
     renderGroceryList();
     showSuccessMessage(`${added.length} item${added.length > 1 ? 's' : ''} added to pantry`);
   }
@@ -7799,6 +7814,7 @@ function removeFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(p => String(p.id) !== String(id));
   saveData();
   renderPantry();
+  refreshFreshnessAlerts();
   renderGroceryList();
 }
 
@@ -8060,12 +8076,14 @@ function confirmAddIngredientToPantry(name, idx, unit) {
   saveData();
   renderIngredientsTab();
   renderPantry();
+  refreshFreshnessAlerts();
 }
 
 function removeIngredientFromPantry(id) {
   AppState.pantry = AppState.pantry.filter(function(p) { return String(p.id) !== String(id); });
   saveData();
   renderPantry();
+  refreshFreshnessAlerts();
   renderIngredientsTab();
 }
 
