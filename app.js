@@ -5560,7 +5560,9 @@ async function loadProfile() {
       AppState.profile = null;
     }
   } catch (e) {
-    console.error('Profile load failed:', e);
+    // /profiles powers the dormant community feed and its rules aren't provisioned,
+    // so permission-denied here is expected — stay quiet; still log anything else.
+    if (!e || e.code !== 'permission-denied') console.error('Profile load failed:', e);
   }
 }
 
