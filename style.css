@@ -5850,6 +5850,65 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   box-shadow: var(--shadow-sm);
 }
 
+.dash-card--leftovers {
+  background: rgba(var(--color-teal-500-rgb), 0.08);
+  border-color: rgba(var(--color-teal-500-rgb), 0.22);
+}
+
+.dash-leftover-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-leftover-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-leftover-icon .lc-icon { width: 16px; height: 16px; }
+
+.dash-leftover-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash-leftover-title {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.dash-leftover-copy {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+}
+
+.dash-leftover-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .dash-leftover-prompt {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .dash-leftover-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .dash-card-header {
   display: flex;
   align-items: center;

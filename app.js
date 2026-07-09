@@ -3244,6 +3244,17 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
+  var leftoverPromptCard = '<div class="dash-card dash-card--leftovers">' +
+    '<div class="dash-leftover-prompt">' +
+      '<div class="dash-leftover-icon">' + icon('utensils') + '</div>' +
+      '<div class="dash-leftover-body">' +
+        '<div class="dash-leftover-title">Have leftovers or takeout?</div>' +
+        '<div class="dash-leftover-copy">Record it so the app can remind you before it goes bad.</div>' +
+      '</div>' +
+      '<button class="btn btn--primary btn--sm dash-leftover-btn" onclick="openManualCookedModal()">+ Record meal</button>' +
+    '</div>' +
+    '</div>';
+
   // ══════════════════════════════════════════════════════════════
   // Cook History
   // ══════════════════════════════════════════════════════════════
@@ -3267,6 +3278,7 @@ function renderDashboard() {
 
   el.innerHTML = '<div class="dashboard">' +
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
+    leftoverPromptCard +
     level1Card +
     level2Card +
     level3Card +
