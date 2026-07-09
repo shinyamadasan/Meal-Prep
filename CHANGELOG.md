@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-009 — done (branch: task-009)
+changed:
+  - style.css (`.recipe-card-header`, `.recipe-title`, and `.recipe-category` use the existing smaller spacing/type tokens for a tighter recipe card header, 4 loc)
+tests: `git diff --check` (pass); `npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000` (1 passed)
+blockers: none
+deviations: `npm test -- --reporter=list --workers=1` timed out after 604s without a pass/fail result; real-device visual polish remains human verification
+→ status set to `review` in TASKS.md
+
 ## TASK-007 — done (re-applied on main; original branch task-007 not merged)
 changed:
   - app.js (`markRecipeCooked()` opens a portion-multiplier prompt before the missing-check; `deductIngredientsForRecipe()`, `checkMissingIngredients()`, `_doMarkCooked()` take an optional `multiplier = 1` and scale deduction / missing-check / cookHistory servings, plus a `(×N)` toast suffix, 53 loc)

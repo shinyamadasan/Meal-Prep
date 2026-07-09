@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-009 · 2026-07-08
+suite: token grep for `--space-2`, `--space-6`, `--space-8`, `--font-size-lg`; git diff --check; npm test -- --reporter=list --workers=1; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; CSS QA grep for app dark-mode selectors and `:root`
+result: required tokens exist; `git diff --check` passed with only Git LF-to-CRLF warnings; app source has zero `prefers-color-scheme` / `data-color-scheme="dark"` matches; `style.css` has exactly one `:root`; mobile-layout spec passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 604s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; desktop recipe-card visual comparison and real-device rendering remain human verification
+
 ## TASK-007 · 2026-07-08 (re-applied on main)
 suite: node --check app.js; git apply --3way (feature hunks from d8acde3); npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=line; acceptance code-trace
 result: `node --check` passed. Feature hunks applied cleanly onto current main (deduct at app.js:7280, check at 7312, `_doMarkCooked` at 7350, `markRecipeCooked` at 7395). `smoke.spec.js` + `button-smoke.spec.js` passed (2 passed; 460 buttons discovered, 200 clicked, 0 broken). Code-trace verified all 8 acceptance criteria: default-param backward-compat; `scaledQty *= multiplier` in deduct + check before `toGrams`; cookHistory `servings` rounded to 2 dp; `(×N)` toast only when `!== 1`; `cookedMeals` untouched; scaled missing-check runs before cook; captured-reference input read (correct for showConfirmDialog's close-before-onConfirm ordering); invalid/empty → 1× fallback.

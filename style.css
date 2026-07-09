@@ -1186,19 +1186,20 @@ select.form-control {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-12);
+  margin-bottom: var(--space-8);
 }
 
 .recipe-title {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
+  line-height: 1.25;
   margin: 0;
 }
 
 .recipe-category {
   background: var(--color-bg-1);
   color: var(--color-primary);
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-2) var(--space-6);
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
