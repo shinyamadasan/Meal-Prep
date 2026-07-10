@@ -523,50 +523,49 @@ test steps:
 
 ---
 
-### TASK-010 · Design clarification: what does "always-expanded detail view" mean?
+### TASK-010 · Recipe card: show ingredients by default, instructions behind a toggle
 status: codex
 owner: codex
-source: BQ-020
+source: BQ-020 (PROP-026)
 priority: P3
 depends-on: TASK-009
-files: (none — this task produces a written spec, not code)
+
+decision (human, 2026-07-08):
+  Resolved the "always-expanded detail" ambiguity → interpretation C, "Open → Ingredients first":
+  the recipe's Ingredients should be visible at a glance WITHOUT turning the grid into a wall of
+  text. Concretely: show the Ingredients list expanded by default on each card; keep the longer
+  Instructions collapsed behind a toggle. Interpretation A (auto-expand everything) was rejected;
+  B (persisted expand state) was rejected.
+
+files: app.js, style.css
 
 context:
-  PROP-026 explicitly flags: `"always open" = expand on list render, or just default to
-  expanded when tapping? If the former, the entire recipe list would be a wall of text —
-  almost certainly not what the user means.` The proposal itself asks to "Confirm
-  interpretation at build."
-
-  Three plausible interpretations, each shipping to a different codebase surface:
-
-  1. **Auto-expand `.recipe-details` inline on card render** — flip `.recipe-details hidden`
-     off in `renderRecipes()` at app.js:2538. **Cost:** ingredient/step blocks always show →
-     recipe grid becomes multi-screen-tall wall of text. **Almost certainly not what the user
-     wants** per PROP-026 itself.
-
-  2. **Persist per-recipe expanded state** — remember which cards a user has expanded across
-     sessions (localStorage `expandedRecipes: string[]`), re-expand them on load. **Cost:**
-     new AppState key, save/load path, low-value polish.
-
-  3. **When the edit modal opens, land on the ingredients section by default** — the recipe
-     card's `onclick` opens the edit modal (app.js:2437); change the modal's default tab/scroll
-     state to show ingredients first. **Cost:** a `renderRecipeModal()` tweak. **Most likely
-     what the user means** given the "detail view" phrasing.
+  In `renderRecipes()` (app.js ~2572) each card has ONE collapsible block:
+    `<button class="recipe-details-toggle" onclick="toggleRecipeDetails(event)">Ingredients & steps ▾</button>`
+    `<div class="recipe-details hidden">` [serving scaler] [.recipe-ingredients] [instructions <p>] `</div>`
+  Ingredients already render before Instructions inside `.recipe-details`. There is no separate
+  "detail view / modal tabs" — the edit modal (`openEditRecipeModal`) is a plain form, out of scope.
 
 acceptance:
-  - [ ] This task is opened by Codex, who reads the three interpretations above, picks the one
-        that matches its reading of PROP-026's captures/context, and sets `status: blocked` with
-        a single-line question written under `blocker:` for Claude to answer:
-        `blocker: Need human pick from A/B/C above before implementing; Codex recommends: <A|B|C>
-        because <one-line why>.` NO CODE is written.
-  - [ ] TASK-010 does not change any file. Its output is the recorded blocker line.
+  - [ ] The serving scaler + `.recipe-ingredients` list render VISIBLE by default on every card
+        (not inside a hidden container).
+  - [ ] The Instructions (`<p><strong>Instructions:</strong> …</p>`) render COLLAPSED by default,
+        behind a toggle button (e.g. "Instructions ▾") — reuse the `toggleRecipeDetails` pattern or a
+        small variant; `aria-expanded` updates on toggle.
+  - [ ] Tapping the instructions toggle expands/collapses only the instructions.
+  - [ ] The serving +/- scaler still scales the shown ingredient quantities (`adjustDetailServings`).
+  - [ ] With instructions collapsed a card is ≈ header + ingredient list only (no wall of text).
+  - [ ] Only the recipe-card markup/CSS changes; other tabs unaffected.
 
 constraints:
-  - Do not implement any of the three options — this task is a decision gate, not a build
-  - Do not delete or rewrite this task; only append the `blocker:` line
+  - Minimal: reuse the existing toggle + CSS patterns; NO new AppState, NO persisted expand state.
+  - Do not auto-expand instructions (interpretation A is rejected).
+  - Match existing card style; light-only; no second `:root` block.
 
 test steps:
-  - [ ] (none — no code)
+  - [ ] `node --check app.js`; recipe grid shows ingredients inline, instructions collapsed.
+  - [ ] Toggle instructions on a card → expands; scaler still adjusts ingredient amounts.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
 
 ---
 
@@ -574,39 +573,138 @@ test steps:
      BQ-022 · Long-press to enter bulk multi-select mode
      ═══════════════════════════════════════════════════════ -->
 
-### TASK-011 · Design clarification: long-press bulk multi-select scope + desktop fallback
+### TASK-011 · Pantry bulk multi-select: Select mode → bulk delete + bulk move
 status: codex
 owner: codex
-source: BQ-022
+source: BQ-022 (PROP-028)
 priority: P3
 depends-on: none
-files: (none — this task produces a written spec, not code)
+
+decision (human, 2026-07-08):
+  Resolved PROP-028's three ambiguities → BUILD MINIMAL:
+    (a) scope: PANTRY ONLY (skip the grocery list).
+    (b) enter selection: a "Select" toggle button — NOT long-press — so it works on touch AND desktop.
+    (c) bulk actions: bulk DELETE + bulk MOVE (storage picker: counter / fridge / freezer).
+
+files: app.js, index.html, style.css
 
 context:
-  PROP-028 flags three ambiguities that must be resolved before build:
-    1. Scope — pantry only, or grocery list too? (The proposal says the user asked for both.)
-    2. Move-target UI — a storage-location picker (counter/fridge/freezer) or a full location
-       modal? Grocery-list "move" doesn't have an equivalent destination.
-    3. Desktop fallback — long-press is touch-only; desktop needs multi-click or a "select"
-       toggle button.
-
-  This is a P3 power-user feature; the safest autonomous act is to record the ambiguity and
-  block on human clarification rather than pick a default that could ship the wrong feature.
+  Pantry renders via `buildPantryItem()` inside `renderPantry()` (app.js ~6759). Each item is
+  `.pi-item` > `.pi-row` (`onclick="togglePantryExpand(...)"`) + `.pi-expand`. Move uses
+  `setPantryStorage(id, storage)` (already stamps `updatedAt`); storage options come from the `WHERE`
+  array (counter/fridge/freezer). A per-item delete already exists in the item's expand controls —
+  reuse its handler for the delete mechanics.
 
 acceptance:
-  - [ ] Codex reads this task, then sets `status: blocked` with a single-line question written
-        under `blocker:` for Claude to answer:
-        `blocker: Need human pick on (a) scope (pantry only | pantry+grocery), (b) move-target
-        UI for pantry (dropdown | modal), (c) desktop fallback (multi-click | select-mode
-        button); Codex recommends: <one-line default per question>.` NO CODE is written.
-  - [ ] TASK-011 does not change any file. Its output is the recorded blocker line.
+  - [ ] A "Select" toggle button in the pantry tab header (near the search / add controls) enters and
+        exits selection mode.
+  - [ ] In selection mode each `.pi-item` shows a checkbox; tapping a row toggles its checkbox and does
+        NOT expand the item. Leaving selection mode restores normal tap-to-expand.
+  - [ ] A bulk action bar shows the selected count + "Move to…" (storage picker: counter/fridge/freezer)
+        + "Delete" + a way to cancel/exit. It is hidden when not in selection mode or nothing is selected.
+  - [ ] Bulk MOVE sets storage on every selected item (reuse `setPantryStorage` per id), re-renders, exits.
+  - [ ] Bulk DELETE removes every selected pantry item, re-renders, and exits selection mode.
+  - [ ] Works with mouse (desktop) and touch — no long-press anywhere.
+  - [ ] The grocery list is NOT touched (out of scope).
 
 constraints:
-  - Do not implement any part of the feature — this is a decision gate
-  - Do not delete or rewrite this task; only append the `blocker:` line
+  - CRITICAL: bulk DELETE must tombstone each removed id EXPLICITLY (`AppState.deletions[String(id)] =
+    new Date().toISOString()`) BEFORE `saveData()`, exactly like `clearLocalStorage()` (app.js ~479).
+    Reason: `recordLocalDeletions()`'s `MASS_DELETE_GUARD` (D-029) ignores a batch of >5 simultaneous
+    disappearances, so a 6+ item bulk delete would otherwise NOT propagate to other devices. Do not
+    rely on the baseline-diff to tombstone bulk deletions.
+  - Selection state is transient: a mode flag + a Set of selected ids. NO persisted AppState, NO new
+    saved fields.
+  - Reuse existing helpers (`setPantryStorage`, the per-item delete path, `saveData`, `renderPantry`);
+    match existing pantry CSS; light-only; no second `:root` block.
+  - Do not change single-item tap-to-expand behavior outside selection mode.
 
 test steps:
-  - [ ] (none — no code)
+  - [ ] `node --check app.js`; enter Select mode → checkboxes appear, rows don't expand.
+  - [ ] Select 3 → Move to Fridge → all three show fridge; Select 2 → Delete → both gone.
+  - [ ] Bulk-delete 6+ items, then reload → they stay deleted (verifies the explicit-tombstone
+        workaround for the D-029 guard). Flag human/emulator-verified if not automatable.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     review-2026-07-08 · Data-integrity review follow-ups
+     Risk: Medium · Execution: NOT chained (build + review each solo)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-012 · Fix stale `reportError()` comment (Loader Script → SDK)
+status: codex
+source: review-2026-07-08
+depends-on: none
+priority: P3
+files: app.js
+
+context:
+  `reportError()`'s doc comment says the Sentry SDK is "loaded via the Sentry Loader Script in
+  index.html". That was true briefly, but the hosted Loader Script no-op'd and was replaced with a
+  direct DSN + SDK bundle (`Sentry.init({ dsn })`) in `index.html` (commit 14a7cbd, see DECISIONS
+  D-030's Sentry half). The comment is now inaccurate. Comment-only fix.
+
+acceptance:
+  - [ ] The comment on `reportError()` no longer references "Loader Script".
+  - [ ] It accurately states the SDK is loaded + initialized (DSN) in `index.html`.
+  - [ ] NO behavior change — only the comment lines are touched.
+
+constraints:
+  - Comment-only. Do not touch `reportError()`'s body or any other code.
+
+test steps:
+  - [ ] `node --check app.js` passes.
+  - [ ] `grep -n "Loader Script" app.js` returns nothing.
+
+---
+
+### TASK-013 · Stamp imported items with `updatedAt` so a surviving tombstone can't delete them
+status: codex
+source: review-2026-07-08
+depends-on: none
+priority: P2
+files: app.js
+
+context:
+  `importData()` (app.js — the `showConfirmDialog('Import data?'...)` confirm callback) unions the
+  imported file into `AppState` and clears tombstones for imported ids (D-019). But imported JSON
+  items usually have NO `updatedAt`. `applyTombstones()` does `if (!it.updatedAt) return false` — an
+  item with no timestamp LOSES to any tombstone. So if a tombstone for an imported id survives (e.g.
+  it still exists on another device that hasn't synced the clear yet), the freshly-imported item is
+  deleted on the next merge. Stamping imported items with `updatedAt = now` makes them win the LWW
+  (`it.updatedAt > tombAt`) against any older tombstone — the same durability `stampUpdated()` gives
+  inventory edits (D-028). This is additive hardening on top of D-019's clear + D-031's full-overwrite
+  write; it does NOT replace either. See DECISIONS D-019, D-020, D-028, D-031.
+
+acceptance:
+  - [ ] After the `unionById(...)` merges in the import confirm callback, every item whose id is
+        present in the imported file has `updatedAt` set to the import time (one ISO string), across
+        `recipes, pantry, customIngredients, customHacks, userIngredients, cookedMeals, groceryList`
+        (the same key set D-019's tombstone-clear loop uses).
+  - [ ] Items NOT in the import file keep their existing `updatedAt` unchanged.
+  - [ ] The stamp is applied BEFORE `var savePromise = saveData();` so it persists to localStorage +
+        Firestore in the same save.
+  - [ ] Trace: a previously-deleted item (tombstone time T in the past) re-imported now has
+        `updatedAt > T`, so `applyTombstones()` keeps it (does not fall into the `!it.updatedAt` or
+        `updatedAt <= tombAt` delete branches).
+  - [ ] Existing import behavior is otherwise unchanged (existing-wins-on-collision union, D-019
+        tombstone-clear, backup, render calls, awaited save + success toast).
+
+constraints:
+  - Reuse the existing `stampUpdated(item)` helper (or an inline `new Date().toISOString()`); do not
+    add a new helper.
+  - Do NOT change `unionById` argument order (existing item wins a true duplicate — D-003 / import
+    semantics stay intact).
+  - Do NOT modify the D-019 tombstone-clear block or the write path; this task is purely additive.
+  - app.js only. Data-integrity surface — build solo, do not chain.
+
+test steps:
+  - [ ] `node --check app.js` passes.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
+  - [ ] Manual/emulator (flag as human-verified if not automatable): import a file containing an id
+        that currently carries a tombstone → item appears AND still there after a reload + ~2 min.
 
 ---
 
