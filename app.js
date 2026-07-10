@@ -2279,6 +2279,42 @@ function toggleRecipeDetails(e) {
 }
 window.toggleRecipeDetails = toggleRecipeDetails;
 
+function openRecipeFromHome(recipeId) {
+  var id = String(recipeId);
+  var recipe = AppState.recipes.find(function(r) { return String(r.id) === id; });
+  if (!recipe) {
+    showTab('recipes');
+    return;
+  }
+
+  var searchEl = document.getElementById('recipe-search');
+  var categoryEl = document.getElementById('category-filter');
+  var preptimeEl = document.getElementById('preptime-filter');
+  var favoritesEl = document.getElementById('favorites-filter');
+  if (searchEl) searchEl.value = '';
+  if (categoryEl) categoryEl.value = '';
+  if (preptimeEl) preptimeEl.value = '';
+  if (favoritesEl) favoritesEl.checked = false;
+
+  showTab('recipes');
+  renderRecipes();
+
+  var card = Array.prototype.slice.call(document.querySelectorAll('.recipe-card')).find(function(el) {
+    return String(el.dataset.recipeId) === id;
+  });
+  if (!card) return;
+
+  var details = card.querySelector('.recipe-details');
+  var toggle = card.querySelector('.recipe-details-toggle');
+  if (details) details.classList.remove('hidden');
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.innerHTML = 'Hide details ▴';
+  }
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+window.openRecipeFromHome = openRecipeFromHome;
+
 // Generic "click card to edit" — runs editFn(id) unless an inner control was clicked.
 function handleCardEdit(e, editFn, id) {
   if (e.target.closest('button, input, select, a')) return;
@@ -3179,7 +3215,7 @@ function renderDashboard() {
           buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJ(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
         }
         return '<div class="dash-cook-row">' +
-          '<button class="dash-cook-item" onclick="showTab(\'recipes\')">' +
+          '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJ(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
           '</button>' + buyBtn + '</div>';
       }).join('');
@@ -3244,6 +3280,17 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
+  var leftoverPromptCard = '<div class="dash-card dash-card--leftovers">' +
+    '<div class="dash-leftover-prompt">' +
+      '<div class="dash-leftover-icon">' + icon('utensils') + '</div>' +
+      '<div class="dash-leftover-body">' +
+        '<div class="dash-leftover-title">Have leftovers or takeout?</div>' +
+        '<div class="dash-leftover-copy">Record it so the app can remind you before it goes bad.</div>' +
+      '</div>' +
+      '<button class="btn btn--primary btn--sm dash-leftover-btn" onclick="openManualCookedModal()">+ Record meal</button>' +
+    '</div>' +
+    '</div>';
+
   // ══════════════════════════════════════════════════════════════
   // Cook History
   // ══════════════════════════════════════════════════════════════
@@ -3267,6 +3314,7 @@ function renderDashboard() {
 
   el.innerHTML = '<div class="dashboard">' +
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
+    leftoverPromptCard +
     level1Card +
     level2Card +
     level3Card +
