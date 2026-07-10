@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-009 - 2026-07-10 branch refresh
+suite: git diff --check main..HEAD; token grep for `--space-2`, `--space-6`, `--space-8`, `--font-size-lg`; CSS QA grep for app dark-mode selectors and `:root`; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
+result: `git diff --check` passed; required tokens exist; app source has zero `prefers-color-scheme` / `data-color-scheme="dark"` matches; `style.css` has exactly one `:root`; mobile-layout spec passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 244s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; desktop recipe-card visual comparison and real-device rendering remain human verification
+
 ## TASK-009 · 2026-07-08
 suite: token grep for `--space-2`, `--space-6`, `--space-8`, `--font-size-lg`; git diff --check; npm test -- --reporter=list --workers=1; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; CSS QA grep for app dark-mode selectors and `:root`
 result: required tokens exist; `git diff --check` passed with only Git LF-to-CRLF warnings; app source has zero `prefers-color-scheme` / `data-color-scheme="dark"` matches; `style.css` has exactly one `:root`; mobile-layout spec passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 604s without reporter output.
