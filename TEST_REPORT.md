@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-010 · 2026-07-10
+suite: node --check app.js; git diff --check -- app.js style.css; static greps for hidden recipe-details, instructions toggle, `:root`; temporary Playwright TASK-010 behavior spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
+result: `node --check` passed; `git diff --check` passed with only Git LF-to-CRLF warnings; `.recipe-details hidden` is gone from recipe-card markup; `.recipe-instructions hidden` + instructions toggle are present; `style.css` has exactly one `:root`; temporary behavior spec passed (ingredients visible by default, instructions collapsed then expandable with `aria-expanded`, detail scaler changes serving count); smoke + button-smoke passed (2/2; 465 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; real-device recipe-card rendering remains human verification
+
 ## TASK-009 - 2026-07-10 branch refresh
 suite: git diff --check main..HEAD; token grep for `--space-2`, `--space-6`, `--space-8`, `--font-size-lg`; CSS QA grep for app dark-mode selectors and `:root`; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
 result: `git diff --check` passed; required tokens exist; app source has zero `prefers-color-scheme` / `data-color-scheme="dark"` matches; `style.css` has exactly one `:root`; mobile-layout spec passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 244s without reporter output.

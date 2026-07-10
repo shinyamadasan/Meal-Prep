@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-010 — done (branch: task-010)
+changed:
+  - app.js (`renderRecipes()` keeps the detail scaler + `.recipe-ingredients` visible by default, moves recipe instructions into `.recipe-instructions hidden`, keeps `toggleRecipeDetails()` as the instructions toggle with `aria-expanded`, and updates `openRecipeFromHome()` so it no longer rewrites the instructions toggle, 32 loc)
+  - style.css (`.recipe-instructions.hidden` shares the existing hidden detail rule and the recipe toggle comment now describes instructions-only collapse, 5 loc)
+tests: `node --check app.js` (pass); `git diff --check -- app.js style.css` (pass); temporary Playwright TASK-010 behavior spec (1 passed; not committed); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 465 buttons, 0 broken)
+blockers: none
+deviations: `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output; real-device recipe-card visual polish remains human verification
+→ status set to `review` in TASKS.md
+
 ## TASK-009 — done (branch: task-009)
 changed:
   - style.css (`.recipe-card-header`, `.recipe-title`, and `.recipe-category` use the existing smaller spacing/type tokens for a tighter recipe card header, 4 loc)

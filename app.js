@@ -2262,20 +2262,9 @@ function toggleRecipeDetails(e) {
   if (!details) return;
   const nowHidden = details.classList.toggle('hidden');
   btn.setAttribute('aria-expanded', String(!nowHidden));
-  btn.innerHTML = nowHidden ? 'Ingredients &amp; steps ▾' : 'Hide details ▴';
-
-  if (nowHidden) {
-    // Reset the detail scaler back to the recipe's saved serving count
-    const card = btn.closest('.recipe-card');
-    if (!card) return;
-    const recipeId = card.dataset.recipeId;
-    const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
-    if (!recipe) return;
-    const countEl = card.querySelector('.detail-serving-count');
-    if (countEl) countEl.textContent = recipe.currentServings;
-    const ul = card.querySelector('.detail-inglist');
-    if (ul) ul.innerHTML = buildDetailIngList(recipe, recipe.currentServings);
-  }
+  const showLabel = btn.getAttribute('data-show-label') || 'Ingredients &amp; steps ▾';
+  const hideLabel = btn.getAttribute('data-hide-label') || 'Hide details ▴';
+  btn.innerHTML = nowHidden ? showLabel : hideLabel;
 }
 window.toggleRecipeDetails = toggleRecipeDetails;
 
@@ -2304,13 +2293,6 @@ function openRecipeFromHome(recipeId) {
   });
   if (!card) return;
 
-  var details = card.querySelector('.recipe-details');
-  var toggle = card.querySelector('.recipe-details-toggle');
-  if (details) details.classList.remove('hidden');
-  if (toggle) {
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.innerHTML = 'Hide details ▴';
-  }
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 window.openRecipeFromHome = openRecipeFromHome;
@@ -2569,9 +2551,8 @@ function renderRecipes() {
       </div>
       ` : ''}
       
-      <!-- Ingredients + instructions: collapsed by default so the grid stays scannable -->
-      <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false">Ingredients &amp; steps ▾</button>
-      <div class="recipe-details hidden">
+      <!-- Ingredients visible by default; instructions stay collapsed so the grid stays scannable -->
+      <div class="recipe-details">
         <div class="detail-scaler">
           <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${recipe.id}',-1)">−</button>
           <span class="detail-serving-count">${recipe.currentServings}</span>
@@ -2584,6 +2565,9 @@ function renderRecipes() {
             ${buildDetailIngList(recipe, recipe.currentServings)}
           </ul>
         </div>
+      </div>
+      <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false" data-show-label="Instructions ▾" data-hide-label="Hide instructions ▴">Instructions ▾</button>
+      <div class="recipe-instructions hidden">
         <p><strong>Instructions:</strong> ${recipe.instructions}</p>
       </div>
 

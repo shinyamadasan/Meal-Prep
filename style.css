@@ -5722,7 +5722,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .week-stats--compact .stat-value { font-size: 1rem; }
 
-/* Collapsible ingredients/instructions on recipe cards (keeps the grid short) */
+/* Collapsible instructions on recipe cards (keeps the grid short) */
 .recipe-details-toggle {
   display: inline-flex;
   align-items: center;
@@ -5738,7 +5738,8 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   cursor: pointer;
 }
 .recipe-details-toggle:hover { background: var(--color-bg-1); }
-.recipe-details.hidden { display: none; }
+.recipe-details.hidden,
+.recipe-instructions.hidden { display: none; }
 
 /* ── Micro-animations: subtle motion for a more premium feel ─────────────── */
 @keyframes mp-fade-in { from { opacity: 0; } to { opacity: 1; } }
