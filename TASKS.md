@@ -524,7 +524,7 @@ test steps:
 ---
 
 ### TASK-010 · Recipe card: show ingredients by default, instructions behind a toggle
-status: review
+status: done
 owner: codex
 source: BQ-020 (PROP-026)
 priority: P3

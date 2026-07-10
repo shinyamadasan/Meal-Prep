@@ -356,6 +356,37 @@ Approved → TASKS.md `review → done`. Desktop recipe-card visual comparison a
 
 → TASK-009 status set to `done` in TASKS.md.
 
+## Review TASK-010 — APPROVED (implementation matches spec; correctness verified by code trace)
+branch: task-010
+verdict: approved
+
+### Findings
+**1. Matches all 6 acceptance criteria.** `git diff main..task-010` = app.js (`renderRecipes` + `toggleRecipeDetails` + `openRecipeFromHome`) and style.css (one rule + comment):
+- Ingredients now render in a NON-hidden `<div class="recipe-details">` (serving scaler + `.recipe-ingredients`) → visible by default (AC1). ✅
+- Instructions moved to a new `<div class="recipe-instructions hidden">` behind a new toggle button (`data-show-label="Instructions ▾"`, `aria-expanded="false"`) (AC2/AC5). ✅
+- `.recipe-instructions.hidden { display: none; }` folded into the existing hide rule (AC). ✅
+
+**2. The toggle targets the right element — the subtle correctness point.** `toggleRecipeDetails(e)` toggles `btn.nextElementSibling` (unchanged mechanism). Codex placed the button immediately before `.recipe-instructions`, so it collapses/expands ONLY the instructions, not the now-always-visible ingredients. A hardcoded `.recipe-details` selector here would have silently hidden the ingredients — `nextElementSibling` + correct placement avoids it (AC3). ✅
+
+**3. Scaler still works (AC4).** The −/＋ serving controls (`adjustDetailServings`) live in the always-visible `.recipe-details` and are untouched. The only removed logic was the "reset scaler on collapse" branch — moot now that ingredients never collapse. ✅
+
+**4. `openRecipeFromHome` cleaned up correctly.** Its old force-expand-`.recipe-details` / relabel block is dead now that ingredients are always shown; it just `scrollIntoView`s. Consequent minor change: opening a recipe from Home no longer auto-expands Instructions — consistent with the new default, not a regression.
+
+**5. Hard rules / quality.** No second `:root` (Rule 7 ✅). Button labels come from static `data-*` attributes, not user input → the `innerHTML` writes are XSS-safe. Light-only intact; no framework (Rule 9 ✅). Firestore / `saveData` / recipe-id-handler surfaces untouched. `recipe.instructions` interpolation is unchanged from before (pre-existing, not introduced here).
+
+**6. Evidence.** CHANGELOG + TEST_REPORT TASK-010 entries present: `node --check` pass, `git diff --check` pass, a temporary Playwright behavior spec (1 passed, not committed), smoke + button-smoke (2 passed, 465 buttons, 0 broken). `npm test` timeout flagged `untested` (same environmental issue as prior tasks). Real-device visual polish flagged for human verification.
+
+### Verdict
+Approved → TASKS.md `review → done`; fast-forwarded onto main.
+
+### Note (product-intent flag, not a defect)
+This faithfully implements interpretation **C** as specced — but that spec is my translation of the human's "Open → Ingredients first" pick against a codebase with no tabbed detail view. Worth an eyeball on the live result; if "always-expanded detail" meant something else, it's a trivial adjust/revert.
+
+### Nits
+- `.recipe-details.hidden` CSS rule is now unused by the main recipe cards (kept, harmless — may still apply to the other `.recipe-details` render). Not worth a change.
+
+→ TASK-010 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
