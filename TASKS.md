@@ -473,7 +473,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-009 · Compact recipe-card-header CSS pass
-status: review
+status: done
 owner: codex
 source: BQ-020
 priority: P3

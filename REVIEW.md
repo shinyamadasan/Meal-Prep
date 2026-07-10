@@ -323,6 +323,39 @@ The original `task-007` build (`d8acde3`) was correct but never reviewed — the
 ### Verdict
 Approved → TASKS.md `blocked → done`. Runtime multiplier deductions (2× / 0.5× / invalid) and device rendering are flagged for human verification — the smoke suite does not drive the cook dialog.
 
+## Review TASK-009 — APPROVED (CSS-only, code-trace + targeted spec verified)
+branch: task-009
+verdict: approved
+
+### Findings
+**1. Implementation — matches all 5 acceptance criteria.** Diff vs `main` is exactly `style.css` +4/-3 inside the `.recipe-card-header` block (style.css:1185-1205):
+- `.recipe-card-header` `margin-bottom`: `var(--space-12)` → `var(--space-8)` (12→8px). ✅
+- `.recipe-title` `font-size`: `var(--font-size-xl)` → `var(--font-size-lg)` (one step down); `line-height: 1.25` added. ✅
+- `.recipe-category` `padding`: `var(--space-4) var(--space-8)` → `var(--space-2) var(--space-6)`. ✅
+- Nothing else in the block changed; no HTML, no JS, no other CSS ranges touched.
+
+**2. Tokens verified present.** Grep of `style.css` `:root` shows `--font-size-lg: 16px` (line 124), `--space-2: 2px` (140), `--space-6: 6px` (142), `--space-8: 8px` (143) — all four exist, no new tokens introduced.
+
+**3. Constraints held.**
+- `.recipe-photo`, `.serving-controls`, `.prep-time-info` untouched (TASK-010 scope preserved).
+- No media queries added; treatment applies at all breakpoints.
+- `.recipe-fav-btn` unmodified — favorite-button anchor preserved.
+
+**4. Hard rules.** Only one `:root` block in `style.css` (Rule 7 ✅). No framework / build step / module system introduced (Rule 9 ✅). No Firestore, `saveData()`, or recipe-id handler surfaces touched (Rules 3–6 n/a for a CSS-only diff).
+
+**5. Evidence surface.**
+- `CHANGELOG.md`: TASK-009 entry present with the correct file + loc summary.
+- `TEST_REPORT.md`: two entries (2026-07-08, 2026-07-10 refresh). `git diff --check` passed, tokens grep passed, `:root` count = 1, `tests/mobile-layout.spec.js` passed (1/1). `npm test` timed out at 244s/604s without a reporter result — flagged `untested` rather than passed.
+- The `npm test` timeout is an environmental harness issue (same shape as TASK-001's `spawn EPERM` / timeouts), not a code defect. The single spec most likely to catch a `.recipe-card-header` layout regression (`mobile-layout.spec.js`) ran and passed; the change is a pure token substitution inside three existing selectors with no cascade-widening effect, so a code-trace verdict is defensible here.
+
+### Verdict
+Approved → TASKS.md `review → done`. Desktop recipe-card visual comparison and real-device rendering remain human verification (Codex flagged this explicitly in `TEST_REPORT.md`, per acceptance test-step 1's "visual check").
+
+### Nits
+- None blocking. `TEST_REPORT.md` carries two entries for the same task (initial + refresh) — accurate audit trail; not a defect.
+
+→ TASK-009 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
