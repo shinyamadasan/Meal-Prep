@@ -523,50 +523,49 @@ test steps:
 
 ---
 
-### TASK-010 · Design clarification: what does "always-expanded detail view" mean?
+### TASK-010 · Recipe card: show ingredients by default, instructions behind a toggle
 status: codex
 owner: codex
-source: BQ-020
+source: BQ-020 (PROP-026)
 priority: P3
 depends-on: TASK-009
-files: (none — this task produces a written spec, not code)
+
+decision (human, 2026-07-08):
+  Resolved the "always-expanded detail" ambiguity → interpretation C, "Open → Ingredients first":
+  the recipe's Ingredients should be visible at a glance WITHOUT turning the grid into a wall of
+  text. Concretely: show the Ingredients list expanded by default on each card; keep the longer
+  Instructions collapsed behind a toggle. Interpretation A (auto-expand everything) was rejected;
+  B (persisted expand state) was rejected.
+
+files: app.js, style.css
 
 context:
-  PROP-026 explicitly flags: `"always open" = expand on list render, or just default to
-  expanded when tapping? If the former, the entire recipe list would be a wall of text —
-  almost certainly not what the user means.` The proposal itself asks to "Confirm
-  interpretation at build."
-
-  Three plausible interpretations, each shipping to a different codebase surface:
-
-  1. **Auto-expand `.recipe-details` inline on card render** — flip `.recipe-details hidden`
-     off in `renderRecipes()` at app.js:2538. **Cost:** ingredient/step blocks always show →
-     recipe grid becomes multi-screen-tall wall of text. **Almost certainly not what the user
-     wants** per PROP-026 itself.
-
-  2. **Persist per-recipe expanded state** — remember which cards a user has expanded across
-     sessions (localStorage `expandedRecipes: string[]`), re-expand them on load. **Cost:**
-     new AppState key, save/load path, low-value polish.
-
-  3. **When the edit modal opens, land on the ingredients section by default** — the recipe
-     card's `onclick` opens the edit modal (app.js:2437); change the modal's default tab/scroll
-     state to show ingredients first. **Cost:** a `renderRecipeModal()` tweak. **Most likely
-     what the user means** given the "detail view" phrasing.
+  In `renderRecipes()` (app.js ~2572) each card has ONE collapsible block:
+    `<button class="recipe-details-toggle" onclick="toggleRecipeDetails(event)">Ingredients & steps ▾</button>`
+    `<div class="recipe-details hidden">` [serving scaler] [.recipe-ingredients] [instructions <p>] `</div>`
+  Ingredients already render before Instructions inside `.recipe-details`. There is no separate
+  "detail view / modal tabs" — the edit modal (`openEditRecipeModal`) is a plain form, out of scope.
 
 acceptance:
-  - [ ] This task is opened by Codex, who reads the three interpretations above, picks the one
-        that matches its reading of PROP-026's captures/context, and sets `status: blocked` with
-        a single-line question written under `blocker:` for Claude to answer:
-        `blocker: Need human pick from A/B/C above before implementing; Codex recommends: <A|B|C>
-        because <one-line why>.` NO CODE is written.
-  - [ ] TASK-010 does not change any file. Its output is the recorded blocker line.
+  - [ ] The serving scaler + `.recipe-ingredients` list render VISIBLE by default on every card
+        (not inside a hidden container).
+  - [ ] The Instructions (`<p><strong>Instructions:</strong> …</p>`) render COLLAPSED by default,
+        behind a toggle button (e.g. "Instructions ▾") — reuse the `toggleRecipeDetails` pattern or a
+        small variant; `aria-expanded` updates on toggle.
+  - [ ] Tapping the instructions toggle expands/collapses only the instructions.
+  - [ ] The serving +/- scaler still scales the shown ingredient quantities (`adjustDetailServings`).
+  - [ ] With instructions collapsed a card is ≈ header + ingredient list only (no wall of text).
+  - [ ] Only the recipe-card markup/CSS changes; other tabs unaffected.
 
 constraints:
-  - Do not implement any of the three options — this task is a decision gate, not a build
-  - Do not delete or rewrite this task; only append the `blocker:` line
+  - Minimal: reuse the existing toggle + CSS patterns; NO new AppState, NO persisted expand state.
+  - Do not auto-expand instructions (interpretation A is rejected).
+  - Match existing card style; light-only; no second `:root` block.
 
 test steps:
-  - [ ] (none — no code)
+  - [ ] `node --check app.js`; recipe grid shows ingredients inline, instructions collapsed.
+  - [ ] Toggle instructions on a card → expands; scaler still adjusts ingredient amounts.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
 
 ---
 
@@ -574,39 +573,58 @@ test steps:
      BQ-022 · Long-press to enter bulk multi-select mode
      ═══════════════════════════════════════════════════════ -->
 
-### TASK-011 · Design clarification: long-press bulk multi-select scope + desktop fallback
+### TASK-011 · Pantry bulk multi-select: Select mode → bulk delete + bulk move
 status: codex
 owner: codex
-source: BQ-022
+source: BQ-022 (PROP-028)
 priority: P3
 depends-on: none
-files: (none — this task produces a written spec, not code)
+
+decision (human, 2026-07-08):
+  Resolved PROP-028's three ambiguities → BUILD MINIMAL:
+    (a) scope: PANTRY ONLY (skip the grocery list).
+    (b) enter selection: a "Select" toggle button — NOT long-press — so it works on touch AND desktop.
+    (c) bulk actions: bulk DELETE + bulk MOVE (storage picker: counter / fridge / freezer).
+
+files: app.js, index.html, style.css
 
 context:
-  PROP-028 flags three ambiguities that must be resolved before build:
-    1. Scope — pantry only, or grocery list too? (The proposal says the user asked for both.)
-    2. Move-target UI — a storage-location picker (counter/fridge/freezer) or a full location
-       modal? Grocery-list "move" doesn't have an equivalent destination.
-    3. Desktop fallback — long-press is touch-only; desktop needs multi-click or a "select"
-       toggle button.
-
-  This is a P3 power-user feature; the safest autonomous act is to record the ambiguity and
-  block on human clarification rather than pick a default that could ship the wrong feature.
+  Pantry renders via `buildPantryItem()` inside `renderPantry()` (app.js ~6759). Each item is
+  `.pi-item` > `.pi-row` (`onclick="togglePantryExpand(...)"`) + `.pi-expand`. Move uses
+  `setPantryStorage(id, storage)` (already stamps `updatedAt`); storage options come from the `WHERE`
+  array (counter/fridge/freezer). A per-item delete already exists in the item's expand controls —
+  reuse its handler for the delete mechanics.
 
 acceptance:
-  - [ ] Codex reads this task, then sets `status: blocked` with a single-line question written
-        under `blocker:` for Claude to answer:
-        `blocker: Need human pick on (a) scope (pantry only | pantry+grocery), (b) move-target
-        UI for pantry (dropdown | modal), (c) desktop fallback (multi-click | select-mode
-        button); Codex recommends: <one-line default per question>.` NO CODE is written.
-  - [ ] TASK-011 does not change any file. Its output is the recorded blocker line.
+  - [ ] A "Select" toggle button in the pantry tab header (near the search / add controls) enters and
+        exits selection mode.
+  - [ ] In selection mode each `.pi-item` shows a checkbox; tapping a row toggles its checkbox and does
+        NOT expand the item. Leaving selection mode restores normal tap-to-expand.
+  - [ ] A bulk action bar shows the selected count + "Move to…" (storage picker: counter/fridge/freezer)
+        + "Delete" + a way to cancel/exit. It is hidden when not in selection mode or nothing is selected.
+  - [ ] Bulk MOVE sets storage on every selected item (reuse `setPantryStorage` per id), re-renders, exits.
+  - [ ] Bulk DELETE removes every selected pantry item, re-renders, and exits selection mode.
+  - [ ] Works with mouse (desktop) and touch — no long-press anywhere.
+  - [ ] The grocery list is NOT touched (out of scope).
 
 constraints:
-  - Do not implement any part of the feature — this is a decision gate
-  - Do not delete or rewrite this task; only append the `blocker:` line
+  - CRITICAL: bulk DELETE must tombstone each removed id EXPLICITLY (`AppState.deletions[String(id)] =
+    new Date().toISOString()`) BEFORE `saveData()`, exactly like `clearLocalStorage()` (app.js ~479).
+    Reason: `recordLocalDeletions()`'s `MASS_DELETE_GUARD` (D-029) ignores a batch of >5 simultaneous
+    disappearances, so a 6+ item bulk delete would otherwise NOT propagate to other devices. Do not
+    rely on the baseline-diff to tombstone bulk deletions.
+  - Selection state is transient: a mode flag + a Set of selected ids. NO persisted AppState, NO new
+    saved fields.
+  - Reuse existing helpers (`setPantryStorage`, the per-item delete path, `saveData`, `renderPantry`);
+    match existing pantry CSS; light-only; no second `:root` block.
+  - Do not change single-item tap-to-expand behavior outside selection mode.
 
 test steps:
-  - [ ] (none — no code)
+  - [ ] `node --check app.js`; enter Select mode → checkboxes appear, rows don't expand.
+  - [ ] Select 3 → Move to Fridge → all three show fridge; Select 2 → Delete → both gone.
+  - [ ] Bulk-delete 6+ items, then reload → they stay deleted (verifies the explicit-tombstone
+        workaround for the D-029 guard). Flag human/emulator-verified if not automatable.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
 
 ---
 
