@@ -610,6 +610,86 @@ test steps:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     review-2026-07-08 · Data-integrity review follow-ups
+     Risk: Medium · Execution: NOT chained (build + review each solo)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-012 · Fix stale `reportError()` comment (Loader Script → SDK)
+status: codex
+source: review-2026-07-08
+depends-on: none
+priority: P3
+files: app.js
+
+context:
+  `reportError()`'s doc comment says the Sentry SDK is "loaded via the Sentry Loader Script in
+  index.html". That was true briefly, but the hosted Loader Script no-op'd and was replaced with a
+  direct DSN + SDK bundle (`Sentry.init({ dsn })`) in `index.html` (commit 14a7cbd, see DECISIONS
+  D-030's Sentry half). The comment is now inaccurate. Comment-only fix.
+
+acceptance:
+  - [ ] The comment on `reportError()` no longer references "Loader Script".
+  - [ ] It accurately states the SDK is loaded + initialized (DSN) in `index.html`.
+  - [ ] NO behavior change — only the comment lines are touched.
+
+constraints:
+  - Comment-only. Do not touch `reportError()`'s body or any other code.
+
+test steps:
+  - [ ] `node --check app.js` passes.
+  - [ ] `grep -n "Loader Script" app.js` returns nothing.
+
+---
+
+### TASK-013 · Stamp imported items with `updatedAt` so a surviving tombstone can't delete them
+status: codex
+source: review-2026-07-08
+depends-on: none
+priority: P2
+files: app.js
+
+context:
+  `importData()` (app.js — the `showConfirmDialog('Import data?'...)` confirm callback) unions the
+  imported file into `AppState` and clears tombstones for imported ids (D-019). But imported JSON
+  items usually have NO `updatedAt`. `applyTombstones()` does `if (!it.updatedAt) return false` — an
+  item with no timestamp LOSES to any tombstone. So if a tombstone for an imported id survives (e.g.
+  it still exists on another device that hasn't synced the clear yet), the freshly-imported item is
+  deleted on the next merge. Stamping imported items with `updatedAt = now` makes them win the LWW
+  (`it.updatedAt > tombAt`) against any older tombstone — the same durability `stampUpdated()` gives
+  inventory edits (D-028). This is additive hardening on top of D-019's clear + D-031's full-overwrite
+  write; it does NOT replace either. See DECISIONS D-019, D-020, D-028, D-031.
+
+acceptance:
+  - [ ] After the `unionById(...)` merges in the import confirm callback, every item whose id is
+        present in the imported file has `updatedAt` set to the import time (one ISO string), across
+        `recipes, pantry, customIngredients, customHacks, userIngredients, cookedMeals, groceryList`
+        (the same key set D-019's tombstone-clear loop uses).
+  - [ ] Items NOT in the import file keep their existing `updatedAt` unchanged.
+  - [ ] The stamp is applied BEFORE `var savePromise = saveData();` so it persists to localStorage +
+        Firestore in the same save.
+  - [ ] Trace: a previously-deleted item (tombstone time T in the past) re-imported now has
+        `updatedAt > T`, so `applyTombstones()` keeps it (does not fall into the `!it.updatedAt` or
+        `updatedAt <= tombAt` delete branches).
+  - [ ] Existing import behavior is otherwise unchanged (existing-wins-on-collision union, D-019
+        tombstone-clear, backup, render calls, awaited save + success toast).
+
+constraints:
+  - Reuse the existing `stampUpdated(item)` helper (or an inline `new Date().toISOString()`); do not
+    add a new helper.
+  - Do NOT change `unionById` argument order (existing item wins a true duplicate — D-003 / import
+    semantics stay intact).
+  - Do NOT modify the D-019 tombstone-clear block or the write path; this task is purely additive.
+  - app.js only. Data-integrity surface — build solo, do not chain.
+
+test steps:
+  - [ ] `node --check app.js` passes.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
+  - [ ] Manual/emulator (flag as human-verified if not automatable): import a file containing an id
+        that currently carries a tombstone → item appears AND still there after a reload + ~2 min.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
