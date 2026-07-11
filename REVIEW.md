@@ -416,6 +416,39 @@ Approved → TASKS.md `review → done`; fast-forwarded onto main.
 
 → TASK-011 status set to `done` in TASKS.md.
 
+## Review TASK-012 — APPROVED (comment-only; accuracy verified against `index.html`)
+branch: task-012
+verdict: approved
+
+### Findings
+**1. Diff is exactly what the task asks for.** `git diff main..task-012 -- app.js` is 2 lines of comment at `app.js:5326-5327`, immediately above `function reportError(err, context)`:
+
+```
+- // Report a handled error to Sentry (loaded via the Sentry Loader Script in index.html).
+- // No-op if the loader hasn't initialized yet. Call at data-integrity failure points so a
++ // Report a handled error to Sentry (SDK bundle loaded and initialized with the DSN in index.html).
++ // No-op if Sentry hasn't initialized yet. Call at data-integrity failure points so a
+```
+
+The `reportError()` body (`try { if (window.Sentry && window.Sentry.captureException) ... }`) is byte-identical to `main`. Constraint held (comment-only, no other code touched). ✅
+
+**2. Rewritten comment is accurate.** Cross-checked against `index.html:16-29`: a `<script>` inserts a `<script src="https://browser.sentry-cdn.com/7.119.0/bundle.min.js">` and its `onload` calls `window.Sentry.init({ dsn: 'https://...ingest.us.sentry.io/...' })`. That is "SDK bundle loaded and initialized with the DSN in `index.html`" — the new comment is exactly right, and it matches the sibling explanation already in `index.html`'s own HTML comment ("Uses the DSN directly rather than the hosted Loader Script, which no-op'd"). AC1 ("no longer references 'Loader Script'") and AC2 ("accurately states the SDK is loaded + initialized (DSN) in `index.html`") both met. ✅
+
+**3. Test steps satisfied.**
+- `node --check app.js` — pass (Codex + evidence in `TEST_REPORT.md`).
+- `rg -n "Loader Script" app.js` — 0 matches (re-verified on the branch). ✅
+- Bonus: Codex also ran `smoke.spec.js` + `button-smoke.spec.js` — 2 passed, 466 buttons, 0 broken. Comment-only change; a `npm test` timeout at 304s is the same environmental issue prior tasks flagged and is not attributable here.
+
+**4. Hard rules.** No JS/HTML/CSS behavior change, so Rules 3-9 are untouched by definition. No new `:root`, no framework, no shortcut around `saveData()` / cloud-write guard.
+
+### Verdict
+Approved → TASKS.md `review → done`. Nothing to merge to `main` requires human eyes; comment-only.
+
+### Nits
+- None.
+
+→ TASK-012 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
