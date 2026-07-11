@@ -387,6 +387,35 @@ This faithfully implements interpretation **C** as specced — but that spec is 
 
 → TASK-010 status set to `done` in TASKS.md.
 
+## Review TASK-011 — APPROVED (bulk select; critical tombstone constraint verified)
+branch: task-011
+verdict: approved
+
+### Findings
+**1. All acceptance criteria met.** `git diff main..task-011` = app.js (+~121), index.html (+2), style.css (+~35):
+- "Select" toggle (`#pantry-select-toggle` → `togglePantrySelectMode`) enters/exits select mode; label flips Select/Done, disabled when the pantry is empty. ✅
+- In select mode each `.pi-item` shows a checkbox and the row onclick becomes `togglePantrySelected` (not expand), chevron hidden. Outside select mode, tap-to-expand is unchanged. ✅
+- Bulk action bar (`#pantry-bulk-actions`) shows "N selected" + Move-to picker (fridge/freezer/counter) + Move + Delete + Cancel; hidden when not selecting or nothing is selected. ✅
+- Bulk MOVE (`moveSelectedPantryItems`) sets storage on each selected item via `applyPantryStorage` (`storage` + `stampUpdated`), one `saveData()`, exits. ✅
+- Touch + desktop via button/checkbox — no long-press. Grocery list not modified (only re-rendered). ✅
+
+**2. CRITICAL constraint — verified correct.** `deleteSelectedPantryItems()` implements the D-029 workaround exactly: `AppState.deletions[String(id)] = when` for every selected id (EXPLICIT tombstones) BEFORE removing them and BEFORE `saveData()`, then `snapshotIdBaseline()` so `recordLocalDeletions()` sees no vanished ids and `MASS_DELETE_GUARD` never triggers. Propagation rides on the explicit tombstones + the D-031 full-overwrite write. A 6+ item bulk delete will sync to other devices rather than be swallowed by the guard. This was the one thing most likely to be silently wrong; it is right.
+
+**3. Hard rules / quality.** Exactly one `:root` block (line 1; the other grep match is a comment) — Rule 7 ✅. `saveData()` used throughout, not `saveToLocalStorage` alone — Rule 5 ✅. Checkbox `aria-label` uses `escapeHtml(p.name)`; bulk-bar innerHTML is static markup + a numeric count — XSS-safe. Light-only (no dark block), no framework. Firestore write-guard untouched.
+
+**4. Hygiene.** Transient state only (`pantrySelectMode` bool + `pantrySelectedIds` Set — no persisted AppState). `normalizePantrySelection()` prunes stale ids; an empty pantry resets select mode. `setPantryStorage` refactored to share `applyPantryStorage` (DRY, still stamps `updatedAt`).
+
+**5. Evidence.** CHANGELOG + TEST_REPORT TASK-011 entries: `node --check` pass, a temporary Playwright behavior spec (1 passed, not committed), smoke + button-smoke (2 passed, 465 buttons, 0 broken), mobile-layout (1 passed). `npm test` timed out (environmental). I re-ran smoke on the branch before merge: 2 passed, 0 broken. Real-device touch feel flagged for human verification.
+
+### Verdict
+Approved → TASKS.md `review → done`; fast-forwarded onto main.
+
+### Nits (non-blocking)
+- `.pantry-bulk-move` references `--color-text-secondary`; if that token isn't defined it falls back harmlessly. Worth a spot-check, not a defect.
+- Pre-existing (NOT this task): `style.css` opens with a UTF-8 BOM on the `:root` line — harmless, but it's why `^:root` greps miss it.
+
+→ TASK-011 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

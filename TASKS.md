@@ -574,7 +574,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-011 · Pantry bulk multi-select: Select mode → bulk delete + bulk move
-status: review
+status: done
 owner: codex
 source: BQ-022 (PROP-028)
 priority: P3
