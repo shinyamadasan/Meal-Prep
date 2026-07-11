@@ -5323,8 +5323,8 @@ function mergeCloudConflict(remote, local) {
   return out;
 }
 
-// Report a handled error to Sentry (loaded via the Sentry Loader Script in index.html).
-// No-op if the loader hasn't initialized yet. Call at data-integrity failure points so a
+// Report a handled error to Sentry (SDK bundle loaded and initialized with the DSN in index.html).
+// No-op if Sentry hasn't initialized yet. Call at data-integrity failure points so a
 // swallowed sync failure still produces a signal instead of only a console line.
 function reportError(err, context) {
   try {

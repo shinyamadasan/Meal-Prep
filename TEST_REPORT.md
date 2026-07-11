@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-012 · 2026-07-11
+suite: node --check app.js; rg -n "Loader Script" app.js; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
+result: `node --check` passed. `rg -n "Loader Script" app.js` returned no matches. Smoke + button-smoke passed (2/2; 466 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; no human visual check needed for this comment-only change
+
 ## TASK-011 · 2026-07-10
 suite: node --check app.js; git diff --check -- app.js index.html style.css; static greps for debug leftovers, raw CSS colors, light-only selectors, and `:root`; temporary Playwright TASK-011 behavior spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
 result: `node --check` passed; `git diff --check` passed with only Git LF-to-CRLF warnings; no new debug leftovers/raw CSS colors/dark-mode selectors found in the task diff; `style.css` has exactly one `:root`. Temporary behavior spec passed: Select mode shows checkboxes, row taps select without expanding, Move updates selected pantry storage, Delete removes 6 selected items, explicit `AppState.deletions` tombstones are present, and reload keeps them deleted. Smoke + button-smoke passed (2/2; 465 buttons discovered, 200 clicked, 0 broken). Mobile-layout passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.

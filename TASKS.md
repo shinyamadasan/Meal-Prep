@@ -634,7 +634,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-012 · Fix stale `reportError()` comment (Loader Script → SDK)
-status: codex
+status: review
 source: review-2026-07-08
 depends-on: none
 priority: P3

@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-012 — done (branch: task-012)
+changed:
+  - app.js (`reportError()` comment now says the Sentry SDK bundle is loaded and initialized with the DSN in `index.html`, 2 loc)
+tests: `node --check app.js` (pass); `rg -n "Loader Script" app.js` (no matches); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 466 buttons, 0 broken)
+blockers: none
+deviations: `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output
+→ status set to `review` in TASKS.md
+
 ## TASK-011 — done (branch: task-011)
 changed:
   - app.js (`renderPantry()` adds transient select mode rows with checkboxes, `renderPantryBulkActions()` shows selected-count/move/delete/cancel controls, bulk move reuses the pantry storage mutation path, and bulk delete explicitly writes tombstones before `saveData()`, 121 loc)
