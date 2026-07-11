@@ -661,7 +661,7 @@ test steps:
 ---
 
 ### TASK-013 · Stamp imported items with `updatedAt` so a surviving tombstone can't delete them
-status: review
+status: done
 source: review-2026-07-08
 depends-on: none
 priority: P2

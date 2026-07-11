@@ -449,6 +449,29 @@ Approved → TASKS.md `review → done`. Nothing to merge to `main` requires hum
 
 → TASK-012 status set to `done` in TASKS.md.
 
+## Review TASK-013 — APPROVED (import-stamp; data-integrity hardening verified)
+branch: task-013
+verdict: approved
+
+### Findings
+**1. Correct, matches all acceptance criteria.** `git diff main..task-013` = app.js +11, inside `importData()` right after the `unionById` merges and before `saveData()`: one shared `importStampedAt = new Date().toISOString()`; for each of the D-019 key set (recipes, pantry, customIngredients, customHacks, userIngredients, cookedMeals, groceryList) it builds the imported-id set and stamps `updatedAt = importStampedAt` on every surviving `AppState[key]` item whose id was in the import file. Non-imported items keep their `updatedAt`. ✅
+
+**2. The purpose holds.** A re-imported previously-deleted item (tombstone time T in the past) now has `updatedAt = now > T`, so `applyTombstones()` keeps it (`it.updatedAt > tombAt`) instead of deleting it via the `!it.updatedAt` branch. Exactly the durability gap the task targeted — complements D-019's tombstone-clear and the D-031 full-overwrite write. ✅
+
+**3. Constraints held.** Additive only: union argument order unchanged (existing-wins-on-collision intact), the D-019 tombstone-clear block untouched, write path untouched, app.js only. A single shared inline timestamp (the AC's "one ISO string") is more correct here than per-item `stampUpdated` calls. ✅
+
+**4. Hard rules.** No DOM/CSS/handlers, no `:root`, no Firestore write-guard change, `saveData()` path unchanged, no new innerHTML → no XSS surface. ✅
+
+**5. Evidence.** CHANGELOG + TEST_REPORT TASK-013 entries: `node --check` pass, a temporary Playwright import spec (1 passed, not committed), smoke + button-smoke (2 passed, 466 buttons, 0 broken). `npm test` timed out (environmental). Live Firebase/emulator "reload after ~2 min" import test flagged for human verification. I re-ran `node --check` + smoke on the branch: clean, 2 passed.
+
+### Verdict
+Approved → TASKS.md `review → done`; fast-forwarded onto main.
+
+### Nits (non-blocking)
+- A collision (re-importing an item that still exists live) also bumps that live item's `updatedAt` to import time — harmless and consistent with "every imported id gets stamped".
+
+→ TASK-013 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
