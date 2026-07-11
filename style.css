@@ -5315,6 +5315,17 @@ select.form-control {
 }
 
 .pi-row:hover { background: var(--color-secondary); }
+.pi-row--selecting { cursor: pointer; }
+
+.pi-item--selected .pi-row {
+  background: var(--color-bg-1);
+}
+
+.pi-select-checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
 
 .pi-name {
   flex: 1;
@@ -5384,6 +5395,30 @@ select.form-control {
 }
 
 .pi-remove-btn { color: var(--color-error) !important; border-color: var(--color-error) !important; }
+
+.pantry-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.6rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-1);
+}
+.pantry-bulk-actions.hidden { display: none; }
+.pantry-bulk-count { font-size: 0.85rem; font-weight: 600; color: var(--color-text); }
+.pantry-bulk-move { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--color-text-secondary); }
+.pantry-bulk-move select {
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.pantry-bulk-delete { color: var(--color-error) !important; border-color: var(--color-error) !important; }
 
 /* Shared input styles inside the expand panel */
 .pi-expand input[type="number"],

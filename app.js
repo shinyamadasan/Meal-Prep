@@ -4722,6 +4722,11 @@ window.cycleStapleLevel = cycleStapleLevel;
 window.togglePantryGuide = togglePantryGuide;
 window.togglePantryExpand = togglePantryExpand;
 window.togglePantryDateMode = togglePantryDateMode;
+window.togglePantrySelectMode = togglePantrySelectMode;
+window.exitPantrySelectMode = exitPantrySelectMode;
+window.togglePantrySelected = togglePantrySelected;
+window.moveSelectedPantryItems = moveSelectedPantryItems;
+window.deleteSelectedPantryItems = deleteSelectedPantryItems;
 window.markRecipeCooked = markRecipeCooked;
 window.openManualCookedModal = openManualCookedModal;
 window.closeManualCookedModal = closeManualCookedModal;
@@ -6694,6 +6699,105 @@ function isInPantry(name) {
 
 // Common household staples for one-tap pantry adding (PH context).
 var COMMON_PANTRY_STAPLES = ['Rice', 'Garlic', 'Onion', 'Cooking Oil', 'Soy Sauce', 'Fish Sauce', 'Vinegar', 'Salt', 'Sugar', 'Black Pepper', 'Eggs', 'Ginger'];
+var PANTRY_STORAGE_OPTIONS = [['fridge', 'Fridge'], ['freezer', 'Freezer'], ['counter', 'Counter']];
+var pantrySelectMode = false;
+var pantrySelectedIds = new Set();
+
+function normalizePantrySelection() {
+  var existing = {};
+  (AppState.pantry || []).forEach(function(p) { existing[String(p.id)] = true; });
+  Array.from(pantrySelectedIds).forEach(function(id) {
+    if (!existing[id]) pantrySelectedIds.delete(id);
+  });
+}
+
+function renderPantryBulkActions() {
+  normalizePantrySelection();
+  var toggle = document.getElementById('pantry-select-toggle');
+  if (toggle) {
+    toggle.textContent = pantrySelectMode ? 'Done' : 'Select';
+    toggle.disabled = (AppState.pantry || []).length === 0;
+    toggle.classList.toggle('active', pantrySelectMode);
+  }
+
+  var bar = document.getElementById('pantry-bulk-actions');
+  if (!bar) return;
+  var ids = Array.from(pantrySelectedIds);
+  if (!pantrySelectMode || ids.length === 0) {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    return;
+  }
+
+  var storageOpts = PANTRY_STORAGE_OPTIONS.map(function(w) {
+    return '<option value="' + w[0] + '">' + w[1] + '</option>';
+  }).join('');
+  bar.classList.remove('hidden');
+  bar.innerHTML = '<span class="pantry-bulk-count">' + ids.length + ' selected</span>' +
+    '<label class="pantry-bulk-move">Move to <select id="pantry-bulk-storage">' + storageOpts + '</select></label>' +
+    '<button class="btn btn--secondary btn--sm" onclick="moveSelectedPantryItems()">Move</button>' +
+    '<button class="btn btn--outline btn--sm pantry-bulk-delete" onclick="deleteSelectedPantryItems()">Delete</button>' +
+    '<button class="btn btn--ghost btn--sm" onclick="exitPantrySelectMode()">Cancel</button>';
+}
+
+function togglePantrySelectMode() {
+  pantrySelectMode = !pantrySelectMode;
+  pantrySelectedIds.clear();
+  renderPantry();
+}
+
+function exitPantrySelectMode() {
+  pantrySelectMode = false;
+  pantrySelectedIds.clear();
+  renderPantry();
+}
+
+function togglePantrySelected(id) {
+  if (!pantrySelectMode) return;
+  id = String(id);
+  if (pantrySelectedIds.has(id)) pantrySelectedIds.delete(id);
+  else pantrySelectedIds.add(id);
+  renderPantry();
+}
+
+function applyPantryStorage(p, storage) {
+  p.storage = storage;
+  stampUpdated(p);
+}
+
+function moveSelectedPantryItems() {
+  var select = document.getElementById('pantry-bulk-storage');
+  var storage = select ? select.value : 'fridge';
+  var ids = Array.from(pantrySelectedIds);
+  if (ids.length === 0) return;
+  ids.forEach(function(id) {
+    var p = AppState.pantry.find(function(x) { return String(x.id) === id; });
+    if (p) applyPantryStorage(p, storage);
+  });
+  pantrySelectMode = false;
+  pantrySelectedIds.clear();
+  saveData();
+  renderPantry();
+  refreshFreshnessAlerts();
+}
+
+function deleteSelectedPantryItems() {
+  var ids = Array.from(pantrySelectedIds);
+  if (ids.length === 0) return;
+  var selected = {};
+  ids.forEach(function(id) { selected[String(id)] = true; });
+  if (!AppState.deletions) AppState.deletions = {};
+  var when = new Date().toISOString();
+  ids.forEach(function(id) { AppState.deletions[String(id)] = when; });
+  AppState.pantry = AppState.pantry.filter(function(p) { return !selected[String(p.id)]; });
+  pantrySelectMode = false;
+  pantrySelectedIds.clear();
+  snapshotIdBaseline();
+  saveData();
+  renderPantry();
+  refreshFreshnessAlerts();
+  renderGroceryList();
+}
 
 
 function renderPantry() {
@@ -6703,6 +6807,11 @@ function renderPantry() {
 
   const n = AppState.pantry.length;
   count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
+  if (n === 0) {
+    pantrySelectMode = false;
+    pantrySelectedIds.clear();
+  }
+  renderPantryBulkActions();
 
   // Real-time search: filters the pantry view by name (renderPantry is the renderer, re-run on input).
   const searchWrap = document.getElementById('pantry-search-wrap');
@@ -6737,7 +6846,6 @@ function renderPantry() {
   }
 
   function effStorage(p) { return p.storage || inferStorage(p.name, p.category); }
-  var WHERE = [['fridge', 'Fridge'], ['freezer', 'Freezer'], ['counter', 'Counter']];
 
   // Build a compact row + collapsible edit panel per item.
   function buildPantryItem(p) {
@@ -6764,9 +6872,15 @@ function renderPantry() {
 
     var freshBadge = fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '';
 
-    var whereOpts = WHERE.map(function(w) {
+    var whereOpts = PANTRY_STORAGE_OPTIONS.map(function(w) {
       return '<option value="' + w[0] + '"' + (storage === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
     }).join('');
+    var selected = pantrySelectedIds.has(String(p.id));
+    var selectBox = pantrySelectMode
+      ? '<input type="checkbox" class="pi-select-checkbox" ' + (selected ? 'checked ' : '') +
+        'onclick="event.stopPropagation();togglePantrySelected(\'' + p.id + '\')" aria-label="Select ' + escapeHtml(p.name) + '">'
+      : '';
+    var rowClick = pantrySelectMode ? 'togglePantrySelected(\'' + p.id + '\')' : 'togglePantryExpand(\'' + safeId + '\')';
 
     var stockEdit = !staple
       ? '<div class="pi-field"><span class="pi-field-label">Qty</span>' +
@@ -6784,11 +6898,12 @@ function renderPantry() {
         '</div></div>'
       : '';
 
-    return '<div class="pi-item">' +
-      '<div class="pi-row" onclick="togglePantryExpand(\'' + safeId + '\')">' +
+    return '<div class="pi-item' + (selected ? ' pi-item--selected' : '') + '">' +
+      '<div class="pi-row' + (pantrySelectMode ? ' pi-row--selecting' : '') + '" onclick="' + rowClick + '">' +
+        selectBox +
         '<span class="pi-name">' + escapeHtml(p.name) + '</span>' +
         '<div class="pi-badges">' + stockBadge + freshBadge + '</div>' +
-        '<span class="pi-chevron">' + icon('chevron-right') + '</span>' +
+        (pantrySelectMode ? '' : '<span class="pi-chevron">' + icon('chevron-right') + '</span>') +
       '</div>' +
       '<div class="pi-expand hidden" id="piexp-' + safeId + '">' +
         stockEdit +
@@ -6848,8 +6963,7 @@ function renderPantry() {
 function setPantryStorage(id, storage) {
   var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
-  p.storage = storage;
-  stampUpdated(p);
+  applyPantryStorage(p, storage);
   saveData();
   renderPantryKeepOpen();
 }

@@ -5,6 +5,16 @@
 
 ---
 
+## TASK-011 — done (branch: task-011)
+changed:
+  - app.js (`renderPantry()` adds transient select mode rows with checkboxes, `renderPantryBulkActions()` shows selected-count/move/delete/cancel controls, bulk move reuses the pantry storage mutation path, and bulk delete explicitly writes tombstones before `saveData()`, 121 loc)
+  - index.html (`#pantry-select-toggle` and `#pantry-bulk-actions` added near the pantry controls, 2 loc)
+  - style.css (`.pi-select-checkbox`, selected row state, and `.pantry-bulk-actions` styling, 35 loc)
+tests: `node --check app.js` (pass); temporary Playwright TASK-011 behavior spec (1 passed; not committed); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 465 buttons, 0 broken); `npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000` (1 passed)
+blockers: none
+deviations: `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output; real-device touch feel remains human verification
+→ status set to `review` in TASKS.md
+
 ## TASK-010 — done (branch: task-010)
 changed:
   - app.js (`renderRecipes()` keeps the detail scaler + `.recipe-ingredients` visible by default, moves recipe instructions into `.recipe-instructions hidden`, keeps `toggleRecipeDetails()` as the instructions toggle with `aria-expanded`, and updates `openRecipeFromHome()` so it no longer rewrites the instructions toggle, 32 loc)

@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-011 · 2026-07-10
+suite: node --check app.js; git diff --check -- app.js index.html style.css; static greps for debug leftovers, raw CSS colors, light-only selectors, and `:root`; temporary Playwright TASK-011 behavior spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npx playwright test tests/mobile-layout.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
+result: `node --check` passed; `git diff --check` passed with only Git LF-to-CRLF warnings; no new debug leftovers/raw CSS colors/dark-mode selectors found in the task diff; `style.css` has exactly one `:root`. Temporary behavior spec passed: Select mode shows checkboxes, row taps select without expanding, Move updates selected pantry storage, Delete removes 6 selected items, explicit `AppState.deletions` tombstones are present, and reload keeps them deleted. Smoke + button-smoke passed (2/2; 465 buttons discovered, 200 clicked, 0 broken). Mobile-layout passed (1/1). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; real-device touch feel remains human verification
+
 ## TASK-010 · 2026-07-10
 suite: node --check app.js; git diff --check -- app.js style.css; static greps for hidden recipe-details, instructions toggle, `:root`; temporary Playwright TASK-010 behavior spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
 result: `node --check` passed; `git diff --check` passed with only Git LF-to-CRLF warnings; `.recipe-details hidden` is gone from recipe-card markup; `.recipe-instructions hidden` + instructions toggle are present; `style.css` has exactly one `:root`; temporary behavior spec passed (ingredients visible by default, instructions collapsed then expandable with `aria-expanded`, detail scaler changes serving count); smoke + button-smoke passed (2/2; 465 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
