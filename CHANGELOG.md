@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-013 — done (branch: task-013)
+changed:
+  - app.js (`importData()` stamps every imported-id survivor across recipes, pantry, custom ingredients, hacks, user ingredients, cooked meals, and grocery list with one import-time `updatedAt` before `saveData()`, 11 loc)
+tests: `node --check app.js` (pass); temporary Playwright TASK-013 import spec (1 passed; not committed); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 466 buttons, 0 broken)
+blockers: none
+deviations: `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output; live Firebase/emulator reload-after-2-min import verification remains human/emulator verification
+→ status set to `review` in TASKS.md
+
 ## TASK-012 — done (branch: task-012)
 changed:
   - app.js (`reportError()` comment now says the Sentry SDK bundle is loaded and initialized with the DSN in `index.html`, 2 loc)

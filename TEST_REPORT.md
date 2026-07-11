@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-013 · 2026-07-11
+suite: node --check app.js; git diff --check -- app.js; temporary Playwright TASK-013 import spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
+result: `node --check` passed. `git diff --check -- app.js` passed with only Git LF-to-CRLF warnings. Temporary import spec passed: imported IDs across all seven synced import lists received one shared `updatedAt` before `saveData()`, duplicate existing item fields still won, non-imported item `updatedAt` stayed unchanged, and imported tombstones were cleared. Smoke + button-smoke passed (2/2; 466 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; live Firebase/emulator reload-after-2-min import verification remains human/emulator verification
+
 ## TASK-012 · 2026-07-11
 suite: node --check app.js; rg -n "Loader Script" app.js; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
 result: `node --check` passed. `rg -n "Loader Script" app.js` returned no matches. Smoke + button-smoke passed (2/2; 466 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.

@@ -4906,6 +4906,17 @@ function importData() {
             AppState.cookedMeals = unionById(AppState.cookedMeals, importedData.cookedMeals || []);
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
+            var importStampedAt = new Date().toISOString();
+            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
+              var importedIds = {};
+              (importedData[key] || []).forEach(function(it) {
+                if (it && it.id != null) importedIds[String(it.id)] = true;
+              });
+              (AppState[key] || []).forEach(function(it) {
+                if (it && it.id != null && importedIds[String(it.id)]) it.updatedAt = importStampedAt;
+              });
+            });
+
             // Plan: fill empty slots only (never wipe a planned meal).
             if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
 
