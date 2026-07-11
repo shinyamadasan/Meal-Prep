@@ -3191,6 +3191,7 @@ function renderDashboard() {
       var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 3);
       if (!items.length) return '';
       var rows = items.map(function(s) {
+        var sid = String(s.recipe.id);
         var meta = tier.key === 0
           ? '<span class="dash-cook-full">All ingredients ✓</span>'
           : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
