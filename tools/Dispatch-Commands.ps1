@@ -41,6 +41,24 @@ $runClaude    = Join-Path $root 'run-claude.ps1'
 $utf8         = New-Object System.Text.UTF8Encoding($false)
 $NO_REPLIES   = 'No pending replies.'
 
+# KEEP-AWAKE (D-033). This task runs on a WakeToRun timer, so it can be the thing that woke a
+# sleeping PC. A /build it then dispatches runs Codex for 10-15 minutes -- long enough for Windows'
+# unattended-sleep timer to suspend the machine mid-build and leave a half-finished branch. Assert
+# ES_SYSTEM_REQUIRED for the life of this process (ES_CONTINUOUS), which also covers the phase
+# runners it invokes and waits on. Windows releases it automatically when this process exits, so the
+# PC idles back to sleep on its own once the queue is drained.
+try {
+    Add-Type -Namespace Win32Power -Name Native -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint SetThreadExecutionState(uint esFlags);
+'@ -ErrorAction Stop
+    # ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x00000001)
+    [void][Win32Power.Native]::SetThreadExecutionState(0x80000001)
+} catch {
+    # Non-fatal: worst case Windows may sleep mid-build; the lock + idempotent commands make a
+    # retry safe on the next wake.
+}
+
 # Under $ErrorActionPreference = 'Stop', ANY stderr text from a native command -- even a benign
 # warning like git's LF-will-be-replaced-by-CRLF notice, on a call that otherwise succeeds -- gets
 # promoted to a terminating exception, regardless of whether stderr is redirected to $null. This

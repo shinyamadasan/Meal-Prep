@@ -319,6 +319,11 @@ if (-not $Scheduled) {
 } elseif ($changed.Count -eq 0) {
     Add-Content -Path $logFile -Value "Automation completed successfully (idle run, nothing to commit). Shutdown skipped."
 } else {
-    Add-Content -Path $logFile -Value "=== Shutting down PC in 60 seconds ==="
-    shutdown /s /t 60
+    # SLEEP -- never `shutdown /s` (S5). A powered-OFF PC cannot be woken by a Task Scheduler wake
+    # timer, which would strand every queued Telegram command until someone physically pressed the
+    # power button. Sleep (S3) / hibernate (S4) are both wakeable, so the Command Dispatcher's
+    # WakeToRun timer can wake the machine, drain the queue (build/review/merge), and let it idle
+    # back to sleep. Same power saving, without cutting off remote work. See DECISIONS D-033.
+    Add-Content -Path $logFile -Value "=== Sleeping PC (wakeable by the Command Dispatcher wake timer) ==="
+    rundll32.exe powrprof.dll,SetSuspendState 0,1,0
 }

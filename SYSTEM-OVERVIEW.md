@@ -203,6 +203,12 @@ saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate 
 8. AUDIT      security-guardian → quality-guardian → all ACs verified
 9. PR         Thanos opens a PR with full ledger + guardian results
 10. VALIDATE  You test on a real device when the change needs human feel/device judgment
+--  SLEEP/WAKE (D-033): the PC sleeps (15 min idle) and the Command Dispatcher WAKES it every
+              30 min to drain queued Telegram commands, then it idles back to sleep. So you can
+              /go from anywhere with the machine asleep. Commands are never lost while asleep —
+              n8n writes them into the repo, and the backlog drains on the next wake. The overnight
+              run SLEEPS the PC (never `shutdown /s` — a powered-OFF PC can't be woken by a timer).
+
 11. MERGE     RISK-GATED (D-032). Reviewer picks the landing state by blast radius:
               · done     → reversible (UI/CSS/copy/additive) → AUTO-merges to main → Pages deploys ~1 min
               · approved → red-zone (Firestore/sync/storage, tombstone-merge-delete machinery,

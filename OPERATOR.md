@@ -89,26 +89,47 @@ touch `main` — inspect first) and `-NoPush` (merge locally, don't push).
 > ⚠ **Never run `.\run-claude.ps1 -Scheduled` by hand.** `-Scheduled` is the Task Scheduler's signal to
 > **shut the PC down** when the run ends. Plain `.\run-claude.ps1` is safe and will not power off.
 
-## Can I sleep the PC? (verified against Task Scheduler)
+## Sleep the PC and still dev remotely (D-033)
 
-| Scheduled task | Wakes the PC? | What it runs |
+The machine is set up to **sleep and still work for you**:
+
+| Piece | Setting | Why |
 |---|---|---|
-| **Meal Prep Command Dispatcher** (~2 min poll) | **No** — `WakeToRun = False`, deliberately | Picks up Telegram commands |
-| **Meal Prep Claude Overnight** (9 PM + 2 AM) | **Yes** — `WakeToRun = True` | Planning/triage only (`run-claude.ps1`) |
+| **Command Dispatcher** | Enabled · **WakeToRun = True** · wakes every **30 min** | Wakes the sleeping PC to drain queued Telegram commands (build → review → merge → deploy) |
+| **Sleep-after-idle (AC)** | **15 min** *(was: never)* | The PC actually sleeps when you walk away |
+| **Claude Overnight** (9 PM / 2 AM) | Wakes PC, then **sleeps** it *(was: `shutdown /s`)* | A powered-**OFF** PC cannot be woken by a timer. Sleep/hibernate can. |
+| **Dispatcher keep-awake** | Asserts `ES_SYSTEM_REQUIRED` while working | So a 10–15 min Codex build is never cut in half by the sleep timer |
 
-- **Yes, you can sleep the PC.** Telegram commands sent while it's asleep are **not lost** — n8n writes
-  them into the repo via GitHub, so they queue up and get picked up once the PC is awake
-  (`StartWhenAvailable = True` means the dispatcher runs shortly after wake).
-- **The dispatcher will NOT wake the PC.** That's on purpose — waking the machine every 2 minutes
-  would be absurd. So **a build or review only runs while the PC is awake.** Sleep is fine; work waits.
-- **The overnight task DOES wake the PC** (9 PM / 2 AM) — but it only does *planning*, never builds or
-  reviews, and with `-Scheduled` it powers the machine back down afterwards.
+**The remote loop:** send `/go` from anywhere → n8n writes it into the repo → within **≤30 min** the PC
+wakes, builds, reviews, merges (if the D-032 gate says `done`), deploys → goes idle → sleeps again.
 
-### The dispatcher must be ENABLED for Telegram to work at all
+**Nothing is lost while asleep.** Commands queue in the repo via GitHub, and `StartWhenAvailable = True`
+means the dispatcher drains the whole backlog on the next wake.
+
+**Trade-off:** up to ~30 min latency on a remote command. Irrelevant for work you aren't watching.
+Want it snappier? Shorten the interval (more wakes). Want fewer wakes? Lengthen it.
+
+### Dispatcher controls — these need an **elevated** PowerShell (Run as Administrator)
 ```powershell
-Enable-ScheduledTask  -TaskName "Meal Prep Command Dispatcher"    # turn Telegram polling on
-Disable-ScheduledTask -TaskName "Meal Prep Command Dispatcher"    # turn it off
-Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher" | Select-Object State   # check
+Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher" |
+  Select-Object State, @{n='Wake';e={$_.Settings.WakeToRun}}, @{n='Every';e={$_.Triggers[0].Repetition.Interval}}
+
+Enable-ScheduledTask  -TaskName "Meal Prep Command Dispatcher"   # Telegram polling ON
+Disable-ScheduledTask -TaskName "Meal Prep Command Dispatcher"   # OFF
+```
+
+### Change how often it wakes (elevated)
+```powershell
+$t = Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher"
+$t.Settings.WakeToRun = $true
+$t.Triggers[0].Repetition.Interval = "PT30M"   # PT15M | PT30M | PT1H
+Set-ScheduledTask -InputObject $t
+```
+
+### Sleep timing (no elevation needed)
+```powershell
+powercfg /change standby-timeout-ac 15    # minutes idle before sleeping on AC (0 = never)
+powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Select-String "Current AC"
 ```
 
 ## The mindset

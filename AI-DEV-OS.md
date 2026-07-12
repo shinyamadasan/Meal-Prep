@@ -11,7 +11,13 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.9 — updated 2026-07-11.** Auto-merge is now **risk-gated** (D-032). An approved review
+**Version: v1.10 — updated 2026-07-11.** The PC now **sleeps by default and wakes to work** (D-033).
+The Command Dispatcher runs on a `WakeToRun` timer every 30 min: send `/go` from anywhere, the sleeping
+machine wakes, drains the queued command (build → review → merge → deploy), and idles back to sleep.
+The overnight run now **sleeps** the PC instead of `shutdown /s` — a powered-OFF machine cannot be woken
+by a timer, which previously stranded every remote command. The dispatcher holds `ES_SYSTEM_REQUIRED`
+while working so a 10–15 min Codex build is never suspended mid-flight. v1.9 made auto-merge
+**risk-gated** (D-032). An approved review
 has two landing states, chosen by blast radius: `done` = approved **and reversible** (UI, CSS, copy,
 additive non-data features) → auto-merges and deploys; `approved` = approved **but red-zone**
 (Firestore/sync/storage, the tombstone-merge-deletion machinery, `saveData()` / the `cloudReady`
