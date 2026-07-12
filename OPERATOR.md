@@ -43,6 +43,35 @@ Habits, not commands.
 - [ ] Skim `docs/DECISIONS.md` — still agree? Supersede anything that changed.
 - [ ] Prune `planning/DONE.md` if it's long (git keeps the full history).
 
+## At the keyboard (PC cheat sheet)
+
+Telegram works fine from the PC too (it just polls every ~2 min). These run the **same phase runners**
+instantly. All are lock-protected (`automation.lock`) so they can never overlap each other or the
+scheduled run, and **every one takes `-DryRun`** — show what it would do, change nothing.
+
+| Want to… | Run (from the repo root) | Telegram equivalent |
+|---|---|---|
+| Plan / triage — captures → proposals, approved queue → tasks | `.\run-claude.ps1` | `/run` |
+| Build the next `status: codex` task (**auto-chains into review**) | `.\tools\Run-Codex-Build.ps1` | `/build` |
+| Review the pending `status: review` task | `.\tools\Run-Claude-Review.ps1` | `/review` |
+| Process any queued Telegram command files | `.\tools\Dispatch-Commands.ps1` | — |
+
+**Closest thing to `/go` at the PC:** `.\tools\Run-Codex-Build.ps1` — it builds the next task *and*
+auto-runs the review, which auto-merges if the D-032 gate lands on `done`.
+
+> ⚠ **Never run `.\run-claude.ps1 -Scheduled` by hand.** `-Scheduled` is the Task Scheduler's signal to
+> **shut the PC down** when the run ends. Plain `.\run-claude.ps1` is safe and will not power off.
+
+**Merge a held red-zone branch** (D-032 — a task the reviewer left at `status: approved`):
+```
+git checkout main
+git merge --ff-only task-<id>
+git push origin main
+```
+
+**Review runner options:** `-NoAutoMerge` (review, but never touch `main` — inspect first) ·
+`-NoPush` (merge locally, don't push) · `-DryRun`.
+
 ## The mindset
 > Old: *"How do I code this?"* → New: *"How do I keep the system flowing?"*
 
