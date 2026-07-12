@@ -11,9 +11,17 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.8 — updated 2026-07-06.** Approved reviews now auto-merge: after Claude sets a task
-to `done`, `tools/Run-Claude-Review.ps1` runs `npm test` on the reviewed task branch, verifies
-`main` can fast-forward to it, fast-forwards `main`, and pushes `origin/main` (D-027). v1.7 made
+**Version: v1.9 — updated 2026-07-11.** Auto-merge is now **risk-gated** (D-032). An approved review
+has two landing states, chosen by blast radius: `done` = approved **and reversible** (UI, CSS, copy,
+additive non-data features) → auto-merges and deploys; `approved` = approved **but red-zone**
+(Firestore/sync/storage, the tombstone-merge-deletion machinery, `saveData()` / the `cloudReady`
+write-guard, auth, security, or the AI Dev OS itself) → **held**, `main` is not merged and the human
+merges after a glance. Rationale: a broken UI change is reverted in a minute, but **lost user data
+cannot be reverted at all** — proven by D-030's `merge:true` regression, which auto-shipped and made
+imported data vanish. When torn, the reviewer chooses `approved`. v1.8 introduced the auto-merge
+itself: after Claude sets a task to `done`, `tools/Run-Claude-Review.ps1` runs `npm test` on the
+reviewed task branch, verifies `main` can fast-forward to it, fast-forwards `main`, and pushes
+`origin/main` (D-027). v1.7 made
 `/go` a **mission autopilot** (D-026): one Telegram command drives plan→build→review→merge to a
 verdict and returns an aggregate summary, keeping the Claude/Codex split fully intact internally but
 invisible from Telegram. One `/go` = one mission — plan if needed, build the single highest-priority

@@ -275,9 +275,21 @@ Whenever a design decision changes project behavior or introduces a new conventi
 - Review Codex branches by reading the diff, `CHANGELOG.md`, `TEST_REPORT.md`, and acceptance criteria.
 - Verify correctness, security, architecture fit, and hard-rule compliance.
 - Never rubber-stamp. If anything is wrong, write must-fix items in `REVIEW.md`.
-- If approved, set the task `status: done` in `TASKS.md`.
 - If rework is needed, set the task back to `status: codex`.
 - Do not edit `CHANGELOG.md` or `TEST_REPORT.md`.
+
+#### Risk-gated merge — choose the approved status by what the task TOUCHES (D-032)
+
+An approved review has **two** landing states. Pick by blast radius, not by confidence:
+
+| Status | Meaning | Effect |
+|---|---|---|
+| `done` | Approved **and reversible** — UI, CSS, copy, additive non-data features. | **Auto-merges** to `main` and deploys (D-027). No human step. |
+| `approved` | Approved **but red-zone** — Firestore/sync/storage, the tombstone-merge-deletion machinery, `saveData()` / the `cloudReady` write-guard, auth, security, or the AI Dev OS / automation itself. | **Held.** `main` is NOT merged; the human eyeballs the branch and merges. |
+
+Why: a broken UI change is reverted in a minute; **lost user data cannot be reverted at all** (north-star
+goal #2). Red-zone work therefore never auto-ships. When torn between `done` and `approved`, choose
+`approved`. State which gate you picked, and why, at the end of the `REVIEW.md` entry.
 
 ### Definition of Done
 

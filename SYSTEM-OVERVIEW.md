@@ -203,7 +203,12 @@ saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate 
 8. AUDIT      security-guardian → quality-guardian → all ACs verified
 9. PR         Thanos opens a PR with full ledger + guardian results
 10. VALIDATE  You test on a real device when the change needs human feel/device judgment
-11. MERGE     Approved review auto-merges to main → GitHub Pages deploys in ~1 minute
+11. MERGE     RISK-GATED (D-032). Reviewer picks the landing state by blast radius:
+              · done     → reversible (UI/CSS/copy/additive) → AUTO-merges to main → Pages deploys ~1 min
+              · approved → red-zone (Firestore/sync/storage, tombstone-merge-delete machinery,
+                           saveData()/write-guard, auth, security, the AI Dev OS itself)
+                           → HELD. main untouched; you eyeball the branch and merge.
+              Why: a bad UI change is reverted in a minute; LOST USER DATA CANNOT BE REVERTED.
 12. DOCUMENT  docs/ + DONE + DECISIONS update with the task branch before merge
 ```
 

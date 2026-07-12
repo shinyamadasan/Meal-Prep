@@ -31,6 +31,13 @@ Habits, not commands.
 - [ ] Make sure the **top of `planning/ROADMAP.md`** is what you want built tonight.
 
 ## Weekly (~10 min)
+- [ ] **Export your data** (app → Settings → Export Data). Keep the last few `.json` files.
+      This is the **only real undo for data loss** — `git revert` restores code, never deleted data.
+      It's what saved the pantry during the 2026-07 sync incidents. Do it before you dogfood
+      anything risky. (Set a recurring phone reminder; see D-032.)
+- [ ] Merge any **held** red-zone branches: an approved-but-`approved`-status task (data/sync/auth/OS)
+      waits for your glance. Check `TASKS.md` for `status: approved`, skim the diff, then
+      `git checkout main && git merge --ff-only task-<id> && git push origin main`.
 - [ ] Clean `planning/ROADMAP.md` — reorder the queue, prune stale items.
 - [ ] Promote any `/idea` / `/research` that's now worth building into the Task Queue.
 - [ ] Skim `docs/DECISIONS.md` — still agree? Supersede anything that changed.

@@ -191,7 +191,19 @@ index.html, style.css, tests, or any other file. Do not attempt git commit or gi
 available to you this run).
 
 Write a REVIEW.md entry: verdict (APPROVED or REWORK), must-fix items if any, nits if any. Then set
-$taskId's status in TASKS.md: `done` if approved, back to `codex` if rework is needed. Never rubber-stamp.
+$taskId's status in TASKS.md. Never rubber-stamp.
+
+RISK-GATED MERGE (see DECISIONS D-032). Choose the status by what the task TOUCHES:
+  - codex    = REWORK needed (must-fix items exist).
+  - approved = APPROVED, but the task touches a RED-ZONE surface: Firestore / sync / storage, the
+               tombstone-merge-deletion machinery, saveData() or the cloudReady write-guard, auth,
+               security, or the AI Dev OS / automation itself. This HOLDS the branch: main is NOT
+               merged, and the human merges after a glance. Lost data cannot be reverted, so these
+               never auto-ship.
+  - done     = APPROVED and the change is reversible (UI, CSS, copy, additive non-data features).
+               This AUTO-MERGES into main and deploys.
+If you are torn between done and approved, choose approved.
+State which gate you picked, and why, at the end of the REVIEW.md entry.
 "@
 
 # Pipe the PROMPT itself via stdin (not `claude -p $prompt`): under Windows PowerShell 5.1 a long
@@ -249,6 +261,11 @@ if ($newStatus -eq 'done') {
 } elseif ($newStatus -eq 'codex') {
     Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$taskId needs REWORK -- see REVIEW.md on $branchName for must-fix items."
+} elseif ($newStatus -eq 'approved') {
+    # Risk gate (D-032): approved-but-red-zone. Reviewed OK, but it touches data/sync/auth/OS, so it
+    # is deliberately NOT auto-merged -- a human eyeballs and merges. main is untouched.
+    Invoke-Git -C $root checkout main | Out-Null
+    Write-Result "$taskId APPROVED but HELD for your merge -- red-zone surface (data/sync/auth/OS). main NOT changed. Review the diff on $branchName, then: git checkout main; git merge --ff-only $branchName; git push origin main"
 } else {
     Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$taskId reviewed (status now '$newStatus') -- pushed to $branchName. Check REVIEW.md for detail."
