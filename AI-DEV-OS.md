@@ -11,16 +11,18 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.7 — updated 2026-07-05.** `/go` is now a **mission autopilot** (D-026): one Telegram
-command drives plan→build→review to a verdict and returns an aggregate summary, keeping the
-Claude/Codex split fully intact internally but invisible from Telegram. One `/go` = one mission —
-plan if needed, build the single highest-priority dependency-satisfied task (priority = P1→P2→P3 file
-order, which planning maintains), auto-review it, mark it `done` on `main` (= ready to merge) so the
-next `/go` advances, and report. Rework auto-blocks with an `auto:` strike note (retries until 3/3),
-and a task whose dependency isn't merged is parked "waiting on merge"; both share one mechanism and
-carry their state in the task's own blocker note (no side file). It's a thin orchestration layer over
-the **unchanged** phase runners, so every preflight/guard is preserved by construction. Budget: 30 min
-or 10 AI actions. v1.6 made `/build` run Codex CLI for real —
+**Version: v1.8 — updated 2026-07-06.** Approved reviews now auto-merge: after Claude sets a task
+to `done`, `tools/Run-Claude-Review.ps1` runs `npm test` on the reviewed task branch, verifies
+`main` can fast-forward to it, fast-forwards `main`, and pushes `origin/main` (D-027). v1.7 made
+`/go` a **mission autopilot** (D-026): one Telegram command drives plan→build→review→merge to a
+verdict and returns an aggregate summary, keeping the Claude/Codex split fully intact internally but
+invisible from Telegram. One `/go` = one mission — plan if needed, build the single highest-priority
+dependency-satisfied task (priority = P1→P2→P3 file order, which planning maintains), auto-review it,
+auto-merge it if approved, and report. Rework auto-blocks with an `auto:` strike note (retries until
+3/3), and a task whose dependency isn't merged is parked "waiting on merge"; both share one mechanism
+and carry their state in the task's own blocker note (no side file). It's a thin orchestration layer
+over the phase runners, so every preflight/guard is preserved by construction. Budget: 30 min or 10
+AI actions. v1.6 made `/build` run Codex CLI for real —
 `codex exec -C <root> --sandbox workspace-write "Continue"`, unattended, with its own `codex`-on-PATH
 Preflight check, result classification (review/blocked/failure/no-work), and an automatic chain into
 `/review` when a task reaches `status: review` — superseding v1.5's "stage a branch and ask a human to
@@ -56,15 +58,16 @@ Telegram capture
        Codex CLI unattended on a task-<id> branch (codex exec ... "Continue") and auto-chains into
        Review if it reaches status: review] → Codex implements from TASKS.md
     → Review (Claude, automatically after a successful /build, interactively, or via /review from
-       Telegram) → merge (always manual)
+       Telegram) → auto-merge after approval/test/fast-forward gates
     → docs/ + DONE + DECISIONS updated
 ```
 
 Telegram also doubles as a remote control panel — `/status /next /go /run /build /review /stop
 /enable /disable` (plus `/log`). **`/go` is the everyday driver: a mission autopilot that runs the
-whole plan→build→review span above for one task per press and returns a single summary** (D-026), so
+whole plan→build→review→merge span above for one task per press and returns a single summary**
+(D-026/D-027), so
 the pipeline's internal handoffs are invisible from Telegram; the other commands force a specific
-phase for power-user/debug use. See DECISIONS D-024/D-025/D-026 and `docs/09-automation.md`.
+phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027 and `docs/09-automation.md`.
 
 > **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
 > build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that
@@ -97,7 +100,7 @@ phase for power-user/debug use. See DECISIONS D-024/D-025/D-026 and `docs/09-aut
 | `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
 | `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
 | `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, ~2-min Scheduled Task, no `-WakeToRun` | set project path |
-| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards | none |
+| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards, approved review fast-forwards `main` | none |
 
 ### Scaffold folders (start empty)
 | Folder | Role |

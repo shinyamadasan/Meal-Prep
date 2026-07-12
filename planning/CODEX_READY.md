@@ -1,9 +1,7 @@
-🤖 *Codex-Ready Tasks (6)*
+🤖 *Codex-Ready Tasks (4)*
 Run Codex locally and say "Continue" to pick these up.
 
-*TASK-006* · Add default storage selector to #bulk-add-modal
-*TASK-007* · Add portion multiplier to cook confirmation + scale pantry deduction
-*TASK-008* · Add inline `exp:YYYY-MM-DD` per-line expiry keyword to bulk-add parser
-*TASK-009* · Compact recipe-card-header CSS pass
-*TASK-010* · Design clarification: what does "always-expanded detail view" mean?
-*TASK-011* · Design clarification: long-press bulk multi-select scope + desktop fallback
+*TASK-010* · Recipe card: show ingredients by default, instructions behind a toggle
+*TASK-011* · Pantry bulk multi-select: Select mode → bulk delete + bulk move
+*TASK-012* · Fix stale `reportError()` comment (Loader Script → SDK)
+*TASK-013* · Stamp imported items with `updatedAt` so a surviving tombstone can't delete them

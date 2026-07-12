@@ -50,23 +50,23 @@ and keeps building whatever else in the group is independent. See DECISIONS D-02
 
 Beyond approving proposals, Telegram is a control panel: `/status`, `/next`, `/go`, `/run`, `/build`,
 `/review`, `/stop`, `/enable`, `/disable` (plus `/log`). **`/go` is the everyday one — a mission
-autopilot (D-026): one press drives the whole plan→build→review span for one task and replies with a
-single summary** (e.g. "APPROVED: TASK-051 [P1] ready to merge" or "NEEDS YOU: TASK-051 — rework
-(strike 1/3): …"), so you never have to think about which internal phase comes next or whose turn it
-is. It builds the highest-priority task whose dependencies are already merged, marks it `done` on
-`main` (ready to merge — the code waits on its branch until you merge) so your next `/go` moves on,
-and auto-parks rework (with a strike, retried until 3) and dependency-blocked tasks with a clear
-reason. The other commands force a specific phase for power-user/debug use.
+autopilot (D-026/D-027): one press drives the whole plan→build→review→merge span for one task and
+replies with a single summary** (e.g. "APPROVED: TASK-051 [P1] built + reviewed + merged to main" or
+"NEEDS YOU: TASK-051 — rework (strike 1/3): …"), so you never have to think about which internal
+phase comes next or whose turn it is. It builds the highest-priority task whose dependencies are
+already merged, auto-merges it after Claude approval, branch tests, and fast-forward checks, and
+auto-parks rework (with a strike, retried until 3) and dependency-blocked tasks with a clear reason.
+The other commands force a specific phase for power-user/debug use.
 
 n8n can't reach into your PC directly, so commands are dispatched by a new Scheduled Task polling
 every ~2 minutes (not tied to the twice-daily automation) rather than an instant push — that
 trade-off was deliberate: true instant push would mean opening an inbound path to your PC for the
-first time in this whole system. `/build` and `/review` each work on their own `task-<id>` branch and
-never touch or merge `main`; merging stays a manual step, same as always. `/build` runs Codex CLI for
-real, unattended (`codex exec ... "Continue"`, verified working) — and if it reaches
-`status: review`, it automatically triggers `/review` too, so a clean build doesn't need a second
-Telegram message. See DECISIONS D-024/D-025 and `docs/09-automation.md`'s "Telegram remote control"
-section for the full design.
+first time in this whole system. `/build` and `/review` still do their work on the `task-<id>` branch,
+but an approved `/review` now runs `npm test`, fast-forwards `main`, and pushes `origin/main`.
+`/build` runs Codex CLI for real, unattended (`codex exec ... "Continue"`, verified working) — and if
+it reaches `status: review`, it automatically triggers `/review` too, so a clean build doesn't need a
+second Telegram message. See DECISIONS D-024/D-025/D-026/D-027 and `docs/09-automation.md`'s
+"Telegram remote control" section for the full design.
 
 ---
 
@@ -112,7 +112,7 @@ TASKS.md              ← status: codex — Codex's only input
     ↓ you run Codex locally, say "Continue"
 Codex implements       ← the ONLY step that ever touches app.js/index.html/style.css
     ↓ Claude reviews (REVIEW.md)
-    ↓ you validate on device, merge
+    ↓ approved review auto-merges after npm test + fast-forward checks
 main branch           ← production
 ```
 
@@ -202,9 +202,9 @@ saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate 
 7. BUILD      thanos reads PRD → EXECUTION_LEDGER → sub-agent waves → code written
 8. AUDIT      security-guardian → quality-guardian → all ACs verified
 9. PR         Thanos opens a PR with full ledger + guardian results
-10. VALIDATE  You test on a real device
-11. MERGE     You merge to main → GitHub Pages deploys in ~1 minute
-12. DOCUMENT  docs/ + DONE + DECISIONS updated in the same commit
+10. VALIDATE  You test on a real device when the change needs human feel/device judgment
+11. MERGE     Approved review auto-merges to main → GitHub Pages deploys in ~1 minute
+12. DOCUMENT  docs/ + DONE + DECISIONS update with the task branch before merge
 ```
 
 ---
@@ -220,10 +220,11 @@ saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate 
 | Security audit | AI (security-guardian) |
 | AC verification | AI (quality-guardian) |
 | Validate on a real device | Human |
-| Merge to production | Human |
+| Merge to production after approved AI review | AI |
 | Capture ideas from phone | Human |
 | Triage + score captures | AI |
-| Update docs after merge | AI |
+| Validate human-only product feel/device checks | Human |
+| Update docs with implementation | AI |
 
 The rule: AI handles mechanical work. Humans make commitments.
 
@@ -259,7 +260,7 @@ The rule: AI handles mechanical work. Humans make commitments.
 | Capture pipeline | Live (Telegram → n8n → inbox) |
 | Planning pipeline | Operational (D-015 gated pipeline; Claude→TASKS.md conversion added D-022) |
 | Overnight build automation | Built, disabled by default (`$AUTOMATION_ENABLED = $false` in `run-claude.ps1`) — see `docs/09-automation.md` |
-| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable /log`); `/go` is a mission autopilot driving plan→build→review per press with a single summary; `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success — see D-024/D-025/D-026 |
+| Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable /log`); `/go` is a mission autopilot driving plan→build→review→merge per press with a single summary; `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success; approved `/review` auto-merges after test/fast-forward gates — see D-024/D-025/D-026/D-027 |
 | Agent + skill workforce | Installed (12 agents, 13 skills) |
 | PRD system | First PRD written (PRD-001: Firebase Auth) |
 | Firebase Auth + Firestore | Planned — PRD-001 ready to build |

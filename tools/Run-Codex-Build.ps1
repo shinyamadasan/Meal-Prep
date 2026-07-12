@@ -4,8 +4,8 @@
   invoking Codex CLI unattended.
 
 .DESCRIPTION
-  Never touches main. Creates/checks out task-<id> from a clean main (named after the first
-  status: codex task found), then invokes:
+  The build step never touches main. It creates/checks out task-<id> from a clean main (named after
+  the first status: codex task found), then invokes:
       codex exec -C <repo root> --sandbox workspace-write "Continue"
   This is a verified, real headless invocation -- confirmed to read AGENTS.md/TASKS.md, follow the AI
   Dev OS, and refuse to act when no status: codex task exists. There is no more "prepare branch and
@@ -25,7 +25,8 @@
 
   If the tracked set reaches status: review, this script automatically invokes
   tools/Run-Claude-Review.ps1 (goal: no separate manual /review step needed after a clean build) and
-  folds both results into one reply.
+  folds both results into one reply. If Claude approves, the review runner can fast-forward main
+  after its own tests and guards pass.
 
   Writes its final human-readable result to .last-phase-result.txt (gitignored) for
   Dispatch-Commands.ps1 to relay -- this script does not talk to Telegram itself.

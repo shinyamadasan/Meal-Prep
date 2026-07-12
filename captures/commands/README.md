@@ -45,6 +45,24 @@ status: new
 | `/enable` | Enables automation | yes (flag only, `main`) |
 | `/disable` | Disables automation (does not interrupt an in-progress run) | yes (flag only, `main`) |
 
+## Manual dispatcher commands
+
+If Telegram says a command is queued but nothing happens, run this from PowerShell to process queued
+commands once:
+
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\tools\Dispatch-Commands.ps1"
+```
+
+If the scheduled dispatcher is disabled, run PowerShell as Administrator and re-enable it:
+
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+Enable-ScheduledTask -TaskName "Meal Prep Command Dispatcher"
+Start-ScheduledTask -TaskName "Meal Prep Command Dispatcher"
+```
+
 `status: new` → `applied` once processed (idempotent — an n8n retry can't double-dispatch). Every
 command produces exactly one reply in `captures/replies/`, regardless of outcome (success, halt, or
 "nothing to do").

@@ -6,9 +6,9 @@
   Checks out task-<id>, invokes Claude non-interactively to do exactly what the interactive "Review"
   command already documents in CLAUDE.md (read the branch diff, CHANGELOG.md, TEST_REPORT.md,
   acceptance criteria; write REVIEW.md; set TASKS.md status to done or back to codex/rework) --
-  never touching app code, never merging, never pushing main. A commit-scope guard (same fail-fast
-  mechanism as run-claude.ps1's) allows only REVIEW.md and TASKS.md; anything else halts with no
-  commit/push.
+  never touching app code. A commit-scope guard (same fail-fast mechanism as run-claude.ps1's)
+  allows only REVIEW.md and TASKS.md; anything else halts with no commit/push. If Claude approves,
+  this runner verifies the reviewed branch with npm test, fast-forwards main, and pushes main.
 
   Writes its final human-readable result to .last-phase-result.txt (gitignored) for
   Dispatch-Commands.ps1 to relay.
@@ -16,8 +16,9 @@
 .EXAMPLE
   ./tools/Run-Claude-Review.ps1
   ./tools/Run-Claude-Review.ps1 -DryRun
+  ./tools/Run-Claude-Review.ps1 -NoAutoMerge
 #>
-param([switch]$DryRun)
+param([switch]$DryRun, [switch]$NoAutoMerge, [switch]$NoPush)
 
 $ErrorActionPreference = 'Stop'
 $root       = Split-Path $PSScriptRoot -Parent
@@ -25,6 +26,9 @@ $logFile    = Join-Path $root 'claude-session.log'
 $resultFile = Join-Path $root '.last-phase-result.txt'
 $tasksFile  = Join-Path $root 'TASKS.md'
 $utf8       = New-Object System.Text.UTF8Encoding($false)
+$AUTO_MERGE_AFTER_REVIEW = -not $NoAutoMerge
+$AUTO_PUSH_AFTER_MERGE   = -not $NoPush
+$AUTO_MERGE_TEST_TIMEOUT_MINUTES = 10
 
 # Under $ErrorActionPreference = 'Stop', ANY stderr text from a native command -- even a benign
 # warning like git's LF-will-be-replaced-by-CRLF notice, on a call that otherwise succeeds -- gets
@@ -54,6 +58,90 @@ function Get-TaskStatus {
     if ($m.Success) { $m.Groups['s'].Value } else { $null }
 }
 
+function Invoke-NpmTest {
+    Add-Content -Path $logFile -Value "[Run-Claude-Review] running npm test before auto-merge (timeout: $AUTO_MERGE_TEST_TIMEOUT_MINUTES minute(s))."
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = 'cmd.exe'
+    $psi.Arguments = '/c npm test'
+    $psi.WorkingDirectory = $root
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $proc.Start() | Out-Null
+    $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+    $stderrTask = $proc.StandardError.ReadToEndAsync()
+    $exited = $proc.WaitForExit($AUTO_MERGE_TEST_TIMEOUT_MINUTES * 60 * 1000)
+    if (-not $exited) {
+        & taskkill /PID $proc.Id /T /F 2>$null | Out-Null
+        if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+        $proc.WaitForExit()
+        Add-Content -Path $logFile -Value "[Run-Claude-Review] npm test TIMED OUT after $AUTO_MERGE_TEST_TIMEOUT_MINUTES minute(s)."
+        return 124
+    }
+
+    $stdout = $stdoutTask.Result
+    $stderr = $stderrTask.Result
+    if ($stdout) { Add-Content -Path $logFile -Value "[Run-Claude-Review] --- npm test stdout ---`n$stdout" }
+    if ($stderr) { Add-Content -Path $logFile -Value "[Run-Claude-Review] --- npm test stderr ---`n$stderr" }
+    $proc.ExitCode
+}
+
+function Invoke-AutoMerge {
+    param([string]$TaskId, [string]$BranchName)
+
+    if (-not $AUTO_MERGE_AFTER_REVIEW) {
+        Invoke-Git -C $root checkout main | Out-Null
+        return "$TaskId APPROVED. Auto-merge disabled; merge $BranchName into main when you're ready."
+    }
+
+    $branchDirty = @(Invoke-Git -C $root status --porcelain)
+    if ($branchDirty.Count -gt 0) {
+        return "Review passed, but auto-merge BLOCKED: $BranchName has $($branchDirty.Count) uncommitted change(s) after review. Main was not changed."
+    }
+
+    $testExit = Invoke-NpmTest
+    if ($testExit -ne 0) {
+        Invoke-Git -C $root checkout main | Out-Null
+        return "Review passed, but auto-merge BLOCKED: npm test failed on $BranchName (exit $testExit). Main was not changed."
+    }
+
+    $postTestDirty = @(Invoke-Git -C $root status --porcelain)
+    if ($postTestDirty.Count -gt 0) {
+        return "Review passed, but auto-merge BLOCKED: npm test changed $($postTestDirty.Count) tracked/visible file(s) on $BranchName. Main was not changed."
+    }
+
+    Invoke-Git -C $root merge-base --is-ancestor main $BranchName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Git -C $root checkout main | Out-Null
+        return "Review passed, but auto-merge BLOCKED: main is not an ancestor of $BranchName. Rebase or merge by hand."
+    }
+
+    Invoke-Git -C $root checkout main | Out-Null
+    $mainDirty = @(Invoke-Git -C $root status --porcelain)
+    if ($mainDirty.Count -gt 0) {
+        return "Review passed, but auto-merge BLOCKED: main has $($mainDirty.Count) uncommitted change(s)."
+    }
+
+    Invoke-Git -C $root merge --ff-only $BranchName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        return "Review passed, but auto-merge BLOCKED: git merge --ff-only $BranchName failed."
+    }
+
+    if ($AUTO_PUSH_AFTER_MERGE) {
+        Invoke-Git -C $root push origin main | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            return "$TaskId APPROVED and auto-merged $BranchName into local main, but push to origin/main FAILED. Inspect main and push manually."
+        }
+        return "$TaskId APPROVED and auto-merged $BranchName into main, then pushed origin/main."
+    }
+
+    "$TaskId APPROVED and auto-merged $BranchName into local main. Push origin/main when you're ready."
+}
+
 # --- Find the first status: review task ---
 $text = Get-Content $tasksFile -Raw -Encoding UTF8
 $body = ($text -split '<!-- TASK TEMPLATE')[0]
@@ -72,7 +160,9 @@ $title  = $target.Groups['title'].Value.Trim()
 $branchName = ($taskId -replace 'TASK-', 'task-').ToLower()
 
 if ($DryRun) {
-    Write-Result "[DRY RUN] would checkout $branchName and review $taskId ($title)."
+    $mergeMode = if ($AUTO_MERGE_AFTER_REVIEW) { 'enabled' } else { 'disabled' }
+    $pushMode = if ($AUTO_PUSH_AFTER_MERGE) { 'enabled' } else { 'disabled' }
+    Write-Result "[DRY RUN] would checkout $branchName and review $taskId ($title). Auto-merge after approval: $mergeMode. Push after merge: $pushMode."
     exit 0
 }
 
@@ -154,12 +244,13 @@ Invoke-Git -C $root push origin $branchName | Out-Null
 # review with status correctly set to `done` on $branchName was misreported as "needs REWORK"
 # because $tasksFile was read after the branch switch.
 $newStatus = Get-TaskStatus -TaskId $taskId
-Invoke-Git -C $root checkout main | Out-Null
 if ($newStatus -eq 'done') {
-    Write-Result "$taskId APPROVED. Merge $branchName into main when you're ready."
+    Write-Result (Invoke-AutoMerge -TaskId $taskId -BranchName $branchName)
 } elseif ($newStatus -eq 'codex') {
+    Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$taskId needs REWORK -- see REVIEW.md on $branchName for must-fix items."
 } else {
+    Invoke-Git -C $root checkout main | Out-Null
     Write-Result "$taskId reviewed (status now '$newStatus') -- pushed to $branchName. Check REVIEW.md for detail."
 }
 exit 0

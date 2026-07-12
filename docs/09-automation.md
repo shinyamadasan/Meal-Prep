@@ -628,17 +628,19 @@ it that way. If the PC is asleep, commands wait until it wakes — either on its
 |---|---|---|---|
 | `/status` | Automation on/off, current branch + tree state, last log line, Codex-ready + review-ready counts | none | no |
 | `/next` | Reports whose turn it is (same priority table as the `Next` command, D-021) | none | no |
-| `/go` | **Mission autopilot (the everyday command, D-026).** One `/go` = one mission: plan if needed → build the single highest-priority dependency-satisfied task → auto-review → report. Marks the built task `done` on `main` (= ready to merge) so the next `/go` advances. Rework auto-blocks with a strike (retries until 3/3, then stays blocked); a task whose dependency isn't merged is parked "waiting on merge". Returns an aggregate summary, detail only on failure. | `main` (plus the `task-<id>` its build runs on) | `TASKS.md` status/notes on `main`; app code etc. on the `task-<id>` branch |
+| `/go` | **Mission autopilot (the everyday command, D-026/D-027).** One `/go` = one mission: plan if needed → build the single highest-priority dependency-satisfied task → auto-review → auto-merge if approved → report. Rework auto-blocks with a strike (retries until 3/3, then stays blocked); a task whose dependency isn't merged is parked "waiting on merge". Returns an aggregate summary, detail only on failure. | `main` (plus the `task-<id>` its build runs on) | `TASKS.md` status/notes on `main`; app code etc. on the `task-<id>` branch; approved branches fast-forward into `main` |
 | `/log` | Tails the last 40 lines of `claude-session.log` (power-user/debug) | none | no |
 | `/run` | Manual override: runs planning right now (Triage + BUILD_QUEUE→TASKS.md), same as `run-claude.ps1` without `-Scheduled` | `main` | same allow-list as the scheduled run |
-| `/build` | Builds the first `status: codex` task on its own `task-<id>` branch by running Codex CLI unattended (`codex exec ... "Continue"`) — auto-chains into `/review` if it reaches `status: review` | `task-<id>` (never `main`) | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
-| `/review` | Reviews the first `status: review` task's branch — runs automatically after a successful `/build`, or on its own as a manual override | that `task-<id>` (never `main`) | `REVIEW.md` + `TASKS.md` status only |
+| `/build` | Builds the first `status: codex` task on its own `task-<id>` branch by running Codex CLI unattended (`codex exec ... "Continue"`) — auto-chains into `/review` if it reaches `status: review` | `task-<id>`; approved review may fast-forward `main` | app code + tests + `CHANGELOG.md`/`TEST_REPORT.md` + `TASKS.md` status |
+| `/review` | Reviews the first `status: review` task's branch — runs automatically after a successful `/build`, or on its own as a manual override. If Claude approves, runs `npm test`, fast-forwards `main`, and pushes `origin/main`. | that `task-<id>`; approved review fast-forwards `main` | `REVIEW.md` + `TASKS.md` status on branch; approved task branch merges to `main` |
 | `/stop` | Kill switch: disables automation, tries to stop an in-progress run | `main` | flag line only |
 | `/enable` | Enables automation | `main` | flag line only |
 | `/disable` | Disables automation (does not interrupt anything already running) | `main` | flag line only |
 
-No command ever merges a `task-<id>` branch into `main`. That's always a manual step you do yourself,
-the same way every task branch in this repo has been merged so far.
+Approved `/review` is the only command path that merges a `task-<id>` branch into `main`. It only does
+so after Claude sets the task to `done`, `npm test` passes on the reviewed branch within 10 minutes,
+and `main` can fast-forward to that branch. Rework, failed/timed-out tests, dirty branches, and
+non-fast-forward branches leave `main` unchanged.
 
 ### Architecture
 
@@ -657,7 +659,7 @@ Telegram (/status /next /go /run /build /review /stop /enable /disable)
                                   auto-chains into Run-Claude-Review.ps1 if a task reaches status: review)
             /review            → tools/Run-Claude-Review.ps1
             /go                → Invoke-Autopilot: one mission (plan-if-needed → build one
-                                  dependency-satisfied task → auto-review → reflect outcome onto main)
+                                  dependency-satisfied task → auto-review → auto-merge if approved)
             /status /next      → computed directly, read-only
             /stop /enable /disable → flips $AUTOMATION_ENABLED, commits + pushes main
         marks the command status: applied
@@ -690,7 +692,7 @@ After the run, results are classified against the tracked set:
 | Outcome | Condition | What happens |
 |---|---|---|
 | **no codex work available** | tracked set was empty before invoking | exits 0, Codex is never actually invoked |
-| **success → review** | exit 0, at least one tracked task now `status: review` | commits/pushes the branch, then **automatically invokes `tools/Run-Claude-Review.ps1`** (no separate manual `/review` needed), folds both results into one reply |
+| **success → review** | exit 0, at least one tracked task now `status: review` | commits/pushes the branch, then **automatically invokes `tools/Run-Claude-Review.ps1`** (no separate manual `/review` needed); if Claude approves, `/review` runs its merge gates and fast-forwards `main`; folds both results into one reply |
 | **blocked** | exit 0, at least one tracked task now `status: blocked` | commits/pushes whatever's safe (Codex wrote its own blocker note per `AGENTS.md`), reports it, no auto-chain |
 | **failure (Codex exited non-zero)** | `codex exec` itself exited non-zero | commits any safe partial progress, marks every still-`codex` tracked task `blocked` with the exit code, reports the failure |
 | **failure (no progress)** | exit 0 but no tracked task changed status at all | marks the task(s) `blocked` with a "no tracked progress" note rather than silently reporting success |
@@ -705,8 +707,9 @@ like the planning guard.
   requires `main` clean before branching; `/review` requires the target `task-<id>` branch to exist
   and be clean.
 - **Never on a dirty tree / never on the wrong branch** — same `AUTOMATION ABORTED` format, reused verbatim.
-- **Never auto-merge** — structurally impossible: no command's logic ever checks out or pushes `main`
-  except the flag-only commands, and none of them touch a `task-<id>` branch.
+- **Auto-merge only after approval** — only `/review` can merge, and only after Claude sets the task
+  to `done`, `npm test` passes on the reviewed branch within 10 minutes, and
+  `git merge --ff-only task-<id>` is possible.
 - **Claude never writes app code** — `/review`'s `claude -p` call uses the same restricted
   `--allowedTools` pattern as the planning session, plus its own commit-scope guard whose allow-list
   is only `REVIEW.md`/`TASKS.md`.
@@ -716,9 +719,10 @@ like the planning guard.
   scripts. Any violation halts with no commit/push, exactly like the planning guard.
 - **Codex only builds `status: codex` items** — `/build` picks the first one, same FIFO rule as
   Codex's own documented "Continue" behavior.
-- **Claude reviews before anything is "done"** — only `/review` can set a task to `status: done`.
+- **Claude reviews before anything merges** — only `/review` can set a task to `status: done`.
   `/build` reaching `status: review` auto-chains into `/review`, but the review step itself is never
-  skipped, and only `/review`'s own commit-scope guard (`REVIEW.md`/`TASKS.md` only) governs it.
+  skipped, and only `/review`'s own commit-scope guard (`REVIEW.md`/`TASKS.md` only) governs the
+  review commit before merge gates run.
 - **Notify after every phase** — every command appends exactly one entry to `OUTBOX.md`.
 - **Repeat-safety** — `/build`/`/review` check the current task status before acting (already
   building/reviewed/done → reply and no-op); `/enable`/`/disable`/`/stop` just set a flag;
@@ -759,8 +763,9 @@ like the planning guard.
    `.\tools\Dispatch-Commands.ps1 -DryRun`, confirm the reply looks right, delete the test file.
 3. **Live `/status`/`/next`** — read-only, verify accuracy against real repo state.
 4. **Live `/go`/`/run`/`/build`/`/review`** — one at a time, watching `claude-session.log` and
-   `OUTBOX.md`, confirming branch discipline (never `main` for build/review) and the commit-scope
-   guards (simulate a violation the same way `run-claude.ps1`'s guard was verified, if you want to be thorough).
+   `OUTBOX.md`, confirming branch discipline (`/build` stays on the task branch; approved `/review`
+   reaches `main` only through npm-test + fast-forward gates) and the commit-scope guards (simulate a
+   violation the same way `run-claude.ps1`'s guard was verified, if you want to be thorough).
 5. **Repeat-safety:** send the same command twice; confirm the second is a safe no-op.
 6. **Concurrency:** trigger two commands back-to-back; confirm the second gets "busy."
 7. **Kill switch:** `/stop` mid-run; confirm it actually halts and the flag is off afterward.
@@ -775,7 +780,9 @@ like the planning guard.
    table above (no codex-ready task, a task that reaches `review`, one Codex marks `blocked` itself,
    and — if you can force it — a non-zero `codex exec` exit) and confirm each produces the right
    `OUTBOX.md` message and TASKS.md state, and that reaching `review` actually triggers `/review`
-   automatically without you sending it.
+   automatically without you sending it. For an approved review, confirm `npm test` runs before
+   `git merge --ff-only` and `origin/main` advances only after both pass within the 10-minute test
+   timeout.
 
 ### Rollback
 

@@ -96,8 +96,8 @@ Codex-ready: $codexReady - Review-ready: $reviewReady
 
 # Single source of truth for both /next (report) and /go (report + act). Returns a structured
 # recommendation: which task, whose turn, and which phase-runner action /go should take.
-# 'blocked' and 'approved' map to action 'status' -- both need a human decision (unblock, or merge
-# after review), not something /go can safely do on its own.
+# 'blocked' and 'approved' map to action 'status' -- both need a human decision (unblock, or inspect
+# older pre-auto-merge state), not something /go can safely do on its own.
 function Get-NextAction {
     if (-not (Test-Path $tasksFile)) { return @{ Action = 'status'; Message = 'No TASKS.md found.' } }
     $text = Get-Content $tasksFile -Raw -Encoding UTF8
@@ -106,7 +106,7 @@ function Get-NextAction {
     $priority = @(
         @{ s = 'blocked';     owner = 'you (Claude)'; action = 'status'; note = 'blocked -- needs your decision, see the blocker note in TASKS.md' }
         @{ s = 'review';      owner = 'Claude';        action = 'review' }
-        @{ s = 'approved';    owner = 'you';           action = 'status'; note = 'approved -- ready to merge into main yourself' }
+        @{ s = 'approved';    owner = 'you';           action = 'status'; note = 'approved -- inspect older pre-auto-merge state' }
         @{ s = 'codex';       owner = 'Codex';         action = 'build' }
         @{ s = 'in-progress'; owner = 'Codex';         action = 'build' }
         @{ s = 'todo';        owner = 'Claude';        action = 'run' }
@@ -180,7 +180,7 @@ function Invoke-RunPhase {
 }
 
 # ===================== AUTOPILOT (mission-based /go) ==========================================
-# /go owns "missions", not phases. A mission = one approved item driven to "ready to merge". The loop
+# /go owns "missions", not phases. A mission = one approved item driven through review and auto-merge. The loop
 # calls the same phase runners as /run /build /review -- it only SEQUENCES them, so every preflight,
 # fail-fast halt, and commit-scope guard inside those runners is preserved untouched. Ownership flips
 # (Claude plan -> Codex build -> Claude review) are internal and never a stop; only real external
@@ -218,8 +218,7 @@ function Get-TaskTable {
     $out
 }
 
-# A dependency is satisfied only if its task branch is already merged into main (nothing auto-merges,
-# so a dep built-but-unmerged this run would not be present when a dependent builds from clean main).
+# A dependency is satisfied only if its task branch is already merged into main.
 function Test-DepsSatisfied {
     param($Task, $MergedBranches)
     foreach ($d in $Task.Deps) {
@@ -258,10 +257,9 @@ function Set-TaskBlockedAuto {
     if (-not $DryRun) { [System.IO.File]::WriteAllText($tasksFile, ($s.Pre + $blk + $s.Post), $utf8) }
 }
 
-# Set a task's status field only (no blocker manipulation). Used to reflect a build outcome onto
-# main -- e.g. an APPROVED build sets the task `done` on main (= ready to merge; the code itself
-# stays on the unmerged task branch until a human merges), so a later /go advances to the next task
-# instead of Codex re-picking this one. See docs/DECISIONS.md D-026.
+# Set a task's status field only (no blocker manipulation). Used as a defensive no-op after
+# auto-merge -- the reviewed branch already carries `done` onto main, but this keeps older
+# non-auto-merge outcomes from being re-picked by a later /go. See docs/DECISIONS.md D-026/D-027.
 function Set-TaskStatus {
     param([string]$TaskId, [string]$NewStatus)
     $text = Get-Content $tasksFile -Raw -Encoding UTF8
@@ -298,8 +296,8 @@ function Publish-TasksChange {
 
 # ONE mission per /go: release retryable auto-blocks -> plan once if nothing is build-ready ->
 # build exactly one dependency-satisfied task (auto-blocking any dep-blocked higher-priority ones
-# ahead of it) -> reflect the outcome onto main -> report. The build runner auto-chains its own
-# review internally; every preflight/guard inside it is untouched. See docs/DECISIONS.md D-026.
+# ahead of it) -> auto-review -> auto-merge if approved -> report. The build runner auto-chains its
+# own review internally; every preflight/guard inside it is untouched. See docs/DECISIONS.md D-026/D-027.
 function Invoke-Autopilot {
     $start = Get-Date
     $actions = 0
@@ -353,7 +351,7 @@ function Invoke-Autopilot {
 
         if ($r.Result -match '(?im)\bAPPROVED\b') {
             Set-TaskStatus -TaskId $next.Id -NewStatus 'done'
-            Publish-TasksChange "autopilot: $($next.Id) approved, ready to merge"
+            Publish-TasksChange "autopilot: $($next.Id) approved and merged"
             $built = [pscustomobject]@{ Id = $next.Id; P = $next.Priority; Outcome = 'approved' }
         } elseif ($r.Result -match '(?im)REWORK') {
             $prev = if ($next.Note -match 'strike (?<n>\d)/3') { [int]$Matches['n'] } else { 0 }
@@ -375,7 +373,7 @@ function Invoke-Autopilot {
     $out = @()
     if ($built) {
         if ($built.Outcome -eq 'approved') {
-            $out += "APPROVED: $($built.Id) [P$($built.P)] built + reviewed, ready to merge (branch $(($built.Id -replace 'TASK-','task-').ToLower()))."
+            $out += "APPROVED: $($built.Id) [P$($built.P)] built + reviewed + merged to main."
         } else {
             $out += "NEEDS YOU: $($built.Id) [P$($built.P)] -- $($built.Outcome)"
             $out += "Branch $(($built.Id -replace 'TASK-','task-').ToLower()) left for inspection."
@@ -388,7 +386,7 @@ function Invoke-Autopilot {
     if ($planned -gt 0) { $out += "(planned $planned new task(s) this run.)" }
     if ($waiting.Count) { $out += "Waiting on merge: " + ($waiting -join '; ') }
     $out += "Remaining approved work: $remaining."
-    $out += if ($built -and $built.Outcome -eq 'approved') { "Next: merge $($built.Id), then /go." } else { "Next: /go (after resolving the above)." }
+    $out += if ($built -and $built.Outcome -eq 'approved') { "Next: /go." } else { "Next: /go (after resolving the above)." }
     ($out -join "`n")
 }
 
