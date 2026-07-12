@@ -45,32 +45,71 @@ Habits, not commands.
 
 ## At the keyboard (PC cheat sheet)
 
-Telegram works fine from the PC too (it just polls every ~2 min). These run the **same phase runners**
+Telegram works from the PC too (it just polls every ~2 min). These run the **same phase runners**
 instantly. All are lock-protected (`automation.lock`) so they can never overlap each other or the
 scheduled run, and **every one takes `-DryRun`** — show what it would do, change nothing.
 
-| Want to… | Run (from the repo root) | Telegram equivalent |
-|---|---|---|
-| Plan / triage — captures → proposals, approved queue → tasks | `.\run-claude.ps1` | `/run` |
-| Build the next `status: codex` task (**auto-chains into review**) | `.\tools\Run-Codex-Build.ps1` | `/build` |
-| Review the pending `status: review` task | `.\tools\Run-Claude-Review.ps1` | `/review` |
-| Process any queued Telegram command files | `.\tools\Dispatch-Commands.ps1` | — |
+Open PowerShell and copy-paste a block:
 
-**Closest thing to `/go` at the PC:** `.\tools\Run-Codex-Build.ps1` — it builds the next task *and*
-auto-runs the review, which auto-merges if the D-032 gate lands on `done`.
-
-> ⚠ **Never run `.\run-claude.ps1 -Scheduled` by hand.** `-Scheduled` is the Task Scheduler's signal to
-> **shut the PC down** when the run ends. Plain `.\run-claude.ps1` is safe and will not power off.
-
-**Merge a held red-zone branch** (D-032 — a task the reviewer left at `status: approved`):
+**Plan / triage** — captures → proposals, approved queue → tasks *(Telegram: `/run`)*
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+.\run-claude.ps1
 ```
+
+**Build the next `status: codex` task** — auto-chains into review *(Telegram: `/build`; closest thing to `/go` at the PC)*
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+.\tools\Run-Codex-Build.ps1
+```
+
+**Review the pending `status: review` task** — applies the D-032 risk gate *(Telegram: `/review`)*
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+.\tools\Run-Claude-Review.ps1
+```
+
+**Merge a held red-zone branch** — a task the reviewer left at `status: approved` (D-032). Replace `<id>`:
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
 git checkout main
 git merge --ff-only task-<id>
 git push origin main
 ```
 
-**Review runner options:** `-NoAutoMerge` (review, but never touch `main` — inspect first) ·
-`-NoPush` (merge locally, don't push) · `-DryRun`.
+**Process queued Telegram command files** (rarely needed by hand)
+```powershell
+cd "C:\Users\Admin\Desktop\Vibe code\Meal prep app"
+.\tools\Dispatch-Commands.ps1
+```
+
+**Options:** all runners take `-DryRun`. The review runner also takes `-NoAutoMerge` (review but never
+touch `main` — inspect first) and `-NoPush` (merge locally, don't push).
+
+> ⚠ **Never run `.\run-claude.ps1 -Scheduled` by hand.** `-Scheduled` is the Task Scheduler's signal to
+> **shut the PC down** when the run ends. Plain `.\run-claude.ps1` is safe and will not power off.
+
+## Can I sleep the PC? (verified against Task Scheduler)
+
+| Scheduled task | Wakes the PC? | What it runs |
+|---|---|---|
+| **Meal Prep Command Dispatcher** (~2 min poll) | **No** — `WakeToRun = False`, deliberately | Picks up Telegram commands |
+| **Meal Prep Claude Overnight** (9 PM + 2 AM) | **Yes** — `WakeToRun = True` | Planning/triage only (`run-claude.ps1`) |
+
+- **Yes, you can sleep the PC.** Telegram commands sent while it's asleep are **not lost** — n8n writes
+  them into the repo via GitHub, so they queue up and get picked up once the PC is awake
+  (`StartWhenAvailable = True` means the dispatcher runs shortly after wake).
+- **The dispatcher will NOT wake the PC.** That's on purpose — waking the machine every 2 minutes
+  would be absurd. So **a build or review only runs while the PC is awake.** Sleep is fine; work waits.
+- **The overnight task DOES wake the PC** (9 PM / 2 AM) — but it only does *planning*, never builds or
+  reviews, and with `-Scheduled` it powers the machine back down afterwards.
+
+### The dispatcher must be ENABLED for Telegram to work at all
+```powershell
+Enable-ScheduledTask  -TaskName "Meal Prep Command Dispatcher"    # turn Telegram polling on
+Disable-ScheduledTask -TaskName "Meal Prep Command Dispatcher"    # turn it off
+Get-ScheduledTask -TaskName "Meal Prep Command Dispatcher" | Select-Object State   # check
+```
 
 ## The mindset
 > Old: *"How do I code this?"* → New: *"How do I keep the system flowing?"*
