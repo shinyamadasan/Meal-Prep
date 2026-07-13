@@ -88,9 +88,10 @@ Telegram capture
 Telegram also doubles as a remote control panel — `/status /next /go /run /build /review /stop
 /enable /disable` (plus `/log`). **`/go` is the everyday driver: a mission autopilot that runs the
 whole plan→build→review→merge span above for one task per press and returns a single summary**
-(D-026/D-027), so
-the pipeline's internal handoffs are invisible from Telegram; the other commands force a specific
-phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027 and `docs/09-automation.md`.
+(D-026/D-027), and when there is nothing to build it **triages any waiting captures into proposals
+instead of dead-ending** (D-035) — so one command always does the next useful thing. The pipeline's
+internal handoffs are invisible from Telegram; the other commands force a specific
+phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027/D-035 and `docs/09-automation.md`.
 
 > **Note:** this supersedes the older `library-guardian` PRD → `thanos-gauntlet-glove` multi-agent
 > build path described in `SYSTEM-OVERVIEW.md`'s Layer 6 for day-to-day `BUILD_QUEUE.md` work — that

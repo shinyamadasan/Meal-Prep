@@ -280,6 +280,14 @@ Why: Porting this OS to a second app (ChronaSense) produced **six bugs, none of 
 
 The common thread is that **every failure was silent**, and a checklist cannot catch a silent failure — only execution can. So the doctor resolves the git remote, parses the workflow JSON, calls the GitHub API, and performs a **real write with the real token**, then deletes it. Anything it cannot check is reported **SKIPPED, never passed**: a gate that claims "pass" without running is worse than no gate, because it launders unverified work as verified. Verified by re-introducing all seven failures into a scratch install — the doctor catches every one, and a clean install produces zero false positives.
 
+## D-035 — An idle `/go` triages instead of dead-ending
+
+Task: autopilot idle behavior · 2026-07-13
+
+Decision: `/go`'s planning phase now fires when there is **either** approved work to convert **or** new captures to triage — previously only the former (`no codex tasks AND unconverted BUILD_QUEUE > 0`). Since the planning phase already does both jobs (STEP A triages `captures/inbox` → `planning/PROPOSALS.md`; STEP B converts approved BUILD_QUEUE items → tasks), widening the trigger costs one condition and no new machinery. The summary now reports `TRIAGED n new idea(s) into proposals` and points at the next real action (`reply Approve <n>, then /go`).
+
+Why: The old condition made `/go` a **dead end exactly when it was most needed**. With the build queue empty and ideas sitting in the inbox, `/go` replied "nothing to do" and did nothing — the captures could only be triaged by the overnight run, so an idea sent in the morning was invisible until the next day's digest. Caught live: all 13 tasks `done`, **six captures untriaged**, and `/go` idle. For a phone-first operator the whole value of one command is that it always does the next useful thing; "nothing to do" while six of your ideas rot in a queue is a broken promise, not a safe default. Approval is still the human's (Hard Rule 1) — triage only produces *proposals*, it never queues or builds anything.
+
 Extraction itself was overdue for a structural reason: while the OS lived only here, this repo was the de facto master and every other app held a *copy* that began rotting immediately. Not hypothetical — this app's own `setup-command-dispatcher-scheduler.ps1` had silently drifted from the live D-033 config and was sitting ready to undo it the moment anyone re-ran it.
 
 The Guardian Gauntlet was the sharpest case of the same disease: `AI-DEV-OS.md` has advertised "Build → **Guardian Gauntlet** → Document" since v1.1, but `Task` was never in the reviewer's `--allowedTools`. The reviewer had no tool with which to spawn a guardian, so it reviewed alone — for months — while the documentation asserted otherwise. Documentation that describes machinery nobody built is not aspiration; it is a false claim that stops anyone from looking.
