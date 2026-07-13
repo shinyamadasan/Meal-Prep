@@ -120,7 +120,7 @@ function Get-NextAction {
     if (-not (Test-Path $tasksFile)) { return @{ Action = 'status'; Message = 'No TASKS.md found.' } }
     $text = Get-Content $tasksFile -Raw -Encoding UTF8
     $body = ($text -split '<!-- TASK TEMPLATE')[0]
-    $blocks = [regex]::Matches($body, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[Â·â€¢]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
+    $blocks = [regex]::Matches($body, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[·•]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
     $priority = @(
         @{ s = 'blocked';     owner = 'you (Claude)'; action = 'status'; note = 'blocked -- needs your decision, see the blocker note in TASKS.md' }
         @{ s = 'review';      owner = 'Claude';        action = 'review' }
@@ -214,7 +214,7 @@ function Get-TaskTable {
     if (-not (Test-Path $tasksFile)) { return @() }
     $text = Get-Content $tasksFile -Raw -Encoding UTF8
     $body = ($text -split '<!-- TASK TEMPLATE')[0]
-    $blocks = [regex]::Matches($body, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[Â·â€¢]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
+    $blocks = [regex]::Matches($body, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[·•]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
     $out = @()
     foreach ($b in $blocks) {
         $rest = $b.Groups['rest'].Value
@@ -300,16 +300,6 @@ function Get-UnconvertedBQCount {
     $n
 }
 
-# Count of captures/inbox/*.md still awaiting triage (status: new). Planning's STEP A turns these into
-# proposals, so a /go with an empty build queue can still do the next genuinely useful thing.
-function Get-NewCaptureCount {
-    $dir = Join-Path $root 'captures/inbox'
-    if (-not (Test-Path $dir)) { return 0 }
-    @(Get-ChildItem -Path $dir -Filter '*.md' -File |
-        Where-Object { $_.Name -ne 'README.md' } |
-        Where-Object { (Get-Content $_.FullName -Raw -Encoding UTF8) -match '(?m)^status:\s*new\s*$' }).Count
-}
-
 # Commit + push a TASKS.md status change autopilot just made (no-op in DryRun / when nothing staged).
 function Publish-TasksChange {
     param([string]$Message)
@@ -344,21 +334,14 @@ function Invoke-Autopilot {
     }
     if ($released) { Publish-TasksChange 'autopilot: release auto-blocked task(s) for retry' }
 
-    # --- Plan once if there is either approved work to convert OR new captures to triage. The planning
-    #     phase does BOTH: STEP A triages captures/inbox -> planning/PROPOSALS.md, STEP B converts
-    #     approved BUILD_QUEUE items -> tasks. Triggering on captures too means a /go with an empty
-    #     build queue still does the next useful thing (turns your ideas into proposals you can approve)
-    #     instead of dead-ending on "nothing to do" -- which is precisely when you most want it to act. ---
+    # --- Plan once if there is approved work but nothing build-ready yet. ---
     $planned = 0
-    $triaged = 0
-    $capturesBefore = Get-NewCaptureCount
-    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and ((Get-UnconvertedBQCount) -gt 0 -or $capturesBefore -gt 0)) {
+    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and (Get-UnconvertedBQCount) -gt 0) {
         if (-not (Test-AutomationEnabled)) { return "Autopilot: automation disabled -- nothing done." }
         $before = @(Get-TaskTable | Where-Object { $_.Status -eq 'codex' }).Count
         $rp = Invoke-RunPhase; $actions++
         if ($rp.ExitCode -ne 0) { return "Autopilot stopped in planning: $($rp.Result)" }
         $planned = @(Get-TaskTable | Where-Object { $_.Status -eq 'codex' }).Count - $before
-        $triaged = $capturesBefore - (Get-NewCaptureCount)
     }
 
     # --- Build exactly ONE dependency-satisfied task. Codex self-selects the first status:codex task
@@ -415,20 +398,13 @@ function Invoke-Autopilot {
         }
     } elseif ($waiting.Count -gt 0) {
         $out += "Nothing built -- top task(s) waiting on a merge."
-    } elseif ($triaged -gt 0) {
-        $out += "TRIAGED $triaged new idea(s) into proposals -- nothing approved to build yet."
     } else {
         $out += "Nothing to do -- no approved work is build-ready."
     }
     if ($planned -gt 0) { $out += "(planned $planned new task(s) this run.)" }
-    if ($triaged -gt 0 -and $built) { $out += "(also triaged $triaged new idea(s) into proposals.)" }
     if ($waiting.Count) { $out += "Waiting on merge: " + ($waiting -join '; ') }
     $out += "Remaining approved work: $remaining."
-    $pending = Get-NewCaptureCount
-    $out += if ($built -and $built.Outcome -eq 'approved') { "Next: /go." }
-            elseif ($triaged -gt 0) { "Next: check the proposals digest and reply Approve <n>, then /go." }
-            elseif (-not $built -and $remaining -eq 0 -and $pending -eq 0) { "Next: send me an idea -- there is nothing approved or pending." }
-            else { "Next: /go (after resolving the above)." }
+    $out += if ($built -and $built.Outcome -eq 'approved') { "Next: /go." } else { "Next: /go (after resolving the above)." }
     ($out -join "`n")
 }
 
