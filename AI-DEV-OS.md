@@ -11,7 +11,16 @@
 >
 > See `SYSTEM-OVERVIEW.md` for a plain-language explanation of how all the pieces fit together.
 
-**Version: v1.10 — updated 2026-07-11.** The PC now **sleeps by default and wakes to work** (D-033).
+**Version: v1.11 — updated 2026-07-13.** The OS is now a **separate, installable `ai-dev-os` repo**
+(D-034). This app consumes it; re-running `Install-AiDevOs.ps1` upgrades this app's OS in place,
+preserving everything this app wrote (including `$AUTOMATION_ENABLED`). `Doctor.ps1` verifies the
+install by *execution*, not by checklist — it resolves the git remote, parses the n8n workflow JSON,
+and performs a real GitHub write with the real token; whatever it cannot check is reported SKIPPED,
+never passed. And the **Guardian Gauntlet is finally real**: `Task` was missing from the reviewer's
+`--allowedTools`, so for months it had no tool to spawn a guardian with and reviewed alone while this
+very document claimed a gauntlet ran. `security-guardian` + `quality-guardian` now audit every build
+before a verdict; a confirmed security finding forces rework. v1.10 made the PC
+**sleep by default and wake to work** (D-033).
 The Command Dispatcher runs on a `WakeToRun` timer every 30 min: send `/go` from anywhere, the sleeping
 machine wakes, drains the queued command (build → review → merge → deploy), and idles back to sleep.
 The overnight run now **sleeps** the PC instead of `shutdown /s` — a powered-OFF machine cannot be woken
@@ -42,7 +51,7 @@ Preflight check, result classification (review/blocked/failure/no-work), and an 
 `/review` when a task reaches `status: review` — superseding v1.5's "stage a branch and ask a human to
 open Codex" fallback, now that headless execution is verified working (D-025). v1.5 added Telegram
 remote control — `/status /next /go /run /build /review /stop /enable /disable`, dispatched via a new
-~2-min-polling "Meal Prep Command Dispatcher" Scheduled Task (no `-WakeToRun`) reading
+30-min `-WakeToRun` "Meal Prep Command Dispatcher" Scheduled Task (D-033: the PC sleeps, and wakes to drain) reading
 `captures/commands/` and replying through `captures/replies/OUTBOX.md`; `/build`/`/review` run on
 isolated `task-<id>` branches with their own commit-scope guards and never touch/merge `main` (D-024).
 v1.4 added Sprint Execution Mode —
@@ -102,8 +111,15 @@ phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027 and `docs/
 | `PROMPTS.md` | Engineering (P1–P10) + Product (PP1–PP7) reusable prompts | none |
 | `OPERATOR.md` | Human playbook (principles + rhythm) | none |
 | `GUIDE.md` | Phone capture card | none |
-| `AI-DEV-OS.md` | This file — OS manifest + bootstrap guide | none |
-| `SYSTEM-OVERVIEW.md` | Plain-language system explainer | none |
+| `AI-DEV-OS.md` | This file — OS manifest + bootstrap guide | **seeded once, then app-owned** |
+| `SYSTEM-OVERVIEW.md` | Plain-language system explainer | **seeded once, then app-owned** |
+
+> These last two were listed as "per-app change: **none**" for months. That was **false**, and the
+> installer was briefly about to act on it. `SYSTEM-OVERVIEW.md` carries a live "Current State of
+> This App" table, the deploy URL, and this app's own red-zone list; `AI-DEV-OS.md` carries this
+> app's version history. Overwriting either on an upgrade silently destroys hand-written project
+> state and replaces it with TODOs. **A file is only generic if it contains nothing an app would
+> grieve losing.** The installer now protects both and warns instead.
 
 ### Automation files
 | File / folder | Role | Per-app change |
@@ -113,7 +129,7 @@ phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027 and `docs/
 | `n8n-telegram-digest.json` | Morning digest + Codex-ready notification | set repo, bot token, user id |
 | `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
 | `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
-| `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, ~2-min Scheduled Task, no `-WakeToRun` | set project path |
+| `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, 30-min `-WakeToRun` Scheduled Task so a sleeping PC still drains queued commands (D-033) | set project path |
 | `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards, approved review fast-forwards `main` | none |
 
 ### Scaffold folders (start empty)
@@ -193,6 +209,28 @@ The boundary is the whole point: the **protocol** (how work flows, how quality i
 
 ---
 
-## Not yet done — true extraction (parked)
+## Extraction — done (D-034)
 
-Today the OS and this app share one repo. To make cloning real, lift the generic set into its own `ai-dev-os/` repo and consume it via template-repo / submodule / copy-on-init. See ROADMAP → Research. This file is the manifest that extraction will follow.
+The generic set now lives in its own **`ai-dev-os` repo**. This app *consumes* the OS; it no longer
+owns it. Re-running the installer is how this app's OS gets upgraded:
+
+```powershell
+cd ..\ai-dev-os
+.\Install-AiDevOs.ps1 -Config .\apps\meal-prep.json     # overwrites the generic set only
+.\Doctor.ps1          -Config .\apps\meal-prep.json     # refuses to take your word for it
+```
+
+The installer never touches what this app wrote: `CLAUDE.md`, `AGENTS.md`, `QA.md`, `docs/*`,
+`planning/*`, the instance files, or `SYSTEM-OVERVIEW.md`/`AI-DEV-OS.md`. It also **preserves
+`$AUTOMATION_ENABLED`** — an upgrade must never silently switch a validated app's overnight
+automation off, nor switch a brand-new app's on.
+
+Why extraction finally mattered: while the OS lived only here, this repo was the de facto master and
+every other app got a *copy* that immediately began to rot. That is not hypothetical — the port to a
+second app produced six bugs, **none of which threw an error**, and this repo's own
+`setup-command-dispatcher-scheduler.ps1` had silently drifted out of sync with the live D-033 config,
+sitting ready to undo it the moment anyone re-ran it.
+
+`Doctor.ps1` exists because documentation cannot catch that class of failure. It resolves the git
+remote, parses the n8n workflow JSON, calls the GitHub API, and performs a **real write with the real
+token**. Anything it cannot check is reported as SKIPPED — never as passed.

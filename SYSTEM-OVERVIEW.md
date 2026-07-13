@@ -272,7 +272,9 @@ The rule: AI handles mechanical work. Humans make commitments.
 | Planning pipeline | Operational (D-015 gated pipeline; Claude→TASKS.md conversion added D-022) |
 | Overnight build automation | Built, disabled by default (`$AUTOMATION_ENABLED = $false` in `run-claude.ps1`) — see `docs/09-automation.md` |
 | Telegram remote control | Built (`/status /next /go /run /build /review /stop /enable /disable /log`); `/go` is a mission autopilot driving plan→build→review→merge per press with a single summary; `/build` runs Codex CLI unattended for real and auto-chains into `/review` on success; approved `/review` auto-merges after test/fast-forward gates — see D-024/D-025/D-026/D-027 |
-| Agent + skill workforce | Installed (12 agents, 13 skills) |
+| Guardian Gauntlet | **Live** (D-034) — `security-guardian` + `quality-guardian` audit every build before the reviewer issues a verdict. Previously documented but never wired: `Task` was missing from the reviewer’s `--allowedTools`, so it had no tool to spawn a guardian with. |
+| AI Dev OS itself | **Extracted** to the separate `ai-dev-os` repo (D-034). This app consumes it; `Install-AiDevOs.ps1` upgrades it in place, `Doctor.ps1` verifies it by execution. |
+| Agent + skill workforce | Installed from `ai-dev-os/workforce/` (78 agents, 85 skills) |
 | PRD system | First PRD written (PRD-001: Firebase Auth) |
 | Firebase Auth + Firestore | Planned — PRD-001 ready to build |
 | CI pipeline | Not yet — no GitHub Actions |
