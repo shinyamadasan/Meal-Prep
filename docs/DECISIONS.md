@@ -295,3 +295,21 @@ The Guardian Gauntlet was the sharpest case of the same disease: `AI-DEV-OS.md` 
 Trade-off: Two files the manifest called "generic — per-app change: none" (`SYSTEM-OVERVIEW.md`, `AI-DEV-OS.md`) turned out to carry real app state, so the installer protects them and warns about drift rather than overwriting; OS improvements to those two must be merged by hand. The installer also **preserves `$AUTOMATION_ENABLED`** across upgrades — writing the template's value blind would either switch a validated app's overnight automation off, or switch a brand-new app's on, both silently. (This is not theoretical: it happened to ChronaSense during this very change, and the doctor is what surfaced it.) Guardians add latency and tokens to every review; a confirmed security finding now blocks approval outright, which is the point.
 
 Supersedes: `AI-DEV-OS.md` "Not yet done — true extraction (parked)".
+
+## D-036 — Held red-zone branches can be merged from the phone, in two steps
+
+Task: `/merge` command · 2026-07-14
+
+Decision: Add a `/merge` Telegram command, implemented as a phase runner (`tools/Run-Merge.ps1`) in two deliberate steps. `/merge TASK-014` replies with what the branch **touches** — the file list, the diff stat, a GitHub compare link, and the reviewer's own recorded reason for holding it, quoted verbatim — and merges **nothing**. `/merge TASK-014 yes` then runs the gates and fast-forwards `main`.
+
+Why: D-032 holds red-zone work (data/sync/storage, auth, security, the OS itself) because a human should see what it touches before something irreversible lands. But look closely at what that gate was actually enforcing: **"be at a PC."** That was never the safety property. The safety property is **"you looked."** Being at a keyboard was incidental — and the incidental part had a real cost: a held branch could sit unmerged for days simply because the operator was away, which is precisely the friction this whole system exists to remove.
+
+A diff reads perfectly well on a phone. So `/merge` removes the desk and keeps the looking.
+
+The genuine risk was never the phone — it is that typing `/merge` is so cheap it becomes a **reflex**, and red-zone work gets rubber-stamped from a bus stop. That would quietly destroy the one gate protecting against unrecoverable data loss. Hence the two-step: the summary step **cannot merge anything**, so seeing what a change touches is unavoidable, while ignoring it remains a deliberate act rather than a reflex. Showing the reviewer's *own* stated reason for holding it ("Reversible in code, NOT reversible in data") is the single most useful sentence at that moment, so it is surfaced rather than re-derived.
+
+`/merge <id> yes` is held to **exactly** the auto-merge's standard — never a lower one just because it arrived by text message: the task must be `status: approved` (never `codex`/`review`/`done`), `main` and the branch must be clean, `npm test` must pass on the branch and leave the tree clean, and `main` must be a true ancestor (fast-forward only — never a merge commit nobody reviewed).
+
+Trade-off: one more surface that can mutate `main`. Mitigated by making the destructive step opt-in, keeping the gates identical to the proven path, and verifying every refusal (not-held task, missing branch, garbage input, dirty `main`) as well as the success path.
+
+Found while building it: two latent bugs the OS already had. `.last-phase-result.txt` and `automation.lock` were **not gitignored in one installed app** — untracked, they permanently dirty the tree, and every merge gate in the system would then refuse to act while blaming "uncommitted changes" on a file the OS itself created. The installer now guarantees those entries and the doctor asserts them.
