@@ -331,3 +331,21 @@ What survives is the part that carries most of the weight. The builder and revie
 Found while building it: `codex` is a real `.exe`, but `claude` is an npm shim (`claude.ps1`). `System.Diagnostics.Process` with `UseShellExecute = false` **cannot start a script by bare name** — it throws `Win32Exception`. A Claude-only user would have hit that on their very first `/go`, with a stack trace and no explanation. Launching via `cmd.exe /c` resolves the shim exactly as a human typing `claude` in a terminal does. The doctor now also asserts that the *configured* builder is on PATH, because installing a pipeline whose build step can never run is precisely the failure this OS keeps producing: capability that is documented, believed, and impossible.
 
 Verified end-to-end: a headless Claude builder took a real failing task (a missing `shout()` export that `npm test` demanded), implemented it on an isolated `task-001` branch, made the tests pass, appended `CHANGELOG.md` and `TEST_REPORT.md` evidence, set `status: review`, and handed off — in 46 seconds, with no human present.
+
+## D-038 — macOS support: launchd, and the Mac deliberately does NOT sleep
+
+Task: macOS port · 2026-07-14
+
+Decision: Run the OS on macOS via PowerShell 7 (`pwsh`) and **launchd**, and on macOS the machine **stays awake** rather than sleeping between runs.
+
+Why the machine stays awake — this is the whole decision, and it is not a translation of the Windows behaviour: **macOS has no `WakeToRun`.** Windows sleeps deeply and is woken every 30 minutes by a Task Scheduler wake timer (D-033), which is what makes remote `/go` work while the PC is off. macOS offers only `pmset repeat wakeorpoweron`, which supports **exactly one repeating wake per day** — a 30-minute wake cadence is simply not expressible.
+
+So a sleeping Mac would sit on a queued `/go` until somebody physically touched it. **Silently.** No error, no reply, the command just never runs — which is precisely the class of failure this OS exists to make impossible, and precisely why D-033 stopped using `shutdown /s`.
+
+Given that, the Mac stays awake (`sudo pmset -a sleep 0 displaysleep 10`) and launchd's 30-minute `StartInterval` fires reliably. On a Mac mini — a desktop that sits there anyway, idling around 7W — that is the right trade: a few watts for a remote loop that actually works. The display still sleeps. The doctor **fails** if `pmset` reports a non-zero sleep timer, because a Mac configured to sleep has a dispatcher that will never fire and no way to know it.
+
+What changed, and nothing more: `cmd.exe` → `/bin/sh` (3 sites), `taskkill /T` → `pkill -P` (1 site), `SetThreadExecutionState` → `caffeinate -i -w $PID` (which is tied to the process lifetime exactly as `ES_CONTINUOUS` is, so the Mac idles back on its own), `rundll32 powrprof` → no-op, and `Register-ScheduledTask` → launchd plists in `~/Library/LaunchAgents`. Every guard, gate, guardian and workflow is untouched — they never knew what OS they were on.
+
+Platform detection is `$OnWindows = if ($null -eq $IsWindows) { $true } else { $IsWindows }`, and the null check is load-bearing: **Windows PowerShell 5.1 does not define `$IsWindows`**, so it is `$null`, which is *falsy*. A naive `if ($IsWindows)` would take the macOS branch on every existing 5.1 install and break all of them — a one-character bug that would have shipped silently.
+
+Trade-off, stated honestly: **this is the first thing in this OS that has not been verified by execution.** There is no Mac on the machine it was written on. What *was* verified: every script parses, both generated plists are well-formed XML (a malformed plist does not error — launchd just silently declines to load the job), the detection expression returns `True` on PS 5.1, and both existing Windows apps still pass 24/24 with zero changes. What was **not** verified: that `launchctl bootstrap`, `pmset`, `caffeinate`, and `/bin/sh -c claude` actually behave as intended on real hardware. The doctor is the safety net — it is platform-aware and will fail loudly rather than let a Mac user believe a dead install is working. First Mac user reports back; we fix what breaks.
