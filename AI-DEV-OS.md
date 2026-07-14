@@ -131,7 +131,7 @@ phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027/D-035 and 
 | `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
 | `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
 | `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, 30-min `-WakeToRun` Scheduled Task so a sleeping PC still drains queued commands (D-033) | set project path |
-| `tools/Run-Codex-Build.ps1` · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards, approved review fast-forwards `main` | none |
+| `tools/Run-Codex-Build.ps1` (the implementer is PLUGGABLE -- `builder: codex|claude`, D-037) · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards, approved review fast-forwards `main` | none |
 
 ### Scaffold folders (start empty)
 | Folder | Role |

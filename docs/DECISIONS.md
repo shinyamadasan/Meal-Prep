@@ -313,3 +313,21 @@ The genuine risk was never the phone — it is that typing `/merge` is so cheap 
 Trade-off: one more surface that can mutate `main`. Mitigated by making the destructive step opt-in, keeping the gates identical to the proven path, and verifying every refusal (not-held task, missing branch, garbage input, dirty `main`) as well as the success path.
 
 Found while building it: two latent bugs the OS already had. `.last-phase-result.txt` and `automation.lock` were **not gitignored in one installed app** — untracked, they permanently dirty the tree, and every merge gate in the system would then refuse to act while blaming "uncommitted changes" on a file the OS itself created. The installer now guarantees those entries and the doctor asserts them.
+
+## D-037 — The implementer is pluggable: `builder: "codex" | "claude"`
+
+Task: Claude-only build path · 2026-07-14
+
+Decision: Make the build step's engine a config value. `builder: "codex"` runs `codex exec` (the default, unchanged). `builder: "claude"` runs a headless `claude -p` implementer instead. Everything else in `Run-Codex-Build.ps1` — branch isolation, the clean-main preflight, the tracked-task snapshot, the commit-scope guard, the 20-minute timeout kill, the blocked-task classification, the auto-chain into review — is engine-agnostic and untouched. Only the process that gets started changes.
+
+Why: Codex was the *only* thing in this OS that a Claude-only user could not run. Planning, triage, review, the Guardian Gauntlet, the dispatcher, `/merge`, the digest — all Claude or plain PowerShell. One invocation, in one file, was the entire barrier between this system and anyone who has Claude Code but not Codex.
+
+And what that barrier costs is not a nice-to-have: without a headless implementer, `/build` and `/go` cannot run at all, which means no remote loop. The point of this system is that you can suggest an improvement on a commute, or while waiting for an order, and it is live before you get home. A pipeline that requires you to be at the keyboard to build is a different, much smaller product.
+
+The honest trade, stated plainly: with `codex`, the model that **writes** the code is not the model that **reviews** it, so their blind spots do not line up. With `claude`, they do — if the builder misreads a task, the reviewer is more likely to misread it the same way. That is a real weakening of the review gate and it should not be hand-waved.
+
+What survives is the part that carries most of the weight. The builder and reviewer are **separate processes**, with separate prompts and **zero shared context** — the reviewer never sees the builder's reasoning, only the diff, so it cannot inherit the builder's rationalisations for a shortcut. And crucially they have **different tool grants**: the builder gets *no git tools whatsoever*. It cannot commit, cannot push, cannot merge, and cannot set its own task to a status the reviewer never granted. The runner commits; the reviewer (which has no Edit/Write on app code) judges; two guardians audit; the D-032 risk gate still refuses to auto-merge anything irreversible. That is a far stronger gate than the realistic alternative for a Claude-only user, which is one session doing everything and grading its own homework.
+
+Found while building it: `codex` is a real `.exe`, but `claude` is an npm shim (`claude.ps1`). `System.Diagnostics.Process` with `UseShellExecute = false` **cannot start a script by bare name** — it throws `Win32Exception`. A Claude-only user would have hit that on their very first `/go`, with a stack trace and no explanation. Launching via `cmd.exe /c` resolves the shim exactly as a human typing `claude` in a terminal does. The doctor now also asserts that the *configured* builder is on PATH, because installing a pipeline whose build step can never run is precisely the failure this OS keeps producing: capability that is documented, believed, and impossible.
+
+Verified end-to-end: a headless Claude builder took a real failing task (a missing `shout()` export that `npm test` demanded), implemented it on an isolated `task-001` branch, made the tests pass, appended `CHANGELOG.md` and `TEST_REPORT.md` evidence, set `status: review`, and handed off — in 46 seconds, with no human present.
