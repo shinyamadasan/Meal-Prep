@@ -5,6 +5,57 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-15 — TASK-015/016 authored: `/suggest` + `/audit` (proactive "what's next" without a prior capture); Preflight-blocking dirty tree fixed
+
+**Human request, direct conversation:** wanted a command that suggests the next build even without
+a capture/task already queued — modeled on how they've been using a separate Codex session ("what's
+next" → it proposes → they approve → it executes). Landed on a two-command split so the expensive
+part (scanning the app) doesn't have to happen on every check:
+
+- **TASK-016 `/audit`** (new `tools/Run-Audit.ps1`, on-demand only, no schedule) — runs one Claude
+  session combining `PROMPTS.md`'s PP1 (Internal Alpha Audit) + PP2 (UX Friction Audit) with P9's
+  Triage output contract, writing real findings straight into `planning/PROPOSALS.md` (same
+  `▶ Decision`/priority contract as a normal capture), deduped against ROADMAP/DONE, capped to 5 new
+  findings per run. Modeled directly on `run-claude.ps1`'s existing Preflight/lock/commit-scope-guard
+  shape rather than inventing a new one.
+- **TASK-015 `/suggest`** (pure PowerShell, no LLM call, works even with `$AUTOMATION_ENABLED =
+  $false`) — ranks whatever's already pending in `PROPOSALS.md` (from a capture or from `/audit`) by
+  goal-adjusted priority and replies with the single best one to build next, no proposal number
+  lookup required.
+
+Both authored to `TASKS.md` (`status: codex`), automation/OS-surface (Hard Rule 10 / D-023: solo
+build; D-032: held for `/merge`, never auto-merged).
+
+**Also fixed in the same session — a real, live production issue, not hypothetical:** the overnight
+"Meal Prep Claude Overnight" task had been aborting at Preflight ("working tree dirty") on at least
+three consecutive runs (2026-07-14 02:00, 2026-07-14 21:00, 2026-07-15 02:00, confirmed in
+`claude-session.log`), which is why `planning/DIGEST.md` had been stuck showing 2026-07-05 content
+and why captures sent since then (including a real bug report about work-session tracking state)
+were still sitting untriaged. Root cause: pre-existing untracked items (`.claude/`, `.codex/` — local
+agent tool state; `avoid-ai-writing/` — an unrelated nested repo; `OPS_STATE.md` — an undocumented
+auto-generated snapshot, not in `CLAUDE.md`'s doc map) plus this session's own doc edits, all sitting
+uncommitted. Fixed: added the pre-existing items to `.gitignore` (none deleted), committed the doc
+fixes, rebased onto origin (n8n had pushed 4 capture/command commits in the meantime — no file
+overlap), pushed. Working tree is clean on `main` as of this entry; the next scheduled run should
+pass Preflight and actually refresh the digest.
+
+**Next command output:**
+```
+NEXT
+milestone : Ship BQ-018..022 P2/P3 UX batch [done — all TASK-006..013 done]
+task      : TASK-014 — Fix /go idle-triage gap [codex]
+owner     : Codex
+why       : Three human-approved automation-surface tasks now queued (TASK-014, 015, 016), all
+            authored directly to TASKS.md (no BUILD_QUEUE trail — found/requested live in chat,
+            not via the capture pipeline). File order = build order.
+run       : Continue
+```
+
+**Blockers:** none. `GUIDE.md` intentionally NOT updated with `/suggest`/`/audit` yet — they don't
+exist until TASK-015/016 are built; adding them to the phone cheat sheet now would be misleading.
+
+---
+
 ## 2026-07-14 — TASK-014 authored: `/go` idle-triage gap found live (doesn't match D-035); 4 stale docs corrected
 
 **Found via direct conversation, not the capture pipeline.** While explaining `/go`'s mechanics to
