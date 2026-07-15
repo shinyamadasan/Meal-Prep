@@ -34,15 +34,59 @@ $logFile = "$projectPath\claude-session.log"
 
 Set-Location $projectPath
 
+# Pushes a Telegram notification for a Preflight abort or mid-run halt, reusing the exact outbox
+# idiom Dispatch-Commands.ps1 already uses (captures/replies/OUTBOX.md -> n8n's ~2-min relay ->
+# Telegram) instead of inventing a second delivery path. Closes a real gap: this scheduled run has
+# no Telegram command/id of its own to reply to, so before this existed, a Preflight abort or
+# commit-scope halt was ONLY ever visible in claude-session.log (and, for halts, STATUS.md) -- a
+# human had to notice a symptom (e.g. a stale digest) and go looking. Confirmed live: this run
+# aborted silently for at least three consecutive nights before anyone noticed.
+#
+# Best-effort and NEVER allowed to fail the abort/halt path it's called from -- notification
+# delivery failing is not itself grounds to change this run's exit behavior. Only commits/pushes
+# when already on a clean `main` (checked via the SAME git call every other phase here uses); if
+# the failure itself left us on the wrong branch, this deliberately does not try to fix that by
+# switching branches -- that would be exactly the auto-remediation this script's Preflight design
+# refuses to do everywhere else. In that rarer case the entry still gets written to the local
+# OUTBOX.md file (harmless) and will go out whenever a future run next commits it from main.
+function Send-Notification {
+    param([string]$Text)
+    try {
+        $outboxFile = Join-Path $projectPath 'captures/replies/OUTBOX.md'
+        $noReplies = 'No pending replies.'
+        $existing = if (Test-Path $outboxFile) { (Get-Content $outboxFile -Raw -Encoding UTF8).Trim() } else { '' }
+        $entry = "## overnight-$(Get-Date -Format 'yyyyMMddTHHmmssZ')`n$(Get-Date -Format o)`n`n$Text"
+        $newContent = if ($existing -eq '' -or $existing -eq $noReplies) { $entry } else { "$existing`n`n---`n`n$entry" }
+        [System.IO.File]::WriteAllText($outboxFile, $newContent + "`n", (New-Object System.Text.UTF8Encoding($false)))
+
+        $prevEAP2 = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $branchNow = git branch --show-current 2>$null
+        $ErrorActionPreference = $prevEAP2
+        if ($LASTEXITCODE -eq 0 -and $branchNow -eq 'main') {
+            git add -- $outboxFile 2>$null | Out-Null
+            git diff --cached --quiet -- $outboxFile
+            if ($LASTEXITCODE -ne 0) {
+                git commit -m "notify: overnight automation failure" 2>$null | Out-Null
+                git push origin main 2>$null | Out-Null
+            }
+        }
+    } catch {
+        # Best-effort only -- see comment above. Never rethrow into the caller's abort/halt path.
+    }
+}
+
 function Halt-Automation {
     param([string]$Reason)
     Add-Content -Path $logFile -Value "ALERT: $Reason"
     $statusEntry = @"
 
 ## $(Get-Date -Format 'yyyy-MM-dd HH:mm') -- AUTOMATION HALTED: $Reason
-Investigate before the next scheduled run. Nothing further was committed, pushed, or notified this run.
+Investigate before the next scheduled run. No further planning-doc changes were committed or pushed
+this run (a Telegram notification was sent separately, see Send-Notification).
 "@
     Add-Content -Path "$projectPath\STATUS.md" -Value $statusEntry
+    Send-Notification "AUTOMATION HALTED (overnight run)`n$Reason`n`nInvestigate before the next scheduled run."
     Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (HALTED) ==="
     exit 1
 }
@@ -135,6 +179,7 @@ function Abort-Preflight {
     foreach ($c in $PassedChecks) { $lines.Add("[x] $c") }
     $lines.Add("[ ] $CheckName  <-- failed here")
     Add-Content -Path $logFile -Value ($lines -join "`n")
+    Send-Notification "AUTOMATION ABORTED (Preflight -- $CheckName)`n$Reason`n`nAction needed: $($Action -join ' / ')"
     Add-Content -Path $logFile -Value "=== Session ended: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (ABORTED) ==="
     exit 2
 }
