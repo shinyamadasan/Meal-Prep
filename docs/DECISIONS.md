@@ -348,4 +348,32 @@ What changed, and nothing more: `cmd.exe` → `/bin/sh` (3 sites), `taskkill /T`
 
 Platform detection is `$OnWindows = if ($null -eq $IsWindows) { $true } else { $IsWindows }`, and the null check is load-bearing: **Windows PowerShell 5.1 does not define `$IsWindows`**, so it is `$null`, which is *falsy*. A naive `if ($IsWindows)` would take the macOS branch on every existing 5.1 install and break all of them — a one-character bug that would have shipped silently.
 
+## D-039 — The overnight run notifies on failure instead of failing silently
+
+Task: silent Preflight/halt failures · 2026-07-15
+
+Context: Preflight aborts and mid-run halts in `run-claude.ps1` only ever wrote to `claude-session.log` (and, for halts, `STATUS.md`) — there was no Telegram notification path, since this script has no Telegram command/reply to attach one to. That silence let the overnight run abort on a dirty working tree for at least three consecutive runs (2026-07-14 02:00 and 21:00, 2026-07-15 02:00) before a human noticed — and it was only noticed because `planning/DIGEST.md`'s date was stuck on 2026-07-05, ten days stale.
+
+Decision: Add `Send-Notification` to `run-claude.ps1` — on any Preflight abort or mid-run halt, append an entry to `captures/replies/OUTBOX.md` (the exact outbox `n8n-telegram-replies.json` already polls every ~2 min) and, only if already on a clean `main`, commit + push just that one file. Best-effort and wrapped so it can never itself fail the abort/halt path it's called from; deliberately does **not** try to fix a wrong-branch failure by switching branches — that would be the same auto-remediation Preflight already refuses to do everywhere else.
+
+Why: A safety gate that fails silently is only half a safety gate. Preflight and the commit-scope guard were working exactly as designed the whole time — refusing to proceed rather than guessing — but "refuse and say nothing" let a real failure compound, unnoticed, for over a week.
+
+Trade-off: None of the existing safety behavior changes; this only adds a notification on top of failures that already happen. Reuses the existing outbox/relay infrastructure rather than inventing a second delivery path.
+
+Supersedes: nothing.
+
+## D-040 — Automation-surface tasks are Claude's to build directly, never Codex's
+
+Task: `tools/` deny-list vs. self-modifying tasks · 2026-07-15
+
+Context: TASK-014 (a correctly-scoped fix to `tools/Dispatch-Commands.ps1`) was authored with `owner: codex`, built correctly by Codex, tested by Codex — and then permanently blocked from ever being committed, because Codex's own commit-scope guard (see `docs/09-automation.md`) explicitly deny-lists `tools/` and "this repo's own automation scripts" as outside Codex's legitimate write surface. This is not a transient failure: every future attempt at a `tools/`-touching task hits the identical wall, confirmed live while building TASK-014, 015, and 016 in the same session.
+
+Decision: Any task whose `files:` touch `tools/`, `run-claude.ps1`, `.claude/`, `AGENTS.md`, `CLAUDE.md`, `docs/`, `planning/`, `captures/`, `library/`, or `config/` is never assigned `owner: codex` / `status: codex`. Claude implements it directly instead — still landing at `status: approved`, held for a human `/merge` (D-032), never auto-merged, same review discipline as any other red-zone change. Enforced two ways: (1) Claude's own task-authoring practice, documented here; (2) a deterministic check added to `run-claude.ps1` right after Phase 2 (Plan Conversion) that scans any newly-written `status: codex` task for a denied file path and automatically flips it to `status: blocked` with an explanatory note — covering the unattended overnight path, where no human or interactive Claude session is present to catch the mistake before it's made.
+
+Why: The guard itself is correct and should not be loosened — letting an autonomous, unattended agent freely rewrite the safety code that constrains it is a real risk, not a hypothetical one. The actual gap was routing: nothing stopped a task like this from being written with `owner: codex` in the first place. A documented convention alone only protects the interactive path (a human/Claude conversation); the deterministic check also protects the autonomous overnight Plan-Conversion step, where the planning LLM session has no guarantee it applies this rule on its own — matching the "code for deterministic transforms, not LLM judgment" principle already used everywhere else in this pipeline.
+
+Trade-off: When Claude implements one of these directly, the same session that writes the code also reviews it — the "different model builds vs. reviews" safety property (see D-037's own honest framing of the identical trade-off) does not hold for this class of change. Mitigated by still holding it at `approved` for a human `/merge` rather than auto-shipping, and by stating this explicitly in each task's own review note (see TASK-014, TASK-017).
+
+Supersedes: nothing. Extends D-023 (risk tiers) and D-032 (red-zone hold) to a case neither anticipated: work that is both correctly-scoped red-zone material *and* structurally undoable by the normal Codex build path.
+
 Trade-off, stated honestly: **this is the first thing in this OS that has not been verified by execution.** There is no Mac on the machine it was written on. What *was* verified: every script parses, both generated plists are well-formed XML (a malformed plist does not error — launchd just silently declines to load the job), the detection expression returns `True` on PS 5.1, and both existing Windows apps still pass 24/24 with zero changes. What was **not** verified: that `launchctl bootstrap`, `pmset`, `caffeinate`, and `/bin/sh -c claude` actually behave as intended on real hardware. The doctor is the safety net — it is platform-aware and will fail loudly rather than let a Mac user believe a dead install is working. First Mac user reports back; we fix what breaks.

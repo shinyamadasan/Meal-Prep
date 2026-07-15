@@ -714,7 +714,16 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-014 · Fix `/go` idle-triage gap: Invoke-Autopilot never triggers Triage for untriaged captures
-status: codex
+status: approved
+review: Codex correctly implemented and tested this fix on branch `task-014` (commit 37f58b9), but
+  its own commit-scope guard permanently blocks it from committing anything under `tools/` (deny-
+  listed as "this repo's own automation scripts") — so it could never land this itself. Claude
+  verified the diff against every acceptance criterion, verified the CHANGELOG.md/TEST_REPORT.md
+  evidence (isolated `/go -DryRun` fixture reproduced the exact TRIAGED-message scenario), and
+  completed the commit. Held at `approved` rather than `done` per D-032 (automation/OS surface) —
+  note this means the same session both completed and reviewed this change; there was no
+  independent second set of eyes for this one. Land with `/merge TASK-014` then `/merge TASK-014
+  yes` when ready.
 source: human-reported gap (2026-07-14 conversation) — the intended behavior is already documented at DECISIONS.md D-035, code just doesn't implement it
 priority: P1
 depends-on: none
@@ -779,7 +788,13 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-015 · Add `/suggest`: recommend the single best pending proposal, no LLM call
-status: codex
+status: blocked
+blocker:
+  - routing, not ambiguity: this touches `tools/Dispatch-Commands.ps1`, which Codex's own
+    commit-scope guard permanently deny-lists ("this repo's own automation scripts") — Codex can
+    never commit a change here (confirmed live on TASK-014). `status: codex` would just let Codex
+    self-select this and repeat the same wasted-build loop. Needs Claude to implement directly (same
+    treatment as TASK-014/017), landing at `approved` for human `/merge`, never routed to Codex.
 source: human request (2026-07-15 conversation) — wants a cheap, frequent "what should I build next"
         command distinct from the occasional deep scan in TASK-016
 priority: P2
@@ -854,7 +869,12 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-016 · Add `/audit`: on-demand app scan that writes new proposals (no schedule, no LLM at read time)
-status: codex
+status: blocked
+blocker:
+  - routing, not ambiguity: touches `tools/Dispatch-Commands.ps1` and adds `tools/Run-Audit.ps1` —
+    both under Codex's permanent `tools/` commit-scope deny-list (confirmed live on TASK-014). Needs
+    Claude to implement directly (same treatment as TASK-014/015/017), landing at `approved` for
+    human `/merge`, never routed to Codex.
 source: human request (2026-07-15 conversation) — wants a periodic, human-triggered deep scan that
         "parks" findings so the cheap TASK-015 `/suggest` command always has fresh material, instead
         of re-scanning the whole app on every single "what's next" check
@@ -933,6 +953,65 @@ test steps:
   - [ ] Confirm `app.js`, `index.html`, `style.css` are byte-identical before/after any `/audit` run.
   - [ ] Confirm `$AUTOMATION_ENABLED = $false` blocks `/audit` with the same refusal message
         `/run`/`/build`/`/review`/`/go` already give.
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-15 · overnight run notifies on failure instead of failing silently (D-039)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-017 · Add Send-Notification: push a Telegram notice on any Preflight abort or mid-run halt
+status: approved
+review: Same reasoning as TASK-014 (D-040) — this touches `run-claude.ps1` directly, which Codex's
+  commit-scope guard would also permanently block, so Claude wrote it directly rather than queuing
+  a doomed Codex build. Verified in isolation (a scratch outbox file, no git/repo involved): empty
+  outbox, second-entry accumulation with the `---` separator, and the `No pending replies.`
+  placeholder all format correctly; the full script parser-checks clean. Held at `approved` rather
+  than `done` per D-032 — same session wrote and reviewed this, no independent second set of eyes.
+  Land with `/merge TASK-017` then `/merge TASK-017 yes` when ready.
+source: human request (2026-07-15 conversation) — "how would we know that something is ongoing" /
+        "why do we keep having problems" led to: failures should push a notification, not sit silent
+priority: P1
+depends-on: none
+files: run-claude.ps1
+
+context:
+  `Abort-Preflight` and `Halt-Automation` in `run-claude.ps1` previously only wrote to
+  `claude-session.log` (and, for halts, `STATUS.md`) — there was no Telegram notification path at
+  all, since this scheduled-task script has no Telegram command/reply of its own to attach one to.
+  That silence is exactly what let the overnight run abort on a dirty working tree for at least
+  three consecutive runs (2026-07-14 02:00/21:00, 2026-07-15 02:00) before a human noticed — and it
+  was only noticed because `planning/DIGEST.md` sat on 2026-07-05 content for ten days. See D-039.
+
+acceptance:
+  - [x] New `Send-Notification` function: appends an entry to `captures/replies/OUTBOX.md` using the
+        exact same format `Dispatch-Commands.ps1`'s `Write-Reply` already uses (`## <id>` header,
+        timestamp, blank line, text; `---`-separated when the outbox already has real content;
+        correctly treats the `No pending replies.` placeholder as empty).
+  - [x] Only attempts `git add`/`commit`/`push` of that one file when already on a clean `main`
+        (checked via `git branch --show-current`) — never tries to switch branches to deliver a
+        notification, matching Preflight's own no-auto-remediation stance.
+  - [x] Wrapped in try/catch so notification delivery can never itself fail the abort/halt path.
+  - [x] Called from both `Abort-Preflight` (exit 2) and `Halt-Automation` (exit 1), with a concise,
+        actionable message (Reason + Required action, or Reason + "investigate before next run").
+  - [x] `STATUS.md`'s halt-entry wording updated to stop claiming "nothing... was notified this run"
+        now that it is.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): build solo, never chained.
+  - Red-zone surface (D-032) — held at `approved`, never auto-merged.
+  - No new n8n workflow, no new scheduled task — reuses the existing `n8n-telegram-replies.json`
+    relay (~2 min poll) and the existing `captures/replies/OUTBOX.md` outbox exactly as-is.
+
+test steps:
+  - [x] Isolated scratch-file test (no git): write to empty/nonexistent outbox, append a second entry
+        (confirms `---` separator + accumulation), and confirm the placeholder is treated as empty —
+        all three passed.
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile` on the full script: no syntax
+        errors.
+  - [ ] Live (human-verified, next real Preflight abort or halt): confirm a Telegram message actually
+        arrives via the existing relay.
 
 ---
 
