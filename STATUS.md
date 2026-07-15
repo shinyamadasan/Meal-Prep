@@ -5,6 +5,61 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-15 (cont.) — TASK-014 landed on `task-014`; TASK-017 (notification feature) + guard landed on `task-017`; TASK-015/016 re-flagged; D-039/D-040 recorded
+
+**Discovered live:** `/build` ran TASK-014 for real — Codex correctly implemented and tested the fix
+(isolated `/go -DryRun` fixture reproduced the exact TRIAGED-message scenario), but its own
+commit-scope guard permanently blocked the commit ("touched file(s) outside Codex's allowed surface:
+tools/Dispatch-Commands.ps1"). This is not transient: Codex can **never** land a change under
+`tools/` — confirmed by design in `docs/09-automation.md`'s deny-list ("this repo's own automation
+scripts").
+
+**Resolved:**
+- **TASK-014** — Claude verified the diff + evidence and completed the commit Codex's guard blocked
+  (`37f58b9` on branch `task-014`, pushed). `status: approved`, held for `/merge TASK-014` — review
+  note discloses this is a same-session build+review, not independent (see DECISIONS D-040).
+- **TASK-017 (new)** — `Send-Notification`: overnight Preflight aborts / mid-run halts now push a
+  Telegram notice via the existing `captures/replies/OUTBOX.md` → `n8n-telegram-replies.json` relay,
+  instead of only logging locally. This is the actual root cause fix for "why didn't we know the
+  digest was stale for 10 days" — the safety gates were working correctly the whole time, they just
+  had no way to tell anyone. Landed on branch `task-017` (rebased onto this commit + a second commit
+  adding the D-040 guard below), `status: approved`, held for `/merge TASK-017`.
+- **TASK-015/016** — re-flagged `status: codex` → `status: blocked`: both touch `tools/`, hitting the
+  identical wall TASK-014 did. Needs direct Claude implementation, not a Codex build.
+- **New deterministic guard (Phase 2c in `run-claude.ps1`, on `task-017`)** — right after Plan
+  Conversion writes `TASKS.md`, auto-flips any `status: codex` task whose `files:` touch the
+  automation-surface deny-list to `status: blocked` with an explanatory note, before a build is ever
+  attempted. Covers the unattended overnight path where no human/Claude session is present to catch
+  this by hand. Verified in isolation against realistic fixtures (flags only the automation-surface
+  task, ignores app-code tasks and done tasks).
+- **DECISIONS.md D-039** (notify-on-failure) and **D-040** (automation-surface tasks are Claude's to
+  build directly, never Codex's — codifies the routing rule the guard now enforces in code).
+
+**Git housekeeping note:** `task-017` was rebased + force-pushed once (with explicit human
+confirmation) after it fell behind `main` mid-session — nobody else was using that branch.
+
+**Outstanding for the human:**
+- `/merge TASK-014` → `/merge TASK-014 yes`
+- `/merge TASK-017` → `/merge TASK-017 yes`
+- TASK-015/016 still need direct Claude implementation (not yet built)
+- 11 untriaged captures were reported sitting in `captures/inbox/` during TASK-014's test run — worth
+  a `/run` or waiting for the next clean overnight pass now that Preflight can actually succeed
+
+**Next command output:**
+```
+NEXT
+milestone : Fix /go idle-triage gap + add /suggest & /audit [in-progress]
+task      : TASK-014 — Fix `/go` idle-triage gap [approved]
+owner     : you
+why       : TASK-014 and TASK-017 are both approved and held for /merge (D-032 red-zone hold).
+            TASK-015/016 are blocked pending direct Claude implementation.
+run       : Review (merge TASK-014 and TASK-017 when ready)
+```
+
+**Blockers:** none — everything above is either done, held for `/merge`, or clearly queued.
+
+---
+
 ## 2026-07-15 — TASK-015/016 authored: `/suggest` + `/audit` (proactive "what's next" without a prior capture); Preflight-blocking dirty tree fixed
 
 **Human request, direct conversation:** wanted a command that suggests the next build even without
