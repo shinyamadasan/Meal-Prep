@@ -371,6 +371,53 @@ if ($violations.Count -gt 0) {
     Add-Content -Path $logFile -Value "No planning changes this run."
 }
 
+# --- Phase 2c (deterministic): automation-surface task guard (D-040). Codex's own commit-scope
+#     guard (Run-Codex-Build.ps1) permanently deny-lists tools/ and this repo's own automation
+#     scripts as outside its legitimate write surface -- confirmed live on TASK-014, where Codex
+#     correctly built and tested a fix it could then never commit. A task naming one of those paths
+#     in `files:` can NEVER actually be built by Codex; left at `status: codex` it would just sit
+#     until a human (or a future Claude session) rediscovered the identical wall. This is the same
+#     class of gap the commit-scope guard above already closes for out-of-scope EDITS -- this closes
+#     it for out-of-scope TASK ASSIGNMENT, catching it the moment planning writes a new task rather
+#     than relying on whoever authors one remembering to check by hand. Runs even on a "no planning
+#     changes" idle run, since a task written by an earlier run could still be sitting unflagged.
+$deniedFilePatterns = @(
+    '(^|[/\\])tools[/\\]', '^run-claude\.ps1$', '(^|[/\\])\.claude[/\\]', '^AGENTS\.md$', '^CLAUDE\.md$',
+    '(^|[/\\])docs[/\\]', '(^|[/\\])planning[/\\]', '(^|[/\\])captures[/\\]', '(^|[/\\])library[/\\]',
+    '(^|[/\\])config[/\\]'
+)
+$tasksPath = Join-Path $projectPath 'TASKS.md'
+$tasksText = Get-Content $tasksPath -Raw -Encoding UTF8
+$taskBlocks = [regex]::Matches($tasksText, '(?ms)^###\s+(?<id>TASK-\d+)\s*\p{Pd}?\s*[·•]?\s*(?<title>.+?)\r?\n(?<rest>.*?)(?=^###\s|\z)')
+$flagged = @()
+foreach ($b in $taskBlocks) {
+    $statusMatch = [regex]::Match($b.Groups['rest'].Value, '(?m)^status:\s*(?<s>[\w-]+)')
+    if (-not $statusMatch.Success -or $statusMatch.Groups['s'].Value -ne 'codex') { continue }
+    $filesMatch = [regex]::Match($b.Groups['rest'].Value, '(?m)^files:\s*(?<f>.+)$')
+    if (-not $filesMatch.Success) { continue }
+    $filesList = $filesMatch.Groups['f'].Value -split ',' | ForEach-Object { $_.Trim() }
+    $hit = $filesList | Where-Object { $f = $_; $deniedFilePatterns | Where-Object { $f -match $_ } } | Select-Object -First 1
+    if ($hit) { $flagged += [pscustomobject]@{ Id = $b.Groups['id'].Value; File = $hit } }
+}
+if ($flagged.Count -gt 0) {
+    foreach ($f in $flagged) {
+        $blockNote = "auto: automation-surface task -- Codex's commit-scope guard permanently denies '$($f.File)'; needs direct Claude implementation, not a Codex build. See DECISIONS.md D-040."
+        $tasksText = [regex]::Replace($tasksText, "(?ms)(^###\s+$([regex]::Escape($f.Id))\b.*?^status:\s*)codex(\s*\r?\n)", "`${1}blocked`${2}blocker:`n  - $blockNote`n")
+    }
+    [System.IO.File]::WriteAllText($tasksPath, $tasksText, (New-Object System.Text.UTF8Encoding($false)))
+    git add TASKS.md
+    git diff --cached --quiet
+    if ($LASTEXITCODE -ne 0) {
+        $idList = ($flagged | ForEach-Object { $_.Id }) -join ', '
+        git commit -m "guard: auto-block automation-surface task(s) Codex cannot build: $idList" | Out-Null
+        if ($LASTEXITCODE -ne 0) { Halt-Automation "git commit failed for automation-surface task guard" }
+        git push origin main | Out-Null
+        if ($LASTEXITCODE -ne 0) { Halt-Automation "git push failed for automation-surface task guard" }
+        $detail = ($flagged | ForEach-Object { "$($_.Id) ($($_.File))" }) -join '; '
+        Send-Notification "Blocked $($flagged.Count) task(s) touching files Codex cannot commit: $detail. Needs direct Claude implementation (see TASKS.md blocker note)."
+    }
+}
+
 # --- Phase 3 (deterministic, post-run): only reached if nothing above halted. Refreshes the
 #     proposals digest + Codex-ready notice for n8n's next morning send. ---
 try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Halt-Automation "Generate-Digest.ps1 threw an error: $_" }
