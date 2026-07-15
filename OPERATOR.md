@@ -101,7 +101,7 @@ no extra machine time — only the two minutes of judgment its digest asks for.
 
 ## At the keyboard (PC cheat sheet)
 
-Telegram works from the PC too (it just polls every ~2 min). These run the **same phase runners**
+Telegram works from the PC too (it just polls every ~30 min — D-033). These run the **same phase runners**
 instantly. All are lock-protected (`automation.lock`) so they can never overlap each other or the
 scheduled run, and **every one takes `-DryRun`** — show what it would do, change nothing.
 

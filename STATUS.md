@@ -5,6 +5,48 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-14 — TASK-014 authored: `/go` idle-triage gap found live (doesn't match D-035); 4 stale docs corrected
+
+**Found via direct conversation, not the capture pipeline.** While explaining `/go`'s mechanics to
+the human, reading `tools/Dispatch-Commands.ps1`'s `Invoke-Autopilot` turned up a real gap: the
+"Plan once" trigger only checks `Get-UnconvertedBQCount -gt 0` — it never checks `captures/inbox/`
+for untriaged captures. This contradicts DECISIONS.md D-035 ("An idle `/go` triages instead of
+dead-ending"), which was written specifically to guarantee that. Net effect today: `/go` sent right
+after a fresh capture, with nothing else build-ready, replies "Nothing to do" instead of triaging it
+and reporting a PROP number — the exact dead-end D-035 exists to close.
+
+**TASK-014 authored** (`status: codex`, priority P1, `depends-on: none`, `files:
+tools/Dispatch-Commands.ps1`) — human approved live in chat. Marked automation/OS-surface: solo
+execution only (Hard Rule 10 / D-023); review must land it `status: approved` (held for human
+`/merge`), never auto-merged to `done` (D-032 red zone), regardless of diff size.
+
+**Also corrected this session (docs-only, no code):**
+- `captures/README.md` — routing table + diagram wrongly implied `/feature`/`/todo` auto-build
+  without approval; now states every capture lands in `PROPOSALS.md` pending approval, tag only
+  affects Triage's recommended verdict.
+- `docs/09-automation.md`, `OPERATOR.md`, `SYSTEM-OVERVIEW.md` — all still said the Command
+  Dispatcher polls "~2 min" in several places; D-033 (2026-07-11) actually changed this to ~30 min
+  (`WakeToRun` enabled, interval relaxed for the sleep-by-default design). Three docs were never
+  updated after that decision landed.
+- `GUIDE.md` — was missing `/go /build /review /merge /status /next /log /stop /enable /disable`
+  entirely (only listed the 5 capture tags); now a complete phone cheat sheet.
+
+**Next command output:**
+```
+NEXT
+milestone : Ship BQ-018..022 P2/P3 UX batch [done — all TASK-006..013 done]
+task      : TASK-014 — Fix /go idle-triage gap [codex]
+owner     : Codex
+why       : Human-approved automation-surface fix, authored directly to TASKS.md (not via
+            BUILD_QUEUE — no capture/triage/approve trail exists for this one, by design, since
+            it was found and approved live in conversation).
+run       : Continue
+```
+
+**Blockers:** none.
+
+---
+
 ## 2026-07-05 — Autonomous run: Triage no-op; Plan converts BQ-018..022 → TASK-006..011
 
 **Autonomous, planning-only role (Claude as PM/Tech Lead/Architect). Two-step scope: Step A

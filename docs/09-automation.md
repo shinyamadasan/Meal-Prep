@@ -614,13 +614,15 @@ get results, from Telegram — without touching the PC. See DECISIONS D-024 for 
 
 n8n (cloud-hosted) has **no way to execute anything on your PC directly** — it only reads/writes
 files via the GitHub API. So a Telegram command can't instantly *cause* anything; your PC has to
-independently notice a new command file and act on it. This design polls every **~2 minutes** (a new
-Scheduled Task, not tied to the twice-daily one) rather than opening an inbound path to your PC for
-true instant push — that would mean a listener process on your PC reachable from the internet (via a
-tunnel like Cloudflare Tunnel/ngrok), its own auth, and its own monitoring. This system has had zero
-inbound network exposure this entire session; a couple of minutes of latency was judged worth keeping
-it that way. If the PC is asleep, commands wait until it wakes — either on its own, or at the next
-9PM/2AM run of "Meal Prep Claude Overnight" (which still has `-WakeToRun`).
+independently notice a new command file and act on it. This design polls every **~30 minutes**
+(D-033 — relaxed from an original ~2 minutes once the PC needed to sleep between checks; the
+dispatcher's own `WakeToRun` now wakes a sleeping PC to check) rather than opening an inbound path to
+your PC for true instant push — that would mean a listener process on your PC reachable from the
+internet (via a tunnel like Cloudflare Tunnel/ngrok), its own auth, and its own monitoring. This
+system has had zero inbound network exposure this entire session; up to ~30 minutes of latency was
+judged worth keeping it that way. Because the dispatcher wakes the PC itself, commands no longer need
+to wait for the twice-daily "Meal Prep Claude Overnight" run — that run's own `-WakeToRun` still
+applies independently, for its own 9PM/2AM schedule.
 
 ### The commands
 
@@ -650,7 +652,7 @@ Telegram (/status /next /go /run /build /review /stop /enable /disable)
       captures/decisions verbs and captures/inbox capture types)
     → captures/commands/<id>.md (status: new)
 
-"Meal Prep Command Dispatcher" Scheduled Task, every ~2 min, NO -WakeToRun
+"Meal Prep Command Dispatcher" Scheduled Task, every ~30 min, WakeToRun = True (D-033)
     → tools/Dispatch-Commands.ps1
         lock-protected (automation.lock, shared with run-claude.ps1 and the phase runners below)
         routes each new command to:

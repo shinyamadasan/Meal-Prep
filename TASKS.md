@@ -708,6 +708,71 @@ test steps:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-14 · /go idle-triage gap (found live, via chat)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-014 · Fix `/go` idle-triage gap: Invoke-Autopilot never triggers Triage for untriaged captures
+status: codex
+source: human-reported gap (2026-07-14 conversation) — the intended behavior is already documented at DECISIONS.md D-035, code just doesn't implement it
+priority: P1
+depends-on: none
+files: tools/Dispatch-Commands.ps1
+
+context:
+  DECISIONS.md D-035 ("An idle `/go` triages instead of dead-ending") says `/go`'s planning phase
+  should fire when there is EITHER approved work to convert OR new captures to triage. The shipped
+  `Invoke-Autopilot` only implements the first half:
+
+    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and (Get-UnconvertedBQCount) -gt 0) {
+
+  There is no check for untriaged files in `captures/inbox/`. Today, sending `/go` with a fresh,
+  untriaged capture and nothing else build-ready silently replies "Nothing to do -- no approved
+  work is build-ready." instead of triaging it and reporting the resulting PROP number — exactly
+  the dead-end D-035 was written to close. Confirmed live by reading the current script; D-035's
+  own text warns about this exact failure mode elsewhere ("documentation that describes machinery
+  nobody built is not aspiration; it is a false claim").
+
+acceptance:
+  - [ ] Add a way to detect untriaged captures — e.g. a `Get-UntriagedCaptureCount` helper counting
+        `*.md` files in `captures/inbox/` with frontmatter `status: new` (mirror
+        `Get-UnconvertedBQCount`'s shape and style).
+  - [ ] Widen the "Plan once" trigger in `Invoke-Autopilot` to also fire when untriaged captures
+        exist: `-not (codex-status task exists) -and ((Get-UnconvertedBQCount) -gt 0 -or
+        (Get-UntriagedCaptureCount) -gt 0)`.
+  - [ ] When planning ran ONLY because of untriaged captures (no unconverted BUILD_QUEUE items) and
+        still leaves nothing build-ready, the summary must say so plainly and name the next action —
+        e.g. "TRIAGED n new idea(s) into proposals. Reply Approve <n>, then /go." (matching D-035's
+        own described summary text) — instead of falling into the generic "Nothing to do" branch.
+  - [ ] No change to `/run`, `/build`, `/review`, `/merge`, `/status`, `/next`, `/stop`, `/enable`,
+        `/disable` behavior.
+  - [ ] No change to the "build exactly one task" loop, dependency handling, or auto-merge logic in
+        `Invoke-Autopilot` — only the planning trigger condition and the idle-triage-only summary.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): build solo, never chained, regardless of
+    what any group header elsewhere says.
+  - Red-zone surface (D-032: "the AI Dev OS / automation itself") — review should land this at
+    `status: approved` (held for human merge via `/merge`), never auto-merge to `done`, no matter
+    how clean the diff looks.
+  - Do not touch `Apply-Decisions.ps1` or its ordering relative to Triage inside `run-claude.ps1` —
+    that decisions-before-triage sequencing is intentional; this task only changes whether `/go`
+    decides to invoke planning at all, not what planning does once invoked.
+  - Do not add a new scheduled task, dispatcher, or polling mechanism — reuse the existing
+    `Invoke-RunPhase` call already used for the BUILD_QUEUE case.
+
+test steps:
+  - [ ] `-DryRun`: with a fresh `captures/inbox/*.md` (status: new) and nothing else build-ready,
+        confirm the dry-run path reports it would run planning instead of "nothing to do".
+  - [ ] Live: with one fresh test capture and nothing else queued, send `/go`; confirm the reply
+        shows a new PROP number was created and reads like the D-035 example, not "Nothing to do".
+  - [ ] Regression: confirm today's only supported case (BUILD_QUEUE already has an unconverted
+        approved item) still triggers planning and builds identically to before.
+  - [ ] Confirm `/run`, `/build`, `/review` are byte-for-byte unchanged in behavior.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

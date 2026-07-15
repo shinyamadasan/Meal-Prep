@@ -59,9 +59,10 @@ auto-parks rework (with a strike, retried until 3) and dependency-blocked tasks 
 The other commands force a specific phase for power-user/debug use.
 
 n8n can't reach into your PC directly, so commands are dispatched by a new Scheduled Task polling
-every ~2 minutes (not tied to the twice-daily automation) rather than an instant push — that
-trade-off was deliberate: true instant push would mean opening an inbound path to your PC for the
-first time in this whole system. `/build` and `/review` still do their work on the `task-<id>` branch,
+every ~30 minutes (D-033 — relaxed from an original ~2 minutes once the PC needed to sleep between
+checks; it now also wakes a sleeping PC) rather than an instant push — that trade-off was deliberate:
+true instant push would mean opening an inbound path to your PC for the first time in this whole
+system. `/build` and `/review` still do their work on the `task-<id>` branch,
 but an approved `/review` now runs `npm test`, fast-forwards `main`, and pushes `origin/main`.
 `/build` runs Codex CLI for real, unattended (`codex exec ... "Continue"`, verified working) — and if
 it reaches `status: review`, it automatically triggers `/review` too, so a clean build doesn't need a
@@ -184,8 +185,8 @@ When enabled:
 5. n8n sends both to Telegram at 7AM — the Codex-ready notice only when there's actually a task waiting
 
 Claude never touches app code in this loop, and Codex only ever runs when triggered — by you, either
-saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate ~2-min-polling
-"Meal Prep Command Dispatcher" task, see the Telegram Remote Control section above). See
+saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate ~30-min-polling
+"Meal Prep Command Dispatcher" task — D-033, see the Telegram Remote Control section above). See
 `docs/09-automation.md` (enable/disable, rollback, test checklist) and DECISIONS D-022/D-024/D-025.
 
 ---
