@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-014 — done (branch: task-014)
+changed:
+  - tools/Dispatch-Commands.ps1 (`Get-UntriagedCaptureCount` counts fresh inbox captures; `Invoke-Autopilot` plans when either unconverted BUILD_QUEUE work or untriaged captures exist; idle triage-only runs reply with the next approval action, 19 loc)
+tests: PowerShell parser check for `tools/Dispatch-Commands.ps1` (pass); isolated `/go -DryRun` fixture with one `captures/inbox` `status: new` file and no build-ready tasks (reported `TRIAGED 1 new idea(s) into proposals`); repo inbox count check found 11 untriaged captures; `git diff --check -- tools/Dispatch-Commands.ps1` (pass with Git LF-to-CRLF warning only); `npm test` timed out after 124s without reporter output
+blockers: none
+deviations: full Playwright suite completion remains unverified because `npm test` timed out under the tool limit
+→ status set to `review` in TASKS.md
+
 ## TASK-013 — done (branch: task-013)
 changed:
   - app.js (`importData()` stamps every imported-id survivor across recipes, pantry, custom ingredients, hacks, user ingredients, cooked meals, and grocery list with one import-time `updatedAt` before `saveData()`, 11 loc)

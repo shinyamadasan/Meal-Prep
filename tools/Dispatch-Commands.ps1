@@ -368,6 +368,18 @@ function Get-UnconvertedBQCount {
     $n
 }
 
+# Count of fresh capture files waiting for the planning phase to triage into proposals.
+function Get-UntriagedCaptureCount {
+    $inbox = Join-Path $root 'captures/inbox'
+    if (-not (Test-Path $inbox)) { return 0 }
+    $n = 0
+    foreach ($f in (Get-ChildItem -Path $inbox -Filter '*.md' -File)) {
+        $raw = Get-Content $f.FullName -Raw -Encoding UTF8
+        if ($raw -match '(?m)^status:\s*new\s*$') { $n++ }
+    }
+    $n
+}
+
 # Commit + push a TASKS.md status change autopilot just made (no-op in DryRun / when nothing staged).
 function Publish-TasksChange {
     param([string]$Message)
@@ -402,9 +414,12 @@ function Invoke-Autopilot {
     }
     if ($released) { Publish-TasksChange 'autopilot: release auto-blocked task(s) for retry' }
 
-    # --- Plan once if there is approved work but nothing build-ready yet. ---
+    # --- Plan once if there is approved work or untriaged captures but nothing build-ready yet. ---
     $planned = 0
-    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and (Get-UnconvertedBQCount) -gt 0) {
+    $unconvertedBefore = Get-UnconvertedBQCount
+    $untriagedBefore = Get-UntriagedCaptureCount
+    $triageOnlyPlan = ($unconvertedBefore -eq 0 -and $untriagedBefore -gt 0)
+    if (-not (Get-TaskTable | Where-Object { $_.Status -eq 'codex' }) -and ($unconvertedBefore -gt 0 -or $untriagedBefore -gt 0)) {
         if (-not (Test-AutomationEnabled)) { return "Autopilot: automation disabled -- nothing done." }
         $before = @(Get-TaskTable | Where-Object { $_.Status -eq 'codex' }).Count
         $rp = Invoke-RunPhase; $actions++
@@ -466,6 +481,8 @@ function Invoke-Autopilot {
         }
     } elseif ($waiting.Count -gt 0) {
         $out += "Nothing built -- top task(s) waiting on a merge."
+    } elseif ($triageOnlyPlan) {
+        $out += "TRIAGED $untriagedBefore new idea(s) into proposals. Reply Approve <n>, then /go."
     } else {
         $out += "Nothing to do -- no approved work is build-ready."
     }

@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-014 · 2026-07-15
+suite: PowerShell parser check for tools/Dispatch-Commands.ps1; isolated /go -DryRun fixture; inbox count check; git diff --check -- tools/Dispatch-Commands.ps1; npm test
+result: PowerShell parser check passed. Isolated dry-run fixture with no build-ready tasks, empty BUILD_QUEUE, one `captures/inbox` file with `status: new`, and a `/go` command reported `TRIAGED 1 new idea(s) into proposals. Reply Approve <n>, then /go.` Repo inbox count check found 11 current untriaged captures. `git diff --check -- tools/Dispatch-Commands.ps1` passed with only Git LF-to-CRLF warning. `npm test` timed out after 124s without reporter output.
+untested: full Playwright suite completion remains unverified because `npm test` timed out; live Telegram `/go` was not run because this task is on a red-zone automation branch awaiting review
+
 ## TASK-013 · 2026-07-11
 suite: node --check app.js; git diff --check -- app.js; temporary Playwright TASK-013 import spec; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test -- --reporter=list --workers=1
 result: `node --check` passed. `git diff --check -- app.js` passed with only Git LF-to-CRLF warnings. Temporary import spec passed: imported IDs across all seven synced import lists received one shared `updatedAt` before `saveData()`, duplicate existing item fields still won, non-imported item `updatedAt` stayed unchanged, and imported tombstones were cleared. Smoke + button-smoke passed (2/2; 466 buttons discovered, 200 clicked, 0 broken). `npm test -- --reporter=list --workers=1` timed out after 304s without reporter output.
