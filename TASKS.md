@@ -1021,8 +1021,9 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-018 · Fix array-splat parameter binding in Invoke-MergePhase/BuildPhase/ReviewPhase
-status: LANDED DIRECTLY ON MAIN (bootstrapping exception — see below), not held at `approved`
-review: This is the one case tonight that could NOT be held for `/merge` — `/merge` was the thing
+status: done
+review: Landed directly on `main` (bootstrapping exception, see below), not held at `approved` —
+  this is the one case tonight that could NOT be held for `/merge`. `/merge` was the thing
   broken, so there was no way to use it to land its own fix. Verified directly against the real
   target scripts before landing: `/merge TASK-014` (summary) and `/merge TASK-014 yes` (Confirm,
   forced `-DryRun` for safety) both bound correctly and produced expected output; `Run-Codex-Build.ps1
