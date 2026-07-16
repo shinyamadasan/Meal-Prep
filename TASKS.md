@@ -1051,7 +1051,55 @@ test steps:
         auto-rebase correctly detects the conflict (`$LASTEXITCODE -ne 0`), aborts, reports.
   - [x] Isolated scratch repo, conflict-free scenario (branches touch different files): auto-rebase
         completes cleanly (`$LASTEXITCODE -eq 0`), branch ends up correctly rebased onto main.
-  - [ ] Live (human-verified): a real `/merge TASK-019 yes` from Telegram lands this fix itself.
+  - [x] Live (human-verified): landed (commit 6f7c471) after one more manual rebase (the fix cannot
+        rescue its own first landing, as noted above) plus a human-authorized direct `Run-Merge.ps1
+        -Confirm` invocation when a second self-inflicted staling recurred mid-Telegram-round-trip.
+
+---
+
+### TASK-020 · Fix Invoke-Git crashing on git's own stderr progress output in Run-Merge.ps1
+status: done
+owner: claude
+source: found live the first real time TASK-019's auto-rebase step ran, processing `/merge TASK-014
+  yes` (2026-07-16 conversation)
+priority: P0
+depends-on: TASK-019
+files: tools/Run-Merge.ps1
+
+context:
+  The very first live run of D-044's auto-rebase step crashed the whole dispatcher instead of
+  rebasing task-014. `Run-Merge.ps1` sets `$ErrorActionPreference = 'Stop'` at the top; under that
+  setting, PowerShell promotes ANY stderr text from a native command into a terminating exception --
+  even a fully successful `git rebase` printing its ordinary "Rebasing (1/1)" progress line, which
+  git always writes to stderr by design. `Run-Merge.ps1`'s own `Invoke-Git` was a bare `git @args`
+  passthrough with none of the EAP-lowering protection `Dispatch-Commands.ps1`'s sibling helper
+  already had (see that file's own `Invoke-Git`, lines 86-91) -- every OTHER git call in this file
+  had simply never happened to write anything to stderr, so the gap stayed invisible until `git
+  rebase` (which always does) finally exercised it. Confirmed the actual `git rebase` had succeeded
+  before the script died (`git merge-base --is-ancestor main task-014` was true afterward) -- this
+  was purely a PowerShell error-handling bug, not a git or logic bug. See DECISIONS.md D-044 addendum.
+
+acceptance:
+  - [x] `Invoke-Git` lowers `$ErrorActionPreference` to `'Continue'` for the duration of each git
+        call (restored in a `finally`), matching `Dispatch-Commands.ps1`'s pattern.
+  - [x] Does not swallow stderr at the source -- callers that want it (the auto-rebase conflict
+        message) can still capture it via their own `2>&1`.
+  - [x] No change to any other gate or behavior.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Bootstrapping exception to D-032/D-040's hold-for-`/merge` pattern, same as TASK-018 -- `/merge`
+    was the thing broken, so there was no way to use it to land its own fix. Not a precedent.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Isolated scratch repo, reproducing the EXACT `$ErrorActionPreference = 'Stop'` context (the
+        gap in D-044's own first verification, which had NOT reproduced this): conflict-free rebase
+        now completes without crashing (`LASTEXITCODE -eq 0`, no exception).
+  - [x] Same context, guaranteed-conflict scenario: still correctly detected (`LASTEXITCODE -ne 0`),
+        no crash, conflict path reports as designed.
+  - [ ] Live: TASK-014's actual merge (the run that first crashed) completes successfully after this
+        fix lands.
 
 ---
 

@@ -49,7 +49,19 @@ function Write-Result([string]$Text) {
     [System.IO.File]::WriteAllText($resultFile, $Text, $utf8)
     Write-Host $Text
 }
-function Invoke-Git { git @args }
+# $ErrorActionPreference = 'Stop' (below) promotes ANY stderr text from a native command -- even
+# routine progress output like git rebase's "Rebasing (1/1)" -- into a terminating exception, even
+# when the command's own exit code is 0. Confirmed live: this crashed the whole script the first
+# time the new auto-rebase step (below) ran `git rebase`, mid-merge, on a real branch. Lowering EAP
+# for the duration of the call (matching Dispatch-Commands.ps1's own Invoke-Git) fixes it without
+# swallowing stderr at the source, so callers that actually want it (e.g. the auto-rebase conflict
+# message) can still capture it via their own `2>&1`.
+function Invoke-Git {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & git @args }
+    finally { $ErrorActionPreference = $prevEAP }
+}
 
 $TaskId = $TaskId.ToUpper()
 if ($TaskId -notmatch '^TASK-\d+$') {
