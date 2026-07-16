@@ -224,7 +224,7 @@ test.describe('Grocery list', () => {
     await loadApp(page);
     await addCustomItem(page, 'Printable Test Item');
 
-    await page.getByRole('button', { name: /Print/ }).click();
+    await page.getByRole('button', { name: /^Print$/ }).click();
 
     // Print now uses the main window + a print-only #grocery-print-area (reliable
     // on mobile). Assert that area gets populated with the list.
