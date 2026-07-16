@@ -1,13 +1,15 @@
 # Proposal Queue — pending product judgment
 
-> **Triage writes here. Nothing here is built.** Each capture becomes a *proposal*, enriched with
-> evidence and scored against the **Current Objective** in [ROADMAP.md](ROADMAP.md), then waits for
-> **your approval**. Approve → it moves to `ROADMAP.md` (the approved backlog). Park/Reject is recorded
-> and dropped.
+> **Triage writes here.** Each capture becomes a *proposal*, enriched with evidence and scored against
+> the **Current Objective** in [ROADMAP.md](ROADMAP.md), then leads with two fields: `▶ Decision`
+> (Approve/Park/Reject/Clarify) and `▶ Risk` (Low/High, the same reversible-vs-red-zone criteria
+> `DECISIONS.md` D-032 already uses at merge time, applied here at idea time instead).
 >
-> **Every proposal leads with `▶ Decision`** — the AI's recommended next action
-> (**Approve · Park · Reject · Clarify**) with a one-line why, so you can act from the digest on your
-> phone without figuring out what to do. The rest of the fields are the evidence behind that call.
+> **`Decision: Approve` + `Risk: Low` auto-promotes straight to `BUILD_QUEUE.md` — no approval reply
+> needed** (D-042). Everything else (any other Decision, or `Risk: High`) still waits for **your**
+> Approve/Park/Reject/Clarify reply, exactly as before. Auto-promotion is a deterministic step — Triage
+> only ever recommends; the mechanical act of moving something to the build queue is code, not an LLM
+> judgment call, same as every other stage-transition in this pipeline.
 >
 > Single responsibility: **Triage routes + enriches — it never schedules or builds.**
 >
@@ -407,6 +409,10 @@
 ```
 ### PROP-NNN — <title>
 - ▶ Decision: Approve | Park | Reject | Clarify — <one-line why; the recommended next action, stated first>
+- ▶ Risk: Low | High — <one-line why. Low = reversible (UI, copy, additive non-data features). High =
+  touches data/sync/storage (Firestore, saveData()/cloudReady, the tombstone-merge machinery), auth,
+  security, or the AI Dev OS/automation itself — the exact D-032 red-zone list, applied here at idea
+  time instead of at merge time. When genuinely unsure, say High — the tie-break favors asking.>
 - type:        feature | bug | chore | decision
 - source captures: <ids> (×N duplicates)
 - goal alignment:  supports | conflicts | mixed | neutral  — vs the Current Objective (name it; add which North-star goal)
@@ -421,5 +427,7 @@
 - status:      pending
 ```
 *`▶ Decision` is the recommended action; `status` is your recorded outcome. They differ on purpose —
-the AI recommends, you decide.* **Approve** = build it (→ ROADMAP). **Park** = valid, not now. **Reject**
-= drop it. **Clarify** = AI can't recommend confidently; it needs an answer from you first.
+the AI recommends, you decide, UNLESS Decision is Approve and Risk is Low, in which case the decision
+is made mechanically (D-042) and `status` goes straight to `approved` without waiting for a reply.*
+**Approve** = build it (→ ROADMAP). **Park** = valid, not now. **Reject** = drop it. **Clarify** = AI
+can't recommend confidently; it needs an answer from you first.

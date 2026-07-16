@@ -209,7 +209,10 @@ STEP A -- TRIAGE (route + enrich only; never build, schedule, or prioritize-for-
 captures/inbox/*.md with `status: new` (SKIP any already `status: triaged`), process per WORKFLOW.md
 "Triage": categorize, dedupe vs PROPOSALS/ROADMAP/DONE, then ENRICH into the proposal contract in
 planning/PROPOSALS.md (status: pending) -- fill EVERY field. LEAD with **> Decision** (the recommended
-next action: Approve | Park | Reject | Clarify + a one-line why) so it's actionable from a phone digest.
+next action: Approve | Park | Reject | Clarify + a one-line why) so it's actionable from a phone digest,
+THEN **> Risk** (Low | High + a one-line why -- High means it touches data/sync/storage, auth,
+security, or the AI Dev OS itself, the exact DECISIONS.md D-032 red-zone list applied here at idea
+time instead of merge time; everything else is Low; say High whenever genuinely unsure).
 Then: goal alignment vs the **Current Objective** in ROADMAP.md (supports/conflicts/mixed + which
 North-star goal), expected user value, evidence (recurring friction, dup count, demand signal), effort
 + dependencies + confidence + ambiguity, why now vs later, and a **goal-adjusted** AI-recommended
@@ -269,6 +272,15 @@ try {
     $ErrorActionPreference = $prevEAP
 }
 if ($LASTEXITCODE -ne 0) { Halt-Automation "claude -p exited with code $LASTEXITCODE" }
+
+# --- Phase 2a-bis (deterministic, D-042): auto-promote Decision:Approve + Risk:Low proposals
+#     straight into BUILD_QUEUE.md, no human reply needed. Runs on EVERY pending proposal currently
+#     in PROPOSALS.md, not just ones this session just triaged -- so an old proposal sitting from
+#     before this existed also gets picked up once it has both fields. Anything else (any other
+#     Decision, Risk: High, or no Risk field at all) is untouched and still needs a human reply via
+#     Apply-Decisions.ps1, exactly as before. No LLM call -- see tools/Invoke-AutoPromote.ps1. ---
+try { & "$projectPath\tools\Invoke-AutoPromote.ps1" | Tee-Object -FilePath $logFile -Append }
+catch { Halt-Automation "Invoke-AutoPromote.ps1 threw an error: $_" }
 
 # --- Phase 2b (deterministic): commit-scope guard. The Claude session above cannot commit or push
 #     itself; this script is the only thing that ever commits its output, and only after checking
