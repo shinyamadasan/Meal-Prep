@@ -5,6 +5,67 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-16 — Less-babysitting redesign built: auto-promote (D-042) + /audit (D-043); /merge live-verified; TASK-016 landed on its own branch
+
+**The ask, direct quote:** "I want less role as much as possible." Chaos-tested before building
+anything (musing-vs-commitment risk, D-032's red-zone list not covering every category a human might
+want a say in, audit token cost over a brain-fog week, audit summary drift) — all four named
+explicitly; the human chose to accept them rather than have any resolved first. See D-042/D-043 for
+the full reasoning.
+
+**Built and landed on branch `task-016`** (commit `a8bbf60`), `status: approved`, held for
+`/merge TASK-016`:
+- **D-042 auto-promote** — every proposal now leads with `▶ Decision` AND `▶ Risk` (Low/High, D-032's
+  own criteria, applied at idea time). `Approve` + `Risk: Low` → straight into `BUILD_QUEUE.md`, no
+  human reply. Everything else unchanged. `tools/Invoke-AutoPromote.ps1` (new, deterministic, no
+  LLM), wired into `run-claude.ps1` between Triage and the commit-scope guard.
+- **D-043 `/audit` redesign** — on-demand only (human-sent, or `/go`'s idle fallback when genuinely
+  nothing else is queued). Cost-gated by an actual `git diff` against the app since the last audit,
+  not a time-based cooldown — no changes = zero-token reply, however many times pressed. Real changes
+  → Claude reads only the diff + `planning/AUDIT_SUMMARY.md` (new), not the whole app, except one
+  flat full re-scan every 30 days to correct drift. `tools/Run-Audit.ps1` (new) calls
+  `Invoke-AutoPromote.ps1` itself, so a Low-risk finding is buildable in the same `/go` press that
+  found it.
+- **`TASK-015` (`/suggest`) retired, never built** — its job (recommend the best pending item)
+  disappears once nothing routine sits pending.
+- **`n8n-telegram-inbox.json`** updated to recognize `audit` as a control verb (+ its comment) —
+  pre-emptive fix for the exact mis-routing bug `/merge` hit (see below).
+
+**Also fixed a real doc bug found while appending D-042/043:** D-038's (macOS) closing trade-off
+paragraph had been orphaned to the very end of the file when D-039 was added earlier — moved back to
+its actual section.
+
+**`/merge` live-verified working end-to-end for the first time tonight, after fixing why it wasn't:**
+the live n8n workflow was running a version from before D-036 added `/merge` to its recognized-command
+regex — re-imported/hand-edited by the human mid-session. Confirmed via a real `/merge TASK-014` →
+`/merge TASK-014 yes` round trip over Telegram; the summary step returned the correct diff, and the
+confirmed step correctly ran the full gate (`npm test` etc.) before reporting back.
+
+**Outstanding for the human:**
+- `/merge TASK-016` → `/merge TASK-016 yes` (this session's whole redesign)
+- `/merge TASK-014`, `/merge TASK-017` — still held from the prior session; `TASK-014` specifically
+  needs the ~15 pre-existing stale test failures (`buttons-functional.spec.js`/`recipe-actions.spec.js`,
+  unrelated to any of tonight's changes) addressed before `npm test` can pass its merge gate. The
+  onboarding-modal root cause is already fixed (`07b594e`, direct to `main`); what's left is
+  feature-by-feature staleness in ~15 individual assertions.
+- First live test of the new idle-`/go` → audit → auto-promote → build loop, once `TASK-016` lands.
+
+**Next command output:**
+```
+NEXT
+milestone : Less-babysitting redesign (auto-promote + /audit) [built, held for /merge]
+task      : TASK-016 — auto-promote + /audit redesign [approved]
+owner     : you
+why       : TASK-016 is code-complete and held for /merge, same as TASK-014/017 from the prior
+            session. All three are independent holds; land in any order.
+run       : Review (merge TASK-016, and/or resolve TASK-014's test-suite gate, whenever ready)
+```
+
+**Blockers:** none — everything above is either landed, held for `/merge`, or a clearly-scoped
+follow-up (the stale test suite).
+
+---
+
 ## 2026-07-15 (cont.) — TASK-014 landed on `task-014`; TASK-017 (notification feature) + guard landed on `task-017`; TASK-015/016 re-flagged; D-039/D-040 recorded
 
 **Discovered live:** `/build` ran TASK-014 for real — Codex correctly implemented and tested the fix
