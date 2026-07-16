@@ -180,7 +180,11 @@ function Get-NextReply {
 # code -- the autopilot loop classifies on the exit code, standalone /build just uses .Result.
 # ($a, not $args: $args is a PowerShell automatic variable and must not be shadowed.)
 function Invoke-BuildPhase {
-    $a = @(); if ($DryRun) { $a += '-DryRun' }
+    # Hashtable splat, NOT array: @('-DryRun') splatted via @array binds POSITIONALLY, never as a
+    # named switch -- confirmed live (D-041): it silently failed to activate -DryRun at all, with no
+    # error, on both a switch-only target and one with a mandatory positional parameter. Only
+    # hashtable splatting (@{ DryRun = $true }) reliably maps to '-DryRun' in this PowerShell version.
+    $a = @{}; if ($DryRun) { $a['DryRun'] = $true }
     & (Join-Path $root 'tools\Run-Codex-Build.ps1') @a
     $code = $LASTEXITCODE
     $resultFile = Join-Path $root '.last-phase-result.txt'
@@ -191,7 +195,8 @@ function Invoke-BuildPhase {
 
 # Shared by /review and /go's autopilot.
 function Invoke-ReviewPhase {
-    $a = @(); if ($DryRun) { $a += '-DryRun' }
+    # See Invoke-BuildPhase's comment: hashtable splat, not array (D-041).
+    $a = @{}; if ($DryRun) { $a['DryRun'] = $true }
     & (Join-Path $root 'tools\Run-Claude-Review.ps1') @a
     $code = $LASTEXITCODE
     $resultFile = Join-Path $root '.last-phase-result.txt'
@@ -229,9 +234,15 @@ function Invoke-MergePhase {
     $taskId    = $idM.Groups['id'].Value.ToUpper()
     $confirmed = $rest -match '(?i)\b(yes|confirm)\b'
 
-    $a = @('-TaskId', $taskId)
-    if ($confirmed) { $a += '-Confirm' }
-    if ($DryRun)    { $a += '-DryRun' }
+    # Hashtable splat, NOT array (D-041): @('-TaskId', $taskId) splatted via @array binds
+    # POSITIONALLY, so '-TaskId' itself became the value of Run-Merge.ps1's mandatory $TaskId
+    # parameter and the real task id had nowhere left to bind -- confirmed live, every /merge
+    # command crashed the whole dispatcher with "A positional parameter cannot be found that
+    # accepts argument 'TASK-014'." Hashtable splatting is the only form that reliably maps to
+    # named parameters in this PowerShell version.
+    $a = @{ TaskId = $taskId }
+    if ($confirmed) { $a['Confirm'] = $true }
+    if ($DryRun)    { $a['DryRun'] = $true }
 
     & (Join-Path $root 'tools\Run-Merge.ps1') @a
     $code = $LASTEXITCODE
