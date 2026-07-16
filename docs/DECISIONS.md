@@ -3,6 +3,12 @@
 > Why the important architectural choices were made — so they don't get silently reversed.
 > Append-only. Never rewrite an entry; to reverse one, add a new entry and mark the old
 > `Status: Superseded by D-0NN`. Read before replacing any existing approach.
+>
+> Optional `Verify:` line(s) on any entry are a machine-checkable pointer (D-046):
+> `Verify: <file> contains "<literal text>"` or `Verify: <file> does not contain "<literal text>"`.
+> Run `tools/Verify-Decisions.ps1` to check every one against the current code. Add one when a
+> decision's correctness depends on something specific enough to name (a guard clause, a call site) —
+> not every entry needs one.
 
 ---
 
@@ -28,6 +34,8 @@ Context: App must work with no account and offline (flaky mobile); cloud sync is
 Decision: `saveData()` always writes `localStorage`; also writes Firestore when signed-in + online.
 Why: localStorage is the always-available source of truth; cloud is additive.
 Trade-off: Two write paths and a reconciliation problem — solved by D-004.
+Verify: app.js contains "saveToLocalStorage()"
+Verify: app.js contains "saveToFirestore()"
 Supersedes: —
 
 ## D-004 — Optimistic concurrency with union-merge on conflict
@@ -44,6 +52,7 @@ Context: Recipes saved before a field existed load as plain JSON missing that fi
 Decision: After loading recipes, call `patchMissingNutrition(AppState.recipes)`; use `|| []` / `|| {}` defaults elsewhere. No versioned migration system.
 Why: Cheap, good enough for a single-file app; avoids a migration framework.
 Trade-off: Every new recipe field needs a defensive default or a patch step. Easy to forget.
+Verify: app.js contains "patchMissingNutrition("
 Supersedes: —
 
 ## D-006 — Recipe photos in a Firestore subcollection
@@ -84,6 +93,7 @@ Context: Signed-in users lost ALL cloud data around deploys/reloads. Root cause:
 Decision: Add `AppState.cloudReady` (transient). `saveToFirestore()` refuses to write while it's false. It flips true only once the cloud baseline is known — `loadFromFirestore()` returned `loaded`/`empty`, an `onSnapshot` arrived, or a new account is being seeded (`initializeUserData`). It resets to false on each sign-in. The `online` handler loads (not pushes) when not ready.
 Why: Makes overwriting un-read cloud data structurally impossible. localStorage still saves, so nothing is lost locally — the cloud write just waits until it's safe.
 Trade-off: A cloud write can be briefly deferred until the baseline loads (seconds). Worth it to never wipe cloud data. Does NOT fix the deeper `tx.set` full-overwrite design (still merge-only-on-version-conflict) — left as debt in ROADMAP.
+Verify: app.js contains "AppState.cloudReady"
 Supersedes: —
 
 ## D-011 — Mobile capture pipeline: Telegram → n8n → captures/inbox → Triage
@@ -449,3 +459,17 @@ Why: A grep-based check can't judge whether documented BEHAVIOR still matches co
 Trade-off: First real run also surfaced ~8 items that are NOT drift — references to a separate `ai-dev-os` repo's config schema (`appName`, `appSlug`, `repoSlug`, `localPath`) and one illustrative example (`shout()`) inside `docs/DECISIONS.md` prose. Filtering those out reliably would need either cross-repo awareness or example-vs-real-code judgment — both are LLM territory, which defeats the "deterministic, free" point of building this at all. Left as-is: a human skimming ~9 lines once in a while to dismiss obvious non-issues is a fair trade against the alternative (an LLM call every run, or missing the real finding entirely).
 
 Supersedes: nothing. New, standalone capability alongside `/audit` (D-043) and auto-promote (D-042), not a replacement for either.
+
+## D-046 — `DECISIONS.md` gets an optional, non-executable `Verify:` pointer per entry
+
+Task: TASK-022, second of three "treat prose knowledge as infra" follow-ups · 2026-07-16
+
+Context: D-045's checker catches "this identifier doesn't exist anywhere anymore" for free, with no per-entry authoring — but that's a narrow net. Some decisions are wrong in a way pure existence-checking can't see: D-010's write guard is only actually honored if `saveToFirestore()` still checks `AppState.cloudReady` specifically, not just if the word appears somewhere in the file; D-003's dual-write is only real if `saveData()` still calls both `saveToLocalStorage()` and `saveToFirestore()`. A decision record that describes a guarantee should be able to say, in one line, how a machine would confirm that guarantee still holds — the same instinct as a test asserting a specific behavior, not just that a module imports without crashing.
+
+Decision: Any `docs/DECISIONS.md` entry may carry one or more `Verify:` lines, in a small, deliberately non-executable DSL: `Verify: <file> contains "<literal text>"` or `Verify: <file> does not contain "<literal text>"`. No shell commands, no regex, no `eval` — a decision record is prose that people and models read and trust, and the check itself has to stay exactly as inspectable as the prose around it. `tools/Verify-Decisions.ps1` parses every `Verify:` line across the file, runs each one, and reports any that fail. Added three real pointers as the first working examples: D-003 (both write paths still present), D-005 (`patchMissingNutrition(` still exists), D-010 (`AppState.cloudReady` still referenced).
+
+Why: This is optional and additive by design (CLAUDE.md's Simplicity First: "no features beyond what was asked, no configurability that wasn't requested") — retrofitting all ~45 existing entries would be a large, low-value effort for decisions unlikely to silently regress. A `Verify:` line earns its keep only on a decision whose correctness genuinely depends on something specific enough to name.
+
+Trade-off: The DSL is deliberately weak (literal substring only, no regex, no "check this function's body does X") — it can confirm a guard clause's KEY PHRASE still exists, not that the guard's logic is still correct. That's the same trade D-045 made: a narrow, always-safe check beats a powerful one that needs an LLM (or worse, `eval`) to run.
+
+Supersedes: nothing. Sibling to D-045, not a replacement — D-045 catches broad identifier drift automatically; this catches specific, human-flagged correctness claims.

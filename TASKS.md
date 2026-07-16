@@ -1151,6 +1151,51 @@ test steps:
         one illustrative example in prose -- both acceptable per D-045's stated trade-off.
   - [ ] Live (human-verified): a real `/merge TASK-021 yes` lands it.
 
+---
+
+### TASK-022 · `DECISIONS.md` verify-pointer mechanism (tools/Verify-Decisions.ps1)
+status: approved
+owner: claude
+source: "ok lets do these" -- second of three follow-ups approved during the "less babysitting"
+  philosophy discussion (2026-07-16 conversation)
+priority: P2
+depends-on: none
+files: tools/Verify-Decisions.ps1 (new), docs/DECISIONS.md
+
+context:
+  D-045's docs-vs-code checker catches "this identifier doesn't exist anywhere anymore" for free, but
+  some decisions are wrong in a way pure existence-checking can't see -- D-010's write guard is only
+  actually honored if the guard clause is still in place, not just if the word `cloudReady` appears
+  somewhere in the file. A decision record should be able to say, in one line, how a machine would
+  confirm the guarantee it describes still holds. See DECISIONS.md D-046.
+
+acceptance:
+  - [x] `docs/DECISIONS.md` entries may carry `Verify: <file> contains "<text>"` or
+        `Verify: <file> does not contain "<text>"` lines -- literal substring only, no regex, no
+        shell execution, no `eval` (a decision record's check must stay as inspectable as its prose).
+  - [x] `tools/Verify-Decisions.ps1` parses every `Verify:` line across the file, runs each one,
+        reports any that fail, exits 1 if any fail / 0 if all pass or none exist.
+  - [x] Three real pointers added as first working examples: D-003 (both write paths present),
+        D-005 (`patchMissingNutrition(` exists), D-010 (`AppState.cloudReady` referenced).
+  - [x] The file's own header documents the convention for future entries.
+  - [x] Optional and additive -- not retrofitted onto all ~45 existing entries (Simplicity First).
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - No LLM call, no arbitrary code execution -- literal substring match only.
+  - Held at `approved` for human `/merge`, not auto-merged, matching every other automation-surface
+    task this session (D-040).
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Baseline (no Verify: lines): correctly reports "No Verify: pointers found."
+  - [x] All 3 real pointers (4 total lines): correctly report pass.
+  - [x] Temporarily broke one pointer (pointed at a nonexistent function name): correctly detected
+        and reported the failure with the exact reason; restored and re-confirmed all pass.
+  - [ ] Live (human-verified): a real `/merge TASK-022 yes` lands it.
+
+<!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
+
 <!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>
