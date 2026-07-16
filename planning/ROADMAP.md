@@ -122,7 +122,6 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
   `#pantry-qty-input` / `#pantry-storage` (resolves null, no crash).
 - **`colorScheme` localStorage key** — now fully unused (light-only release, D-013); harmless orphan in some users' storage.
 - **`recipe.highlights`** — rendered as tag chips but no edit-form input to set it.
-- **`printGroceryList()`** — defined, no button wired.
 - Hidden features: Family Sharing modal, Community Feed / `sharedRecipes`.
 
 ---

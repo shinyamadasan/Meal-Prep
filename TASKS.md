@@ -1194,6 +1194,51 @@ test steps:
         and reported the failure with the exact reason; restored and re-confirmed all pass.
   - [ ] Live (human-verified): a real `/merge TASK-022 yes` lands it.
 
+---
+
+### TASK-023 · Proactive pass: document undocumented Claude/Codex operating constraints
+status: done
+owner: claude
+source: "ok lets do these" -- third of three follow-ups approved during the "less babysitting"
+  philosophy discussion (2026-07-16 conversation)
+priority: P3
+depends-on: none
+files: CLAUDE.md, docs/DECISIONS.md, docs/AI_OS_NOTES.md, planning/ROADMAP.md
+
+context:
+  A proactive review for constraints this session actually tripped over but that weren't recorded
+  anywhere a future session would see them before hitting the same wall:
+  - The TASKS.md-must-land-on-main-directly rule (D-040 addendum) cost ~15 minutes to diagnose the
+    first time (TASK-019) because it was only implicit in how prior tasks happened to be committed,
+    never stated as a rule.
+  - The PowerShell EAP=Stop / native-stderr gotcha had already bitten Dispatch-Commands.ps1 once
+    (fixed, with a good inline comment) and then bit Run-Merge.ps1 again (TASK-020) because the
+    inline-comment fix was never promoted to CLAUDE.md's Tooling Gotchas, the one place a future
+    session reads before touching either file.
+  - The OUTBOX.md race between the PC dispatcher and n8n's reply-clearing step recurred five times
+    this session with no stable record beyond a transient STATUS.md session-log entry.
+  - `planning/ROADMAP.md`'s Known Issues still listed `printGroceryList()` as "defined, no button
+    wired" -- stale since this session's earlier e2e-suite fix restored the button.
+
+acceptance:
+  - [x] CLAUDE.md's Tooling Gotchas gained three entries: the EAP/stderr promotion rule, the
+        TASKS.md-goes-to-main rule, and the Start-ScheduledTask unreliability workaround.
+  - [x] DECISIONS.md D-040 gained an addendum stating the commit-split rule explicitly.
+  - [x] docs/AI_OS_NOTES.md (previously empty) gained three dated friction-log entries: the OUTBOX
+        race, the Start-ScheduledTask unreliability, and the TASKS.md-to-main rule.
+  - [x] planning/ROADMAP.md's stale `printGroceryList()` line removed.
+  - [x] Pure documentation, no executable code touched -- committed directly to main, no branch/hold
+        (unlike TASK-021/022, which ship actual tools/*.ps1 scripts with real execution risk).
+
+constraints:
+  - Docs-only; Claude's own ownership of CLAUDE.md/docs//planning/ per this file's own Claude
+    Workflow section covers this directly, no /merge gate needed.
+
+test steps:
+  - [x] Re-read each edited file after writing to confirm no structural markdown breakage.
+  - [x] Cross-checked the OUTBOX-race and TASKS-to-main claims against this session's actual git
+        history before writing them down, rather than relying on memory of what happened.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

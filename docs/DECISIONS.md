@@ -388,6 +388,14 @@ Trade-off: When Claude implements one of these directly, the same session that w
 
 Supersedes: nothing. Extends D-023 (risk tiers) and D-032 (red-zone hold) to a case neither anticipated: work that is both correctly-scoped red-zone material *and* structurally undoable by the normal Codex build path.
 
+Addendum (TASK-019, found while landing it): when Claude implements one of these directly, the
+task's `TASKS.md` entry (and any `docs/DECISIONS.md` record) must be committed to `main` directly, in
+its own commit — never bundled into the task branch's own commit alongside the code. `/merge` reads
+`TASKS.md` from whatever is currently on `main` at invocation time; if the task entry only exists on
+the held branch, `/merge TASK-X` fails outright with "TASK-X is not in TASKS.md" even though the code
+is fully ready. Cost ~15 minutes to diagnose the first time (TASK-019's own landing) before the
+pattern was recognized and corrected. See docs/AI_OS_NOTES.md's 2026-07-16 entry.
+
 ## D-041 — Splat phase-runner args as a hashtable, never an array
 
 Task: `/merge` crash + silent `-DryRun` failure · 2026-07-15

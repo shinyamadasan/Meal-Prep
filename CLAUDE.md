@@ -364,6 +364,21 @@ Do not violate a higher-priority rule to satisfy a lower-priority one.
   special characters.
 - Autonomous Claude sessions run via `run-claude.ps1`; it reads `CLAUDE.md`, `STATUS.md`,
   `planning/TASK.md`, then runs triage on `captures/inbox/`.
+- PowerShell `$ErrorActionPreference = 'Stop'` promotes ANY stderr text from a native command into a
+  terminating exception — even routine progress output on a fully successful call (`git rebase`'s
+  "Rebasing (1/1)", git's LF/CRLF notice). Any script with `$ErrorActionPreference = 'Stop'` at the
+  top needs its `Invoke-Git`-style wrapper to lower EAP to `'Continue'` for the duration of each
+  native call (see `Dispatch-Commands.ps1`'s and `Run-Merge.ps1`'s `Invoke-Git`). Has broken two
+  different scripts this way; test any change to error handling under the script's own real EAP
+  setting, not in a bare isolated snippet — see DECISIONS D-044's addendum for a case where that
+  exact shortcut in verification missed the bug.
+- When Claude implements a D-040 automation-surface task directly, the `TASKS.md` entry (and any
+  `docs/DECISIONS.md` record) goes to `main` in its own commit — never bundled into the task
+  branch's commit alongside the code. `/merge` reads `TASKS.md` from `main`, not the branch; see
+  DECISIONS D-040's addendum.
+- The Command Dispatcher scheduled task doesn't always respond promptly to a programmatic
+  `Start-ScheduledTask` trigger. Running `tools/Dispatch-Commands.ps1` directly is the reliable way
+  to force immediate processing. See `docs/AI_OS_NOTES.md`.
 
 ## Deploy
 
