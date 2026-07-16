@@ -714,7 +714,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-014 · Fix `/go` idle-triage gap: Invoke-Autopilot never triggers Triage for untriaged captures
-status: approved
+status: done
 review: Codex correctly implemented and tested this fix on branch `task-014` (commit 37f58b9), but
   its own commit-scope guard permanently blocks it from committing anything under `tools/` (deny-
   listed as "this repo's own automation scripts") — so it could never land this itself. Claude
