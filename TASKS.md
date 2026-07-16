@@ -1104,7 +1104,52 @@ test steps:
 
 ---
 
-<!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
+### TASK-021 · Docs-vs-code consistency checker (tools/Check-DocsConsistency.ps1)
+status: approved
+owner: claude
+source: "ok lets do these" -- first of three follow-ups approved during the "less babysitting"
+  philosophy discussion (2026-07-16 conversation), prioritized after the /merge blocker (TASK-019/020)
+priority: P2
+depends-on: none
+files: tools/Check-DocsConsistency.ps1 (new), docs/ARCHITECTURE.md
+
+context:
+  Prose-encoded knowledge (CLAUDE.md, docs/DECISIONS.md, architecture docs) has no self-checking
+  mechanism analogous to lint/type-checking for code, so it silently rots the same way tribal
+  knowledge used to. First real run of this checker proved it isn't hypothetical: it found
+  `docs/ARCHITECTURE.md` still describing `stripTagsDeep()` as an active safety measure, when that
+  function (and the entire "shared recipes" import feature it protected) had been removed together
+  in an earlier "remove dead code" commit. Not a live security hole -- the vulnerable import path is
+  gone too -- but exactly the class of drift this tool exists to catch. See DECISIONS.md D-045.
+
+acceptance:
+  - [x] `tools/Check-DocsConsistency.ps1` extracts backtick-quoted identifiers from
+        docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/DECISIONS.md, and CLAUDE.md.
+  - [x] Filters out wildcards, multi-word spans, file references, and D-NNN/TASK-NNN/BQ-NNN
+        cross-references before checking.
+  - [x] docs/ARCHITECTURE.md and docs/DATA_MODEL.md check against app.js/index.html/style.css only;
+        docs/DECISIONS.md and CLAUDE.md additionally check against run-claude.ps1, AGENTS.md, and
+        every tools/*.ps1, since those two docs cover the automation layer too.
+  - [x] Reports each finding as `[doc] `span` -- 'identifier' not found in ...`; exits 1 if any found,
+        0 if clean.
+  - [x] The one real finding it surfaced (`stripTagsDeep()`) is fixed in docs/ARCHITECTURE.md.
+  - [x] Standalone script only -- not wired into /audit or any Telegram command yet (D-045's
+        deliberate scope limit).
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - No LLM call -- deterministic grep only, per CLAUDE.md's "if code can answer, code answers."
+  - Held at `approved` for human `/merge`, not auto-merged, matching every other automation-surface
+    task this session (D-040).
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Real run against the current repo: found 28 raw hits, reduced to 9 after the per-doc scope
+        fix (the other ~19 were TASKS.md status vocabulary and automation-script identifiers now
+        correctly resolved by the broadened scope). Manually reviewed all 9 remaining: 1 real
+        (stripTagsDeep, fixed), rest are references to a separate ai-dev-os repo's config schema or
+        one illustrative example in prose -- both acceptable per D-045's stated trade-off.
+  - [ ] Live (human-verified): a real `/merge TASK-021 yes` lands it.
 
 <!-- TASK TEMPLATE — copy and fill:
 
