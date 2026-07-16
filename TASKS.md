@@ -1098,8 +1098,9 @@ test steps:
         now completes without crashing (`LASTEXITCODE -eq 0`, no exception).
   - [x] Same context, guaranteed-conflict scenario: still correctly detected (`LASTEXITCODE -ne 0`),
         no crash, conflict path reports as designed.
-  - [ ] Live: TASK-014's actual merge (the run that first crashed) completes successfully after this
-        fix lands.
+  - [x] Live: TASK-014's actual merge (the run that first crashed) completed successfully
+        immediately after this fix landed (commit 976ad4d), fully automated, no manual rebase
+        needed. TASK-016 landed the same way shortly after, confirming both fixes together.
 
 ---
 

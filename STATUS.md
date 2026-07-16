@@ -5,6 +5,38 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-16 — TASK-014 and TASK-016 both landed; the /merge saga is closed
+
+**Resolution.** After D-044 (auto-rebase) landed, its first live run crashed the dispatcher outright
+(TASK-020: `Run-Merge.ps1`'s `Invoke-Git` had none of `Dispatch-Commands.ps1`'s EAP-lowering
+protection, so `git rebase`'s routine stderr progress line became a terminating exception under
+`$ErrorActionPreference = 'Stop'`). Fixed and landed directly to `main` (bootstrapping exception,
+same as TASK-018 — `/merge` was again the thing broken). With both fixes in place:
+
+- **TASK-014 landed fully automated** — no manual rebase, no intervention. First real proof the
+  auto-rebase + crash-fix combination works end-to-end.
+- **TASK-016 hit a genuine merge conflict** (not the self-inflicted staling bug) — its own changes
+  and TASK-014's just-landed changes both touched the same `elseif` chain in
+  `Invoke-Autopilot`'s summary section (one added a triage-report branch, the other an audit-report
+  branch). The auto-rebase correctly detected this and safely refused to guess, exactly as D-044
+  designed it to. Resolved by hand (kept both branches in the chain) and landed successfully on the
+  next attempt.
+- Also hit the OUTBOX.md race (documented in the previous entry) three more times along the way,
+  each time resolved the same proven way: confirm the locally-orphaned commit's content was already
+  delivered/superseded, then sync or skip accordingly.
+
+**Both TASK-014 and TASK-016 are now `status: done` on `main`.** The multi-day `/merge` blocker
+that started this whole investigation is closed. Remaining open item: the OUTBOX.md race between
+the PC-side dispatcher and n8n's independent reply-clearing step is still not fixed at the root
+(only worked around, repeatedly) — worth a proper fix (retry-with-refetch on push failure in
+`Dispatch-Commands.ps1`) next time automation work is picked up.
+
+**Next:** the three follow-up items from the "less babysitting" philosophy discussion are still
+queued: a docs-vs-code consistency checker, a `DECISIONS.md` verify-pointer mechanism, and a
+proactive pass for undocumented Claude/Codex operating constraints.
+
+---
+
 ## 2026-07-16 — found and fixed the real reason /merge could never land anything (D-044, TASK-019)
 
 **What happened:** after the e2e suite fix (below) unblocked `npm test`, `/merge TASK-014 yes` and
