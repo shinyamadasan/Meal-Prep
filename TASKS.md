@@ -998,7 +998,7 @@ test steps:
 ---
 
 ### TASK-019 · `/merge` auto-rebases the branch when its own dispatch commit stales it
-status: approved
+status: done
 review: Claude implemented directly (tools/, same D-040 reasoning as TASK-014/016/017/018 — Codex
   cannot commit here). Held at `approved` for human `/merge`, not auto-merged — this is the merge
   gate itself, squarely automation-surface/Hard-Rule territory. Verified the two new code paths
