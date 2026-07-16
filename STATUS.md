@@ -5,6 +5,40 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-16 — e2e suite blocker cleared: stale tests fixed, real Print-button regression found and restored; TASK-014/TASK-016 unblocked for /merge
+
+**Why this was urgent:** every `/merge` (TASK-014, then TASK-016) was failing with "npm test timed
+out" regardless of what the branch touched — ~15 of `tests/buttons-functional.spec.js` and
+`tests/recipe-actions.spec.js`'s tests had drifted from the current UI and were failing on `main`
+itself, blocking the whole Telegram flow for two days. Root-caused each failure by reading the actual
+current `index.html`/`app.js`, not guessing.
+
+**Test drift found (all fixed):** `nutrition` tab moved under the More menu but `openTab()`'s helper
+was never updated; Help is now reached via Settings → "How to use this app", not a standalone
+`.help-btn`; "Add New Recipe"/"Paste Recipe" buttons live inside the Recipes tab-content (hidden
+until that tab opens); the "⋯ Data" dropdown was replaced by direct rows inside the Settings modal;
+`pantryOnboardingDone` (set by an earlier fix) suppresses the kitchen-setup wizard's seeding, so
+pantry tests now add an item first; `#pantry-add-where` (manual storage picker) no longer exists,
+storage is inferred automatically; `.pt-datemode` lives in the per-row expand panel; Copy button
+label shortened to "Copy"; `recipe-actions.spec.js` never opened the Recipes tab before touching
+`.recipe-card` (invisible on the default Dashboard tab).
+
+**Also found and fixed a real product regression, not just a stale test:** the grocery list's Print
+button had been silently dropped from `index.html` in the nav-restructure commit (`81b507a`) while
+`printGroceryList()` stayed fully wired and its `@media print` CSS intact — restored the one-line
+button rather than deleting the test, since the feature itself still worked end-to-end once wired
+back up. Trivial, reversible, additive — committed directly to `main` per the Delegation Policy's
+"trivial change" exception.
+
+Commits: `291378a` (fixes + Print restore), `16d1ced` (anchor Print regex after it collided with the
+test's own "Printable Test Item" fixture name). Full `npm test` now passes 21/21.
+
+**Next:** human needs to send `/merge TASK-014 yes` and `/merge TASK-016 yes` as two separate
+Telegram messages (the multiline-anchored regex in `Invoke-MergePhase` only parses the first line of
+a message) to land both held branches now that the test gate is green.
+
+---
+
 ## 2026-07-16 — Less-babysitting redesign built: auto-promote (D-042) + /audit (D-043); /merge live-verified; TASK-016 landed on its own branch
 
 **The ask, direct quote:** "I want less role as much as possible." Chaos-tested before building
