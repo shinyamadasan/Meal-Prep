@@ -783,176 +783,102 @@ test steps:
 ---
 
 <!-- ═══════════════════════════════════════════════════════
-     gap-2026-07-15 · /suggest -- cheap "what's next" recommendation
+     gap-2026-07-15/16 · less-babysitting redesign: auto-promote (D-042) + /audit (D-043)
      Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
      ═══════════════════════════════════════════════════════ -->
 
-### TASK-015 · Add `/suggest`: recommend the single best pending proposal, no LLM call
-status: blocked
-blocker:
-  - routing, not ambiguity: this touches `tools/Dispatch-Commands.ps1`, which Codex's own
-    commit-scope guard permanently deny-lists ("this repo's own automation scripts") — Codex can
-    never commit a change here (confirmed live on TASK-014). `status: codex` would just let Codex
-    self-select this and repeat the same wasted-build loop. Needs Claude to implement directly (same
-    treatment as TASK-014/017), landing at `approved` for human `/merge`, never routed to Codex.
-source: human request (2026-07-15 conversation) — wants a cheap, frequent "what should I build next"
-        command distinct from the occasional deep scan in TASK-016
-priority: P2
+### TASK-016 · Auto-promote (D-042) + redesigned `/audit` (D-043) — supersedes TASK-015
+status: done
+review: Claude implemented directly (same `tools/` reasoning as TASK-014/017/018 — Codex cannot
+  commit here). Held at `approved` for human `/merge`, not auto-merged, same disclosed same-session
+  build+review caveat as every other automation-surface item tonight.
+source: human request (2026-07-15/16 conversation) — "I want less role as much as possible," followed
+  by a full redesign discussion (musing-vs-commitment risk, D-032 scope mismatch, audit token cost,
+  summary drift) before landing on this shape. Supersedes the original **TASK-015 (`/suggest`)** plan
+  entirely — `/suggest`'s whole job (recommend the best pending item) stops being needed once nothing
+  routine sits pending waiting for a reply; TASK-015 is retired, not built.
+priority: P1
 depends-on: none
-files: tools/Dispatch-Commands.ps1
+files: planning/PROPOSALS.md, PROMPTS.md, run-claude.ps1, tools/Invoke-AutoPromote.ps1 (new),
+  planning/AUDIT_SUMMARY.md (new), tools/Run-Audit.ps1 (new), tools/Dispatch-Commands.ps1,
+  n8n-telegram-inbox.json
 
 context:
-  `/status` and `/next` already give read-only state, but neither surfaces *pending proposals* —
-  `/status` only reports `TASKS.md` counts (codex-ready/review-ready), and there is no command that
-  tells you what's waiting in `planning/PROPOSALS.md` without first triggering a triage round-trip or
-  waiting for the 7AM digest. The human wants an anytime, cheap "what's the best thing to build right
-  now" command that needs no lookup of proposal numbers.
+  **D-042 (auto-promote):** every proposal now leads with TWO fields, not one — the existing
+  `▶ Decision` (Approve/Park/Reject/Clarify) plus a new `▶ Risk` (Low/High, the exact reversible-
+  vs-red-zone criteria D-032 already uses at merge time, applied here at idea time instead).
+  `Decision: Approve` + `Risk: Low` auto-promotes straight to `BUILD_QUEUE.md` — no human reply
+  needed. Everything else (any other Decision, `Risk: High`, or no Risk field at all — e.g. an old
+  proposal from before this existed) is completely untouched and still waits for a human reply,
+  exactly as before. Deterministic, no LLM judgment at the promotion step itself — Triage only ever
+  recommends; `tools/Invoke-AutoPromote.ps1` (mirroring `Apply-Decisions.ps1`'s own shape) is the
+  mechanical act, run from `run-claude.ps1` between Phase 2 (Claude's Triage session) and Phase 2b
+  (the commit-scope guard) so its edits land in the same allowed-surface check and commit.
 
-  This should be pure, deterministic PowerShell — no `claude -p` invocation, no mutation. All the
-  "thinking" already happened when Triage (or TASK-016's `/audit`) scored and wrote each proposal's
-  `AI-recommended priority` and `▶ Decision` verdict; `/suggest` just ranks what's already there.
-
-  Reuse the existing PROPOSALS.md block regex already used elsewhere in this file, e.g. the pattern
-  in `Apply-Decisions.ps1`:
-    (?ms)^###\s+PROP-0*(?<n>\d+)\s+\p{Pd}\s+.+?\r?\n(?<b>.*?)(?=^###\s|\z)
-  and the `Decision:` extraction pattern from `Generate-Digest.ps1`:
-    \*\*[^*\n]*?Decision:\s*(?<full>.+?)\*\*\s*(?<reason>.+?)(\r?\n|$)
-
-acceptance:
-  - [ ] New `/suggest` command recognized in `Dispatch-Commands.ps1`'s command switch (alongside
-        `/status`, `/next`, etc.) — read-only, so it must work regardless of `$AUTOMATION_ENABLED`
-        (same treatment as `/status`/`/next`, not gated like `/run`/`/build`/`/go`).
-  - [ ] Add a `Get-SuggestReply` function that:
-        - reads every `**status:** pending` block in `planning/PROPOSALS.md`
-        - extracts each proposal's number, title, `AI-recommended priority` (P0–P3, default P3 if
-          absent), and its `▶ Decision` verdict + one-line reason
-        - filters to verdict `Approve` only (Park/Reject/Clarify recommendations are not "the next
-          build" — they should never be what `/suggest` surfaces)
-        - sorts by priority ascending (P0 highest) then by proposal number ascending (oldest first)
-          as the tie-break
-        - picks the single top result
-  - [ ] Reply format (example):
-        ```
-        PROP-014 -- Dark mode toggle in settings
-        -> recommend: Approve (aligns with Current Objective, low effort, requested twice)
-        Reply "Approve 14" (or Accept) to queue it.
-        ```
-  - [ ] If no pending proposal has an `Approve` verdict, reply with something honest and actionable,
-        e.g. `"Nothing pending recommends Approve right now. Capture an idea, or run /audit to look
-        for opportunities."` — never a bare error.
-  - [ ] No change to `/status`, `/next`, `/go`, `/run`, `/build`, `/review`, `/merge`, `/audit` (once
-        TASK-016 lands), `/stop`, `/enable`, `/disable`, `/log` behavior.
-
-constraints:
-  - Automation/OS-surface change (Hard Rule 10 / D-023): build solo, never chained.
-  - Red-zone surface (D-032) — review should land this at `status: approved` (held for `/merge`),
-    never auto-merged, regardless of how small the diff looks.
-  - Read-only: `/suggest` must never write to `PROPOSALS.md`, `BUILD_QUEUE.md`, or `TASKS.md`, and
-    must never invoke a phase runner (`run-claude.ps1`, `Run-Codex-Build.ps1`, etc.).
-  - No LLM call. If implementing this seems to require one to "rank well," that's a sign the scope
-    has grown — raise a blocker instead of adding a `claude -p` invocation here.
-
-test steps:
-  - [ ] With zero pending proposals: `/suggest` replies with the "nothing pending" message, not an
-        error or empty string.
-  - [ ] With 2+ pending proposals at different priorities, one `Approve`-recommended at P1 and one at
-        P3: `/suggest` recommends the P1 one.
-  - [ ] With only Park/Reject/Clarify-recommended pending proposals: `/suggest` replies with the
-        "nothing pending recommends Approve" message, not one of the non-Approve ones.
-  - [ ] Confirm `$AUTOMATION_ENABLED = $false` does not block `/suggest` (unlike `/go`/`/run`/`/build`/`/review`).
-
----
-
-<!-- ═══════════════════════════════════════════════════════
-     gap-2026-07-15 · /audit -- occasional deep scan that refills the proposal backlog
-     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
-     ═══════════════════════════════════════════════════════ -->
-
-### TASK-016 · Add `/audit`: on-demand app scan that writes new proposals (no schedule, no LLM at read time)
-status: blocked
-blocker:
-  - routing, not ambiguity: touches `tools/Dispatch-Commands.ps1` and adds `tools/Run-Audit.ps1` —
-    both under Codex's permanent `tools/` commit-scope deny-list (confirmed live on TASK-014). Needs
-    Claude to implement directly (same treatment as TASK-014/015/017), landing at `approved` for
-    human `/merge`, never routed to Codex.
-source: human request (2026-07-15 conversation) — wants a periodic, human-triggered deep scan that
-        "parks" findings so the cheap TASK-015 `/suggest` command always has fresh material, instead
-        of re-scanning the whole app on every single "what's next" check
-priority: P2
-depends-on: none
-files: tools/Dispatch-Commands.ps1, tools/Run-Audit.ps1 (new)
-
-context:
-  `PROMPTS.md` already defines PP1 (Internal Alpha Audit) and PP2 (UX Friction Audit) — interactive
-  prompts a human pastes into a Claude Code session. This task packages that same kind of analysis
-  into an on-demand Telegram command that writes its findings directly into `planning/PROPOSALS.md`
-  using the exact same Proposal contract Triage already uses (P9 in `PROMPTS.md`) — so nothing
-  downstream (the digest, `Accept`, `Approve N`, TASK-015's `/suggest`) needs to know or care whether
-  a proposal came from a human capture or from this audit.
-
-  Model `tools/Run-Audit.ps1` on `run-claude.ps1`'s existing Phase 0 (Preflight: repo exists, git
-  available, on `main`, clean tree) / Phase 2 (`claude -p` invocation, piped via STDIN per
-  `run-claude.ps1`'s existing Windows-PowerShell-5.1-safe pattern) / Phase 2b (commit-scope guard) /
-  lock-file structure (share `automation.lock` with the other phase runners) — do not invent a new
-  safety pattern when an identical one already exists and is proven.
-
-  The prompt itself should combine PP1 + PP2's analysis approach (read `docs/PROJECT.md`'s five core
-  jobs, walk the app's actual flows in `app.js`/`index.html`/`style.css`, tie every finding to a core
-  job) with P9's Triage OUTPUT contract (write each finding as one `### PROP-NNN` block in
-  `planning/PROPOSALS.md`, status `pending`, leading with `▶ Decision`, filling every field: goal
-  alignment vs the Current Objective, expected user value, evidence, effort/dependencies/confidence/
-  ambiguity, why now vs later, goal-adjusted `AI-recommended priority`). It must dedupe against
-  existing `planning/PROPOSALS.md` + `planning/ROADMAP.md` + `planning/DONE.md` exactly as Triage
-  already does, so re-running `/audit` doesn't re-propose the same finding twice.
+  **D-043 (`/audit` redesign):** `/audit` is on-demand only — never scheduled, never polled. It
+  triggers two ways: (1) a human sends `/audit` directly; (2) `/go`'s autopilot falls back to it
+  automatically, but ONLY when genuinely nothing else is queued (no `status: codex` task, nothing
+  unconverted in `BUILD_QUEUE.md`) — the same "no idea, just find something and build it" case the
+  human described wanting. Cost-gated two ways: a cheap `git diff <last-audited-commit>..HEAD --
+  app.js index.html style.css` runs BEFORE any LLM call — an empty diff means "nothing changed,
+  nothing new to look for," reported and exited with ZERO tokens spent, however many times `/go` is
+  pressed with nothing changing (the human's stated brain-fog-week worry). A non-empty diff (or a
+  stale/missing summary) triggers a real Claude session, but handed only the diff + the persisted
+  `planning/AUDIT_SUMMARY.md` notes, never the whole app again — except a full re-scan every 30 days
+  flat (one rule, not a count-or-time combo), so the incrementally-maintained summary's drift can't
+  compound indefinitely uncorrected. Findings flow through the exact same Proposal contract (and
+  therefore the exact same D-042 auto-promote gate) as a human capture — `Run-Audit.ps1` calls
+  `Invoke-AutoPromote.ps1` itself right after writing findings, so a Low-risk finding is immediately
+  queue-ready, and the SAME `/go` press that triggered the audit can also plan-convert and build it —
+  "find AND build," not "find, then wait for another press."
 
 acceptance:
-  - [ ] New `tools/Run-Audit.ps1`: same Preflight shape as `run-claude.ps1` (repo exists; git on PATH;
-        on `main`; working tree clean; required scripts/`claude` CLI present) — abort with the same
-        "AUTOMATION ABORTED" shape and exit code `2` on any failure, nothing attempted.
-  - [ ] Invokes exactly ONE `claude -p` session, restricted to reading `docs/PROJECT.md`,
-        `app.js`/`index.html`/`style.css`, `planning/ROADMAP.md`, `planning/PROPOSALS.md`,
-        `planning/DONE.md`, and writing ONLY `planning/PROPOSALS.md` — no `Bash(git commit *)` /
-        `Bash(git push *)` in `--allowedTools`, matching `run-claude.ps1`'s existing pattern.
-  - [ ] Caps new findings to a small number per run (5 — pick a constant, document it in a comment)
-        so a single `/audit` can't flood the backlog; if the session tries to add more, only the top
-        5 by goal-adjusted priority are kept.
-  - [ ] A deterministic commit-scope guard (reuse `run-claude.ps1`'s exact allow-list pattern, scoped
-        to `planning/PROPOSALS.md` only) runs after the session: any other changed file halts the run
-        uncommitted with an ALERT, exactly like the existing guard.
-  - [ ] On a clean pass, the script itself (never the LLM) stages, commits, and pushes exactly
-        `planning/PROPOSALS.md`.
-  - [ ] New `/audit` command wired into `Dispatch-Commands.ps1`'s switch, gated behind
-        `Test-AutomationEnabled` exactly like `/run`/`/build`/`/review`/`/go` (it mutates the repo).
-  - [ ] Reply summarizes outcome: how many new proposals were added (with their PROP numbers +
-        titles) or, if the audit found nothing new / deduped everything away, says so plainly rather
-        than replying with nothing.
-  - [ ] `-DryRun` support matching the other phase runners: shows what would run, writes nothing.
+  - [x] `planning/PROPOSALS.md`'s Proposal contract gains the `▶ Risk` field; header explains the
+        auto-promote behavior.
+  - [x] `PROMPTS.md` P9 and `run-claude.ps1`'s STEP A prompt both require Risk on every proposal.
+  - [x] `tools/Invoke-AutoPromote.ps1`: scans every `status: pending` proposal; auto-promotes only
+        `Decision: Approve` + `Risk: Low`; leaves everything else (other Decision, Risk: High, no
+        Risk field, already-decided) completely untouched. No LLM call.
+  - [x] Wired into `run-claude.ps1` between Phase 2 and Phase 2b.
+  - [x] `planning/AUDIT_SUMMARY.md` scaffold: `last-audited-commit` / `last-full-refresh` state lines
+        (script-owned) + prose sections (Claude-owned).
+  - [x] `tools/Run-Audit.ps1`: Preflight (repo/git/branch/clean-tree), git-diff gate before any LLM
+        call, 30-day flat full-refresh rule, capped at 5 new findings, commit-scope guard (only
+        `PROPOSALS.md`/`AUDIT_SUMMARY.md` from the LLM session), calls `Invoke-AutoPromote.ps1`
+        itself afterward, self-contained commit + push (same style as `Run-Merge.ps1`).
+  - [x] `/audit` wired into `Dispatch-Commands.ps1`'s switch, gated behind `$AUTOMATION_ENABLED`
+        (mutates the repo, same treatment as `/run`/`/build`/`/review`/`/go`).
+  - [x] `n8n-telegram-inbox.json`'s command regex + comment updated to recognize `audit` — learned
+        from `/merge` silently mis-routing as an unrecognized capture for a full day after D-036
+        shipped it; would have hit `/audit` too if left unfixed.
+  - [x] `Invoke-Autopilot`'s idle path: triggers the audit only when truly nothing is queued; if the
+        audit auto-promotes something, immediately runs Plan (`Invoke-RunPhase`) so the build loop
+        below can still pick it up in the same `/go` press; summary reports the audit's own result
+        when nothing else happened.
 
 constraints:
-  - Automation/OS-surface change (Hard Rule 10 / D-023): build solo, never chained.
-  - Red-zone surface (D-032) — review should land this at `status: approved` (held for `/merge`),
-    never auto-merged.
-  - Never edits `app.js`, `index.html`, or `style.css` — this command only ever reads the app, it
-    never changes it. It must not build, plan (`TASKS.md`/`PLAN.md`), or invoke Codex.
-  - No new Windows Scheduled Task, no cron, no polling — this is on-demand only, triggered solely by
-    a human sending `/audit`. Do not wire it into the twice-daily overnight run or any interval timer.
-  - Reuse `run-claude.ps1`'s Preflight/lock/commit-scope-guard code shape rather than reimplementing
-    it differently — if reuse genuinely isn't possible, raise a blocker explaining why before
-    inventing a parallel safety mechanism.
+  - Automation/OS-surface (Hard Rule 10 / D-023): solo, never chained.
+  - `/audit` never edits `app.js`/`index.html`/`style.css` — read-only against the app, exactly like
+    Triage is read-only against captures.
+  - No new scheduled task, cron, or polling loop for `/audit` — on-demand only, per the human's
+    explicit ask.
+  - Auto-promote never applies to a proposal missing the Risk field (safe default: treat as needing
+    a human reply, never guess risk retroactively for old proposals).
 
 test steps:
-  - [ ] `-DryRun`: confirm it reports what it would do without writing `PROPOSALS.md` or committing.
-  - [ ] Live, on a repo with no prior audit findings: `/audit` adds at least one new, real,
-        code-grounded proposal to `PROPOSALS.md` with every P9 field filled and a sensible
-        `AI-recommended priority`.
-  - [ ] Re-running `/audit` immediately after: does not re-add the same finding(s) (dedupe works).
-  - [ ] Preflight abort case: dirty tree → aborts with exit 2, nothing written, same shape as
-        `run-claude.ps1`'s existing Preflight failure.
-  - [ ] Commit-scope violation case (simulate the LLM touching an out-of-scope file): halts
-        uncommitted with an ALERT, exactly like the existing guard's behavior.
-  - [ ] Confirm `app.js`, `index.html`, `style.css` are byte-identical before/after any `/audit` run.
-  - [ ] Confirm `$AUTOMATION_ENABLED = $false` blocks `/audit` with the same refusal message
-        `/run`/`/build`/`/review`/`/go` already give.
+  - [x] `Invoke-AutoPromote.ps1` verified in isolation against a 5-proposal fixture: Approve+Low
+        promoted; Approve+High untouched; Approve+no-Risk-field untouched; Park+Low untouched;
+        already-decided untouched. `build:`/`priority:` fields in the resulting `BUILD_QUEUE.md`
+        block verified correct after fixing two regex mismatches found during this same testing.
+  - [x] `Run-Audit.ps1`'s mode-decision logic (fresh scaffold / recently-refreshed / stale /
+        exactly-at-the-30-day-boundary) verified in isolation against fixture summary text — all
+        four cases resolved correctly.
+  - [x] All changed `.ps1` files parse clean (`[System.Management.Automation.Language.Parser]::
+        ParseFile`); `n8n-telegram-inbox.json` re-validated as well-formed JSON after the raw-text
+        regex edit.
+  - [ ] Live (human-verified, next real idle `/go` or manual `/audit`): confirm a real audit run
+        produces a sensible finding, auto-promotes correctly, and the summary/state file updates as
+        expected.
 
 ---
 
