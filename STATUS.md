@@ -5,6 +5,43 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-16 — found and fixed the real reason /merge could never land anything (D-044, TASK-019)
+
+**What happened:** after the e2e suite fix (below) unblocked `npm test`, `/merge TASK-014 yes` and
+`/merge TASK-016 yes` still blocked, repeatedly, with "main is not an ancestor of task-X (it moved
+on). Rebase the branch, then /merge again" — even seconds after rebasing each branch onto main by
+hand and force-pushing. Rebased and retried three separate times; blocked the same way every time.
+
+**Root cause (confirmed by reading `claude-session.log` and the literal commit sequence on `main`,
+not guessed):** `Dispatch-Commands.ps1` commits an administrative "command received" marker to
+`main` immediately before dispatching to any handler, including `/merge` itself — its own Preflight
+needs a clean tree, and the just-arrived command file is an uncommitted change the moment n8n writes
+it. That marker commit advances `main` by exactly one commit every single time, so by the moment
+`Run-Merge.ps1` checked whether `main` was an ancestor of the branch, `main` had already moved past
+whatever the branch was rebased onto instants earlier, in the very same run. This is structural, not
+bad luck — no `/merge` could ever succeed through the normal Telegram dispatch path for this reason
+alone, regardless of how current the branch actually was.
+
+**Fix (TASK-019, held for `/merge`, D-044):** `Run-Merge.ps1` now auto-rebases the branch onto `main`
+when the ancestor check fails, before running `npm test` — clean rebase force-pushes the branch
+(never `main`) and continues; a real conflict still aborts and asks a human, unchanged. Verified both
+new code paths (clean rebase, conflicting rebase) in an isolated scratch repo before landing, since a
+bug in the merge gate itself is unusually expensive to discover live. Landed on branch `task-019`,
+held at `status: approved` for human `/merge` — same as every other automation-surface task tonight.
+
+**Also discovered along the way:** a separate, unrelated race — the PC-side dispatcher and n8n's own
+"clear OUTBOX after send" step both write to `captures/replies/OUTBOX.md` independently, with no
+coordination, so a local reply commit and n8n's clear-commit can fork from the same parent. Resolved
+twice tonight by resetting local `main` to origin (the forked local commit's content was always
+already-delivered and redundant) — not yet fixed at the root; worth a follow-up decision if it
+recurs.
+
+**Next:** human needs to `git rebase main` + force-push `task-019` one more time (the fix can't apply
+to its own first landing), then send `/merge TASK-019` and `/merge TASK-019 yes` via Telegram. Once
+that's in, retry `/merge TASK-014 yes` and `/merge TASK-016 yes` — they should land cleanly now.
+
+---
+
 ## 2026-07-16 — e2e suite blocker cleared: stale tests fixed, real Print-button regression found and restored; TASK-014/TASK-016 unblocked for /merge
 
 **Why this was urgent:** every `/merge` (TASK-014, then TASK-016) was failing with "npm test timed

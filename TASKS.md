@@ -997,6 +997,64 @@ test steps:
 
 ---
 
+### TASK-019 · `/merge` auto-rebases the branch when its own dispatch commit stales it
+status: approved
+review: Claude implemented directly (tools/, same D-040 reasoning as TASK-014/016/017/018 — Codex
+  cannot commit here). Held at `approved` for human `/merge`, not auto-merged — this is the merge
+  gate itself, squarely automation-surface/Hard-Rule territory. Verified the two new code paths
+  (clean auto-rebase, conflicting auto-rebase) in an isolated scratch git repo before landing, since
+  a bug in this exact file is unusually expensive to discover. The branch will need one manual
+  `git rebase main` + force-push immediately before this specific `/merge` lands, same as any other
+  held task caught by the bug this fixes — the fix cannot retroactively apply to its own first
+  landing.
+source: found live while repeatedly retrying `/merge TASK-014 yes` / `/merge TASK-016 yes`
+  (2026-07-16 conversation)
+priority: P0
+depends-on: none
+files: tools/Run-Merge.ps1
+
+context:
+  Both TASK-014 and TASK-016 blocked over and over with "MERGE BLOCKED: main is not an ancestor of
+  task-X (it moved on). Rebase the branch, then /merge again" — even seconds after being freshly
+  rebased onto main by hand. Root cause, confirmed by reading `claude-session.log` and the exact
+  commit sequence on `main`: `Dispatch-Commands.ps1` commits an administrative "command received"
+  marker to `main` immediately before dispatching to any handler (its own Preflight needs a clean
+  tree, and the freshly-arrived command file is itself an uncommitted change). That marker commit
+  advances `main` by exactly one commit every single time a `/merge` command is processed, so the
+  ancestor check in `Run-Merge.ps1` was checking against a `main` that had *already* moved past
+  whatever the branch was rebased onto, moments earlier, in the very same run. This is structural,
+  not incidental — no `/merge` could ever succeed through the normal dispatch path for this reason
+  alone, independent of the branch's real content. See DECISIONS.md D-044.
+
+acceptance:
+  - [x] `Run-Merge.ps1`: when the ancestor check fails, auto-rebase the branch onto `main`
+        (`git rebase main`) before running `npm test`.
+  - [x] Clean rebase: force-push the branch (`git push --force-with-lease origin <branch>`, never
+        `main`) and continue the merge normally.
+  - [x] Conflicting rebase: abort the rebase, check out `main`, block with a clear message asking a
+        human to resolve it by hand — the auto-rebase only removes the self-inflicted case, it does
+        not weaken the gate for a genuinely stale or conflicting branch.
+  - [x] The pre-existing ancestor check right before the actual fast-forward is left in place as a
+        final safety net (handles the rare case of something else landing on `main` during the
+        `npm test` window).
+  - [x] No change to any other gate (task must be `approved`, main/branch clean, npm test passes and
+        leaves the tree clean, fast-forward only).
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Never force-push `main` itself — only the task branch. This is the property every other
+    decision in this file depends on (main is append-only, safe for any clone to pull).
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Isolated scratch repo, guaranteed-conflict scenario (both branches edit the same line):
+        auto-rebase correctly detects the conflict (`$LASTEXITCODE -ne 0`), aborts, reports.
+  - [x] Isolated scratch repo, conflict-free scenario (branches touch different files): auto-rebase
+        completes cleanly (`$LASTEXITCODE -eq 0`), branch ends up correctly rebased onto main.
+  - [ ] Live (human-verified): a real `/merge TASK-019 yes` from Telegram lands this fix itself.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
