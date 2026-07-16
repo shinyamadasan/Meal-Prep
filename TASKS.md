@@ -788,7 +788,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-016 · Auto-promote (D-042) + redesigned `/audit` (D-043) — supersedes TASK-015
-status: approved
+status: done
 review: Claude implemented directly (same `tools/` reasoning as TASK-014/017/018 — Codex cannot
   commit here). Held at `approved` for human `/merge`, not auto-merged, same disclosed same-session
   build+review caveat as every other automation-surface item tonight. Landed on branch `task-016`
