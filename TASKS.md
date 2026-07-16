@@ -1015,6 +1015,60 @@ test steps:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-15 · /merge crash + silent -DryRun failure (D-041)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-018 · Fix array-splat parameter binding in Invoke-MergePhase/BuildPhase/ReviewPhase
+status: LANDED DIRECTLY ON MAIN (bootstrapping exception — see below), not held at `approved`
+review: This is the one case tonight that could NOT be held for `/merge` — `/merge` was the thing
+  broken, so there was no way to use it to land its own fix. Verified directly against the real
+  target scripts before landing: `/merge TASK-014` (summary) and `/merge TASK-014 yes` (Confirm,
+  forced `-DryRun` for safety) both bound correctly and produced expected output; `Run-Codex-Build.ps1
+  -DryRun` and `Run-Claude-Review.ps1 -DryRun` via the fixed pattern also bound correctly. Landed with
+  explicit human authorization for this specific bootstrapping step (2026-07-15 conversation), not a
+  general precedent for skipping the hold-for-`/merge` gate.
+source: found live while testing `/merge TASK-014` for real (2026-07-15 conversation)
+priority: P0
+depends-on: none
+files: tools/Dispatch-Commands.ps1
+
+context:
+  `Invoke-MergePhase`, `Invoke-BuildPhase`, and `Invoke-ReviewPhase` all built an array and splatted
+  it (`$a = @('-TaskId', $taskId); ... @a`), assuming array splatting binds `-Name value` pairs the
+  way hashtable splatting does. It doesn't — PowerShell array splatting is purely positional.
+  Confirmed empirically (plain function, builtin cmdlet, script files, switch-only and mandatory-
+  positional targets): every case silently or loudly mis-bound. For `/merge`: `'-TaskId'` itself got
+  bound to `Run-Merge.ps1`'s mandatory `$TaskId`, leaving the real task id nowhere to go — crashed
+  the whole dispatcher every time, so `/merge` has never worked over Telegram since D-036 shipped it
+  the day before. For `/build`/`/review`: no crash, but `-DryRun` silently never activated at all.
+  See DECISIONS.md D-041.
+
+acceptance:
+  - [x] `Invoke-MergePhase`: `$a` is now a hashtable (`@{ TaskId = $taskId }`, `Confirm`/`DryRun` keys
+        added conditionally), splatted the same way.
+  - [x] `Invoke-BuildPhase`/`Invoke-ReviewPhase`: same hashtable-splat conversion for `-DryRun`.
+  - [x] No change to any other function or command's behavior.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Bootstrapping exception to D-032/D-040's hold-for-`/merge` pattern — see review note above. Not
+    a precedent; every other automation-surface change still gets held.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Real `Run-Merge.ps1` invocation via the fixed pattern, summary mode: correct output, exit 0.
+  - [x] Real `Run-Merge.ps1` invocation via the fixed pattern, Confirm + forced `-DryRun`: correct
+        "[DRY RUN] would run the auto-merge gates..." output, exit 0.
+  - [x] Real `Run-Codex-Build.ps1 -DryRun` / `Run-Claude-Review.ps1 -DryRun` via the fixed pattern:
+        both responded sensibly (no crash) — build correctly reported the actual dirty-tree state at
+        the time, review correctly reported nothing pending.
+  - [ ] Live (human-verified): a real `/merge TASK-014` from Telegram now returns the summary instead
+        of crashing.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
