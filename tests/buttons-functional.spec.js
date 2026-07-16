@@ -16,10 +16,14 @@ const APP_URL = 'https://shinyamadasan.github.io/Meal-Prep/';
  */
 
 async function loadApp(page) {
-  // Suppress the first-run Help modal so it doesn't cover the page.
+  // Suppress the first-run Help modal AND the Kitchen Setup Wizard (which auto-opens
+  // whenever pantryOnboardingDone is unset, per seedPantryIfEmpty()) -- either one covers
+  // the whole page and blocks every click below. Same fix TASK-004 applied to
+  // mobile-layout.spec.js; this file never got it.
   await page.addInitScript(() => {
     try {
       localStorage.setItem('mealPrepHelpSeen', '1');
+      localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });

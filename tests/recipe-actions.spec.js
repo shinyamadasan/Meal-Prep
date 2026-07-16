@@ -16,6 +16,10 @@ async function loadWithSamples(page) {
       localStorage.clear();
       localStorage.setItem('mealPrepHelpSeen', '1');
       localStorage.setItem('mealPrepStartDone', '1');
+      // Kitchen Setup Wizard auto-opens whenever this is unset (seedPantryIfEmpty()) and
+      // covers the whole page, blocking every click below -- same fix TASK-004 applied to
+      // mobile-layout.spec.js; this file never got it.
+      localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
