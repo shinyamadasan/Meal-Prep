@@ -25,7 +25,9 @@
     3. branch exists and is clean
     4. npm test passes on the branch
     5. npm test left the tree clean
-    6. main is an ancestor of the branch (a true fast-forward -- never a merge commit)
+    6. main is an ancestor of the branch (a true fast-forward -- never a merge commit) -- if not,
+       the branch is auto-rebased onto main and force-pushed (D-044); a real conflict still blocks
+       and asks a human, this only closes the gap the dispatcher's own bookkeeping commit opens
 
   Writes its result to .last-phase-result.txt for Dispatch-Commands.ps1 to relay to Telegram.
 #>
@@ -185,6 +187,32 @@ if ($branchDirty.Count -gt 0) {
     Invoke-Git -C $root checkout main | Out-Null
     Write-Result "MERGE BLOCKED: $branchName has $($branchDirty.Count) uncommitted change(s). main was not changed."
     exit 1
+}
+
+# Auto-rebase (D-044). Dispatch-Commands.ps1 commits an administrative "received" marker to
+# main immediately before invoking this script -- its own Preflight requires that, since the
+# freshly-arrived command file would otherwise be an uncommitted change. That means main has
+# ALREADY moved on by exactly that commit every single time a /merge command reaches here, even
+# when the branch was rebased moments earlier: the ancestor check further down would never pass
+# through the normal dispatch path, and every merge would dead-end on "main is not an ancestor"
+# regardless of how current the branch actually is (confirmed live -- this blocked TASK-014 and
+# TASK-016 repeatedly). Auto-rebase closes that self-inflicted gap for the ordinary, conflict-free
+# case; a genuine conflict still stops here and asks a human, same as before.
+Invoke-Git -C $root merge-base --is-ancestor main $branchName | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    $rebaseOutput = Invoke-Git -C $root rebase main 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Git -C $root rebase --abort | Out-Null
+        Invoke-Git -C $root checkout main | Out-Null
+        Write-Result "MERGE BLOCKED: $branchName conflicts with main and could not be auto-rebased. Rebase it by hand, then /merge again. main was not changed.`n`n$rebaseOutput"
+        exit 1
+    }
+    Invoke-Git -C $root push --force-with-lease origin $branchName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Git -C $root checkout main | Out-Null
+        Write-Result "MERGE BLOCKED: $branchName auto-rebased cleanly, but the force-push failed (someone else pushed to it concurrently). Try /merge again. main was not changed."
+        exit 1
+    }
 }
 
 # npm test on the BRANCH, not on main -- we are about to make the branch become main.
