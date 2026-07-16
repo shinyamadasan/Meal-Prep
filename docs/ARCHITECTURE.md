@@ -68,7 +68,7 @@ FoodData Central API with `DEMO_KEY` (D-007).
 `INGREDIENT_DB`, showing name, unit, category, price, and store.
 
 ## Safety / cross-cutting
-- All user strings pass `escapeHtml()` before `innerHTML`; shared content passes `stripTagsDeep()`.
+- All user strings pass `escapeHtml()` before `innerHTML`.
 - Global error handler: `window.addEventListener('error', …)` shows a dismissable banner.
 - Firebase App Check (reCAPTCHA v3) protects Firestore/Auth.
 
