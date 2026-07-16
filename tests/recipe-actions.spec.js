@@ -28,6 +28,7 @@ async function loadWithSamples(page) {
 
 test('clicking a sample recipe card opens the editor (numeric id)', async ({ page }) => {
   await loadWithSamples(page);
+  await page.locator('.tab-btn[data-tab="recipes"]').click(); // recipe cards live in the Recipes tab
   const cards = page.locator('.recipe-card');
   expect(await cards.count()).toBeGreaterThan(0);
 
@@ -42,6 +43,7 @@ test('clicking a sample recipe card opens the editor (numeric id)', async ({ pag
 
 test('serving +/- works on a sample recipe', async ({ page }) => {
   await loadWithSamples(page);
+  await page.locator('.tab-btn[data-tab="recipes"]').click(); // recipe cards live in the Recipes tab
   const card = page.locator('.recipe-card').first();
   const servings = card.locator('.current-servings');
   const before = (await servings.textContent()).trim();

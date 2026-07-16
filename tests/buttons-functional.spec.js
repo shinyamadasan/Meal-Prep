@@ -32,7 +32,7 @@ async function loadApp(page) {
 }
 
 async function openTab(page, tab) {
-  const inMore = ['ingredients', 'hacks'].includes(tab); // moved under the "More" menu
+  const inMore = ['ingredients', 'hacks', 'nutrition'].includes(tab); // moved under the "More" menu
   if (inMore) await page.locator('.tab-more-btn').click();
   await page.locator(`${inMore ? '.tab-more-menu ' : ''}.tab-btn[data-tab="${tab}"]`).click();
   await expect(page.locator(`#${tab}`)).toHaveClass(/active/);
@@ -63,9 +63,12 @@ test.describe('Tab navigation', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Modals open and close', () => {
-  test('Help: ? opens, "Got it" closes', async ({ page }) => {
+  test('Help: Settings -> "How to use this app" opens, "Got it" closes', async ({ page }) => {
     await loadApp(page);
-    await page.locator('.help-btn').click();
+    await page.locator('.tab-more-btn').click();
+    await page.locator('.tab-more-menu').getByRole('button', { name: /Settings/ }).click();
+    await expect(page.locator('#settings-modal')).toBeVisible();
+    await page.getByRole('button', { name: /How to use this app/ }).click();
     await expect(page.locator('#help-modal')).toBeVisible();
     await page.locator('#help-modal').getByRole('button', { name: 'Got it' }).click();
     await expect(page.locator('#help-modal')).toBeHidden();
@@ -73,6 +76,7 @@ test.describe('Modals open and close', () => {
 
   test('Add New Recipe: opens the recipe form, close button dismisses', async ({ page }) => {
     await loadApp(page);
+    await openTab(page, 'recipes');
     await page.locator('#add-recipe-btn').click();
     await expect(page.locator('#recipe-modal')).toBeVisible();
     await expect(page.locator('#recipe-form')).toBeVisible();
@@ -82,6 +86,7 @@ test.describe('Modals open and close', () => {
 
   test('Paste Recipe: opens and cancels', async ({ page }) => {
     await loadApp(page);
+    await openTab(page, 'recipes');
     await page.getByRole('button', { name: /Paste Recipe/ }).click();
     const modal = page.locator('.modal:not(.hidden)');
     await expect(modal).toBeVisible();
@@ -100,18 +105,24 @@ test.describe('Modals open and close', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-test.describe('Data menu', () => {
-  test('⋯ Data toggles the menu panel', async ({ page }) => {
+test.describe('Settings modal — Data', () => {
+  async function openSettings(page) {
+    await page.locator('.tab-more-btn').click();
+    await page.locator('.tab-more-menu').getByRole('button', { name: /Settings/ }).click();
+    await expect(page.locator('#settings-modal')).toBeVisible();
+  }
+
+  test('Settings shows the Export Data row', async ({ page }) => {
     await loadApp(page);
-    await page.getByRole('button', { name: /Data/ }).first().click();
-    await expect(page.locator('#data-menu-panel')).toBeVisible();
+    await openSettings(page);
+    await expect(page.locator('#settings-modal').getByRole('button', { name: /Export Data/ })).toBeVisible();
   });
 
   test('Export Data downloads a file', async ({ page }) => {
     await loadApp(page);
-    await page.getByRole('button', { name: /Data/ }).first().click();
+    await openSettings(page);
     const downloadPromise = page.waitForEvent('download');
-    await page.locator('#data-menu-panel').getByRole('button', { name: /Export Data/ }).click();
+    await page.locator('#settings-modal').getByRole('button', { name: /Export Data/ }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.json$/i);
   });
@@ -119,21 +130,27 @@ test.describe('Data menu', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Pantry (My Fridge)', () => {
+  async function addPantryItem(page, name) {
+    await page.locator('#pantry-input').fill(name);
+    await page.locator('#pantry-body').getByRole('button', { name: /Add/ }).first().click();
+  }
+
   test('add an item into a chosen section', async ({ page }) => {
     await loadApp(page);
     await openTab(page, 'fridge');
-    await page.locator('#pantry-input').fill('Test Ice Cream');
-    await page.locator('#pantry-add-where').selectOption('freezer');
-    await page.locator('#pantry-body').getByRole('button', { name: /Add/ }).first().click();
+    // "Mixed Berries" is a known INGREDIENT_DB item stored in the freezer, so its
+    // section is inferred automatically -- there's no manual storage picker anymore.
+    await addPantryItem(page, 'Mixed Berries');
 
-    // It shows up under the Freezer section.
-    await expect(page.locator('.pt-name', { hasText: 'Test Ice Cream' })).toBeVisible();
+    await expect(page.locator('.pi-name', { hasText: 'Mixed Berries' })).toBeVisible();
     await expect(page.getByText('In the Freezer')).toBeVisible();
   });
 
   test('staple pill cycles Full/OK/Low', async ({ page }) => {
     await loadApp(page);
     await openTab(page, 'fridge');
+    // The pantry starts empty; add a known staple so a .pt-level pill exists.
+    await addPantryItem(page, 'Salt');
     const pill = page.locator('.pt-level').first();
     await expect(pill).toBeVisible();
     const before = (await pill.textContent()).trim();
@@ -144,7 +161,11 @@ test.describe('Pantry (My Fridge)', () => {
   test('Date mode toggles bought <-> expires', async ({ page }) => {
     await loadApp(page);
     await openTab(page, 'fridge');
+    await addPantryItem(page, 'Salt');
+    // .pt-datemode lives in the row's expand panel -- open it first.
+    await page.locator('.pi-name', { hasText: 'Salt' }).click();
     const toggle = page.locator('.pt-datemode').first();
+    await expect(toggle).toBeVisible();
     const before = (await toggle.textContent()).trim();
     await toggle.click();
     await expect(toggle).not.toHaveText(before);
@@ -153,13 +174,13 @@ test.describe('Pantry (My Fridge)', () => {
   test('setting a staple to Low adds it to the grocery list', async ({ page }) => {
     await loadApp(page);
     await openTab(page, 'fridge');
+    await addPantryItem(page, 'Salt');
 
-    // Find a known seeded staple row and set it Low (default OK -> one tap = Low).
-    const saltRow = page.locator('tr', { has: page.locator('.pt-name', { hasText: 'Salt' }) });
+    const saltRow = page.locator('.pi-item', { has: page.locator('.pi-name', { hasText: 'Salt' }) });
     const pill = saltRow.locator('.pt-level');
     await expect(pill).toBeVisible();
-    // Cycle until it reads "Low".
-    for (let i = 0; i < 3 && (await pill.textContent()).trim() !== 'Low'; i++) {
+    // Cycle (empty -> full -> ok -> low) until it reads "Low".
+    for (let i = 0; i < 4 && (await pill.textContent()).trim() !== 'Low'; i++) {
       await pill.click();
     }
     await expect(pill).toHaveText('Low');
@@ -218,7 +239,7 @@ test.describe('Grocery list', () => {
 
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.getByRole('button', { name: /Copy List/ }).click();
+    await page.getByRole('button', { name: /^Copy$/ }).click();
     await page.waitForTimeout(300);
     expect(errors).toEqual([]);
   });
