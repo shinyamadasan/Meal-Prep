@@ -1518,6 +1518,94 @@ test steps:
   - [ ] Delete one recipe that was in the last session; reopen; confirm no crash.
   - [ ] Run `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
 
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-16/17 · symmetric builder/reviewer engine fallback on quota exhaustion (D-048)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-029 · Codex↔Claude builder/reviewer fallback on quota exhaustion + self-healing (D-048)
+status: approved
+review: Claude implemented directly (tools/, same D-040 reasoning as TASK-014/016/017/018/019/020/021/
+  022/024 — Codex cannot commit there). Held at `approved` for human `/merge`, not auto-merged — same
+  disclosed same-session build+review caveat as every other automation-surface item this session.
+  Quota-detection regex verified in isolation against 11 representative pass/fail strings (11/11
+  correct); builder-identity extraction regex verified against 5 representative commit-message strings
+  (5/5 correct); both changed `.ps1` files parse clean via
+  `[System.Management.Automation.Language.Parser]::ParseFile`. Land with `/merge TASK-029` then
+  `/merge TASK-029 yes` when ready.
+source: human question "if codex doesnt have enough tokens, then this workflow wont work?" followed by
+  "can we make the builder claude also if codex runs out of tokens? what about self healing" and then
+  "I also want this vice versa, if claude cant review... codex can take over" (2026-07-16/17
+  conversation) — corrected mid-design after "so you are telling me claude can review and build its
+  own, but codex cant do that?" exposed an inconsistent first draft (see D-048's Context)
+priority: P1
+depends-on: none
+files: tools/Run-Codex-Build.ps1, tools/Run-Claude-Review.ps1, tools/CODEX_REVIEW_INSTRUCTIONS.md (new),
+  AGENTS.md, docs/DECISIONS.md
+
+context:
+  Every prior run had exactly one engine wired per role — `codex exec` builds, Claude reviews — with
+  no automatic recovery if that engine ran out of quota or was briefly unavailable; the task would
+  simply sit blocked (build side) or the review would just fail (review side) until a human noticed.
+  See DECISIONS.md D-048 for the full design history, including the self-review-inconsistency
+  correction.
+
+acceptance:
+  - [x] `Run-Codex-Build.ps1`: builder invocation extracted into `Invoke-BuilderEngine` (parameterized
+        by engine); `Test-QuotaExhaustionSignal` added; on a quota signal or missing-CLI failure (never
+        a normal build failure), automatically retries the SAME task on the SAME branch with the other
+        engine, discarding the failed attempt's partial changes first (`git reset --hard` + `git clean
+        -fd`).
+  - [x] Landing commit records builder identity (`"<id>: built via codex"` / `"built via claude
+        (fallback after ...)"`) instead of a new `TASKS.md` field.
+  - [x] Double-engine build failure (both tried, both quota-signal): tracked tasks marked `blocked`
+        with an `auto:`-prefixed note, reusing `Invoke-Autopilot`'s existing rework-strike auto-release
+        logic (capped at 3) rather than inventing a second retry mechanism.
+  - [x] `Run-Claude-Review.ps1`: reviewer invocation made pluggable (`Invoke-ReviewerEngine`, mirroring
+        the builder's pattern); same quota-signal detection and single fallback retry, discarding
+        partial state first.
+  - [x] `tools/CODEX_REVIEW_INSTRUCTIONS.md` (new): the Codex-as-reviewer contract — no `Task` tool, no
+        Guardian Gauntlet, must say so explicitly in `REVIEW.md`, must never choose `status: done`
+        (reuses the existing "gauntlet didn't run → `approved` at most" clause, no new verdict logic).
+        Invoked via the short, parameterized `codex exec ... "Review TASK-<id>"`, mirroring the
+        already-verified `"Continue"` contract rather than risking a large inline prompt argument.
+  - [x] `AGENTS.md` documents `Review TASK-<id>` as an exceptional, wrapper-only invocation — explicit
+        that a human should never type it directly, and that Codex must not fall back to normal
+        `Continue` behavior mid-review.
+  - [x] After any review (fallback or not), the runner checks via `git log` on the branch whether the
+        same engine both built and reviewed the task and, if so, appends a plain, non-blocking
+        self-review disclosure to the result.
+  - [x] No change to any existing gate: commit-scope guards (build deny-list, review allow-list),
+        verdict rules, risk-gated merge status selection, and auto-merge gates are all unchanged and
+        engine-agnostic.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Red-zone surface (D-032: "the AI Dev OS / automation itself") — held at `approved`, never
+    auto-merged.
+  - Fallback triggers ONLY on a detected quota/capacity signal or a missing CLI — never on a normal
+    task/review failure (an unmet acceptance criterion, a real bug, a REWORK verdict are not failures
+    of the engine and must never trigger a silent second attempt with a different engine).
+  - Self-review is never blocked or prevented — only disclosed. Same trade-off already accepted for
+    Claude-only installs; D-048 requires naming it out loud whenever a fallback causes it, not
+    forbidding it.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile` on both changed `.ps1` files: no
+        syntax errors.
+  - [x] `Test-QuotaExhaustionSignal` tested in isolation against 11 representative strings (rate-limit,
+        quota, 429, insufficient-quota, resource-exhausted, usage-limit phrasing vs. unrelated errors
+        and empty/null input): 11/11 correct.
+  - [x] Builder-identity extraction regex tested in isolation against 5 representative commit-message
+        strings (plain build, fallback build, partial-progress-only, unrelated commit, review commit):
+        5/5 correct, including correctly resolving the fallback case to the actual builder (`claude`)
+        even though the commit message also mentions `codex` in its parenthetical.
+  - [ ] Live (human-verified): a real quota-exhaustion or forced-unavailable scenario for each engine,
+        in each role, confirms the fallback actually fires, lands correctly, and discloses both the
+        fallback and any resulting self-review in the Telegram-relayed result.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
