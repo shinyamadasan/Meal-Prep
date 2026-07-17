@@ -4,46 +4,39 @@
 
 ## Goal
 
-Fix a real automation gap found live (`/go` not triaging idle captures per DECISIONS.md D-035) and
-add two new proactive commands the human explicitly requested: `/suggest` (a cheap "what's next"
-recommendation, no LLM call) and `/audit` (an occasional deep app scan that refills the proposal
-backlog). All three are automation/OS-surface work, not app features — the previous milestone
-(BQ-018..022) is complete.
+Close four real user-reported gaps from alpha use (PROP-030/031/033/034), all auto-promoted
+Low-risk P2 items via D-042. The previous milestone (TASK-014..016: automation gap fixes +
+/audit redesign) is complete — all TASK-014..024 are `status: done` or `status: approved`
+(the approved tasks are held at the `/merge` gate, not outstanding implementation work).
 
 ## Approach
 
-- Same file-order = build-order rule: TASK-014 (P1) before TASK-015 (P2) before TASK-016 (P2).
-- All three are Hard Rule 10 / D-023 High risk (touch `tools/Dispatch-Commands.ps1` and, for
-  TASK-016, a new `tools/Run-Audit.ps1`) — solo build, never chained.
-- D-032 red zone ("the AI Dev OS / automation itself") — review must land each at `status:
-  approved` (held for a human `/merge`), never auto-merged, regardless of diff size.
-- TASK-016 explicitly models its Preflight/lock/commit-scope-guard on `run-claude.ps1`'s existing
-  code shape rather than inventing a new safety pattern.
+- File order = build order: TASK-025 (P2) → TASK-026 (P2) → TASK-027 (P2) → TASK-028 (P2).
+- All four are app-feature/bug tasks touching `app.js` and `index.html` only — no automation
+  scripts, no Firestore/sync/auth paths (per D-042 auto-promote gate, Risk: Low). Reviews should
+  land at `status: done` (auto-merge eligible) unless a specific diff unexpectedly touches a
+  Hard Rule surface.
+- Each task is independently testable; no cross-task dependencies.
 
 ## Scope
 
 **In:**
-- TASK-014 (P1) — fix `Invoke-Autopilot`'s "Plan once" trigger to also fire on untriaged
-  `captures/inbox/` items, matching D-035's documented (but unimplemented) behavior
-- TASK-015 (P2) — `/suggest`: pure-PowerShell, no-LLM recommendation of the single best pending
-  proposal, ranked by goal-adjusted priority
-- TASK-016 (P2) — `/audit`: on-demand Claude session (PP1 + PP2 analysis + P9's output contract)
-  that writes new, deduped proposals into `planning/PROPOSALS.md`
+- TASK-025 (P2) — BQ-023: recipe paste nutrition parse + stop instructions at Nutrition header
+- TASK-026 (P2) — BQ-024: one-tap "Clear expired" pantry action with explicit tombstoning
+- TASK-027 (P2) — BQ-025: voice bulk-add auto-newline per spoken ingredient (no manual Enter)
+- TASK-028 (P2) — BQ-026: Prep Mode active session persisted to localStorage (survive close)
 
 **Out:**
-- Any change to `/run`, `/build`, `/review`, `/merge`, `/status`, `/next`, `/stop`, `/enable`,
-  `/disable` behavior
-- Any new scheduled task, cron, or polling mechanism for `/audit` — on-demand only, human-triggered
-- Updating `GUIDE.md` with `/suggest`/`/audit` before they actually exist
+- PROP-032 (cloud sync failure, Risk: High) — awaiting human review before any BUILD_QUEUE entry
+- BQ-013/014/015 — still deferred; no change to their status
 
 ## Source
 
-- TASK-014/015/016 authored directly to `TASKS.md` from a live conversation (2026-07-14/15) — no
-  `BUILD_QUEUE.md`/`PROPOSALS.md` trail exists for these; the human found/requested them in chat,
-  not via the capture pipeline.
+- BQ-023..026: auto-promoted 2026-07-16 via D-042 (Decision: Approve + Risk: Low in PROPOSALS.md)
+- No BUILD_QUEUE item existed for TASK-014..016; those were authored directly from live chat.
 
 ## Status
 
-in-progress — TASK-014/015/016 authored 2026-07-15, all at `status: codex`, awaiting Codex
-execution in file order. The prior milestone (BQ-018..022 P2/P3 UX batch) is **complete** — all of
-TASK-006..013 are `status: done`.
+in-progress — TASK-025..028 authored 2026-07-17, all at `status: codex`, awaiting Codex
+execution in file order. TASK-017/021/022/024 are `status: approved`, held at the `/merge` gate
+— each needs `/merge TASK-NNN yes` to land on main.

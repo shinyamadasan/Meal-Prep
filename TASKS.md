@@ -1285,6 +1285,239 @@ test steps:
   - [ ] Live (human-verified): a real `/merge TASK-024 yes` lands it, and no further OUTBOX-race
         friction recurs across subsequent /merge cycles.
 
+<!-- ═══════════════════════════════════════════════════════
+     BQ-023 · Recipe paste: parse nutrition block + stop instructions at Nutrition header
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-025 · Recipe paste: parse nutrition block and stop instructions at Nutrition header
+status: codex
+owner: codex
+source: BQ-023
+priority: P2
+depends-on: none
+files: app.js
+
+context:
+  `parseRecipeText()` (app.js) currently captures everything after the `Instructions:` section
+  into the recipe's `instructions` field — it never stops at a `Nutrition` header, so the
+  published nutrition block from structured recipe sites (panlasangpinoy, AllRecipes, etc.) is
+  appended into `instructions` verbatim (pre-existing bug, confirmed PROP-030). The Recipe model
+  already stores `nutritionPerServing` (calories, carbs, protein, fat, fiber, sodium) but the
+  parser doesn't populate it — macros are estimated from `LOCAL_NUTRITION_DB` /
+  `patchMissingNutrition()` instead, even when the pasted page supplies exact per-serving values.
+
+  Typical nutrition line format (`|`-delimited, from PROP-030 example):
+    Calories: 284kcal | Carbohydrates: 15g | Protein: 14g | Fat: 20g | Saturated Fat: 4g |
+    Cholesterol: 31mg | Sodium: 793mg | Potassium: 1242mg | Fiber: 5g | Sugar: 6g | …
+  Some sites use newline-separated `Key: value` lines instead — handle both.
+  Extra micros (saturated fat, cholesterol, potassium, sugar, vitamins, calcium, iron) are
+  silently dropped; the 6-field `nutritionPerServing` model is NOT extended.
+
+acceptance:
+  - [ ] `parseRecipeText()` stops appending to `instructions` when a line matches
+        `/^(nutrition(al(\s+info(rmation)?)?)?|notes):?\s*$/i` (case-insensitive standalone
+        header line) — no other change to how ingredients, servings, prep/cook time are parsed
+  - [ ] After the Nutrition stop-point, the parser scans remaining lines for a nutrition block:
+        (a) a single `|`-delimited `Key: value | Key: value …` line, or
+        (b) consecutive `Key: value` lines (newline-per-nutrient format)
+  - [ ] Parsed values mapped to `nutritionPerServing`: `Calories` → `calories` (strip `kcal`/`cal`),
+        `Carbohydrates`/`Carbs` → `carbs` (strip `g`), `Protein` → `protein` (strip `g`),
+        `Fat` (not Saturated Fat) → `fat` (strip `g`), `Fiber` → `fiber` (strip `g`),
+        `Sodium` → `sodium` (strip `mg`). Keys are case-insensitive; a `Fat` match must not
+        accidentally capture `Saturated Fat`.
+  - [ ] When at least `calories` is parsed, set all six `nutritionPerServing` fields from the
+        block (nutrients not found default to `0`).
+  - [ ] When the pasted text has NO `Nutrition` header, the parser leaves `nutritionPerServing`
+        unmodified — the existing `patchMissingNutrition()` estimation still runs as today.
+  - [ ] No change to the paste-recipe modal UI, the post-parse save flow, or any code path
+        other than `parseRecipeText()` itself.
+  - [ ] `node --check app.js` passes.
+
+constraints:
+  - Do not add a parsing library — regex and string splits only.
+  - Do not change the `nutritionPerServing` model shape or add new Recipe fields.
+  - Do not modify `patchMissingNutrition()` or `LOCAL_NUTRITION_DB`.
+  - If on reading `parseRecipeText()` the stop-point cannot be added cleanly, raise a blocker
+    rather than restructuring the whole parser.
+
+test steps:
+  - [ ] Paste the PROP-030 example (Ginisang Pechay): confirm `instructions` contains none of
+        `Calories / Carbohydrates / Protein / Sodium` and `nutritionPerServing` =
+        `{calories:284, carbs:15, protein:14, fat:20, fiber:5, sodium:793}`
+  - [ ] Paste a recipe with no `Nutrition` header: confirm `instructions` is unchanged from
+        today and `nutritionPerServing` is still estimated (not zeroed out)
+  - [ ] Paste a recipe with a newline-per-nutrient nutrition block: confirm parsing works
+  - [ ] Run `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     BQ-024 · Pantry: one-tap "Clear expired" action
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-026 · Add "Clear expired" button to pantry header (bulk-delete all expired items)
+status: codex
+owner: codex
+source: BQ-024
+priority: P2
+depends-on: none
+files: app.js, index.html
+
+context:
+  Users can mark pantry items with `expiryDate` (card expand, or `exp:DATE` from TASK-008) but
+  there is no fast path to remove all expired items at once — only one-by-one card delete.
+  TASK-011 established the mandatory explicit-tombstone pattern for bulk deletes: set
+  `AppState.deletions[String(id)] = new Date().toISOString()` for EVERY deleted id BEFORE
+  calling `saveData()`, bypassing `recordLocalDeletions()`'s MASS_DELETE_GUARD (D-029, which
+  ignores batches > 5 simultaneous disappearances). This task reuses that exact pattern.
+
+  Expired = `item.expiryDate` is truthy AND `new Date(item.expiryDate) < todayMidnight`
+  where `todayMidnight = new Date(new Date().toDateString())`.
+
+acceptance:
+  - [ ] A "Clear expired" button appears in the pantry section header near the existing
+        Select/search controls — rendered ONLY when at least one item in `AppState.pantry`
+        is expired (per the definition above); hidden otherwise
+  - [ ] Clicking "Clear expired" opens a confirm dialog: "Remove N expired item(s) from your
+        pantry?" where N = count of expired items. Use the existing `showConfirmDialog()`.
+  - [ ] On confirm: for each expired item, set
+        `AppState.deletions[String(item.id)] = new Date().toISOString()`, then remove it from
+        `AppState.pantry`, then call `saveData()` once and `renderPantry()` — all tombstones
+        set BEFORE the single save call.
+  - [ ] Items with no `expiryDate` or `expiryDate >= today` are untouched.
+  - [ ] After deletion, the button is hidden if no expired items remain.
+  - [ ] TASK-011 "Select" mode state is unaffected (exits cleanly if "Clear expired" is used
+        while Select is active).
+  - [ ] `node --check app.js` passes.
+
+constraints:
+  - CRITICAL: explicit tombstone per item BEFORE `saveData()` — do NOT rely on
+    `recordLocalDeletions()`'s diff to capture bulk deletes (D-029 guard blocks batches > 5).
+  - Do not change the single-item delete path or the Select-mode bulk delete from TASK-011.
+  - Match existing pantry header control style; minimize CSS additions.
+  - If any Prep Mode recipe-step state references `AppState.pantry` items by id, raise a
+    blocker rather than silently clearing them from under an active session.
+
+test steps:
+  - [ ] Add 3 pantry items: 1 expired (yesterday), 1 expiring tomorrow, 1 no expiry.
+        Confirm "Clear expired" button is visible.
+  - [ ] Click "Clear expired"; dialog shows "Remove 1 expired item(s)…"; confirm → only the
+        yesterday item disappears; the other two remain.
+  - [ ] Reload; confirm the deleted item is gone and the other two persist.
+  - [ ] With only non-expiring items, confirm "Clear expired" is hidden.
+  - [ ] Bulk-delete 6+ expired items; reload; confirm all stay deleted (tombstone test).
+        Flag as human-verified if not automatable.
+  - [ ] Run `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     BQ-025 · Bulk add voice: auto-newline each recognized item
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-027 · Bulk add voice: auto-insert newline after each recognized item (no manual Enter)
+status: codex
+owner: codex
+source: BQ-025
+priority: P2
+depends-on: none
+files: app.js
+
+context:
+  PROP-033: current voice bulk-add requires the user to press Enter between each spoken
+  ingredient, making the flow a tap-type hybrid instead of truly hands-free. The fix is to
+  auto-append a newline after each FINAL speech recognition result so the next spoken item
+  lands on its own line automatically.
+
+  Before writing code: trace the voice-add flow. Find the `SpeechRecognition` handler
+  (likely near `openBulkAddVoice()` / `#bulk-add-textarea`). Confirm whether each `result`
+  event appends to the textarea or replaces it, and whether interim vs final results are
+  handled separately. If the implementation cannot be extended cleanly, raise a blocker.
+
+acceptance:
+  - [ ] After each FINAL `SpeechRecognition` result is appended to `#bulk-add-textarea`,
+        a newline (`\n`) is automatically inserted — the user does NOT need to press Enter
+        or tap between items
+  - [ ] Speaking two items in sequence ("Chicken thigh 500g" then pause then "Garlic 3 cloves")
+        produces two separate lines in the textarea with no manual input
+  - [ ] Each appended item is trimmed of leading/trailing whitespace before the newline is added
+  - [ ] Interim (in-progress) recognition results are NOT auto-newlined; only the FINAL result
+        for each utterance gets the trailing newline
+  - [ ] Manual typing between voice entries still works; the textarea remains editable
+  - [ ] The existing Speak button toggle, mic icon state, and stop-voice flow are unchanged
+  - [ ] `node --check app.js` passes.
+
+constraints:
+  - Do not add silence-detection or pause-length logic — the newline after a final result is
+    sufficient; do not change `SpeechRecognition` config (language, interimResults setting, etc.)
+  - Do not change `confirmBulkAdd()` parsing — it already handles one item per line
+  - No HTML or CSS changes
+  - If interim results are currently appended (not just shown), only the final result gets the
+    auto-newline; interim content is replaced by the final result as today
+
+test steps:
+  - [ ] Open Bulk Add, tap Speak, say "Chicken thigh 500g" then pause; confirm a line appears
+        and the cursor is on the next line automatically (no manual Enter)
+  - [ ] Say "Garlic 3 cloves" next; confirm it appears as a second separate line
+  - [ ] Submit the textarea as-is; confirm both items parse correctly into the pantry
+  - [ ] Run `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     BQ-026 · Prep Mode: persist active session across browser close
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-028 · Persist Prep Mode active session to localStorage (survive browser close/reopen)
+status: codex
+owner: codex
+source: BQ-026
+priority: P2
+depends-on: none
+files: app.js
+
+context:
+  PROP-034: starting a Prep Mode work session and closing the browser reverts to the "Start
+  Work" prompt on reopen — the active session state is not persisted. The fix must identify
+  whether the relevant Prep Mode state already lives in `AppState` (and therefore in the
+  existing `saveData()` path) or only in memory, then fix accordingly.
+
+  Before writing code: trace `renderPrepMode()` to understand the exact shape of an "active"
+  Prep Mode session — which recipes, current step index or equivalent. Determine whether this
+  state is already in `AppState` (fix: read it back correctly in `renderPrepMode()`) or
+  transient (fix: add it to AppState so `saveData()` captures it). The two approaches differ:
+    (A) Already in AppState → `renderPrepMode()` isn't restoring it; fix the read path only.
+    (B) Transient → add to AppState; persist via the existing `saveData()` call.
+  If the state includes non-JSON-serializable values, raise a blocker first.
+
+acceptance:
+  - [ ] Starting a Prep Mode work session persists the active state so it survives a browser
+        close (via approach A or B above, whichever the code trace indicates)
+  - [ ] On app load / `renderPrepMode()` run, the active session is restored and the user sees
+        their in-progress session rather than the "Start Work" prompt
+  - [ ] Ending the session (existing end/stop action) clears the persisted state so the next
+        open shows "Start Work"
+  - [ ] If the persisted session references recipes since deleted, the restore degrades
+        gracefully: falls back to "Start Work" or filters missing recipes — no crash
+  - [ ] No change to Prep Mode UX beyond the restore behavior; no new UI elements
+  - [ ] `node --check app.js` passes.
+
+constraints:
+  - Prefer approach A (minimal fix) if available; use approach B (add to AppState) only if
+    the session state is genuinely transient.
+  - If approach B introduces a new localStorage key, add a note in `CHANGELOG.md` flagging
+    it for Claude to document in `docs/DATA_MODEL.md` at review.
+  - Do not change how Prep Mode calculates or displays recipe steps.
+  - Hard Rule 5: any new persist call must go through `saveData()`, not `saveToLocalStorage()`
+    alone, so the signed-in user's cloud copy stays in sync.
+
+test steps:
+  - [ ] Start a Prep Mode session with 1–2 recipes; close the browser tab completely.
+  - [ ] Reopen the app; confirm Prep Mode shows the in-progress session (not "Start Work").
+  - [ ] End the session; close and reopen; confirm "Start Work" is shown (session cleared).
+  - [ ] Delete one recipe that was in the last session; reopen; confirm no crash.
+  - [ ] Run `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` — 0 broken.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

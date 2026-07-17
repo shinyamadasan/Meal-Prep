@@ -5,6 +5,21 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-17 — Autonomous triage + plan run: 0 new captures; 4 tasks converted from BUILD_QUEUE (BQ-023..026)
+
+**STEP A (Triage):** All 33 inbox captures already `status: triaged` — nothing to do.
+
+**STEP B (Plan conversion):** BQ-023..026 (auto-promoted 2026-07-16, all Risk: Low / P2) converted to TASK-025..028 in TASKS.md. PLAN.md updated to reflect the new milestone.
+
+- **TASK-025** — BQ-023: recipe paste nutrition parse + stop instructions at Nutrition header
+- **TASK-026** — BQ-024: "Clear expired" pantry button (bulk-delete expired items, explicit tombstone)
+- **TASK-027** — BQ-025: voice bulk-add auto-newline per spoken ingredient (no manual Enter)
+- **TASK-028** — BQ-026: Prep Mode session persisted to localStorage (survive browser close)
+
+**Next:** Codex picks up TASK-025 (P2, first `status: codex` in file order). TASK-017/021/022/024 still `status: approved`, each needs `/merge TASK-NNN yes` to land.
+
+---
+
 ## 2026-07-16 — Triage run: 13 inbox captures processed, 5 new proposals (PROP-030..034)
 
 **Triage only. No tasks changed, no code touched.**
