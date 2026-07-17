@@ -1526,7 +1526,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-029 · Codex↔Claude builder/reviewer fallback on quota exhaustion + self-healing (D-048)
-status: approved
+status: done
 review: Claude implemented directly (tools/, same D-040 reasoning as TASK-014/016/017/018/019/020/021/
   022/024 — Codex cannot commit there). Held at `approved` for human `/merge`, not auto-merged — same
   disclosed same-session build+review caveat as every other automation-surface item this session.
