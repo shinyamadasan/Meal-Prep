@@ -79,7 +79,7 @@ foreach ($docPath in $docScopes.Keys) {
 }
 
 if ($findings.Count -eq 0) {
-    Write-Host "No drift found -- every checkable identifier in $($docsToCheck -join ', ') still exists in app.js/index.html/style.css."
+    Write-Host "No drift found -- every checkable identifier in $($docScopes.Keys -join ', ') still exists in app.js/index.html/style.css."
     exit 0
 }
 
