@@ -481,3 +481,17 @@ Why: This is optional and additive by design (CLAUDE.md's Simplicity First: "no 
 Trade-off: The DSL is deliberately weak (literal substring only, no regex, no "check this function's body does X") — it can confirm a guard clause's KEY PHRASE still exists, not that the guard's logic is still correct. That's the same trade D-045 made: a narrow, always-safe check beats a powerful one that needs an LLM (or worse, `eval`) to run.
 
 Supersedes: nothing. Sibling to D-045, not a replacement — D-045 catches broad identifier drift automatically; this catches specific, human-flagged correctness claims.
+
+## D-047 — Retry the OUTBOX/command-file push instead of silently dropping it on rejection
+
+Task: TASK-024, fixing the recurring friction logged in `docs/AI_OS_NOTES.md` · 2026-07-16
+
+Context: `Dispatch-Commands.ps1`'s two per-command commit+push sites — the "received" status marker on `captures/commands/*.md`, and the reply append to `captures/replies/OUTBOX.md` — never checked whether the push actually succeeded. n8n's independent reply-clearing step (`n8n-telegram-replies.json`) polls and pushes to the same `OUTBOX.md` on its own schedule, uncoordinated with this script. Whenever the two land close together, the dispatcher's push is rejected (non-fast-forward) and, since the result was never checked, the commit sits orphaned in the local clone — later surfacing as a confusing, unrelated-looking rebase conflict on whatever task branch happens to be rebased next. Hit five separate times in one session (see `docs/AI_OS_NOTES.md`'s 2026-07-16 entry), each time requiring a human/Claude to manually diagnose "is this orphaned commit's content already delivered, safe to discard?" before proceeding.
+
+Decision: A shared `Invoke-CommitPushWithRetry` helper wraps both commit sites. On push rejection, it fetches origin, `git reset --hard origin/main` (discarding the just-created local commit), then re-runs a `Reapply` scriptblock that re-derives the SAME change from values already in scope (never from the stale pre-reset file) and retries — up to 5 attempts with a short increasing backoff. This is always safe because the discarded commit only ever touched a file this script alone owns the write path for, and was never seen or acted on by anyone else (it never reached origin).
+
+Why: The two commits this touches only ever change a status field or append a reply — there is no meaningful content to reconcile, only a fast-forward race to win. Retrying with a fresh re-derivation is strictly better than either the old silent-drop behavior or a git-level conflict resolution (which nearly always hit an unresolvable content conflict, since one side's "append" and the other's "clear" touch the exact same lines).
+
+Trade-off: Verified against a real simulated race (two git clones plus a bare "origin," one racing a conflicting push ahead of the other) rather than trusting the logic on inspection alone — D-044's own addendum (TASK-020) already showed that skipping this step misses real bugs. `MaxAttempts = 5` is a judgment call, not a derived number, chosen to comfortably exceed the race window actually observed (a few seconds) without risking a long hang if something is more persistently wrong.
+
+Supersedes: nothing. Closes the gap the D-040 addendum and `docs/AI_OS_NOTES.md` both flagged as not-yet-fixed-at-the-root.

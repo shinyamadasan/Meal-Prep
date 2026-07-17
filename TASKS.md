@@ -1239,6 +1239,52 @@ test steps:
   - [x] Cross-checked the OUTBOX-race and TASKS-to-main claims against this session's actual git
         history before writing them down, rather than relying on memory of what happened.
 
+---
+
+### TASK-024 · Fix the OUTBOX.md / command-file push race at the root (retry, don't drop)
+status: approved
+owner: claude
+source: docs/AI_OS_NOTES.md's 2026-07-16 OUTBOX-race entry, fixed same-day at the user's request
+  ("so why doont we fix it now")
+priority: P1
+depends-on: none
+files: tools/Dispatch-Commands.ps1
+
+context:
+  Dispatch-Commands.ps1's two per-command commit+push sites (the "received" status marker on
+  captures/commands/*.md, and the reply append to OUTBOX.md) never checked whether the push actually
+  succeeded. n8n's independent reply-clearing step polls and pushes to the same OUTBOX.md on its own
+  schedule, uncoordinated with this script -- when the two land close together, the dispatcher's push
+  is silently rejected and the commit sits orphaned locally, later surfacing as a confusing rebase
+  conflict on an unrelated branch. Hit five times in one session, each requiring manual diagnosis.
+  See DECISIONS.md D-047.
+
+acceptance:
+  - [x] New shared `Invoke-CommitPushWithRetry` helper: on push rejection, fetch + reset --hard to
+        origin's fresh tip, re-run a `Reapply` scriptblock that re-derives the change from in-scope
+        values (never the stale file), retry -- up to 5 attempts with a short increasing backoff.
+  - [x] Applied to both commit sites (the "received" marker and the OUTBOX.md reply).
+  - [x] The reply site's pre-existing `Write-Reply` call (unconditional, before the DryRun-gated
+        block) is NOT duplicated by the reapply block on the first attempt -- only re-invoked on an
+        actual retry after a reset.
+  - [x] No change to any other command's behavior.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - The reset --hard is only ever applied to a commit this same script just created and never pushed
+    -- never to a commit that reached origin or that any other actor could have seen.
+  - Held at `approved` for human `/merge`, not auto-merged, matching every other automation-surface
+    task this session (D-040).
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Real simulated race in an isolated sandbox: bare "origin" repo + two clones ("dispatcher" and
+        "n8n"). Dispatcher stages a change against a stale base; n8n commits and pushes a conflicting
+        change first; dispatcher's retry function correctly rejects on attempt 1, fetches/resets/
+        reapplies, and succeeds on attempt 2 -- final origin content correct, no orphaned commits.
+  - [ ] Live (human-verified): a real `/merge TASK-024 yes` lands it, and no further OUTBOX-race
+        friction recurs across subsequent /merge cycles.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
