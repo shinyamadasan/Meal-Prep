@@ -1154,7 +1154,7 @@ test steps:
 ---
 
 ### TASK-022 · `DECISIONS.md` verify-pointer mechanism (tools/Verify-Decisions.ps1)
-status: approved
+status: done
 owner: claude
 source: "ok lets do these" -- second of three follow-ups approved during the "less babysitting"
   philosophy discussion (2026-07-16 conversation)
