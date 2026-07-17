@@ -66,3 +66,23 @@ Promote a new batch from `planning/ROADMAP.md` to activate the next run.
 - source: PROP-028 · priority: P3 · approved: 2026-07-04 (digest reply)
 - build: P3 — power-user shortcut; extends PROP-012. Revisit after alpha stabilize.
 - detail: see PROP-028 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-023 — Recipe paste: parse published nutrition block + stop instructions at Nutrition header
+- source: PROP-030 · priority: P2 · approved: 2026-07-16 (auto-promoted, Risk: Low)
+- build: Low-risk bug fix + accuracy improvement — pasted recipe pages already contain per-serving macros the app silently discards; the instruction parser swallows the whole Nutrition block as text, corrupting stored instructions.
+- detail: see PROP-030 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-024 — Pantry: one-tap "Clear expired" action to remove all expired items
+- source: PROP-031 · priority: P2 · approved: 2026-07-16 (auto-promoted, Risk: Low)
+- build: Closes the expiry-tracking lifecycle — users can mark items with expiry dates but have no fast path to purge them when they expire; individual delete via card edit is too slow for a pantry of expired items.
+- detail: see PROP-031 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-025 — Bulk add voice: pressing Enter between each spoken ingredient is friction
+- source: PROP-033 · priority: P2 · approved: 2026-07-16 (auto-promoted, Risk: Low)
+- build: Clear voice-UX gap — each spoken ingredient requires a manual Enter/newline before the next, breaking the hands-free pantry-scan flow.
+- detail: see PROP-033 in planning/PROPOSALS.md (evidence, ambiguity, likely files)
+
+### BQ-026 — Prep Mode: active session state lost when app is closed and reopened
+- source: PROP-034 · priority: P2 · approved: 2026-07-16 (auto-promoted, Risk: Low)
+- build: Session-continuity regression — a work session started in Prep Mode should survive a browser close/tab refresh; reverting to "Start Work" loses track of the user's place mid-cook.
+- detail: see PROP-034 in planning/PROPOSALS.md (evidence, ambiguity, likely files)

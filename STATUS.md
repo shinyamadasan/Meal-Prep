@@ -5,6 +5,22 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-16 — Triage run: 13 inbox captures processed, 5 new proposals (PROP-030..034)
+
+**Triage only. No tasks changed, no code touched.**
+
+- **PROP-030** — Recipe paste: parse published nutrition block + stop instructions at Nutrition header. P2 feature+bug. Approve + Risk: Low → queued for D-042 auto-promote.
+- **PROP-031** — Pantry: one-tap "Clear expired" action to remove all expired items. P2 feature. Approve + Risk: Low → queued for D-042 auto-promote.
+- **PROP-032** — Cloud sync failure: Firestore save silently failing, data saving to local only. P1 bug. Approve + Risk: **High** → will NOT auto-promote; needs human review before merge.
+- **PROP-033** — Bulk add voice: pressing Enter between each spoken ingredient is friction. P2 UX. Approve + Risk: Low → queued for D-042 auto-promote. (Expiry date complaint in same message may be pre-TASK-008 or voice-mode gap — investigate separately before creating new proposal.)
+- **PROP-034** — Prep Mode: active session state lost when app is closed and reopened. P2 bug. Approve + Risk: Low → queued for D-042 auto-promote.
+- **8 rejected as noise:** /continue, Continue, empty /feature, "routing test meal prep", "test", /merge TASK-014 (already executed), "s", and 1 single-char message.
+- **STEP B (BUILD_QUEUE → TASKS conversion):** nothing to do — all non-deferred BUILD_QUEUE items (BQ-016..022) already have corresponding done tasks in TASKS.md; BQ-013/014/015 remain deferred.
+
+**Next:** PROP-030/031/033/034 will auto-promote to BUILD_QUEUE via Invoke-AutoPromote.ps1 after this session commits. PROP-032 (High risk) awaits your explicit Approve/Park reply before moving to BUILD_QUEUE. TASK-017/021/022/024 are still `status: approved` — each needs `/merge TASK-NNN yes` to land on main.
+
+---
+
 ## 2026-07-16 — TASK-014 and TASK-016 both landed; the /merge saga is closed
 
 **Resolution.** After D-044 (auto-rebase) landed, its first live run crashed the dispatcher outright

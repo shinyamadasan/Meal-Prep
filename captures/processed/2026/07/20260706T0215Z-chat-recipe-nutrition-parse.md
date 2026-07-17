@@ -6,6 +6,7 @@ captured: 2026-07-06T02:15:00.000Z
 via: chat
 msg_id: chat
 status: triaged
+triaged: 2026-07-16
 ---
 
 Add-recipe paste is good, but I wish it were easier and could parse the WHOLE thing — including the
@@ -56,3 +57,6 @@ Notes from a code read of the current parser (`parseRecipeText`, app.js):
 Ask: parse the nutrition block into `nutritionPerServing` when the pasted text provides it (prefer the
 page's published values over the estimate), and stop instruction capture at the Nutrition/Notes header
 so it stops polluting the instructions.
+
+---
+**Triage:** PROP-030 — Recipe paste: parse nutrition block + stop instructions at Nutrition header. P2 feature+bug. Routed to PROPOSALS.md.

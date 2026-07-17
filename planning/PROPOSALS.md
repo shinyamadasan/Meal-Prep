@@ -404,6 +404,76 @@
 
 ---
 
+### PROP-030 — Recipe paste: parse published nutrition block + stop instructions at Nutrition header
+- **▶ Decision: Approve.** Low-risk bug fix + accuracy improvement — pasted recipe pages already contain per-serving macros the app silently discards; the instruction parser swallows the whole Nutrition block as text, corrupting stored instructions.
+- **▶ Risk: Low** — `app.js` parser only; writes into `nutritionPerServing` fields the Recipe model already stores; no Firestore/sync/tombstone path touched.
+- **type:** feature + bug · **source captures:** 20260706T0215Z-chat-recipe-nutrition-parse (×1)
+- **goal alignment:** supports — North-star #1 (accurate core loop). `parseRecipeText()` estimates nutrition from `LOCAL_NUTRITION_DB` even when the pasted page supplies exact per-serving values. The bug (instruction capture running past the `Nutrition` header) means the nutrition block ends up appended into the recipe's `instructions` field on every structured paste.
+- **expected user value:** High for anyone pasting from structured recipe sites (panlasangpinoy, AllRecipes, Yummy.ph, etc.) — gets accurate macros without re-entry and clean instructions text.
+- **evidence:** 1 enriched capture with a real paste example and a code trace confirming: (a) `parseRecipeText()` returns no nutrition at all, (b) the published Nutrition block maps 1:1 to the 6 fields in `nutritionPerServing` (calories/carbs/protein/fat/fiber/sodium), (c) instruction capture never stops at a `Nutrition` header so those lines pollute `instructions`. Pre-existing bug, reproducible on every paste from a structured recipe page.
+- **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** extra micros (sat fat, cholesterol, potassium, vitamins) have no home in the current model — drop them silently; don't add new fields (out of scope). Need a robust regex for the `|`-delimited nutrition line (some sites use commas or newlines).
+- **why now vs later:** Now — the instruction-pollution bug is live on every paste from a structured recipe site; fixing the parser is additive and self-contained.
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-07-16 (auto-promoted: Decision Approve + Risk Low, D-042)
+
+---
+
+### PROP-031 — Pantry: one-tap "Clear expired" action to remove all expired items
+- **▶ Decision: Approve.** Closes the expiry-tracking lifecycle — users can mark items with expiry dates but have no fast path to purge them when they expire; individual delete via card edit is too slow for a pantry of expired items.
+- **▶ Risk: Low** — additive bulk-delete button; reuses the explicit tombstone path from TASK-011 (`AppState.deletions[String(id)] = now` before `saveData()`); no new sync path.
+- **type:** feature · **source captures:** 20260712T0949Z-358-unknown (×1), 20260712T1003Z-362-unknown (×1, same thread)
+- **goal alignment:** supports — North-star #1 (friction) + #2 (accurate data). Expired items appear on pantry cards but require manual one-by-one removal. Closing the cycle ("check what's expired → remove in one tap") makes expiry tracking feel complete, not half-finished.
+- **expected user value:** Medium–High — particularly valuable after a week of disuse when multiple items have expired; eliminates the tedious per-card delete loop.
+- **evidence:** 2 captures from a single conversation thread (msg 358 + 362); user independently arrived at the "completing the cycle" framing, the right mental model. No existing proposal covers bulk expired-item removal.
+- **effort:** S · **dependencies:** none (reuses tombstone + `saveData()` path from TASK-011) · **confidence:** high · **ambiguity:** placement — a "Clear expired" button in the pantry header bar alongside existing Select/Search controls; confirm dialog before deletion. Expired = `expiryDate` is set and `expiryDate < today`. Items with no `expiryDate` are unaffected.
+- **why now vs later:** Now — expiry dates are actively used (TASK-008 shipped per-line expiry dates); the cleanup half of the cycle is missing and the user noticed immediately.
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-07-16 (auto-promoted: Decision Approve + Risk Low, D-042)
+
+---
+
+### PROP-032 — Cloud sync failure: Firestore save silently failing, data saving to local only
+- **▶ Decision: Approve.** P1 bug — if Firestore writes fail silently, the user loses cloud backup without knowing it; next sign-in on a different device would restore an older snapshot.
+- **▶ Risk: High** — diagnosis and fix touch the Firestore write path (`saveToFirestore()`, `AppState.cloudReady` guard, or auth state) — the exact D-032 red zone. Will NOT auto-promote; needs human review before merge.
+- **type:** bug · **source captures:** 20260712T1006Z-364-unknown (×1)
+- **goal alignment:** strongly supports — North-star #2 (never lose data). Silent cloud-save failure breaks the `saveData()` dual-write contract: the "cloud copy is your safety net" guarantee silently disappears without any user signal.
+- **expected user value:** High — any signed-in user trusting the cloud backup is silently at risk until fixed.
+- **evidence:** 1 capture; user reports "failure to save in cloud." Possible causes: auth token expiry, Firestore quota, network failure with no retry, or `cloudReady` stuck at false after an auth hiccup. Root cause needs a code trace of `saveToFirestore()` and its error-handling path.
+- **effort:** M · **dependencies:** none · **confidence:** med (root cause unclear — need to read `saveToFirestore()` + callers in `saveData()`) · **ambiguity:** transient (network) vs persistent (auth/token/quota) failure; whether an error toast already exists but isn't visible enough
+- **why now vs later:** P1 — data durability regression; investigate before next alpha user invite.
+- **AI-recommended priority:** **P1**
+- **status:** pending
+
+---
+
+### PROP-033 — Bulk add voice: pressing Enter between each spoken ingredient is friction
+- **▶ Decision: Approve.** Clear voice-UX gap — each spoken ingredient requires a manual Enter/newline before the next, breaking the hands-free pantry-scan flow.
+- **▶ Risk: Low** — additive voice-mode UX change in `app.js`; no sync/storage/auth path touched. (The same capture also noted expiry dates "don't auto save" — TASK-008 shipped `exp:YYYY-MM-DD` keyword support with a hint line; verify that resolves the expiry complaint before opening a separate proposal for it.)
+- **type:** feature/UX · **source captures:** 20260714T2310Z-399-unknown (×1)
+- **goal alignment:** supports — North-star #1 (reduce friction in stock entry). Voice bulk add is a phone-first feature; requiring Enter between items turns a hands-free flow into a tap-type hybrid.
+- **expected user value:** Medium–High for phone users who use voice to add pantry items while scanning the fridge/counter. The Enter-per-item friction likely causes users to switch to typing or to abandon mid-session.
+- **evidence:** 1 capture from active phone use; user explicitly names the Enter friction ("that is also a friction"). Voice-first is the stated user preference (see memory). Related expiry complaint may be pre-TASK-008 or about voice mode specifically — investigate separately.
+- **effort:** S–M · **dependencies:** none · **confidence:** high (voice friction is clearly real and new) · **ambiguity:** current voice-add flow needs a code trace — does speaking an item auto-submit it, or does transcript land in the textarea waiting for Enter? If the latter, the fix is a "separator-free" mode (pause-detected submit, or a list-of-items session separated by natural pauses).
+- **why now vs later:** P2 — real phone-use friction; voice add is the fastest bulk-entry path and the Enter requirement undermines it.
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-07-16 (auto-promoted: Decision Approve + Risk Low, D-042)
+
+---
+
+### PROP-034 — Prep Mode: active session state lost when app is closed and reopened
+- **▶ Decision: Approve.** Session-continuity regression — a work session started in Prep Mode should survive a browser close/tab refresh; reverting to "Start Work" loses track of the user's place mid-cook.
+- **▶ Risk: Low** — additive localStorage persist of Prep Mode UI state; no Firestore/sync/auth path touched (session state is transient per-user, not shared).
+- **type:** bug · **source captures:** 20260715T1345Z-405-unknown (×1)
+- **goal alignment:** supports — North-star #1 (don't undo user context). A cook who closes the browser mid-prep expects to continue, not restart. Related to the Prep Mode gap in ROADMAP Known Issues ("no batch-cook ingredient aggregation") but distinct — that is about cooking optimization; this is about session continuity.
+- **expected user value:** Medium — affects users who use Prep Mode actively and close the app on their phone between cooking steps (phone-down while cooking, other apps, screen lock).
+- **evidence:** 1 capture from active use; user specifically describes the pattern: "tracking something → close app → reverts to starting 'work' instead of continuing."
+- **effort:** S · **dependencies:** none · **confidence:** high · **ambiguity:** "tracking something" most likely = Prep Mode's active work session (the "Start Work" button state + current step); needs a code trace of `renderPrepMode()` to confirm what Prep Mode state lives in memory vs what's persisted to `AppState` + localStorage.
+- **why now vs later:** P2 — real session-continuity gap in a core phone workflow; losing state mid-cook is jarring.
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-07-16 (auto-promoted: Decision Approve + Risk Low, D-042)
+
+---
+
 ## Proposal contract
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```
