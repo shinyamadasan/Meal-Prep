@@ -1105,7 +1105,7 @@ test steps:
 ---
 
 ### TASK-021 · Docs-vs-code consistency checker (tools/Check-DocsConsistency.ps1)
-status: approved
+status: done
 owner: claude
 source: "ok lets do these" -- first of three follow-ups approved during the "less babysitting"
   philosophy discussion (2026-07-16 conversation), prioritized after the /merge blocker (TASK-019/020)
