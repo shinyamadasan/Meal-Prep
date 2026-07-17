@@ -1242,7 +1242,7 @@ test steps:
 ---
 
 ### TASK-024 · Fix the OUTBOX.md / command-file push race at the root (retry, don't drop)
-status: approved
+status: done
 owner: claude
 source: docs/AI_OS_NOTES.md's 2026-07-16 OUTBOX-race entry, fixed same-day at the user's request
   ("so why doont we fix it now")
