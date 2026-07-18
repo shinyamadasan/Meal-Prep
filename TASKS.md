@@ -1614,7 +1614,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-030 · Retry Run-Merge.ps1's final push-to-main with rebase, not reset (D-047 addendum)
-status: approved
+status: done
 review: Claude implemented directly (tools/, same D-040 reasoning as every other automation-surface
   item this session — Codex cannot commit there). Held at `approved` for human `/merge`, not
   auto-merged. Verified against a real simulated version of the exact failure (bare origin + two
