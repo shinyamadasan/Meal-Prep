@@ -37,11 +37,13 @@ If docs disagree with code about behavior, fix the docs.
 1. Read `CLAUDE.md` only once at session start.
    Do not repeatedly reload `CLAUDE.md` unless it changes.
    Treat it as persistent operating instructions for the session.
-2. Read `STATUS.md` for current state, blockers, and last shipped work.
-3. Read `TASKS.md` to understand active Claude-to-Codex handoffs.
-4. If doing Claude planning, read `PLAN.md` and the relevant approved inputs from `planning/BUILD_QUEUE.md`.
-5. If doing Claude review, read the branch diff, `CHANGELOG.md`, `TEST_REPORT.md`, and `REVIEW.md`.
-6. Pull only the task-specific docs listed in "What to read".
+2. Read `HANDOFF.md` if present for the latest thread-reset checkpoint. Treat it as context only;
+   `STATUS.md` and `TASKS.md` remain the source of truth.
+3. Read `STATUS.md` for current state, blockers, and last shipped work.
+4. Read `TASKS.md` to understand active Claude-to-Codex handoffs.
+5. If doing Claude planning, read `PLAN.md` and the relevant approved inputs from `planning/BUILD_QUEUE.md`.
+6. If doing Claude review, read the branch diff, `CHANGELOG.md`, `TEST_REPORT.md`, and `REVIEW.md`.
+7. Pull only the task-specific docs listed in "What to read".
 
 Do not load every doc by default. Keep context focused.
 
@@ -59,17 +61,18 @@ run the Next Command (see `## Next Command` below) before anything else.
 
 If conversation context is lost or a new session begins:
 
-1. Read `STATUS.md`.
-2. Read `PLAN.md`.
-3. Read `TASKS.md`.
-4. Read `REVIEW.md`.
-5. Determine:
+1. Read `HANDOFF.md` if present.
+2. Read `STATUS.md`.
+3. Read `PLAN.md`.
+4. Read `TASKS.md`.
+5. Read `REVIEW.md`.
+6. Determine:
    - current milestone
    - active task
    - current owner
    - blockers
-6. Resume from the existing project state.
-7. Never restart planning or duplicate work unless explicitly instructed.
+7. Resume from the existing project state.
+8. Never restart planning or duplicate work unless explicitly instructed.
 
 ## Agent Roles
 

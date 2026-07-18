@@ -53,6 +53,10 @@ One press = **one task, all the way through**: plan → Codex builds on a branch
 audits it → Claude reviews → merges → deploys. A sleeping PC wakes itself to do it. Press `/go`
 again for the next task.
 
+When `/go` finishes a task cleanly, or when it finds nothing approved/build-ready, the dispatcher
+updates `HANDOFF.md` and adds a **Thread reset checkpoint** to the Telegram reply. That is the safe
+moment to start a fresh AI thread without manually summarizing the old conversation.
+
 **Evening · ~1 min**
 
 Look at the app. Good → leave it. Wrong → revert the commit. That is the whole review.
