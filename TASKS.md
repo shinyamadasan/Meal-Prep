@@ -1669,6 +1669,70 @@ test steps:
   - [ ] Live (human-verified): a future `/merge ... yes` that happens to race an OUTBOX-clearing cycle
         recovers automatically instead of needing manual `git push origin main` recovery.
 
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-17/18 · full push-to-main retry audit, six more sites found (D-047 addendum)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-031 · Retry every remaining unprotected push-to-main site (D-047 addendum)
+status: approved
+review: Claude implemented directly (tools/ + run-claude.ps1, same D-040 reasoning as every other
+  automation-surface item this session — Codex cannot commit there). Held at `approved` for human
+  `/merge`, not auto-merged. All six sites use the same rebase-based retry pattern already verified
+  live for TASK-030 (`Run-Merge.ps1`); no new mechanism, just the same fix applied everywhere it was
+  missing. All changed files parse clean.
+  Land with `/merge TASK-031` then `/merge TASK-031 yes` when ready.
+source: user asked "should we move to this already?" after the Level 2→3 AI-adoption discussion
+  identified "audit every other push-to-main site" as the direct next step from TASK-030 (2026-07-17/18
+  conversation) — confirmed to go ahead with all six, one by one
+priority: P1
+depends-on: none
+files: tools/Run-Claude-Review.ps1, tools/Run-Audit.ps1, tools/Dispatch-Commands.ps1, run-claude.ps1,
+  docs/DECISIONS.md
+
+context:
+  `grep -rn "push origin main" tools/*.ps1 run-claude.ps1` after TASK-030 landed found six more
+  unretried push-to-main sites with the exact same shape as `Run-Merge.ps1`'s. Full detail (which
+  site, how often each is actually hit, and the two independent bugs found in `Set-AutomationFlag`)
+  is in docs/DECISIONS.md D-047's TASK-031 addendum — not duplicated here.
+
+acceptance:
+  - [x] `Run-Claude-Review.ps1`'s `Invoke-AutoMerge` (highest-traffic site — every reversible task's
+        auto-merge) retries with rebase on push rejection, same 5-attempt convention as TASK-030.
+  - [x] `Run-Audit.ps1`'s push retries the same way.
+  - [x] `Dispatch-Commands.ps1`'s `Publish-TasksChange` retries; on exhausted failure or conflict,
+        logs a warning to claude-session.log rather than staying silent (it has no return value any
+        of its 5 callers check, so this is the minimal honest fix rather than widening its contract).
+  - [x] `Dispatch-Commands.ps1`'s `Set-AutomationFlag` retries; ALSO no longer unconditionally
+        reports "Automation enabled/disabled" when the push actually failed — a second, independent
+        bug found in the same pass.
+  - [x] `run-claude.ps1`'s three sites (Apply-Decisions commit, plan-conversion commit, digest
+        refresh) share one local `Push-MainWithRetry` helper (single file, unlike the other sites
+        which duplicate per this repo's convention) and retry the same way, falling through to the
+        existing `Halt-Automation` on exhausted failure or conflict.
+  - [x] Re-ran the same grep after all six fixes: every remaining `push origin main` hit is either
+        inside a retry loop's own call or a human-facing message string — none are bare/unretried.
+  - [x] docs/DECISIONS.md D-047 gains a second addendum documenting all six sites and the fix.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Red-zone surface (D-032) — held at `approved`, never auto-merged.
+  - Same rebase-not-reset rule as TASK-030: never discard the commit being pushed on conflict —
+    rebase or report-and-stop only.
+  - Duplicate the retry logic per file (matching this repo's existing convention), except within a
+    single file's own multiple sites, where sharing one local helper is the more natural fit.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile` on all four changed `.ps1` files:
+        no syntax errors.
+  - [x] `grep -rn "push origin main" tools/*.ps1 run-claude.ps1` re-run after the fixes: confirmed
+        every hit resolves to a retry loop's internal call or a message string, not a bare push.
+  - [ ] Live (human-verified): a future auto-merge, audit run, `/enable`/`/disable`, or scheduled
+        planning run that happens to race an OUTBOX-clearing cycle recovers automatically instead of
+        needing manual `git push origin main` recovery.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
