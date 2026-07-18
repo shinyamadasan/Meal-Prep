@@ -1677,7 +1677,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-031 · Retry every remaining unprotected push-to-main site (D-047 addendum)
-status: approved
+status: done
 review: Claude implemented directly (tools/ + run-claude.ps1, same D-040 reasoning as every other
   automation-surface item this session — Codex cannot commit there). Held at `approved` for human
   `/merge`, not auto-merged. All six sites use the same rebase-based retry pattern already verified
