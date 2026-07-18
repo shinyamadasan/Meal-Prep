@@ -1606,6 +1606,69 @@ test steps:
         in each role, confirms the fallback actually fires, lands correctly, and discloses both the
         fallback and any resulting self-review in the Telegram-relayed result.
 
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     gap-2026-07-17 · /merge's final push race silently destroyed a real merge (D-047 addendum)
+     Risk: High · Execution: NOT chained (automation/OS surface — Hard Rule 10 / D-023)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-030 · Retry Run-Merge.ps1's final push-to-main with rebase, not reset (D-047 addendum)
+status: approved
+review: Claude implemented directly (tools/, same D-040 reasoning as every other automation-surface
+  item this session — Codex cannot commit there). Held at `approved` for human `/merge`, not
+  auto-merged. Verified against a real simulated version of the exact failure (bare origin + two
+  clones; one pushes an unrelated commit first, the other holds the merge commit and runs the same
+  retry-with-rebase loop): recovered on attempt 2, both commits survived to origin. File parses clean.
+  Land with `/merge TASK-030` then `/merge TASK-030 yes` when ready.
+source: found live while landing TASK-029 (2026-07-17) — the operator's own confirmed `/merge TASK-029
+  yes` silently lost its merge to exactly the race D-047 was built to survive, one script over
+priority: P0
+depends-on: none
+files: tools/Run-Merge.ps1, docs/DECISIONS.md
+
+context:
+  `Run-Merge.ps1`'s final `git push origin main` (after the ff-only merge + status-flip commit) had
+  no retry at all. When it lost the race against an unrelated commit landing on origin first (n8n's
+  reply-clearing step, or — as happened live — the dispatcher's OWN later OUTBOX-reply commit), it
+  correctly reported failure and exited, leaving the merge sitting locally, unpushed. Control then
+  returned to `Dispatch-Commands.ps1`, which wrote its Telegram reply via `Invoke-CommitPushWithRetry`
+  (D-047) — THAT push also lost the same still-open race, so its retry did `git reset --hard
+  origin/main`, silently discarding the still-unpushed merge underneath it. The operator's real,
+  already-approved `/merge TASK-029 yes` was destroyed, and the Telegram message they received ("MERGED
+  into local main, but PUSH FAILED, push it yourself") was stale by the time they read it — there was
+  nothing left to push. Recovered by hand this time (task-029's content was independently safe on its
+  own origin branch); this task closes the hole so the next `/merge` doesn't need the same manual
+  recovery. See docs/DECISIONS.md D-047's addendum for the full sequence.
+
+acceptance:
+  - [x] `Run-Merge.ps1`'s final `push origin main` retries up to 5 times (matching D-047's convention)
+        on rejection.
+  - [x] Each retry fetches origin and rebases (never resets) onto the fresh tip before retrying — the
+        merge/status-flip commits are real content, not a message that can be safely discarded and
+        regenerated the way `Invoke-CommitPushWithRetry`'s own two call sites can.
+  - [x] A genuine rebase conflict (rare — would mean something else touched the same lines) aborts the
+        rebase and reports clearly, asking a human to resolve by hand; does not loop forever.
+  - [x] `Invoke-CommitPushWithRetry` (D-047) itself is unchanged — its two existing call sites are
+        still correctly scoped to freely-regenerable messages; the gap was `Run-Merge.ps1`'s
+        unprotected push, not that function.
+  - [x] docs/DECISIONS.md D-047 gains an addendum describing the failure and the fix.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Red-zone surface (D-032: "the AI Dev OS / automation itself") — held at `approved`, never
+    auto-merged.
+  - Never reset/discard the merge commits on conflict — rebase-or-report-and-stop only.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile`: no syntax errors.
+  - [x] Real simulated race (bare "origin" + two clones, "runner" holding the merge commit and "racer"
+        pushing an unrelated commit first): runner's first push correctly rejected, fetch+rebase
+        applied cleanly, second push succeeded; final origin history contains BOTH commits — the
+        racer's, and the one the old reset-based path would have destroyed.
+  - [ ] Live (human-verified): a future `/merge ... yes` that happens to race an OUTBOX-clearing cycle
+        recovers automatically instead of needing manual `git push origin main` recovery.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
