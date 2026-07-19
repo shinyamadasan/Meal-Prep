@@ -474,6 +474,110 @@ Approved → TASKS.md `review → done`; fast-forwarded onto main.
 
 <!-- Entries go here, newest first. -->
 
+## Review TASK-025 — REWORK
+branch: task-025
+verdict: changes requested
+
+### Guardian Gauntlet
+
+Both guardians ran as read-only advisors. Neither edited any file.
+
+**security-guardian: RAN**
+
+Findings:
+
+- **CONFIRMED-1 (MEDIUM) — Structural prototype pollution risk.**
+  `parseNutritionLines` derives `key` directly from user-pasted text and dispatches on it
+  via six `if/else if` regex guards. In the current code every possible key is covered by an
+  explicit guard, so no assignment with an unconstrained key exists — the actual risk today is
+  Low. However the structure provides no explicit early-exit for unrecognized keys, so a future
+  `else { nutrition[key] = value; }` addition would be immediately exploitable. The guardian
+  recommends an explicit whitelist guard that returns early before the dispatch block.
+
+- **CONFIRMED-2 (LOW) — Unclamped numeric storage.**
+  `parseFloat(match[2].replace(/,/g, '')) || 0` correctly prevents `NaN`/`Infinity`, but
+  valid-looking inputs like `Calories: 99999999` are stored unclamped into `nutritionPerServing`
+  and persisted to localStorage and Firestore. The rendered path goes through `Math.round()` so
+  no XSS exists, but the data-integrity concern (absurdly large values, misleading UI) is real.
+  The guardian recommends clamping to a sane upper bound before assigning.
+
+- ReDoS (`nutritionHeaderRe` / `instructionStopRe`): CLEAN — anchored, non-nested-quantifier
+  patterns, O(n) per line, no super-linear backtracking path confirmed.
+- XSS via parsed nutrition output: CLEAN — all nutrition fields are JS `number` type
+  end-to-end; `Math.round()` is the final transform before `innerHTML`; string injection
+  is impossible.
+- Secret leakage, auth/session changes, Firestore write-guard changes: CLEAN.
+
+**quality-guardian: RAN**
+
+All seven acceptance criteria traced against the actual code:
+
+| # | Criterion | Verdict |
+|---|-----------|---------|
+| 1 | Instruction-stop regex halts instruction accumulation | MET |
+| 2 | Scans remaining lines for pipe-delimited or newline-per-nutrient block | MET |
+| 3 | Key mapping, unit stripping, `Saturated Fat` exclusion | MET |
+| 4 | `calories` gate; absent nutrients default to `0` | MET |
+| 5 | No `Nutrition` header → `nutritionPerServing` unmodified; `patchMissingNutrition()` unaffected | MET |
+| 6 | No change to modal UI, post-parse save flow, or other code paths | MET |
+| 7 | `node --check app.js` | Deferred to TEST_REPORT (code syntactically sound; TEST_REPORT reports pass) |
+
+Quality guardian also traced the canonical PROP-030 pipe-delimited example step by step and
+confirmed the expected output `{calories:284, carbs:15, protein:14, fat:20, fiber:5, sodium:793}`.
+
+One non-blocking note: `parseNutritionLines` receives all remaining lines from
+`nutritionStartIndex` to end-of-array (not just the contiguous nutrition block). Non-matching
+lines silently `return` early. A false positive is possible if a subsequent section happened to
+contain a `Key: number` style line. The plan does not constrain this edge case and the canonical
+test input does not exercise it. Not a defect; noted for awareness.
+
+### Findings
+
+**Functional quality:** Fully correct. The parser change is well-constructed — the
+`nutritionStartIndex`/`nutritionHeaderRe` two-level guard correctly distinguishes a `Notes`
+stop (no nutrition scan) from a `Nutrition` stop (nutrition scan starts), the PROP-030 trace
+is exact, and all acceptance criteria are met. No functional rework required.
+
+**Security:** Two CONFIRMED security findings per the gauntlet. Per review rules, CONFIRMED
+findings require REWORK regardless of my own impression of the diff.
+
+### Must-fix (Codex must address before approval)
+
+- [ ] **CONFIRMED-1 — Explicit whitelist guard before key dispatch.**
+  At the top of the key-dispatch block in `parseNutritionLines`, add an early `return` for any
+  key not in the recognized set, making the exclusion explicit rather than implicit:
+  ```js
+  const RECOGNIZED = new Set([
+    'calorie','calories','carbohydrate','carbohydrates','carb','carbs',
+    'protein','fat','fiber','sodium'
+  ]);
+  if (!RECOGNIZED.has(key)) return;
+  ```
+  Insert this immediately after the `const key = ...` / `const value = ...` lines and before the
+  `if (/^calories?$/.test(key))` chain. The six `if/else if` guards remain unchanged.
+
+- [ ] **CONFIRMED-2 — Clamp parsed numeric values.**
+  After computing `value`, clamp it to a sane range before the dispatch block:
+  ```js
+  const value = Math.min(Math.max(parseFloat(match[2].replace(/,/g, '')) || 0, 0), 99999);
+  ```
+  This eliminates the possibility of absurdly large values reaching storage.
+
+Both fixes are inside `parseNutritionLines` only. No other code path is affected.
+
+### Nits (non-blocking)
+- The double `if (nutritionPerServing && nutritionPerServing.calories)` check at the call site
+  is redundant with `return nutrition.calories ? nutrition : null` inside the helper. Harmless —
+  not worth a rework cycle on its own.
+
+### Risk-gated merge
+Returning to Codex for must-fix items. When the fixes land and re-review is clean, this task
+touches only `parseRecipeText()` in app.js — a UI/parsing concern with no Firestore write-guard,
+no `saveData()` call-site, no auth, no sync machinery. It qualifies for `done` (auto-merge) once
+the security findings are resolved.
+
+→ TASK-025 status set to `codex` in TASKS.md.
+
 <!-- REVIEW TEMPLATE — copy and fill:
 
 ## Review TASK-<id> — <APPROVED | REWORK>
