@@ -1290,7 +1290,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-025 · Recipe paste: parse nutrition block and stop instructions at Nutrition header
-status: blocked
+status: codex
 blocker:
   - auto: review rework, strike 1/3 -- see REVIEW.md on task-025 for must-fix items.
 owner: codex
