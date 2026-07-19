@@ -1290,7 +1290,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-025 · Recipe paste: parse nutrition block and stop instructions at Nutrition header
-status: codex
+status: review
 owner: codex
 source: BQ-023
 priority: P2
