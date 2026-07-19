@@ -226,7 +226,12 @@ Three credentials, created once, named EXACTLY:
 | Name | Type | Value |
 |---|---|---|
 | `Telegram Bot - Meal Prep` | Telegram | that app's bot token |
-| `GitHub PAT` | **Header Auth** | Name: `Authorization` · Value: `Bearer github_pat_...` |
+| `GitHub PAT - Meal Prep` | **Header Auth** | Name: `Authorization` · Value: `Bearer github_pat_...` |
+
+Suffix **every** credential name with the app name — not just Telegram. A generic `GitHub PAT` looks
+harmless with one app, but the moment a second app's workflow also wants a credential named exactly
+`GitHub PAT`, you can no longer tell them apart in the picker, and the same silent by-ID mis-binding
+described below applies to it too.
 
 **THE TRAP: n8n binds credentials by ID, not by name.** The per-app credential names make a
 mis-binding *visible*, but they do not *prevent* it — on import, n8n silently attaches the first
@@ -242,6 +247,14 @@ inbox workflow** to re-register the webhook.
 **Verify by routing, not by reading.** Send each bot a distinct plain message and confirm it lands
 in that app's `captures/inbox/` and nowhere else. A workflow can look perfect and still be writing
 into the wrong repo — GitHub answers `200 OK` either way.
+
+**Import the fourth file too: `n8n-telegram-error-alert.json`.** It's not a workflow you trigger —
+it's the target you point the other three at. After importing it, open each of Inbox/Digest/Replies
+→ 3-dot menu → **Settings** → **Error Workflow** → select `[Meal Prep] Error Alert -> Telegram`.
+Without this, a broken credential or wrong repo fails silently inside n8n forever — Telegram never
+sees it (see the "verify by routing" trap above; a 401 in n8n still shows GitHub answering the
+*webhook* delivery fine, since the failure happens one step later). This is what would have caught
+the 2026-07 GitHub PAT outage (D-049) on the first failed message instead of three days of silence.
 
 ### Running more than one app
 

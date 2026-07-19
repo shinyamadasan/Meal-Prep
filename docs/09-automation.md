@@ -29,7 +29,9 @@ Windows Task Scheduler
 
 n8n (always-on, cloud)
     ├── Workflow 1: Telegram → captures (every message, webhook trigger)
-    └── Workflow 2: DIGEST.md + CODEX_READY.md → Telegram (daily at 07:00)
+    ├── Workflow 2: DIGEST.md + CODEX_READY.md → Telegram (daily at 07:00)
+    ├── Workflow 3: OUTBOX.md → Telegram (fast relay, every 2 min — see "Telegram remote control" below)
+    └── Workflow 4: Error Alert → Telegram (n8n's Error Workflow target for 1-3; see below)
 
 You (human)
     └── Run Codex locally, say "Continue" — the default way TASKS.md work gets built.
@@ -363,6 +365,18 @@ Schedule ───────────┤
 - **Also** fetches `planning/CODEX_READY.md` in parallel and sends it as a second message, but **only**
   when it doesn't contain the placeholder string `No Codex-ready tasks right now.` — so you're not
   pinged every morning when there's nothing for Codex to build
+
+### Workflow 4: Error Alert → Telegram
+
+**File:** `n8n-telegram-error-alert.json`. Not triggered directly — set as the **Error Workflow**
+(Settings → Error Workflow, per-workflow) on Workflows 1, 2, and 3. When any node in one of those
+fails (bad credential, wrong repo, network error), n8n runs this workflow instead of failing silently,
+and it Telegram-messages you the workflow name, the node that failed, and the error message.
+
+This exists because a real outage went three days unnoticed: a broken GitHub PAT made Workflow 1 fail
+on every capture, Telegram saw a normal `200 OK` from n8n either way (per the "verify by routing, not
+by reading" trap in OPERATOR.md), and n8n's own execution log had the error the entire time — nothing
+ever surfaced it. See `docs/DECISIONS.md` D-049.
 
 ---
 

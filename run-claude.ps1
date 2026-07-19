@@ -330,6 +330,21 @@ if ($violations.Count -gt 0) {
 #     proposals digest + Codex-ready notice for n8n's next morning send. ---
 try { & "$projectPath\tools\Generate-Digest.ps1" | Out-Null } catch { Halt-Automation "Generate-Digest.ps1 threw an error: $_" }
 try { & "$projectPath\tools\Generate-Codex-Notice.ps1" | Out-Null } catch { Halt-Automation "Generate-Codex-Notice.ps1 threw an error: $_" }
+
+# --- Phase 3b (deterministic, D-045/D-049): docs-vs-code drift check, now run every automation cycle
+#     instead of requiring someone to remember to run it by hand -- that gap is exactly how docs drift
+#     silently. Non-fatal: drift is a hygiene finding, not a safety issue, so it never halts automation.
+#     Findings are appended to DIGEST.md (already sent to Telegram every morning, unconditionally) so
+#     they actually get seen instead of sitting unread in claude-session.log. ---
+try {
+    $docsDriftOutput = & "$projectPath\tools\Check-DocsConsistency.ps1" 2>&1
+    $docsDriftExit = $LASTEXITCODE
+    $docsDriftOutput | Tee-Object -FilePath $logFile -Append | Out-Null
+    if ($docsDriftExit -ne 0) {
+        Add-Content -Path "$projectPath\planning\DIGEST.md" -Value "`n—`n⚠️ Docs drift detected (Check-DocsConsistency.ps1) — see claude-session.log for details."
+    }
+} catch { Halt-Automation "Check-DocsConsistency.ps1 threw an error: $_" }
+
 git add planning/DIGEST.md planning/CODEX_READY.md
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {

@@ -52,7 +52,7 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "name": "GitHub PAT"
+          "name": "GitHub PAT - Meal Prep"
         }
       },
       "retryOnFail": true,
@@ -157,7 +157,7 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "name": "GitHub PAT"
+          "name": "GitHub PAT - Meal Prep"
         }
       },
       "retryOnFail": true,

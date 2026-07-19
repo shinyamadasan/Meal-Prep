@@ -129,7 +129,8 @@ phase for power-user/debug use. See DECISIONS D-024/D-025/D-026/D-027/D-035 and 
 | `n8n-telegram-inbox.json` | Mobile capture workflow + Telegram control-command recognition | set repo, bot token, user id |
 | `n8n-telegram-digest.json` | Morning digest + Codex-ready notification | set repo, bot token, user id |
 | `n8n-telegram-replies.json` | Fast (~2 min) relay of `captures/replies/OUTBOX.md` to Telegram | set repo, bot token, user id |
-| `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` | Deterministic PROPOSALS→DIGEST and TASKS→CODEX_READY generators (no LLM) | none |
+| `n8n-telegram-error-alert.json` | Not a trigger — the **Error Workflow** target set on the three files above, so a node failure (bad credential, wrong repo) Telegram-alerts you instead of failing silently (D-049) | set bot token, user id; then point the other three workflows' Settings → Error Workflow at it |
+| `tools/Generate-Digest.ps1` · `tools/Generate-Codex-Notice.ps1` · `tools/Check-DocsConsistency.ps1` | Deterministic PROPOSALS→DIGEST, TASKS→CODEX_READY, and docs-vs-code drift generators (no LLM) — all three run every `run-claude.ps1` cycle | none |
 | `tools/Dispatch-Commands.ps1` · `setup-command-dispatcher-scheduler.ps1` | Telegram command router — gated by the same `$AUTOMATION_ENABLED`-style checks, 30-min `-WakeToRun` Scheduled Task so a sleeping PC still drains queued commands (D-033). Writes `HANDOFF.md` at clean thread-reset checkpoints. | set project path |
 | `tools/Run-Codex-Build.ps1` (the implementer is PLUGGABLE -- `builder: codex|claude`, D-037) · `tools/Run-Claude-Review.ps1` | `/build` (runs `codex exec` unattended, auto-chains into review) and `/review` phase runners — isolated `task-<id>` branches, own commit-scope guards, approved review fast-forwards `main` | none |
 

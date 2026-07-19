@@ -185,8 +185,15 @@ When enabled:
    - Convert approved `BUILD_QUEUE.md` items → `PLAN.md` + `TASKS.md` (`status: codex`)
 3. A deterministic commit-scope guard checks every changed file against an allow-list of planning
    docs — anything outside it (e.g. `app.js`) halts the run uncommitted rather than shipping
-4. `Generate-Digest.ps1` + `Generate-Codex-Notice.ps1` refresh `DIGEST.md` + `CODEX_READY.md`
+4. `Generate-Digest.ps1` + `Generate-Codex-Notice.ps1` refresh `DIGEST.md` + `CODEX_READY.md`, then
+   `Check-DocsConsistency.ps1` runs (D-045/D-049) — non-fatal, but any drift it finds gets appended
+   to `DIGEST.md` so it's actually seen instead of sitting unread in `claude-session.log`
 5. n8n sends both to Telegram at 7AM — the Codex-ready notice only when there's actually a task waiting
+
+n8n itself also has a standing safety net independent of this schedule: all three of its always-on
+workflows (Inbox, Digest, Replies) point at a fourth, `n8n-telegram-error-alert.json`, as their Error
+Workflow — any node failure inside n8n (bad credential, wrong repo) Telegram-alerts you immediately
+rather than failing silently the way a real outage did for three days before this existed (D-049).
 
 Claude never touches app code in this loop, and Codex only ever runs when triggered — by you, either
 saying "Continue" at the PC or sending `/build`/`/go` from Telegram (a separate ~30-min-polling
