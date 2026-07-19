@@ -5,6 +5,16 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-18 — Autonomous triage + plan run: 0 new captures; BUILD_QUEUE fully reflected in TASKS.md
+
+**STEP A (Triage):** All inbox captures already `status: triaged` — nothing to do.
+
+**STEP B (Plan conversion):** All non-deferred BUILD_QUEUE items (BQ-017 through BQ-026) already have corresponding tasks in TASKS.md — nothing to add. BQ-013/014/015/016 remain deferred.
+
+**Next:** Codex picks up TASK-025 (P2, first `status: codex` in file order). TASK-017/021/022/024/029/030/031 are `status: approved`, each needs `/merge TASK-NNN yes` to land on main.
+
+---
+
 ## 2026-07-17 — Autonomous triage + plan run: 0 new captures; 4 tasks converted from BUILD_QUEUE (BQ-023..026)
 
 **STEP A (Triage):** All 33 inbox captures already `status: triaged` — nothing to do.
