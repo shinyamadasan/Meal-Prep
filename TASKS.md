@@ -1290,9 +1290,9 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-025 · Recipe paste: parse nutrition block and stop instructions at Nutrition header
-status: codex
+status: blocked
 blocker:
-  - auto: review rework, strike 1/3 -- see REVIEW.md on task-025 for must-fix items.
+  - auto: build stopped -- TASK-025 build reached REVIEW (1 of 4 tracked task(s)) after 508s, pushed to task-025. -> auto-review: TASK-025 review FAILED: claude review exited 1. Left at status: review for automatic retry on the next /review or /go. See claude-session.log.
 owner: codex
 source: BQ-023
 priority: P2
