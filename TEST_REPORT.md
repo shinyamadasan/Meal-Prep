@@ -75,4 +75,9 @@ suite: npm test
 result: not completed — sandbox run failed with `spawn EPERM`; approved runs timed out after 124s and 304s
 untested: visual browser baseline and full Playwright suite remain unverified. Diagnostic `npx playwright test tests/mobile-layout.spec.js --workers=1 --reporter=list --timeout=60000` failed before the CSS overflow assertion because `#kitchen-setup-modal` intercepted the `.tab-btn[data-tab="recipes"]` click.
 
+## TASK-025 · 2026-07-19
+suite: node --check app.js; deterministic parseRecipeText nutrition harness; git diff --check -- app.js; static QA greps for dark-mode selectors, :root count, debug leftovers, secrets, and saveToLocalStorage call sites; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list; npm test
+result: `node --check` passed. Deterministic parser harness passed 4/4 cases: pipe-delimited nutrition, no Nutrition header, newline-per-nutrient block, and Notes stop without nutrition parsing. `git diff --check -- app.js` passed with only the repo's LF-to-CRLF warning. Static QA found no new dark-mode selectors, one `:root`, no new debug leftovers/secrets, and no new direct `saveToLocalStorage()` calls. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full `npm test` passed (21/21).
+untested: paste modal save flow intentionally unchanged by task constraint; direct browser paste of the PROP-030 text remains human-verifiable if desired
+
 <!-- Entries go here, newest first. -->

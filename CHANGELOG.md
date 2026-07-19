@@ -106,4 +106,12 @@ blockers: none for TASK-002
 deviations: branch remained `task-001` because the workspace already had unrelated uncommitted work; no branch switch attempted
 → status set to `review` in TASKS.md
 
+## TASK-025 — done (branch: task-025)
+changed:
+  - app.js (`parseRecipeText()` stops instruction capture at standalone Nutrition/Notes headers and returns parsed `nutritionPerServing` from pipe-delimited or newline nutrition blocks, 39 loc)
+tests: `node --check app.js`; deterministic `parseRecipeText()` harness (4 cases, all pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list` (2 passed); `npm test` (21 passed)
+blockers: none
+deviations: none
+→ status set to `review` in TASKS.md
+
 <!-- Entries go here, newest first. -->
