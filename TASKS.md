@@ -1740,7 +1740,7 @@ test steps:
         needing manual `git push origin main` recovery.
 
 ### TASK-032 · Fix silent no-op rework retry + stuck crashed-review state
-status: approved
+status: done
 review: Claude implemented directly (tools/Dispatch-Commands.ps1, tools/Run-Codex-Build.ps1 — same
   D-040 reasoning as every other automation-surface item: Codex cannot commit under tools/). Held at
   `approved` for human `/merge`, not auto-merged, per D-032/Hard Rule 10. Same disclosed same-session
