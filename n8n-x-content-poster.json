@@ -136,6 +136,7 @@
     },
     {
       "parameters": {
+        "mode": "runOnceForAllItems",
         "jsCode": "// Run Once for All Items. Each input item is one GitHub \"get contents\" response:\n// { name, path, sha, content: \"<base64>\", ... }. Decode, parse frontmatter, keep only\n// status: approved, sort by id (content-001 < content-002 sorts correctly as plain strings),\n// pick the oldest, split its body into individual tweets on a --- delimiter.\nfunction parseFrontmatter(raw) {\n  const m = raw.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n([\\s\\S]*)$/);\n  if (!m) return null;\n  const fm = {};\n  m[1].split(/\\r?\\n/).forEach((line) => {\n    const mm = line.match(/^([a-zA-Z_]+):\\s*(.*)$/);\n    if (mm) fm[mm[1]] = mm[2].trim();\n  });\n  return { fm, body: m[2] };\n}\n\nconst candidates = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (!j.content) continue;\n  const raw = Buffer.from(j.content, 'base64').toString('utf8');\n  const parsed = parseFrontmatter(raw);\n  if (!parsed) continue;\n  if ((parsed.fm.status || '').toLowerCase() !== 'approved') continue;\n  candidates.push({ path: j.path, sha: j.sha, id: parsed.fm.id || j.name.replace(/\\.md$/, ''), source: parsed.fm.source || '', body: parsed.body });\n}\n\nif (candidates.length === 0) return [{ json: { found: false, reason: 'no approved drafts in queue' } }];\n\ncandidates.sort((a, b) => (a.id > b.id ? 1 : -1));\nconst next = candidates[0];\nconst tweets = next.body.trim().split(/\\r?\\n---\\r?\\n/).map((t) => t.trim()).filter(Boolean);\nif (tweets.length === 0) throw new Error('content-poster: ' + next.id + ' has status: approved but no tweet text found in its body');\nif (tweets.length > 12) throw new Error('content-poster: ' + next.id + ' has ' + tweets.length + ' tweets, more than this workflow\\'s 12-tweet cap -- ask Claude to raise MAX_TWEETS and regenerate the posting chain');\n\nreturn [{ json: { found: true, path: next.path, sha: next.sha, id: next.id, source: next.source, tweets } }];"
       },
       "id": "pick-oldest",
@@ -186,7 +187,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",
@@ -211,7 +212,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[0] }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[0] }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -240,7 +241,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 1,
               "operator": {
                 "type": "number",
@@ -265,7 +266,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[1], reply: { in_reply_to_tweet_id: $node[\"Post tweet 0\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[1], reply: { in_reply_to_tweet_id: $('Post tweet 0').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -294,7 +295,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 2,
               "operator": {
                 "type": "number",
@@ -319,7 +320,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[2], reply: { in_reply_to_tweet_id: $node[\"Post tweet 1\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[2], reply: { in_reply_to_tweet_id: $('Post tweet 1').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -348,7 +349,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 3,
               "operator": {
                 "type": "number",
@@ -373,7 +374,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[3], reply: { in_reply_to_tweet_id: $node[\"Post tweet 2\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[3], reply: { in_reply_to_tweet_id: $('Post tweet 2').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -402,7 +403,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 4,
               "operator": {
                 "type": "number",
@@ -427,7 +428,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[4], reply: { in_reply_to_tweet_id: $node[\"Post tweet 3\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[4], reply: { in_reply_to_tweet_id: $('Post tweet 3').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -456,7 +457,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 5,
               "operator": {
                 "type": "number",
@@ -481,7 +482,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[5], reply: { in_reply_to_tweet_id: $node[\"Post tweet 4\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[5], reply: { in_reply_to_tweet_id: $('Post tweet 4').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -510,7 +511,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 6,
               "operator": {
                 "type": "number",
@@ -535,7 +536,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[6], reply: { in_reply_to_tweet_id: $node[\"Post tweet 5\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[6], reply: { in_reply_to_tweet_id: $('Post tweet 5').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -564,7 +565,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 7,
               "operator": {
                 "type": "number",
@@ -589,7 +590,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[7], reply: { in_reply_to_tweet_id: $node[\"Post tweet 6\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[7], reply: { in_reply_to_tweet_id: $('Post tweet 6').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -618,7 +619,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 8,
               "operator": {
                 "type": "number",
@@ -643,7 +644,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[8], reply: { in_reply_to_tweet_id: $node[\"Post tweet 7\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[8], reply: { in_reply_to_tweet_id: $('Post tweet 7').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -672,7 +673,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 9,
               "operator": {
                 "type": "number",
@@ -697,7 +698,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[9], reply: { in_reply_to_tweet_id: $node[\"Post tweet 8\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[9], reply: { in_reply_to_tweet_id: $('Post tweet 8').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -726,7 +727,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 10,
               "operator": {
                 "type": "number",
@@ -751,7 +752,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[10], reply: { in_reply_to_tweet_id: $node[\"Post tweet 9\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[10], reply: { in_reply_to_tweet_id: $('Post tweet 9').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -780,7 +781,7 @@
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ $('Pick oldest approved').item.json.tweets.length }}",
+              "leftValue": "={{ $('Pick oldest approved').first().json.tweets.length }}",
               "rightValue": 11,
               "operator": {
                 "type": "number",
@@ -805,7 +806,7 @@
         "url": "https://api.twitter.com/2/tweets",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').item.json.tweets[11], reply: { in_reply_to_tweet_id: $node[\"Post tweet 10\"].json.data.id } }) }}",
+        "jsonBody": "={{ JSON.stringify({ text: $('Pick oldest approved').first().json.tweets[11], reply: { in_reply_to_tweet_id: $('Post tweet 10').first().json.data.id } }) }}",
         "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "twitterOAuth1Api"
@@ -826,7 +827,8 @@
     },
     {
       "parameters": {
-        "jsCode": "// Walks the fixed-size posting chain's node history to find how many tweets actually posted --\n// works whether the thread used all 12 slots or stopped early. Reached either from the\n// last slot's success or from any earlier slot's \"doesn't exist\" branch (a thread shorter than\n// 12 tweets), so this is the single place both paths converge.\nconst ids = [];\nconst orig = $('Pick oldest approved').item.json;\nfunction finish() {\n  return [{ json: { path: orig.path, sha: orig.sha, id: orig.id, source: orig.source, body: orig.tweets.join('\\n\\n---\\n\\n'), postedIds: ids, firstUrl: 'https://x.com/ShinYamadaSan/status/' + ids[0] } }];\n}\n  try { const d = $node[\"Post tweet 0\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 1\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 2\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 3\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 4\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 5\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 6\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 7\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 8\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 9\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 10\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $node[\"Post tweet 11\"].json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\nreturn finish();"
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Walks the fixed-size posting chain's node history to find how many tweets actually posted --\n// works whether the thread used all 12 slots or stopped early. Reached either from the\n// last slot's success or from any earlier slot's \"doesn't exist\" branch (a thread shorter than\n// 12 tweets), so this is the single place both paths converge. Uses .first() (not\n// .item) everywhere -- .item's pairedItem-based lookup does not reliably resolve this many hops\n// downstream through IF/HTTP nodes; confirmed live it silently returned an object missing\n// .tweets rather than erroring, which broke .join further down.\nconst ids = [];\nconst orig = $('Pick oldest approved').first().json;\nfunction finish() {\n  return [{ json: { path: orig.path, sha: orig.sha, id: orig.id, source: orig.source, body: orig.tweets.join('\\n\\n---\\n\\n'), postedIds: ids, firstUrl: 'https://x.com/ShinYamadaSan/status/' + ids[0] } }];\n}\n  try { const d = $('Post tweet 0').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 1').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 2').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 3').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 4').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 5').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 6').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 7').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 8').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 9').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 10').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\n  try { const d = $('Post tweet 11').first().json; if (d && d.data && d.data.id) { ids.push(d.data.id); } else { throw 0; } } catch (e) { return finish(); }\nreturn finish();"
       },
       "id": "collect-ids",
       "name": "Collect posted ids",
@@ -1417,11 +1419,11 @@
     "executionOrder": "v1"
   },
   "_setup_notes": [
-    "REBUILT after a live error: n8n 2.8.4's Code node runs in a sandboxed task-runner that does NOT support helpers.httpRequestWithAuthentication -- confirmed by the actual error message. Every network call in this version is now a real HTTP Request node with native credential authentication (unaffected by that sandbox restriction); Code nodes here only do pure JS (base64 decode, frontmatter parsing, string building) -- zero network calls from any Code node.",
+    "REBUILT TWICE after live errors. Fix 1: n8n 2.8.4's Code node runs in a sandboxed task-runner that does NOT support helpers.httpRequestWithAuthentication -- every network call is now a real HTTP Request node instead; Code nodes here only do pure JS (base64 decode, frontmatter parsing, string building), zero network calls from any Code node. Fix 2: every cross-node data reference now uses $('NodeName').first() instead of $('NodeName').item -- .item does pairedItem-based lookup, which stopped resolving correctly several hops downstream through the IF/HTTP chain (it silently returned an object missing .tweets rather than erroring, which broke a later .join() call). .first() has no such ambiguity -- it just returns that node's one actual output item.",
     "APPROVAL IS NOT HANDLED BY THIS WORKFLOW ON PURPOSE. Only one workflow can own your bot's Telegram webhook (the existing Inbox workflow) -- adding a second Telegram Trigger here would silently steal it. Approving a draft means telling Claude directly to flip content/queue/<id>.md's status from draft to approved and push. This workflow only watches for status: approved on its schedule.",
     "Create an n8n credential of type 'Twitter OAuth1 API' named EXACTLY 'X API - Meal Prep' using the Consumer Key, Consumer Secret, Access Token, and Access Token Secret from developer.x.com's Keys and Tokens page -- the OAuth 1.0 section specifically, not OAuth 2.0 (Client ID/Client Secret are a different, unused system here). App permissions must be Read and Write BEFORE the Access Token was generated, or posting will fail with a permissions error.",
     "The posting phase (reply-chaining a thread) is a fixed, unrolled chain of up to 12 (IF exists -> post) pairs, not a dynamic loop. This is deliberate: threading requires each tweet's request to reference the PREVIOUS tweet's returned id, a genuine sequential dependency n8n's standard loop node (Split In Batches) isn't built for, and this repo doesn't have live access to verify this n8n version's exact loop/state semantics. A bounded static chain, with each node explicitly wired to the next, is far more predictable to author correctly blind. Current drafts max out at 10 tweets; this leaves 2 slots of headroom. If a future thread needs more than 12 tweets, the 'Pick oldest approved' node will throw a clear error naming the limit -- ask Claude to regenerate the chain with a higher MAX_TWEETS rather than hand-editing the JSON.",
-    "THIS STILL NEEDS A LIVE TEST BEFORE YOU TRUST THE SCHEDULE -- now more than before, since this is a substantially different structure than what already failed once. Test by: set one queue file to status: approved, then manually run this workflow once from the n8n editor (it WILL actually post to X, not a dry run) and watch it complete node by node. If any node errors, the error message plus which node it happened on is exactly what to bring back for a fix -- these are usually small, targeted corrections once we know which specific node/expression n8n's version disagrees with.",
+    "THIS STILL NEEDS A LIVE TEST BEFORE YOU TRUST THE SCHEDULE. Test by: set one queue file to status: approved, then manually run this workflow once from the n8n editor (it WILL actually post to X, not a dry run) and watch it complete node by node. If any node errors, the error message plus which node it happened on is exactly what to bring back for a fix -- both errors so far were small, targeted, specific-to-this-n8n-version issues, not fundamental design problems, and each fix has been a quick turnaround once the actual error was in hand.",
     "Set this workflow's Error Workflow (3-dot menu -> Settings -> Error Workflow) to '[Meal Prep] Error Alert -> Telegram', same as your other three workflows (D-050) -- so a failed post reaches Telegram instead of failing silently.",
     "Cadence: every 2 days at 10:00 UTC (cron: 0 10 */2 * *) -- edit the Schedule Trigger node directly in the n8n UI to change it. If nothing is status: approved when it fires, the workflow ends quietly at 'Posted one?' -- not an error.",
     "REPLACE_WITH_YOUR_TELEGRAM_USER_ID in the notify node -- same numeric id used in your other three workflows.",
