@@ -221,12 +221,13 @@ Use **Workflows -> ... -> Import from File**, not paste-into-canvas. If you see 
 `GitHub: create file1` (note the trailing `1`), you pasted into an existing canvas and now have a
 half-old hybrid. Delete it and import properly.
 
-Three credentials, created once, named EXACTLY:
+Credentials, created once, named EXACTLY:
 
 | Name | Type | Value |
 |---|---|---|
 | `Telegram Bot - Meal Prep` | Telegram | that app's bot token |
 | `GitHub PAT - Meal Prep` | **Header Auth** | Name: `Authorization` · Value: `Bearer github_pat_...` |
+| `X API - Meal Prep` | **Twitter OAuth1 API** | Consumer Key/Secret + Access Token/Secret from developer.x.com (OAuth 1.0 section — app permissions must be Read and Write before generating the Access Token). Used only by `n8n-x-content-poster.json`, a separate build-in-public posting pipeline — not part of the app's own AI Dev OS loop. |
 
 Suffix **every** credential name with the app name — not just Telegram. A generic `GitHub PAT` looks
 harmless with one app, but the moment a second app's workflow also wants a credential named exactly

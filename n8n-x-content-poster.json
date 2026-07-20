@@ -1,0 +1,273 @@
+{
+  "name": "[Meal Prep] X Content Poster",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 */2 * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 2 days",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds the oldest content/queue/*.md file with status: approved, posts its thread to X,\n// and returns what happened so the rest of the workflow can archive the file and notify.\n// Uses TWO credentials attached to this node: httpHeaderAuth (GitHub PAT - Meal Prep) for\n// reading the queue, twitterOAuth1Api (X API - Meal Prep) for posting. See _setup_notes in\n// this workflow's export for how to attach both to a single Code node.\n\nconst REPO = 'shinyamadasan/Meal-Prep';\n\nfunction parseFrontmatter(raw) {\n  const m = raw.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n([\\s\\S]*)$/);\n  if (!m) return null;\n  const fm = {};\n  m[1].split(/\\r?\\n/).forEach((line) => {\n    const mm = line.match(/^([a-zA-Z_]+):\\s*(.*)$/);\n    if (mm) fm[mm[1]] = mm[2].trim();\n  });\n  return { fm, body: m[2] };\n}\n\n// 1. List the queue directory. A truly empty/never-existed directory 404s -- treat that as\n//    \"nothing to do\", not an error, since it just means everything has already been posted.\nlet listing;\ntry {\n  listing = await this.helpers.httpRequestWithAuthentication.call(this, 'httpHeaderAuth', {\n    method: 'GET',\n    url: `https://api.github.com/repos/${REPO}/contents/content/queue`,\n    headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'n8n-meal-prep-poster' },\n    json: true,\n  });\n} catch (e) {\n  if (e.httpCode === '404' || e.statusCode === 404) return [{ json: { found: false, reason: 'queue directory empty or missing' } }];\n  throw e;\n}\n\nconst mdFiles = (Array.isArray(listing) ? listing : []).filter((f) => f.name && f.name.endsWith('.md'));\n\n// 2. Fetch each file's raw content and parse its frontmatter. Small number of files expected\n//    (a handful of drafts at a time), so a plain sequential loop is fine -- no need for\n//    concurrency here.\nconst candidates = [];\nfor (const f of mdFiles) {\n  const raw = await this.helpers.httpRequestWithAuthentication.call(this, 'httpHeaderAuth', {\n    method: 'GET',\n    url: f.url,\n    headers: { 'Accept': 'application/vnd.github.raw', 'User-Agent': 'n8n-meal-prep-poster' },\n  });\n  const text = typeof raw === 'string' ? raw : String(raw);\n  const parsed = parseFrontmatter(text);\n  if (!parsed) continue;\n  if ((parsed.fm.status || '').toLowerCase() !== 'approved') continue;\n  candidates.push({ path: f.path, sha: f.sha, id: parsed.fm.id || f.name.replace(/\\.md$/, ''), source: parsed.fm.source || '', body: parsed.body });\n}\n\nif (candidates.length === 0) return [{ json: { found: false, reason: 'no approved drafts in queue' } }];\n\n// content-001, content-002, ... sorts correctly as plain strings -- oldest first.\ncandidates.sort((a, b) => (a.id > b.id ? 1 : -1));\nconst next = candidates[0];\n\n// 3. Split the body into individual tweets on a \\n---\\n delimiter (same convention as this\n//    repo's markdown docs using --- as a section break).\nconst tweets = next.body.trim().split(/\\r?\\n---\\r?\\n/).map((t) => t.trim()).filter(Boolean);\nif (tweets.length === 0) throw new Error(`content-poster: ${next.id} has status: approved but no tweet text found in its body`);\n\n// 4. Post the thread. Each tweet after the first replies to the one before it. If any call\n//    fails partway through, this THROWS -- the workflow's Error Workflow (Telegram alert) fires,\n//    and the queue file is left untouched (still status: approved) for a human to check before\n//    the next scheduled run retries it. KNOWN LIMITATION: a partial-thread failure (e.g. tweet 4\n//    of 9 fails) leaves tweets 1-3 already live on X, and a retry reposts the whole thread from\n//    tweet 1 -- rare, but if it happens, check the account and delete the orphaned partial thread\n//    by hand before the next scheduled attempt.\nconst postedIds = [];\nlet previousId = null;\nfor (const text of tweets) {\n  const body = previousId ? { text, reply: { in_reply_to_tweet_id: previousId } } : { text };\n  const res = await this.helpers.httpRequestWithAuthentication.call(this, 'twitterOAuth1Api', {\n    method: 'POST',\n    url: 'https://api.twitter.com/2/tweets',\n    body,\n    json: true,\n  });\n  previousId = res.data.id;\n  postedIds.push(previousId);\n}\n\nreturn [{\n  json: {\n    found: true,\n    path: next.path,\n    sha: next.sha,\n    id: next.id,\n    source: next.source,\n    body: next.body,\n    postedIds,\n    firstUrl: `https://x.com/ShinYamadaSan/status/${postedIds[0]}`,\n  },\n}];\n"
+      },
+      "id": "find-and-post",
+      "name": "Find oldest approved + post to X",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "GitHub PAT - Meal Prep"
+        },
+        "twitterOAuth1Api": {
+          "name": "X API - Meal Prep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.found }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "found-one",
+      "name": "Posted one?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/shinyamadasan/Meal-Prep/contents/{{ $json.path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-meal-prep-poster"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"content: {{ $json.id }} posted to X, removed from queue\",\n  \"sha\": \"{{ $json.sha }}\",\n  \"branch\": \"main\"\n}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "github-delete-queue",
+      "name": "GitHub: remove from queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "GitHub PAT - Meal Prep"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the content/posted/YYYY/MM/<id>.md archive file: original body, frontmatter updated\n// to status: posted with posted_at and the actual posted tweet ids for reference.\nconst d = new Date();\nconst yyyy = d.getUTCFullYear();\nconst mm = String(d.getUTCMonth() + 1).padStart(2, '0');\nconst path = `content/posted/${yyyy}/${mm}/${$json.id}.md`;\nconst fm = [\n  '---',\n  `id: ${$json.id}`,\n  `source: ${$json.source}`,\n  'platform: x',\n  'status: posted',\n  `posted_at: ${d.toISOString()}`,\n  `posted_ids: ${$json.postedIds.join(',')}`,\n  '---',\n  '',\n].join('\\n');\nconst content = fm + $json.body.trim() + '\\n';\nconst contentB64 = Buffer.from(content, 'utf8').toString('base64');\nreturn [{ json: { ...$json, archivePath: path, contentB64 } }];\n"
+      },
+      "id": "build-archive",
+      "name": "Build posted-archive file",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/shinyamadasan/Meal-Prep/contents/{{ $json.archivePath }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-meal-prep-poster"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"content: {{ $json.id }} archived to posted/\",\n  \"content\": \"{{ $json.contentB64 }}\",\n  \"branch\": \"main\"\n}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "github-create-archive",
+      "name": "GitHub: create in posted/",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "GitHub PAT - Meal Prep"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
+        "text": "={{ '\\u2705 Posted ' + $json.id + ' to X (' + $json.postedIds.length + ' tweets): ' + $json.firstUrl }}",
+        "additionalFields": {}
+      },
+      "id": "notify-posted",
+      "name": "Telegram: notify posted",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1560,
+        220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram Bot - Meal Prep"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 2 days": {
+      "main": [
+        [
+          {
+            "node": "Find oldest approved + post to X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find oldest approved + post to X": {
+      "main": [
+        [
+          {
+            "node": "Posted one?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Posted one?": {
+      "main": [
+        [
+          {
+            "node": "GitHub: remove from queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "GitHub: remove from queue": {
+      "main": [
+        [
+          {
+            "node": "Build posted-archive file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build posted-archive file": {
+      "main": [
+        [
+          {
+            "node": "GitHub: create in posted/",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: create in posted/": {
+      "main": [
+        [
+          {
+            "node": "Telegram: notify posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_setup_notes": [
+    "APPROVAL IS NOT HANDLED BY THIS WORKFLOW ON PURPOSE. Only one workflow can own your bot's Telegram webhook (the existing Inbox workflow) -- adding a second Telegram Trigger here would silently steal it. Instead: approving a draft means telling Claude directly (in chat) to flip content/queue/<id>.md's status from draft to approved and push -- Claude does the git commit, this workflow just watches for status: approved on its own schedule. No new Telegram wiring needed.",
+    "Create a new n8n credential of type 'Twitter OAuth1 API' named exactly 'X API - Meal Prep' (matching this app's existing app-suffixed naming convention, D-049) using the Consumer Key, Consumer Secret, Access Token, and Access Token Secret from developer.x.com's Keys and Tokens page -- the OAuth 1.0 section, NOT OAuth 2.0. Confirm the app's 'User authentication settings' are set to Read and Write BEFORE generating the Access Token, or posting will fail with a permissions error.",
+    "The core logic lives in ONE Code node ('Find oldest approved + post to X') rather than spread across several visual nodes, on purpose: posting a thread is an inherently SEQUENTIAL, dependent operation (tweet 2 needs tweet 1's returned id, tweet 3 needs tweet 2's, etc.), which n8n's standard loop nodes (Split In Batches) aren't built for -- they're designed for independent per-item work. A single script is also easier to hand back to Claude to debug later than a multi-node loop's wiring.",
+    "THIS NEEDS A LIVE TEST BEFORE YOU TRUST THE SCHEDULE. Specifically the Code node's use of `this.helpers.httpRequestWithAuthentication` with two different attached credentials on one node -- this is standard n8n Code node behavior in recent versions, but hasn't been run against your actual instance. Test by: put one queue file at status: approved, then manually execute this workflow once (the 'Execute workflow' button in the n8n editor) and watch it post for real -- not a dry run, it will actually post to X. Check the result before trusting the every-2-days schedule.",
+    "If your n8n version doesn't support attaching two credential types to one Code node, split 'Find oldest approved + post to X' into two Code nodes -- one with only httpHeaderAuth attached (GitHub read + filter, outputs the chosen file's parsed tweets), one with only twitterOAuth1Api attached (does just the posting loop). Ask Claude to make this split if needed; the logic doesn't otherwise change.",
+    "Set this workflow's Error Workflow (3-dot menu -> Settings -> Error Workflow) to '[Meal Prep] Error Alert -> Telegram', same as the other three workflows (D-050) -- so a failed post (e.g. an expired X token) reaches Telegram instead of failing silently. This is exactly the same class of silent-failure risk logged in docs/CONTENT_LOG.md's own outage story -- worth not repeating here.",
+    "Cadence is set to every 2 days at 10:00 UTC (cron: 0 10 */2 * *) -- edit the Schedule Trigger node's expression directly in the n8n UI to change it. If nothing is status: approved when it fires, the workflow just ends quietly (not an error) -- see the 'Posted one?' node's false branch.",
+    "REPLACE_WITH_YOUR_TELEGRAM_USER_ID in the notify node -- same numeric id already used in your other three workflows.",
+    "Known limitation: a partial-thread failure (posts 3 of 9 tweets, then the 4th call fails) leaves those 3 live on X and the queue file untouched at status: approved, so the next scheduled run reposts the whole thread from tweet 1 -- rare, but if the error alert ever fires mid-thread, check the account and manually delete the orphaned partial thread before the next run."
+  ]
+}
