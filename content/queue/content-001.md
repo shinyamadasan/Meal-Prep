@@ -2,7 +2,7 @@
 id: content-001
 source: docs/CONTENT_LOG.md#2026-06-26
 platform: x
-status: draft
+status: approved
 created: 2026-07-20T18:00:00Z
 ---
 
