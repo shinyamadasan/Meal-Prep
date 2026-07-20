@@ -196,6 +196,7 @@ When in doubt: prefer stopping over guessing.
 | `docs/FEATURES.md` | Feature catalog by tab and status | Feature existence and status |
 | `docs/DECISIONS.md` | ADR-lite rationale | Why key choices were made |
 | `docs/AI_OS_NOTES.md` | Append-only friction log — one line per workflow awkwardness noticed | Candidate improvements to the OS itself, pending promotion |
+| `docs/CONTENT_LOG.md` | Narrative log of struggles, incidents, and wins while building this app | Raw material for building-in-public content — not the technical record (that's REVIEW.md/CHANGELOG.md/DECISIONS.md) |
 | `library/requirements/features/` | Immutable PRDs, one folder per feature | What to build for approved feature scope |
 | `AGENTS.md` | Codex standing instructions, loop, hard rules, templates | How Codex operates |
 
