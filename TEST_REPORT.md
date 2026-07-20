@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-025 · 2026-07-20 (re-applied on main)
+suite: node --check app.js; deterministic parseRecipeText/parseNutritionLines harness (9 cases); npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000 (run twice: once on the fixed task-025 branch, once on main post-apply)
+result: `node --check` passed both times. Deterministic harness passed 9/9: the original 4 cases (pipe-delimited nutrition with Saturated Fat correctly excluded, no-Nutrition-header leaves nutritionPerServing unset, newline-per-nutrient block, Notes header stops instructions without triggering a nutrition scan) plus 5 new security-regression cases added to verify the two must-fix patches — an absurd `Calories: 99999999` clamps to 99999; a line containing `__proto__: 5` and `constructor: 9` keys produces no own-property on the result object and does not pollute the global `Object.prototype` (`({}).polluted` stays `undefined`); a recognized key (`Sodium`) appearing after unrecognized keys on the same line still parses correctly. Playwright smoke + button-smoke passed both runs (2/2 each; 467 buttons discovered, 200 clicked, 0 broken).
+untested: paste modal save flow intentionally unchanged by task constraint; direct browser paste of the PROP-030 text remains human-verifiable if desired; full `npm test` suite was not run in this session (smoke + button-smoke + the targeted deterministic harness were judged sufficient given the change is isolated to one function with no DOM/state-shape changes)
+
 ## TASK-014 · 2026-07-15
 suite: PowerShell parser check for tools/Dispatch-Commands.ps1; isolated /go -DryRun fixture; inbox count check; git diff --check -- tools/Dispatch-Commands.ps1; npm test
 result: PowerShell parser check passed. Isolated dry-run fixture with no build-ready tasks, empty BUILD_QUEUE, one `captures/inbox` file with `status: new`, and a `/go` command reported `TRIAGED 1 new idea(s) into proposals. Reply Approve <n>, then /go.` Repo inbox count check found 11 current untriaged captures. `git diff --check -- tools/Dispatch-Commands.ps1` passed with only Git LF-to-CRLF warning. `npm test` timed out after 124s without reporter output.

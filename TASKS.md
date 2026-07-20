@@ -1290,9 +1290,13 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-025 · Recipe paste: parse nutrition block and stop instructions at Nutrition header
-status: blocked
-blocker:
-  - auto: build stopped -- TASK-025 build reached REVIEW (1 of 4 tracked task(s)) after 508s, pushed to task-025. -> auto-review: TASK-025 review FAILED: claude review exited 1. Left at status: review for automatic retry on the next /review or /go. See claude-session.log.
+status: done
+review: Codex's rework-retry (a24cdbc) flipped status to review without applying either must-fix
+  security patch from the prior review (app.js was byte-identical); the follow-up auto-review then
+  crashed (exit 1), leaving this stuck at blocked in a shape the auto-release logic doesn't match.
+  Claude applied both patches directly (RECOGNIZED key whitelist + value clamp), verified with a
+  9-case regression harness plus smoke/button-smoke, and re-applied the isolated app.js hunk onto
+  main via `git apply --3way` (branch task-025 left unmerged, ~30+ commits stale). See REVIEW.md.
 owner: codex
 source: BQ-023
 priority: P2

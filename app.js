@@ -6560,6 +6560,36 @@ window.parseAndImportRecipe = parseAndImportRecipe;
 
 function parseRecipeText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const nutritionHeaderRe = /^(nutrition(al(\s+info(rmation)?)?)?):?\s*$/i;
+  const instructionStopRe = /^(nutrition(al(\s+info(rmation)?)?)?|notes):?\s*$/i;
+
+  function parseNutritionLines(nutritionLines) {
+    const nutrition = { calories: 0, carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0 };
+    const RECOGNIZED = new Set([
+      'calorie', 'calories', 'carbohydrate', 'carbohydrates', 'carb', 'carbs',
+      'protein', 'fat', 'fiber', 'sodium'
+    ]);
+
+    nutritionLines.forEach(function(line) {
+      line.split('|').forEach(function(part) {
+        const match = part.trim().match(/^([^:]+):\s*([0-9][0-9,]*(?:\.[0-9]+)?)/);
+        if (!match) return;
+
+        const key = match[1].trim().toLowerCase();
+        if (!RECOGNIZED.has(key)) return;
+        const value = Math.min(Math.max(parseFloat(match[2].replace(/,/g, '')) || 0, 0), 99999);
+
+        if (/^calories?$/.test(key)) nutrition.calories = value;
+        else if (/^(carbohydrates?|carbs?)$/.test(key)) nutrition.carbs = value;
+        else if (/^protein$/.test(key)) nutrition.protein = value;
+        else if (/^fat$/.test(key)) nutrition.fat = value;
+        else if (/^fiber$/.test(key)) nutrition.fiber = value;
+        else if (/^sodium$/.test(key)) nutrition.sodium = value;
+      });
+    });
+
+    return nutrition.calories ? nutrition : null;
+  }
 
   let name = '';
   for (const line of lines) {
@@ -6586,8 +6616,10 @@ function parseRecipeText(text) {
   let mode = 'none';
   const ingredientLines = [];
   const instructionLines = [];
+  let nutritionStartIndex = -1;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (/^ingredients?[:\s]*$/i.test(line)) { mode = 'ingredients'; continue; }
     if (/^(?:instructions?|directions?|method|how to make|steps?|procedure)[:\s]*$/i.test(line)) { mode = 'instructions'; continue; }
 
@@ -6599,6 +6631,11 @@ function parseRecipeText(text) {
       const clean = line.replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, '').trim();
       if (clean) ingredientLines.push(clean);
     } else if (mode === 'instructions') {
+      if (instructionStopRe.test(line)) {
+        if (nutritionHeaderRe.test(line)) nutritionStartIndex = i + 1;
+        mode = 'none';
+        continue;
+      }
       if (/^[A-Z][A-Z\s]{3,}[:\s]*$/.test(line) && line.length < 35) continue;
       const clean = line.replace(/^[-*]\s*/, '').trim();
       if (clean) instructionLines.push(clean);
@@ -6621,8 +6658,11 @@ function parseRecipeText(text) {
   const ingredients = ingredientLines.map(parseIngredientLine).filter(Boolean);
   const instructions = instructionLines.join('\n');
   const category = guessRecipeCategory(name);
+  const parsed = { name, servings, prepTime, cookTime, category, ingredients, instructions };
+  const nutritionPerServing = nutritionStartIndex >= 0 ? parseNutritionLines(lines.slice(nutritionStartIndex)) : null;
+  if (nutritionPerServing && nutritionPerServing.calories) parsed.nutritionPerServing = nutritionPerServing;
 
-  return { name, servings, prepTime, cookTime, category, ingredients, instructions };
+  return parsed;
 }
 
 function parseFraction(str) {

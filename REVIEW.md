@@ -472,6 +472,36 @@ Approved → TASKS.md `review → done`; fast-forwarded onto main.
 
 → TASK-013 status set to `done` in TASKS.md.
 
+## Review TASK-025 — APPROVED (re-applied on main; must-fix security patches applied by Claude after a no-op retry + crashed re-review)
+branch: task-025 (feature re-applied to main via `git apply --3way`, not merged — branch was ~30+ commits stale)
+verdict: approved
+
+### Context
+Codex's original build (`03b6b7c`) was functionally correct — all 7 acceptance criteria met, PROP-030 traced exactly — but a Guardian Gauntlet pass (security-guardian + quality-guardian, run as read-only advisors on branch `task-025`) surfaced two CONFIRMED security findings in `parseNutritionLines`:
+- **CONFIRMED-1 (Medium):** no explicit key whitelist before the nutrient-key dispatch — every key is covered today by the `if/else if` chain, but there's no guard against a future `else` branch reintroducing an unconstrained-key assignment (prototype-pollution-shaped risk from user-pasted text).
+- **CONFIRMED-2 (Low):** `parseFloat(...) || 0` blocks `NaN`/`Infinity` but not absurd values (e.g. `Calories: 99999999`), stored unclamped into `nutritionPerServing` and synced to localStorage/Firestore.
+
+That review (`e3c227e`, on the `task-025` branch) set the task back to `status: codex` with both fixes fully specified. `/go`'s rework-strike auto-release picked it up (strike 1/3), but the retry commit (`a24cdbc`) only flipped `TASKS.md`'s status to `review` — `git diff 03b6b7c a24cdbc -- app.js` is empty; **neither fix was actually applied**. The follow-up automated `claude -p` re-review then crashed (exit 1) before catching this, leaving the task stuck at `status: blocked` on `main` with a note that didn't match either auto-release pattern (`waiting on merge of` / `strike N/3`) — so it would not have self-healed on a plain `/go` retry. Caught by direct inspection when the human asked "are you sure it actually did it."
+
+### Findings
+**1. Both must-fix patches now correctly applied (verified by direct read of `app.js:6566-6588` on main post-apply).**
+- `RECOGNIZED` whitelist Set (`calorie/calories/carbohydrate/carbohydrates/carb/carbs/protein/fat/fiber/sodium`) with `if (!RECOGNIZED.has(key)) return;` inserted immediately after `key`/before `value` is computed — matches the review's specified insertion point exactly.
+- `value` is now `Math.min(Math.max(parseFloat(match[2].replace(/,/g, '')) || 0, 0), 99999)` — matches the review's specified clamp exactly.
+- The six `if/else if` dispatch guards are untouched, as the review required.
+
+**2. Regression-verified, not just code-traced.** A 9-case deterministic harness (extracting `parseRecipeText` + its real dependencies from `app.js` and running them in isolation) covers the original 4 acceptance-criteria cases plus 5 new cases targeting exactly these two findings: a `Calories: 99999999` line clamps to `99999`; a line with `__proto__: 5` / `constructor: 9` keys produces no own-property pollution on the result and does not touch the global `Object.prototype`; a recognized key after unrecognized ones still parses. All 9 pass. Playwright `smoke` + `button-smoke` also pass (467 buttons, 0 broken), run twice — once on the fixed `task-025` branch, once again after the `git apply --3way` onto main.
+
+**3. No unrelated changes.** `git diff origin/main -- app.js` (pre-apply) was exactly the original 39-line feature plus these 2 patches (6 lines) — nothing else in `parseRecipeText` or elsewhere in `app.js` was touched. Same file-scope discipline as the original acceptance criteria (`app.js` only).
+
+**4. Why re-applied instead of merged.** Same precedent as TASK-007: the `task-025` branch forked before TASK-014/016/026+ and a large batch of automation/ops work landed on `main`, so merging the branch directly would drag in unrelated stale state and likely conflict. The isolated `app.js` hunk (with the fix on top) applied cleanly via `git apply --3way` with zero conflicts.
+
+**5. Risk-gate.** This task touches only `parseRecipeText()` in `app.js` — parsing logic, no Firestore write-guard, no `saveData()` call site, no auth. Per D-032, qualifies for `done` (auto-merge), consistent with the original review's own risk-gate call once the security findings were actually resolved.
+
+### Disclosed limitation
+Claude both authored this specific 2-line patch and reviewed it (no independent third pass), same disclosed caveat as TASK-014/016. Unlike those, this is NOT an automation-surface task (Hard Rule 10 doesn't apply here), the patch is a small, exactly-specified, mechanical fix matching a prior independent Guardian Gauntlet's own instructions verbatim, and it was verified with new regression tests targeting precisely the two findings — not just re-asserted by the same reviewer. Judged sufficient to land at `done` rather than holding for a further human pass.
+
+→ TASK-025 status set to `done` in TASKS.md.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-025 — done (re-applied on main; original branch task-025 not merged)
+changed:
+  - app.js (`parseRecipeText()` stops instruction capture at standalone Nutrition/Notes headers and returns parsed `nutritionPerServing` from pipe-delimited or newline nutrition blocks, 41 loc including the security fixes below)
+re-apply: Codex built this on branch `task-025` (`03b6b7c`); Claude review (`e3c227e`) found 2 CONFIRMED security-guardian findings (no explicit key whitelist before the nutrient-key dispatch; unclamped numeric values) and required specific fixes. The rework-retry commit (`a24cdbc`) flipped `TASKS.md` status to `review` without applying either fix (`app.js` was byte-identical to the pre-review version), and the automated `claude -p` re-review then crashed (exit 1) before catching that — same crashed-auto-review class as TASK-007/TASK-014. Claude applied both must-fix patches directly (`RECOGNIZED` key whitelist with early return; `Math.min(Math.max(value, 0), 99999)` clamp), committed them to `task-025` (`663478b`, pushed for the record), then re-applied the isolated `app.js` hunk onto current main via `git apply --3way` (clean; branch NOT merged — it was ~30+ commits stale behind main).
+tests: `node --check` (pass); deterministic `parseRecipeText`/`parseNutritionLines` harness (9 cases: original 4 from the first build plus 5 new — clamps a 99999999 value to 99999, drops `__proto__`/`constructor` keys with no own-property or global `Object.prototype` pollution, still parses a recognized key listed after unrecognized ones, Notes-header stop without nutrition scan; all pass); Playwright `smoke` + `button-smoke` (2 passed; 467 buttons discovered, 200 clicked, 0 broken) — run once on the fixed `task-025` branch and again after the `git apply --3way` onto main.
+blockers: none — the prior `blocked` state was Codex's no-op retry plus a crashed auto-review, now resolved.
+→ status set to `done` in TASKS.md (reviewed + approved this cycle).
+
 ## TASK-014 — done (branch: task-014)
 changed:
   - tools/Dispatch-Commands.ps1 (`Get-UntriagedCaptureCount` counts fresh inbox captures; `Invoke-Autopilot` plans when either unconverted BUILD_QUEUE work or untriaged captures exist; idle triage-only runs reply with the next approval action, 19 loc)
