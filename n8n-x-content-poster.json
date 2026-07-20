@@ -882,7 +882,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = new Date();\nconst yyyy = d.getUTCFullYear();\nconst mm = String(d.getUTCMonth() + 1).padStart(2, '0');\nconst path = 'content/posted/' + yyyy + '/' + mm + '/' + $json.id + '.md';\nconst fm = [\n  '---',\n  'id: ' + $json.id,\n  'source: ' + $json.source,\n  'platform: x',\n  'status: posted',\n  'posted_at: ' + d.toISOString(),\n  'posted_ids: ' + $json.postedIds.join(','),\n  '---',\n  '',\n].join('\\n');\nconst content = fm + $json.body.trim() + '\\n';\nconst contentB64 = Buffer.from(content, 'utf8').toString('base64');\nreturn [{ json: { ...$json, archivePath: path, contentB64 } }];"
+        "jsCode": "const src = $('Collect posted ids').first().json;\nconst d = new Date();\nconst yyyy = d.getUTCFullYear();\nconst mm = String(d.getUTCMonth() + 1).padStart(2, '0');\nconst path = 'content/posted/' + yyyy + '/' + mm + '/' + src.id + '.md';\nconst fm = [\n  '---',\n  'id: ' + src.id,\n  'source: ' + src.source,\n  'platform: x',\n  'status: posted',\n  'posted_at: ' + d.toISOString(),\n  'posted_ids: ' + src.postedIds.join(','),\n  '---',\n  '',\n].join('\\n');\nconst content = fm + src.body.trim() + '\\n';\nconst contentB64 = Buffer.from(content, 'utf8').toString('base64');\nreturn [{ json: { ...src, archivePath: path, contentB64 } }];"
       },
       "id": "build-archive",
       "name": "Build posted-archive file",
@@ -937,7 +937,7 @@
     {
       "parameters": {
         "chatId": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
-        "text": "={{ '✅ Posted ' + $json.id + ' to X (' + $json.postedIds.length + ' tweets): ' + $json.firstUrl }}",
+        "text": "={{ '✅ Posted ' + $('Collect posted ids').first().json.id + ' to X (' + $('Collect posted ids').first().json.postedIds.length + ' tweets): ' + $('Collect posted ids').first().json.firstUrl }}",
         "additionalFields": {}
       },
       "id": "notify-posted",
