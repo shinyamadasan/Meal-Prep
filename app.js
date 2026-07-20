@@ -6565,6 +6565,10 @@ function parseRecipeText(text) {
 
   function parseNutritionLines(nutritionLines) {
     const nutrition = { calories: 0, carbs: 0, protein: 0, fat: 0, fiber: 0, sodium: 0 };
+    const RECOGNIZED = new Set([
+      'calorie', 'calories', 'carbohydrate', 'carbohydrates', 'carb', 'carbs',
+      'protein', 'fat', 'fiber', 'sodium'
+    ]);
 
     nutritionLines.forEach(function(line) {
       line.split('|').forEach(function(part) {
@@ -6572,7 +6576,8 @@ function parseRecipeText(text) {
         if (!match) return;
 
         const key = match[1].trim().toLowerCase();
-        const value = parseFloat(match[2].replace(/,/g, '')) || 0;
+        if (!RECOGNIZED.has(key)) return;
+        const value = Math.min(Math.max(parseFloat(match[2].replace(/,/g, '')) || 0, 0), 99999);
 
         if (/^calories?$/.test(key)) nutrition.calories = value;
         else if (/^(carbohydrates?|carbs?)$/.test(key)) nutrition.carbs = value;
