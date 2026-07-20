@@ -21,3 +21,17 @@
   reads `TASKS.md` from whatever's currently on `main`; if the task entry only exists on the branch,
   `/merge TASK-X` fails with "TASK-X is not in TASKS.md" even though the branch is otherwise ready.
   Cost about 15 minutes to diagnose the first time it happened (TASK-019). See D-040.
+- 2026-07-20: two compounding gaps let a real security fix silently not-happen while `/go`'s own
+  reply text claimed it was self-healing (TASK-025). (1) A rework-strike retry can flip
+  `TASKS.md` status forward (`codex` → `review`) without Codex actually changing the code — nothing
+  diffs the retry's output against the pre-review version to confirm the must-fix items were
+  applied before letting it proceed to re-review. (2) When the follow-up auto-review then crashed
+  (`claude -p` exit 1, the same flaky-crash class as TASK-007/014), the resulting `blocked` note
+  ("build stopped ... Left at status: review ...") doesn't match either pattern
+  `Invoke-Autopilot`'s auto-release regex looks for (`waiting on merge of` / `strike N/3`), so a
+  plain `/go` retry would NOT have picked it back up despite the note saying it would. Both were
+  only caught because the human asked "are you sure it actually did it" and got the branch/commit
+  diff checked by hand. Candidate fixes, not yet built: (a) before advancing a rework-retry past
+  `codex`, diff the retry against the must-fix file list and refuse to advance if nothing changed;
+  (b) widen the auto-release regex (or the crashed-review note format) so a crashed re-review after
+  a real code push is retryable the same way a rework strike is.
