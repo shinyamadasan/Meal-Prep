@@ -1739,6 +1739,84 @@ test steps:
         planning run that happens to race an OUTBOX-clearing cycle recovers automatically instead of
         needing manual `git push origin main` recovery.
 
+### TASK-032 · Fix silent no-op rework retry + stuck crashed-review state
+status: approved
+review: Claude implemented directly (tools/Dispatch-Commands.ps1, tools/Run-Codex-Build.ps1 — same
+  D-040 reasoning as every other automation-surface item: Codex cannot commit under tools/). Held at
+  `approved` for human `/merge`, not auto-merged, per D-032/Hard Rule 10. Same disclosed same-session
+  caveat as TASK-014/016/031 — no independent second set of eyes on this specific diff. Verified with
+  an isolated fixture harness (below), not a live end-to-end run. Both changed files parse clean.
+  Land with `/merge TASK-032` then `/merge TASK-032 yes` when ready.
+source: found live while investigating why TASK-025's `/go` reply ("done") turned out not to be true
+  (2026-07-20 conversation) — user then asked to fix it, framing the request as "be my junior dev:
+  investigate, build, verify, and just give me a yes/no" rather than a spec to build from
+priority: P1
+depends-on: none
+files: tools/Run-Codex-Build.ps1, tools/Dispatch-Commands.ps1, docs/DECISIONS.md
+
+context:
+  TASK-025's rework-retry (commit a24cdbc) flipped `TASKS.md` status from `codex` to `review` while
+  changing nothing else at all (`git diff 03b6b7c a24cdbc -- app.js` was empty) — neither must-fix
+  security patch from the prior review was actually applied. The follow-up automated `claude -p`
+  re-review then crashed (exit 1), and `Invoke-Autopilot`'s classifier had no case for "review engine
+  crashed, not a verdict" — it fell into the generic `else` branch and got marked `blocked` with a
+  note ("build stopped -- ...") that doesn't match either of `Invoke-Autopilot`'s own auto-release
+  patterns (`waiting on merge of` / `strike N/3`). The task's own note claimed "automatic retry on the
+  next /review or /go", but neither actually would have resumed it: `/review` found nothing because
+  main's `TASKS.md` said `blocked`, not `review`, and a plain `/go` only ever searches for
+  `status: codex`. Full detail: docs/DECISIONS.md D-051.
+
+acceptance:
+  - [x] `Run-Codex-Build.ps1`: before auto-chaining a build that reached `status: review` into review,
+        verify the build touched at least `CHANGELOG.md` or `TEST_REPORT.md` (AGENTS.md's own
+        mandated evidence steps). If not, mark it `blocked` with a clear "no-op" note and skip the
+        review chain entirely, rather than let a no-op reach review.
+  - [x] `Dispatch-Commands.ps1`: factor the build/review outcome classification into one shared
+        `Resolve-ReviewOutcome` function used by both the build loop's auto-chained-review outcome
+        and a new pending-review-resume step, so the two call sites cannot drift apart.
+  - [x] Add a case recognizing Run-Claude-Review.ps1's crash signal ("Left at status: review for
+        automatic retry") that sets `status: review` on main (not `blocked`), with no strike cap —
+        transient engine flakiness, not a task-level defect.
+  - [x] Add a case recognizing the new "build NO-OP" signal from Run-Codex-Build.ps1, reusing the
+        existing `strike N/3` bounded-retry idiom REWORK already has.
+  - [x] Fix a latent bug found while consolidating the classifier: a red-zone "APPROVED but HELD"
+        review message contains the literal word APPROVED, so the old inline classifier would have
+        matched it and marked the task `done` on main even though the branch was never actually
+        merged. Now checked before the generic APPROVED match and routed to `status: approved`
+        instead.
+  - [x] Add a pending-review-resume step to `Invoke-Autopilot` so a plain `/go` (not just an explicit
+        `/review`) resumes a task stuck at `status: review`, taking priority over starting a new build
+        (it's further along) and counting as that mission's one action.
+  - [x] The `/go` summary says `RETRYING:` (not `NEEDS YOU:`) for a self-healing crash retry, since no
+        human action is actually needed there — distinguished via a new `.NeedsHuman` field on the
+        classifier's return object.
+  - [x] docs/DECISIONS.md gains a D-051 entry.
+
+constraints:
+  - Automation/OS-surface change (Hard Rule 10 / D-023): solo, never chained.
+  - Red-zone surface (D-032) — held at `approved`, never auto-merged.
+  - No strike cap on the pure engine-crash retry case (unlike REWORK and the new no-op case, which
+    both must stay bounded at 3 — a genuinely broken task must not retry forever).
+  - Do not change `/run`, `/build`, `/review`, `/merge`, `/status`, `/next`, `/stop`, `/enable`,
+    `/disable` behavior beyond what's needed for the pending-review-resume step to reuse the existing
+    `Invoke-ReviewPhase`.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile` on both changed `.ps1` files: no
+        syntax errors.
+  - [x] Isolated fixture harness against `Resolve-ReviewOutcome` (extracted from the real file, its
+        real `Split-TaskBlock`/`Set-TaskStatus`/`Set-TaskBlockedAuto` dependencies, `Publish-
+        TasksChange` stubbed to avoid touching git): 7 cases / 16 assertions, all pass — real
+        auto-merge → `done`; APPROVED-but-HELD → `approved` (not `done`); REWORK → `blocked` with
+        strike incremented from a prior note; crash signal → `status: review`, no strike; no-op signal
+        → `blocked` with strike incremented, including from a pre-existing strike count; unrecognized
+        failure → generic `blocked`.
+  - [x] 5-case check of the `$hasEvidence` no-op guard logic, including the exact TASK-025 repro
+        (`$changed` containing only `TASKS.md`) correctly flagged as no evidence.
+  - [ ] Live (human-verified): the next real crashed review or real no-op rework retry in production
+        resolves itself on the next `/go` instead of getting stuck. Not safely reproducible without
+        spawning real `codex`/`claude` CLI processes against a live branch.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

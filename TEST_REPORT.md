@@ -5,6 +5,28 @@
 
 ---
 
+## TASK-032 · 2026-07-20
+suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Run-Codex-Build.ps1 and
+  tools/Dispatch-Commands.ps1; isolated fixture harness against Resolve-ReviewOutcome (function
+  extracted from the real file along with its real Split-TaskBlock/Set-TaskStatus/Set-TaskBlockedAuto
+  dependencies, Publish-TasksChange stubbed to a no-op so the test never touches git); a 5-case check
+  of the $hasEvidence no-op guard logic in isolation
+result: both files parse clean, no syntax errors. Resolve-ReviewOutcome: 16/16 assertions pass across
+  7 cases -- a real auto-merge message sets status: done with NeedsHuman false; an "APPROVED but HELD"
+  red-zone message correctly sets status: approved (NOT done) rather than false-positive-matching the
+  literal word APPROVED; a REWORK message increments an existing strike 1/3 note to 2/3 and sets
+  status: blocked; a crashed-review-engine message ("Left at status: review for automatic retry") sets
+  status: review with no strike; a "build NO-OP" message sets status: blocked with strike 1/3, and a
+  repeat on a task that already carries strike 1/3 correctly increments to 2/3; an unrecognized failure
+  message falls through to the generic blocked path. The $hasEvidence guard: the exact TASK-025 repro
+  ($changed containing only TASKS.md) correctly flagged as no evidence; a real build touching
+  app.js+CHANGELOG.md+TEST_REPORT.md+TASKS.md correctly passes; app.js changed with no evidence docs
+  still correctly flagged (matches AGENTS.md's mandated evidence-before-review contract).
+untested: full live end-to-end verification -- a real crashed claude/codex review process, and a real
+  no-op rework retry -- was not attempted; not safely reproducible without spawning real codex/claude
+  CLI processes against a live git branch. Flagged for human verification on the next real occurrence
+  of either failure mode in production.
+
 ## TASK-025 · 2026-07-20 (re-applied on main)
 suite: node --check app.js; deterministic parseRecipeText/parseNutritionLines harness (9 cases); npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000 (run twice: once on the fixed task-025 branch, once on main post-apply)
 result: `node --check` passed both times. Deterministic harness passed 9/9: the original 4 cases (pipe-delimited nutrition with Saturated Fat correctly excluded, no-Nutrition-header leaves nutritionPerServing unset, newline-per-nutrient block, Notes header stops instructions without triggering a nutrition scan) plus 5 new security-regression cases added to verify the two must-fix patches — an absurd `Calories: 99999999` clamps to 99999; a line containing `__proto__: 5` and `constructor: 9` keys produces no own-property on the result object and does not pollute the global `Object.prototype` (`({}).polluted` stays `undefined`); a recognized key (`Sodium`) appearing after unrecognized keys on the same line still parses correctly. Playwright smoke + button-smoke passed both runs (2/2 each; 467 buttons discovered, 200 clicked, 0 broken).

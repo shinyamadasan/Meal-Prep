@@ -5,6 +5,23 @@
 
 ---
 
+## TASK-032 — approved, held for /merge (branch: task-032)
+changed:
+  - tools/Run-Codex-Build.ps1 (before auto-chaining a status:-review build into review, requires the
+    build touched CHANGELOG.md or TEST_REPORT.md; blocks as a no-op with a clear note otherwise, 23 loc)
+  - tools/Dispatch-Commands.ps1 (factored build/review classification into a shared
+    Resolve-ReviewOutcome; added crashed-review-retry and no-op-retry cases; fixed a HELD-vs-APPROVED
+    false-positive; added a pending-review-resume step to Invoke-Autopilot so plain /go resumes a
+    stuck review; RETRYING vs NEEDS YOU summary wording, 95 loc net)
+tests: `[System.Management.Automation.Language.Parser]::ParseFile` on both files (pass, no syntax
+  errors); isolated fixture harness against Resolve-ReviewOutcome (7 cases / 16 assertions, all pass);
+  5-case check of the no-op $hasEvidence guard logic (all pass, including the exact TASK-025 repro)
+blockers: none
+deviations: full live end-to-end verification (a real crashed review, a real no-op retry) not
+  attempted -- not safely reproducible without spawning real codex/claude CLI processes against a
+  live branch; flagged for human verification on the next real occurrence
+→ status set to `approved` in TASKS.md (red-zone automation surface, held per D-032/Hard Rule 10)
+
 ## TASK-025 — done (re-applied on main; original branch task-025 not merged)
 changed:
   - app.js (`parseRecipeText()` stops instruction capture at standalone Nutrition/Notes headers and returns parsed `nutritionPerServing` from pipe-delimited or newline nutrition blocks, 41 loc including the security fixes below)

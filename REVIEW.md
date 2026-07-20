@@ -502,6 +502,31 @@ Claude both authored this specific 2-line patch and reviewed it (no independent 
 
 → TASK-025 status set to `done` in TASKS.md.
 
+## Review TASK-032 — APPROVED, HELD (automation-surface fix for the TASK-025 stuck-state gaps)
+branch: task-032
+verdict: approved (red-zone, held for human `/merge`)
+
+### Context
+Directly caused by TASK-025's own incident: a rework-retry that silently changed no code, and a crashed re-review that then left the task stuck in a shape neither `/review` nor `/go` could actually resume, despite the task's own note claiming both would work. This task closes both gaps at their root in `tools/Run-Codex-Build.ps1` and `tools/Dispatch-Commands.ps1`.
+
+### Findings
+**1. No-op-build guard — correct.** `Run-Codex-Build.ps1`'s new check (`$hasEvidence`) requires `CHANGELOG.md` or `TEST_REPORT.md` to appear in `$changed` before a build reaching `status: review` is allowed to auto-chain into review. This is a direct, general enforcement of AGENTS.md's own mandated evidence steps — not special-cased to rework retries, so it also catches a fresh build that skips evidence-recording for any reason. Verified against the exact TASK-025 shape (`$changed` = `TASKS.md` only) plus 4 other fixture cases — all correct.
+
+**2. Shared classifier — correct, and caught a real latent bug in the process.** Consolidating the build-loop's inline APPROVED/REWORK/else classification into `Resolve-ReviewOutcome` (so the new pending-review-resume path can't drift from it) surfaced that the old inline check would have matched the literal word "APPROVED" inside Run-Claude-Review.ps1's red-zone "APPROVED but HELD" message and incorrectly marked that task `done` on main — even though `main NOT changed` is explicit in that same message. This never manifested in production (Codex-built tasks reaching a HELD verdict haven't yet occurred through the automated path), but it is a real, previously-undetected correctness gap in the exact function this task is fixing. Now checked and routed to `status: approved` before the generic `APPROVED` match.
+
+**3. Crashed-review handling — correct, and matches Run-Claude-Review.ps1's own stated intent.** Run-Claude-Review.ps1's crash path already says (in its own comment) that a bare engine failure "stays `status: review`, which is already a valid 'try me again' state." The bug was that `Invoke-Autopilot` never mirrored that state onto `main` — it unilaterally overwrote it to `blocked` with an unmatched note. The new `Resolve-ReviewOutcome` case detects the exact text Run-Claude-Review.ps1 emits on crash and sets `status: review` on main instead, with no strike cap (deliberate — this is transient infra flakiness, not a task defect, so capping it would misclassify the failure type).
+
+**4. Pending-review-resume step — correct placement and gating.** Added before the "plan once" and "idle audit" steps, and the build loop below is now gated on `-not $built` so it never double-spends the one-mission-per-`/go` budget. `$waiting`/`$built` initialization was moved up to before this new step (single declaration, verified via grep — no duplicate).
+
+**5. Summary wording fix.** `RETRYING:` vs `NEEDS YOU:`, keyed off the new `.NeedsHuman` field, correctly excludes only the crash-retry case (the one case where no human action is needed) — REWORK, no-op, HELD, and generic-blocked all still correctly report `NEEDS YOU:`.
+
+**6. Verification.** Both files parse clean. `Resolve-ReviewOutcome` verified via an isolated fixture harness (real dependencies, `Publish-TasksChange` stubbed) — 7 cases / 16 assertions, all pass, including the two hardest cases (HELD-not-done, and strike-increment-from-existing-note). The `$hasEvidence` guard verified via 5 fixture cases. No live end-to-end run (would require a real crashed `claude -p`/`codex exec` process) — honestly disclosed as unverified in TEST_REPORT.md rather than claimed.
+
+### Risk-gate
+Automation/OS-surface (Hard Rule 10, D-023): solo, never chained. Touches `tools/Dispatch-Commands.ps1` and `tools/Run-Codex-Build.ps1` directly — the AI Dev OS's own automation. Per D-032 this is red-zone regardless of how mechanically verified the diff is: held at `approved`, `main` NOT changed. Same disclosed same-session caveat as TASK-014/016/031 (Claude both built and reviewed this specific diff) — mitigated here by the isolated fixture harness giving independent-of-the-author verification of the actual behavior, not just a second read of the same code.
+
+→ TASK-032 status set to `approved` in TASKS.md. Land with `/merge TASK-032` then `/merge TASK-032 yes`.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:
