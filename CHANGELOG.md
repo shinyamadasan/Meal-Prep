@@ -5,6 +5,21 @@
 
 ---
 
+## TASK-033 — approved, held for /merge (branch: task-033)
+changed:
+  - tools/Generate-Digest.ps1 (builds the digest incrementally, stops before a safe char threshold,
+    appends a "+N more" note instead of truncating the raw string)
+  - tools/Dispatch-Commands.ps1 (stale-lock check verifies the recorded PID is actually still
+    running; lowered the still-running staleness wait from 2 hours to 45 min; sends a Telegram
+    notice via the existing OUTBOX relay when it clears a stale lock; /status now reports lock age)
+tests: `[System.Management.Automation.Language.Parser]::ParseFile` on both files (pass); digest fix
+  run against this app's own real planning/PROPOSALS.md (530 chars, unaffected at this size);
+  stale-lock/status logic confirmed byte-identical to ChronaSense's already fixture-tested version
+blockers: none
+deviations: ported from the sibling ChronaSense app (its TASK-002), which hit both bugs live first
+  in the same session as this app's own TASK-032 port in the opposite direction
+→ status set to `approved` in TASKS.md (red-zone automation surface, held for human /merge)
+
 ## TASK-032 — approved, held for /merge (branch: task-032)
 changed:
   - tools/Run-Codex-Build.ps1 (before auto-chaining a status:-review build into review, requires the

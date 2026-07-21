@@ -5,6 +5,22 @@
 
 ---
 
+## TASK-033 · 2026-07-21
+suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Generate-Digest.ps1 and
+  tools/Dispatch-Commands.ps1; tools/Generate-Digest.ps1 executed against this app's own real
+  planning/PROPOSALS.md with -OutFile pointed at a scratch file; direct diff of the ported
+  stale-lock/status logic against ChronaSense's already fixture-tested task-002 branch
+result: both files parse clean, no syntax errors. Digest run against real data: 530 chars (limit
+  4096), matching pre-fix output exactly since this app's current proposal count is well under the
+  new truncation threshold — confirms the fix is a no-op at normal digest sizes, only engaging once
+  content actually approaches the limit. Stale-lock/status logic: byte-for-byte identical (via
+  `diff`) to ChronaSense's task-002 branch, which itself passed a 4-case fixture test of the exact
+  decision branching (dead PID clears regardless of age; live PID + fresh timestamp stays busy; live
+  PID + 46-min timestamp clears; live PID + 44-min timestamp stays busy, no boundary false-positive).
+untested: full live end-to-end verification — a real oversized digest send, and a real hung process
+  actually getting auto-cleared with its Telegram notice arriving — was not attempted in this app
+  specifically (ChronaSense's own TASK-002 carries the same disclosure).
+
 ## TASK-032 · 2026-07-20
 suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Run-Codex-Build.ps1 and
   tools/Dispatch-Commands.ps1; isolated fixture harness against Resolve-ReviewOutcome (function

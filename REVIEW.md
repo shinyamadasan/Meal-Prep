@@ -527,6 +527,25 @@ Automation/OS-surface (Hard Rule 10, D-023): solo, never chained. Touches `tools
 
 → TASK-032 status set to `approved` in TASKS.md. Land with `/merge TASK-032` then `/merge TASK-032 yes`.
 
+## Review TASK-033 — APPROVED, HELD (ported digest-length + stale-lock fixes from ChronaSense)
+branch: task-033
+verdict: approved (red-zone, held for human `/merge`)
+
+### Context
+Same-session mirror of TASK-032, in the opposite direction. While working the ChronaSense app (a sibling project, same developer, same AI Dev OS template), two live reliability bugs surfaced: an unbounded digest that failed Telegram delivery outright once enough proposals piled up, and a 2-hour, silent stale-lock wait that let a genuinely hung process block the queue for 48+ minutes undetected. Ported both fixes back here since this app shares the identical `tools/Generate-Digest.ps1` / `tools/Dispatch-Commands.ps1` template — the same latent bugs exist here, just haven't fired yet given this app's currently-small proposal count.
+
+### Findings
+**1. Digest length cap — correct, verified against this app's own real data.** `Generate-Digest.ps1` now tracks cumulative length while adding proposal groups/items and stops before a 3700-char threshold, appending a truncation note rather than cutting the raw string. Run against this app's actual `planning/PROPOSALS.md`: output is 530 chars, identical to what pre-fix logic would have produced at this size — the fix is provably a no-op until content actually approaches the limit, not a behavior change for the common case.
+
+**2. Stale-lock + `/status` fix — correct, verified by direct comparison rather than re-derivation.** Since this is a straight port, verification was done by diffing the new logic against ChronaSense's own `task-002` branch (byte-for-byte identical) rather than re-running an app-agnostic fixture test a second time for no new signal — that branch already passed 4 fixture cases covering the exact decision boundary (44 vs 46 minutes). Same conservative design carried over: clears the lock file on a confirmed-dead or confirmed-stale-with-still-alive-PID lock, never auto-kills the process, and now surfaces the wait via a real Telegram notice instead of `Write-Host` output nobody watching a scheduled task would see.
+
+**3. `/status` lock-age addition — small, correct, directly closes the "how do I know what's happening" gap.** Previously `/status` reported only "BUSY" with no duration; a human checking mid-hang would have seen the same output as checking during a completely normal run. Now reports elapsed minutes using the same `LastWriteTime` check the stale-lock fix itself relies on.
+
+### Verdict
+Gate picked: `approved` (red-zone: touches `tools/Generate-Digest.ps1` and `tools/Dispatch-Commands.ps1` directly — the AI Dev OS itself). Same disclosed same-session caveat as TASK-014/016/031/032 (Claude both built and reviewed this diff) — mitigated by testing against this app's own real data plus a direct diff against an independently fixture-tested source, rather than a second read of the same code.
+
+→ TASK-033 status set to `approved` in TASKS.md. Land with `/merge TASK-033` then `/merge TASK-033 yes`.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

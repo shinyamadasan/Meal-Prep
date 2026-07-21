@@ -1811,6 +1811,66 @@ test steps:
         resolves itself on the next `/go` instead of getting stuck. Not safely reproducible without
         spawning real `codex`/`claude` CLI processes against a live branch.
 
+### TASK-033 · Port ChronaSense's digest-length + stale-lock fixes back here
+status: approved
+review: Claude implemented directly (tools/Generate-Digest.ps1, tools/Dispatch-Commands.ps1 —
+  Codex cannot commit under tools/). Held at `approved` for human `/merge` — touches the AI Dev OS
+  itself (D-032 red-zone). Digest fix run against this app's own real planning/PROPOSALS.md (530
+  chars, unaffected at this size, confirming no change to normal-case output). Stale-lock/status
+  logic confirmed byte-identical to ChronaSense's already fixture-tested version (9/9 assertions
+  there — not re-derived here, verified via direct diff against that branch). Both files parse
+  clean. Land with `/merge TASK-033` then `/merge TASK-033 yes`.
+source: ported from the sibling ChronaSense app (its TASK-002/DECISIONS #20), which hit both bugs
+  live first in the same session as this app's TASK-032 — same shared tools/Dispatch-Commands.ps1 /
+  tools/Generate-Digest.ps1 template, so a bug found in one is latent in the other, same reasoning
+  as TASK-032's own port in the opposite direction
+priority: P2
+depends-on: none
+files: tools/Generate-Digest.ps1, tools/Dispatch-Commands.ps1
+
+context:
+  Two reliability bugs, found live on ChronaSense. (1) `Generate-Digest.ps1` had no cap on digest
+  length — ChronaSense's digest hit ~5000 chars with 12 pending proposals and Telegram rejected the
+  send outright ("Bad Request: message is too long"), total silence instead of even a partial
+  digest. This app's own digest is currently small (530 chars, one proposal) so it hasn't hit this
+  yet, but the same unbounded-growth bug is latent here too — proposals accumulate over time. (2)
+  `Dispatch-Commands.ps1`'s stale-lock wait was 2 hours and cleared silently. On ChronaSense, a
+  genuinely hung process (0% CPU, no log output, no working child process) held
+  `automation.lock` for 48+ minutes, invisible, until a human found it by hand in Task Manager —
+  two queued `/merge` commands sat stuck behind it the whole time.
+
+acceptance:
+  - [x] `Generate-Digest.ps1` builds the digest incrementally, stops before a safe 3700-char content
+        threshold, and appends a "+N more, see PROPOSALS.md" note rather than truncating the raw
+        string (which risks cutting a Markdown entity in half).
+  - [x] `Dispatch-Commands.ps1`'s lock check verifies the recorded PID is actually still running —
+        stale immediately if not, regardless of age.
+  - [x] If the PID is still running, the wait is lowered from 2 hours to 45 minutes (this app's own
+        Run-Codex-Build.ps1 caps its build step at 20 min; Run-Claude-Review.ps1's auto-merge caps
+        npm test at 10 min).
+  - [x] Clearing a stale lock sends a Telegram notice via the existing OUTBOX relay instead of
+        clearing silently.
+  - [x] Does not auto-kill the lingering process — `/stop` remains the explicit, human-triggered way
+        to do that.
+  - [x] `/status` now reports how many minutes a lock has been held, not just "BUSY".
+
+constraints:
+  - Automation/OS-surface change: solo, never chained.
+  - Red-zone surface — held at `approved`, never auto-merged.
+  - Digest truncation must stop at item boundaries, never mid-string.
+  - No auto-kill of the lingering process.
+
+test steps:
+  - [x] `[System.Management.Automation.Language.Parser]::ParseFile` on both changed files: no syntax
+        errors.
+  - [x] `Generate-Digest.ps1` run against this app's own real `planning/PROPOSALS.md`: 530 chars,
+        unaffected at this size (confirms no regression to normal-case output).
+  - [x] Stale-lock/status logic confirmed byte-identical (via direct diff) to ChronaSense's
+        already-verified `task-002` branch, which itself passed a 4-case fixture test of the exact
+        decision branching (dead PID, live+fresh, live+46min, live+44min-boundary).
+  - [ ] Live (human-verified): the next real oversized digest or real hung process resolves the way
+        this fix intends, in production.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
