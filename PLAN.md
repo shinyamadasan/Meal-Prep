@@ -17,6 +17,13 @@ Low-risk P2 items via D-042. The previous milestone (TASK-014..016: automation g
   land at `status: done` (auto-merge eligible) unless a specific diff unexpectedly touches a
   Hard Rule surface.
 - Each task is independently testable; no cross-task dependencies.
+- TASK-026/027/028 (2026-07-20: TASK-025 already done) are grouped under Sprint Execution Mode
+  (`Risk: Low · Execution: Chained`, shared `source: BQ-024/025/026 (alpha-stability batch)`) so
+  one `/go` press builds through all three in sequence instead of needing a separate press per
+  task — requested directly by the human, who found repeatedly pressing `/go` for an
+  already-fully-approved batch to be pure friction. No task in the group carries a `checkpoint:`,
+  so it's one implicit checkpoint: Codex stops only once it runs out of ready tasks in the group,
+  or hits a blocker/rework.
 
 ## Scope
 

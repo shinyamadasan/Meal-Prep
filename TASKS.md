@@ -1358,13 +1358,15 @@ test steps:
 ---
 
 <!-- ═══════════════════════════════════════════════════════
-     BQ-024 · Pantry: one-tap "Clear expired" action
+     BQ-024/025/026 · Alpha-stability batch: pantry clear-expired, voice bulk-add newline,
+     Prep Mode persistence
+     Risk: Low · Execution: Chained
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-026 · Add "Clear expired" button to pantry header (bulk-delete all expired items)
 status: codex
 owner: codex
-source: BQ-024
+source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
 depends-on: none
 files: app.js, index.html
@@ -1417,14 +1419,10 @@ test steps:
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════
-     BQ-025 · Bulk add voice: auto-newline each recognized item
-     ═══════════════════════════════════════════════════════ -->
-
 ### TASK-027 · Bulk add voice: auto-insert newline after each recognized item (no manual Enter)
 status: codex
 owner: codex
-source: BQ-025
+source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
 depends-on: none
 files: app.js
@@ -1470,14 +1468,10 @@ test steps:
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════
-     BQ-026 · Prep Mode: persist active session across browser close
-     ═══════════════════════════════════════════════════════ -->
-
 ### TASK-028 · Persist Prep Mode active session to localStorage (survive browser close/reopen)
 status: codex
 owner: codex
-source: BQ-026
+source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
 depends-on: none
 files: app.js
