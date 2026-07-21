@@ -26,3 +26,21 @@ Nothing has been merged. main is untouched.
 2026-07-21T11:12:49.8182544-07:00
 
 MERGE BLOCKED: main has 2 uncommitted change(s). main was not changed.
+
+---
+
+## 20260721T1743Z-550-command
+2026-07-21T11:12:55.6127023-07:00
+
+HELD (red-zone): TASK-017 - Add Send-Notification: push a Telegram notice on any Preflight abort or mid-run halt
+
+Touches 1 file(s):
+  run-claude.ps1
+
+1 file changed, 93 insertions(+), 1 deletion(-)
+
+Read the diff before you answer:
+  https://github.com/shinyamadasan/Meal-Prep/compare/main...task-017
+
+To land it:  /merge TASK-017 yes
+Nothing has been merged. main is untouched.
