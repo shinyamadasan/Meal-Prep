@@ -44,3 +44,10 @@ Read the diff before you answer:
 
 To land it:  /merge TASK-017 yes
 Nothing has been merged. main is untouched.
+
+---
+
+## 20260721T1743Z-552-command
+2026-07-21T11:13:01.7758761-07:00
+
+MERGE BLOCKED: main has 2 uncommitted change(s). main was not changed.
