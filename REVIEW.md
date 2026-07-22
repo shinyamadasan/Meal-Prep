@@ -195,6 +195,61 @@ review next; require `escapeHtml()` patches as a must-fix before approving that 
 
 → TASK-027 status set to `done` in TASKS.md.
 
+## Review TASK-026 — APPROVED · held for human /merge
+branch: task-026
+verdict: approved
+date: 2026-07-22
+
+### Guardian Gauntlet
+
+Both guardians ran as read-only advisors and were instructed not to edit any file.
+
+**security-guardian — RAN · PASSED**
+No CONFIRMED vulnerabilities. Three POTENTIAL items, all LOW / pre-existing:
+- P-1: `String(item.id)` as plain-object key (prototype-pollution risk) — identical pattern already present in `deleteSelectedPantryItems()`; no new attack surface introduced. Blast radius low given Firestore-ID provenance.
+- P-2: `showConfirmDialog()` interpolates args via `innerHTML` — call site uses hard-coded literals only, no user-supplied text. Pre-existing issue, not introduced here.
+- P-3: Tombstone `when` timestamp captured before confirm-click — slightly early timestamp has no practical impact; does not affect merge correctness. Informational only.
+
+No action required on any of the three. Gauntlet: **PASSED**.
+
+**quality-guardian — RAN · PASSED**
+All 7 acceptance criteria traced criterion-by-criterion against the diff:
+
+| # | Criterion | Verdict |
+|---|---|---|
+| 1 | Button visible only when expired items exist, hidden otherwise | MET |
+| 2 | showConfirmDialog with "Remove N expired item(s)…" body | MET |
+| 3 | Tombstones written to AppState.deletions before single saveData(), then renderPantry() | MET |
+| 4 | Items without expiryDate or expiry >= today untouched | MET |
+| 5 | Button hidden after deletion when none remain | MET |
+| 6 | Select-mode (pantrySelectMode, pantrySelectedIds) exits cleanly | MET |
+| 7 | node --check app.js passes | MET (test evidence) |
+
+All constraints also met: explicit tombstones bypass the D-029 MASS_DELETE_GUARD; existing single-item and Select-mode delete paths untouched; no new CSS, matches existing `btn--ghost btn--sm` class tokens.
+
+Two suggestions (non-blocking): (a) a comment on `snapshotIdBaseline()` inside the callback explaining why it precedes `saveData()`; (b) a future unit test that seeds > 5 expired items to give the D-029 bypass path automated regression coverage. Neither is a must-fix for this task.
+
+Gauntlet: **PASSED**.
+
+### Review Findings
+
+**1. Implementation is correct and well-structured.** The three new functions (`getExpiredPantryItems`, `renderPantryClearExpiredButton`, `clearExpiredPantryItems`) follow the codebase's established patterns precisely. The tombstone-before-filter-before-snapshotIdBaseline-before-saveData ordering mirrors `deleteSelectedPantryItems()` exactly (the TASK-011 pattern that the task context mandates). The D-029 bypass is correctly achieved: by writing tombstones directly to `AppState.deletions` before `snapshotIdBaseline()`, the `recordLocalDeletions()` diff inside `saveData()` sees an empty `vanished` set regardless of how many items were deleted.
+
+**2. Test evidence is solid.** `node --check` passed; Playwright smoke + button-smoke 2/2 with 467 buttons discovered; full `npm test` 21/21. The only unverified path (bulk-delete > 5 items with reload) is flagged in TEST_REPORT.md and is correct-by-code-trace. Acceptable.
+
+**3. No must-fix items.**
+
+### Nits (non-blocking)
+
+- Consider adding a one-line comment above `snapshotIdBaseline()` in the confirm callback explaining the sequencing invariant (prevents double-tombstone on next save). The same unexplained pattern exists in `deleteSelectedPantryItems()` — worth documenting in a future pass.
+- A dedicated unit test seeding > 5 expired items would give the D-029 bypass path automated coverage. Suggest as a future task, not a blocker here.
+
+### Risk Gate (D-032)
+
+The task writes to `AppState.deletions` (tombstone-merge-deletion machinery) and calls `saveData()` — both are explicitly in the red-zone definition in CLAUDE.md. Deleted pantry items cannot be recovered once the tombstone is persisted to Firestore. Status: **`approved`** (HELD). The human must eyeball the branch and merge manually; this does not auto-ship.
+
+→ TASK-026 status set to `approved` in TASKS.md.
+
 ---
 
 ## Review TASK-001 — APPROVED (code-trace verified; test failure unrelated)
