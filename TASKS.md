@@ -1364,7 +1364,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-026 · Add "Clear expired" button to pantry header (bulk-delete all expired items)
-status: codex
+status: approved
 owner: codex
 source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
