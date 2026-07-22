@@ -5,6 +5,20 @@
 
 ---
 
+## TASK-039 — approved, held for /merge (branch: task-039)
+changed:
+  - app.js (`openPrepMode()` now passes `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step`
+    through the existing `escapeHtml()` before interpolating into the `.innerHTML` template, 5 loc)
+tests: `node --check app.js` (pass); `npx playwright test tests/smoke.spec.js
+  tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 467 buttons
+  discovered, 200 clicked, 0 broken); deterministic payload check (`<img src=x onerror=alert(1)>`
+  escapes to `&lt;img src=x onerror=alert(1)&gt;`, no raw `<img` survives)
+blockers: none
+deviations: none — a confirmed security-guardian finding from TASK-027's own review (see
+  `REVIEW.md`) that was never actually acted on because TASK-028 never completed a real review;
+  the vulnerability has been live on `main` since TASK-027/028 merged
+→ status set to `approved` in TASKS.md (security fix, red-zone, held for human /merge per D-032)
+
 ## TASK-028 — done (branch: task-027)
 changed:
   - app.js (`AppState.prepModeSession` now persists the active Prep Mode checklist through localStorage and Firestore; `openPrepMode()`, `togglePrepCheck()`, `closePrepMode()`, and startup restore paths maintain it, 49 loc)
