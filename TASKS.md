@@ -1420,7 +1420,7 @@ test steps:
 ---
 
 ### TASK-027 · Bulk add voice: auto-insert newline after each recognized item (no manual Enter)
-status: review
+status: done
 owner: codex
 source: BQ-024/025/026 (alpha-stability batch)
 priority: P2

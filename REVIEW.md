@@ -5,6 +5,107 @@
 
 ---
 
+## Review TASK-027 — APPROVED
+branch: task-027
+verdict: done
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors and reported findings back. Neither was permitted to
+edit or write any file.
+
+**security-guardian — ran, TASK-027 scope: CLEAN**
+
+- `ta.value = ta.value + separator + line.trim() + '\n'` writes to a textarea's `.value` property,
+  not `.innerHTML`. No XSS path.
+- `statusEl.textContent = '✓ ' + line` uses `.textContent`. No XSS.
+- No credentials, secrets, or auth surface in the TASK-027 change.
+- Verdict on TASK-027 code: CLEAN.
+
+**security-guardian — TASK-028 code on this branch: CONFIRMED finding (not TASK-027's code)**
+
+The guardian identified one confirmed finding in `openPrepMode()` — code introduced by TASK-028,
+not by TASK-027. TASK-027 never touches `openPrepMode()`.
+
+Finding: `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step` are interpolated raw into a
+template literal assigned to `document.getElementById('prep-mode-body').innerHTML`. `escapeHtml()`
+is available and used elsewhere in the codebase but is not called on these values. Before TASK-028
+this was self-XSS (user opens Prep Mode manually). TASK-028's `restorePrepModeSession()` triggers
+`openPrepMode()` automatically on every login — widening the attack surface to any page-load after
+a crafted session is in Firestore. **This finding must be required-fix in TASK-028's review before
+the branch merges.**
+
+Secondary finding (informational only): `session.checked` keys from Firestore are used in
+`prepCheckState[key] = !!checked[key]` — theoretical prototype pollution via `__proto__` key.
+Not practically exploitable given boolean coercion and `Object.assign({}, ...)` usage; noted only.
+
+**quality-guardian — ran, all criteria CONFIRMED**
+
+Traced criterion by criterion:
+
+1. Trailing `\n` appended unconditionally at line 8186: `ta.value = ta.value + separator + line.trim() + '\n'`. ✓
+2. Two-item trace: first call produces `'Chicken thigh 500g\n'`; second call sees `ta.value` ends
+   with `'\n'` so `separator = ''`; result is `'Chicken thigh 500g\nGarlic 3 cloves\n'`. Two
+   separate lines, no manual input. ✓
+3. `line.trim()` at interpolation site; `transcript.trim()` and `parseSpokenItem` inner trim also
+   present (belt-and-suspenders, not a defect). ✓
+4. `_voiceRecognition.interimResults = false` at line 8178 — `onresult` is only reached for final
+   results; no interim branch exists. ✓
+5. Handler only assigns `ta.value`; no `disabled`, no `readOnly`, no intercepting event listener.
+   Manual typing unaffected. ✓
+6. Diff touches only the `if (ta)` block inside `onresult`. Button active class, `_voiceActive`
+   flag, `stopVoiceInput`, `toggleVoiceInput` are all outside the diff and unchanged. ✓
+7. `node --check app.js` passed (TEST_REPORT). ✓
+
+All 5 constraints also confirmed not violated: no silence-detection added; `SpeechRecognition`
+config unchanged; `confirmBulkAdd()` unchanged; no HTML or CSS changes; `interimResults = false`
+makes the interim-handling constraint vacuously satisfied at the source.
+
+Untestable by static analysis: live microphone dictation. TEST_REPORT correctly flags this as
+human-verification-only. Not a code defect.
+
+### Findings
+
+**1. TASK-027 change — correct.** The 4-line change in `startVoiceInput()` satisfies all seven
+acceptance criteria and violates no constraint. The logic is straightforward:
+- `separator` is `'\n'` only when existing textarea content is non-empty and does not already end
+  in `'\n'` — handles manual typing between voice entries without double-newlining.
+- `line.trim() + '\n'` ensures each spoken item arrives trimmed and followed by a newline so the
+  next voice result starts on a fresh line automatically.
+The old path (`ta.value.trimEnd() + '\n'`) stripped manual trailing whitespace and had no
+trailing newline itself; the new path is strictly better and consistent.
+
+**2. TASK-028 XSS — flagged, not TASK-027's responsibility.**
+The confirmed XSS finding lives in `openPrepMode()`, which TASK-027 does not touch. The finding
+pre-dates TASK-027 (it existed in the original `openPrepMode()` implementation) and was amplified
+by TASK-028's auto-restore feature. **TASK-028 review must require `escapeHtml()` on `recipe.name`,
+`ing.name`, `qty`, `ing.unit`, and `step` before the branch merges to main.**
+
+**3. Test evidence — adequate for this change.** `node --check` passed; Playwright smoke and
+button-smoke passed (21/21, 0 broken). Live mic dictation correctly deferred to human verification.
+
+### Must-fix items
+None for TASK-027.
+
+### Nit
+TASK-027 and TASK-028 were both implemented on branch `task-027` and submitted together for
+review. Not blocking, but worth noting in `docs/AI_OS_NOTES.md` if this becomes a pattern —
+two-task branches complicate per-task reviews and make it harder to hold one task while merging
+another.
+
+### Risk gate
+TASK-027 touches only `startVoiceInput()` — a UI behavior change (how text is appended to a
+textarea). No Firestore write, no auth, no deletion machinery, no storage schema, no AI Dev OS
+files. This is reversible. → **`done`** (auto-merge eligible).
+
+⚠️ Branch merge gate: `done` here means TASK-027 is approved. The branch MUST NOT merge to main
+until TASK-028's review passes and the confirmed XSS in `openPrepMode()` is fixed. Run TASK-028
+review next; require `escapeHtml()` patches as a must-fix before approving that task.
+
+→ TASK-027 status set to `done` in TASKS.md.
+
+---
+
 ## Review TASK-001 — APPROVED (code-trace verified; test failure unrelated)
 branch: task-001
 verdict: approved
