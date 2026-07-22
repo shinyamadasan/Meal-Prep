@@ -5,6 +5,22 @@
 
 ---
 
+## TASK-028 — done (branch: task-027)
+changed:
+  - app.js (`AppState.prepModeSession` now persists the active Prep Mode checklist through localStorage and Firestore; `openPrepMode()`, `togglePrepCheck()`, `closePrepMode()`, and startup restore paths maintain it, 49 loc)
+tests: `node --check app.js` (pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` (2 passed; 467 buttons discovered, 200 clicked, 0 broken); `npm test` (21 passed)
+blockers: none
+deviations: no new localStorage key was added, but a new saved field inside `mealPrepAppData` / Firestore payload should be documented in `docs/DATA_MODEL.md` during Claude review; live close/reopen Prep Mode behavior remains human verification
+→ status set to `review` in TASKS.md
+
+## TASK-027 — done (branch: task-027)
+changed:
+  - app.js (`startVoiceInput()` appends each final bulk-add voice result as a trimmed line with a trailing newline, preserving manual textarea edits, 4 loc)
+tests: `node --check app.js` (pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js` (2 passed; 467 buttons discovered, 200 clicked, 0 broken); `npm test` (21 passed)
+blockers: none
+deviations: voice recognition behavior was verified by code trace and regression tests; live microphone/browser dictation remains human verification
+→ status set to `review` in TASKS.md
+
 ## TASK-034 — approved, held for /merge (branch: task-034)
 changed:
   - tools/Run-Codex-Build.ps1 (new `Get-TaskBlockText`/`Get-TaskDeclaredFiles` helpers; after the

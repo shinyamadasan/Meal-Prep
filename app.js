@@ -33,6 +33,7 @@ const AppState = {
   cookedMeals: [],
   cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
+  prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
   deletions: {},              // { id: deletedAtISO } tombstones — sync deletes so a union can't resurrect them
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
@@ -282,6 +283,7 @@ function saveToLocalStorage() {
       cookedMeals: AppState.cookedMeals,
       cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
+      prepModeSession: AppState.prepModeSession,
       deletions: AppState.deletions || {},
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
@@ -331,6 +333,7 @@ function loadFromLocalStorage() {
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      AppState.prepModeSession = data.prepModeSession || null;
       AppState.deletions = data.deletions || {};
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
@@ -448,6 +451,7 @@ function restoreBackup() {
   AppState.customStores = d.customStores || [];
   AppState.cookedMeals = d.cookedMeals || [];
   AppState.recentRecipes = d.recentRecipes || [];
+  AppState.prepModeSession = d.prepModeSession || null;
   cacheInlinePhotos();
   saveData();
 
@@ -486,6 +490,7 @@ async function clearLocalStorage() {
   AppState.myStores = [];
   AppState.customStores = [];
   AppState.cookHistory = [];
+  AppState.prepModeSession = null;
   AppState.weeklyPlan = {
     Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
     Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -1689,6 +1694,7 @@ function initApp() {
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
+        restorePrepModeSession();
         initWeekTemplateButton();
       }
     });
@@ -1720,6 +1726,7 @@ function initApp() {
     renderDashboard();
     updateFreshnessBadges();
     renderFreshnessBanner();
+    restorePrepModeSession();
   }
 
   initWeekTemplateButton();
@@ -5283,6 +5290,7 @@ function buildFirestorePayload() {
     cookedMeals: AppState.cookedMeals,
     cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
+    prepModeSession: AppState.prepModeSession,
     deletions: AppState.deletions || {},
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
@@ -5462,6 +5470,7 @@ async function loadFromFirestore() {
       AppState.cookedMeals = data.cookedMeals || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
+      AppState.prepModeSession = data.prepModeSession || null;
       AppState.deletions = data.deletions || {};
       purgeOldTombstones();
       // Stamp items that pre-date this feature with the document's save time.
@@ -5599,6 +5608,7 @@ async function loadUserData() {
   updateNutritionGoalsDisplay();
   updateFreshnessBadges();
   renderFreshnessBanner();
+  restorePrepModeSession();
   loadProfile(); // load (or prompt for) the community display name
 }
 
@@ -5700,6 +5710,7 @@ function setupRealtimeListeners() {
         AppState.cookedMeals = data.cookedMeals || [];
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
+        AppState.prepModeSession = data.prepModeSession || null;
         AppState.deletions = data.deletions || {}; // adopt the remote tombstones...
         applyTombstones();                          // ...so a delete made on another device lands here too
         snapshotIdBaseline();
@@ -6158,7 +6169,7 @@ function fallbackCopyText(text, onOk, onErr) {
 
 let prepCheckState = {};
 
-function openPrepMode() {
+function getPlannedRecipeUsage() {
   const recipeUsage = {};
   Object.values(AppState.weeklyPlan).forEach(day => {
     ['breakfast', 'lunch', 'dinner'].forEach(meal => {
@@ -6168,15 +6179,28 @@ function openPrepMode() {
       recipeUsage[id] = (recipeUsage[id] || 0) + 1;
     });
   });
+  return recipeUsage;
+}
 
+function openPrepMode(session) {
+  const restoring = session && session.active;
+  const recipeUsage = restoring ? (session.recipeUsage || {}) : getPlannedRecipeUsage();
   const ids = Object.keys(recipeUsage);
   if (ids.length === 0) {
-    showErrorMessage('Your week is empty — add some meals to the planner first.');
+    if (!restoring) showErrorMessage('Your week is empty — add some meals to the planner first.');
     return;
   }
 
   prepCheckState = {};
+  const checked = restoring ? (session.checked || {}) : {};
   const recipes = ids.map(id => AppState.recipes.find(r => String(r.id) === String(id))).filter(Boolean);
+  const validUsage = {};
+  recipes.forEach(recipe => { validUsage[recipe.id] = recipeUsage[recipe.id]; });
+  if (recipes.length === 0) {
+    AppState.prepModeSession = null;
+    saveData();
+    return;
+  }
 
   const cards = recipes.map(recipe => {
     const count = recipeUsage[recipe.id];
@@ -6185,21 +6209,21 @@ function openPrepMode() {
 
     const ingHTML = ingredients.map((ing, i) => {
       const key = `${recipe.id}-ing-${i}`;
-      prepCheckState[key] = false;
+      prepCheckState[key] = !!checked[key];
       const qty = ing.baseQuantity || ing.quantity || '';
       return `
-        <label class="prep-check-row" onclick="togglePrepCheck('${key}')">
-          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')">
+        <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
+          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
           <span>${ing.name}${qty ? ' — ' + qty + ' ' + (ing.unit || '') : ''}</span>
         </label>`;
     }).join('');
 
     const stepsHTML = steps.map((step, i) => {
       const key = `${recipe.id}-step-${i}`;
-      prepCheckState[key] = false;
+      prepCheckState[key] = !!checked[key];
       return `
-        <label class="prep-check-row" onclick="togglePrepCheck('${key}')">
-          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')">
+        <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
+          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
           <span>${step}</span>
         </label>`;
     }).join('');
@@ -6215,6 +6239,8 @@ function openPrepMode() {
       </div>`;
   }).join('');
 
+  AppState.prepModeSession = { active: true, recipeUsage: validUsage, checked: Object.assign({}, prepCheckState) };
+  saveData();
   document.getElementById('prep-mode-body').innerHTML = cards;
   updatePrepProgress();
   document.getElementById('prep-mode-modal').classList.remove('hidden');
@@ -6233,6 +6259,10 @@ function parseInstructionSteps(text) {
 
 function togglePrepCheck(key) {
   prepCheckState[key] = !prepCheckState[key];
+  if (AppState.prepModeSession) {
+    AppState.prepModeSession.checked = Object.assign({}, prepCheckState);
+    saveData();
+  }
   const chk = document.getElementById('chk-' + key);
   if (chk) chk.checked = prepCheckState[key];
   const label = chk ? chk.closest('label') : null;
@@ -6248,9 +6278,17 @@ function updatePrepProgress() {
   document.getElementById('prep-progress-label').textContent = `${done} / ${keys.length} done`;
 }
 
+function restorePrepModeSession() {
+  if (AppState.prepModeSession && AppState.prepModeSession.active) {
+    openPrepMode(AppState.prepModeSession);
+  }
+}
+
 function closePrepMode() {
   document.getElementById('prep-mode-modal').classList.add('hidden');
   prepCheckState = {};
+  AppState.prepModeSession = null;
+  saveData();
 }
 
 // ── CSV Import ────────────────────────────────────────────────────────────────
@@ -8143,7 +8181,10 @@ function startVoiceInput() {
     var transcript = e.results[0][0].transcript.trim();
     var line = parseSpokenItem(transcript);
     var ta = document.getElementById('bulk-add-textarea');
-    if (ta) ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + line;
+    if (ta) {
+      var separator = ta.value && !ta.value.endsWith('\n') ? '\n' : '';
+      ta.value = ta.value + separator + line.trim() + '\n';
+    }
     if (statusEl) statusEl.textContent = '✓ ' + line;
   };
 

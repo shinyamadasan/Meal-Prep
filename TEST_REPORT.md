@@ -5,6 +5,16 @@
 
 ---
 
+## TASK-028 · 2026-07-22
+suite: node --check app.js; git diff --check; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js; npm test; acceptance code-trace
+result: `node --check` passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified `prepModeSession` is saved/loaded through localStorage, included in `buildFirestorePayload()`, read from Firestore and realtime snapshots, restored on startup, cleared by `closePrepMode()` and Clear All Data, and filters deleted recipe references before rendering.
+untested: live browser close/reopen Prep Mode session restoration remains human verification; Playwright does not exercise that modal workflow directly.
+
+## TASK-027 · 2026-07-22
+suite: node --check app.js; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js; npm test; acceptance code-trace
+result: `node --check` passed. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified `startVoiceInput()` keeps `interimResults = false`, trims the parsed final line, inserts a separator only when existing textarea content does not already end in a newline, and leaves a trailing newline after each final result.
+untested: live microphone dictation remains human verification; Playwright does not drive the browser SpeechRecognition API.
+
 ## TASK-034 · 2026-07-21
 suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Run-Codex-Build.ps1 and
   tools/Run-Claude-Review.ps1; isolated fixture harness against `Get-TaskBlockText`/

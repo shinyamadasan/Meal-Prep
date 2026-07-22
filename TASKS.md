@@ -1420,7 +1420,7 @@ test steps:
 ---
 
 ### TASK-027 · Bulk add voice: auto-insert newline after each recognized item (no manual Enter)
-status: codex
+status: review
 owner: codex
 source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
@@ -1469,7 +1469,7 @@ test steps:
 ---
 
 ### TASK-028 · Persist Prep Mode active session to localStorage (survive browser close/reopen)
-status: codex
+status: review
 owner: codex
 source: BQ-024/025/026 (alpha-stability batch)
 priority: P2
