@@ -35,3 +35,18 @@
   `codex`, diff the retry against the must-fix file list and refuse to advance if nothing changed;
   (b) widen the auto-release regex (or the crashed-review note format) so a crashed re-review after
   a real code push is retryable the same way a rework strike is.
+- 2026-07-22: a Sprint Execution Mode chained group (TASK-026/027/028, all on shared branch
+  `task-027`) left TASK-028 stuck at `status: review` forever after TASK-027's own review approved
+  and merged the shared branch — TASK-028's status field was never flipped because nothing in the
+  pipeline recognizes "this task's code landed on a DIFFERENT task's branch" as a case to handle.
+  `Run-Claude-Review.ps1`'s task-lookup always derives the branch to check out mechanically from the
+  task id (`task-<id>`), so every later `/review` (including auto-chains from unrelated builds
+  reaching `status: review`) tried to check out a `task-028` branch that correctly never existed,
+  aborted with "branch does not exist," and silently blocked whatever review should have run next
+  instead (TASK-036's, in this case) — with no error surfaced anywhere that pointed at the real
+  cause. Cost a full manual git-archaeology pass (searching all branches/reflog for the "lost" code
+  before confirming it was actually already merged) to diagnose. Candidate fix, not yet built: when
+  a chained group's task reaches `status: review`, record which branch it actually landed on
+  (e.g. a `branch:` field alongside `status:`) so review/lookup doesn't have to assume
+  `task-<id>` universally, and so a task whose branch already merged under a sibling's identity can
+  be recognized and auto-resolved to `done` instead of retried forever.

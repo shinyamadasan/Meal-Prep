@@ -5,6 +5,44 @@
 
 ---
 
+## Review TASK-028 — APPROVED (retroactive — code already merged via TASK-027's branch)
+branch: task-027 (chained; no dedicated task-028 branch was ever created)
+verdict: done
+
+### Context
+TASK-028 was built chained onto TASK-027 in one Sprint Execution Mode invocation (both share
+`source: BQ-024/025/026`), landing on the shared branch `task-027`. That branch's own review
+approved and merged it to `main` under TASK-027's identity — but TASK-028's own `status:` field in
+`TASKS.md` was never flipped off `review`, because nothing in the pipeline treats "this task's code
+is on a DIFFERENT task's branch" as a first-class case. `Run-Claude-Review.ps1` always derives the
+branch to check out mechanically from the task id (`task-<id>`), so every subsequent `/review` (and
+every auto-chain from a later build reaching `status: review`) tried to check out a `task-028`
+branch that correctly never existed, and aborted — silently blocking whatever real review should
+have run next (in this case, `TASK-036`'s).
+
+### Findings
+**1. Code verified present and correct on `main` by direct inspection**, not assumed from the
+stale `status: review`: `AppState.prepModeSession` (new field, documented in `docs/DATA_MODEL.md`
+in this same pass — the gap flagged in `CHANGELOG.md`'s TASK-028 entry deviation note was never
+actually closed until now) persists through the existing `saveData()` call — no new Firestore
+write path, Hard Rule 5/6 respected. `restorePrepModeSession()` is wired into all three
+init/data-load call sites (`app.js` ~1697, 1729, 5611). `openPrepMode()` filters any recipe id no
+longer present in `AppState.recipes` via `.filter(Boolean)`, and clears the session entirely if
+zero valid recipes remain — matches the acceptance criterion for graceful degradation on a deleted
+recipe, no crash. `closePrepMode()` clears the persisted session. All 6 acceptance criteria in
+`TASKS.md` verified met by reading the actual code, not inferred.
+
+**2. Nothing was lost** — worth stating explicitly since the investigation that led here started
+from a real "is this data actually gone" concern (`git diff main task-027` initially looked empty,
+which turns out to mean task-027 IS main, i.e. already merged, not that the work never happened).
+Confirmed via `git grep prepModeSession` across every branch before concluding anything.
+
+### Verdict
+`done` — code is live on `main` already; this entry documents the retroactive verification, it
+does not trigger a new merge.
+
+→ TASK-028 status set to `done` in TASKS.md.
+
 ## Review TASK-027 — APPROVED
 branch: task-027
 verdict: done

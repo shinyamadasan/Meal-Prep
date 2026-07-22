@@ -1469,7 +1469,22 @@ test steps:
 ---
 
 ### TASK-028 · Persist Prep Mode active session to localStorage (survive browser close/reopen)
-status: review
+status: done
+review: Retroactively verified 2026-07-22 — never got a real review because it was chained onto
+  TASK-027's branch (`task-027`), which merged to `main` under TASK-027's own review/approval
+  before TASK-028's status was ever flipped off `review`. No `task-028` branch was ever created
+  (correct — Sprint Execution Mode built both on one shared branch), but `Run-Claude-Review.ps1`'s
+  "first status: review task" lookup derives a branch name mechanically from the task ID, so it
+  kept trying (and failing) to find `task-028` on every subsequent /review, blocking TASK-036's
+  real auto-chained review behind it. Code confirmed present and correct on `main` by direct
+  inspection: `AppState.prepModeSession` persists via the existing `saveData()` path (localStorage
+  + Firestore, Hard Rule 5 respected — no new write call site), `restorePrepModeSession()` is
+  wired into all three init/data-load paths, `openPrepMode()` filters deleted-recipe ids via
+  `.filter(Boolean)` and clears the session if none remain (graceful degradation, matches
+  acceptance criterion), `closePrepMode()` clears state. All 6 acceptance criteria verified met.
+  `docs/DATA_MODEL.md` documentation gap (flagged in this task's own CHANGELOG deviation, never
+  done) closed in the same pass. See `docs/AI_OS_NOTES.md` for the underlying OS gap this
+  surfaced (chained-task review-branch lookup).
 owner: codex
 source: BQ-024/025/026 (alpha-stability batch)
 priority: P2

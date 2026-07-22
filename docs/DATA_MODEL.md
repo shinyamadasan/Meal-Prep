@@ -26,6 +26,12 @@ AppState.cloudReady         // transient: true once this account's cloud doc has
                             // Gates Firestore writes (saveToFirestore) so we never overwrite
                             // good cloud data with a not-yet-loaded local state. Not persisted.
 AppState.dataVersion        // cloud-doc version last loaded (optimistic concurrency)
+AppState.prepModeSession    // null, or { active, recipeUsage, checked } for an in-progress
+                            // Prep Mode checklist. Persisted through saveData() (localStorage +
+                            // Firestore) so a browser close/reopen restores it; cleared on
+                            // closePrepMode(). openPrepMode() filters out any recipe id no longer
+                            // in AppState.recipes, so a deleted recipe degrades gracefully instead
+                            // of crashing the restore.
 ```
 
 ## Recipe object
