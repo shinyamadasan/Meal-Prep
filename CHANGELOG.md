@@ -19,6 +19,14 @@ deviations: none — a confirmed security-guardian finding from TASK-027's own r
   the vulnerability has been live on `main` since TASK-027/028 merged
 → status set to `approved` in TASKS.md (security fix, red-zone, held for human /merge per D-032)
 
+## TASK-036 — done (branch: task-036)
+changed:
+  - app.js (`restoreBackup()`, `clearLocalStorage()`, `deleteRecipe()`, `clearDay()`, `clearWeeklyPlan()`, `clearGroceryList()`, `deleteIngredient()`, `deleteHack()`, `loadWeekTemplate()`, and `deleteUserIngredient()` now use `showConfirmDialog()` callbacks instead of native `confirm()` guards, 64 loc net)
+tests: `node --check app.js` (pass); `rg -n "confirm\\(" app.js` (zero matches); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed; 467 buttons discovered, 200 clicked, 0 broken); `npm test` (21 passed)
+blockers: none
+deviations: none
+→ status set to `review` in TASKS.md
+
 ## TASK-028 — done (branch: task-027)
 changed:
   - app.js (`AppState.prepModeSession` now persists the active Prep Mode checklist through localStorage and Firestore; `openPrepMode()`, `togglePrepCheck()`, `closePrepMode()`, and startup restore paths maintain it, 49 loc)

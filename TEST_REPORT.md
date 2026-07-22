@@ -17,6 +17,11 @@ untested: live verification that a recipe with a crafted name, opened in Prep Mo
   via auto-restore on login), renders as inert text rather than executing script — remains human
   verification, same as every other DOM-rendering claim in this app's test suite.
 
+## TASK-036 · 2026-07-22
+suite: node --check app.js; git diff --check; rg -n "confirm\\(" app.js; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test; acceptance code-trace
+result: `node --check` passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. `rg -n "confirm\\(" app.js` returned zero matches. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified Cancel only closes `showConfirmDialog()` and Confirm runs the original destructive logic for restore backup, Clear All Data, delete recipe, clear day, clear weekly plan, clear grocery list, delete ingredient, delete cooking hack, load week template, and delete custom ingredient.
+untested: installed iOS PWA behavior remains human verification; Playwright verifies the browser dialog flow but not standalone-mode WebKit.
+
 ## TASK-028 · 2026-07-22
 suite: node --check app.js; git diff --check; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js; npm test; acceptance code-trace
 result: `node --check` passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified `prepModeSession` is saved/loaded through localStorage, included in `buildFirestorePayload()`, read from Firestore and realtime snapshots, restored on startup, cleared by `closePrepMode()` and Clear All Data, and filters deleted recipe references before rendering.

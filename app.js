@@ -434,84 +434,98 @@ function restoreBackup() {
   var backup;
   try { backup = JSON.parse(raw); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
   var when = backup.at ? new Date(backup.at).toLocaleString() : 'an earlier time';
-  if (!confirm('Restore your data from the backup taken ' + when + ' (before "' + (backup.label || 'change') + '")?\n\nThis replaces your current data.')) return;
+  showConfirmDialog(
+    'Restore backup?',
+    '<p>Restore your data from the backup taken ' + escapeHtml(when) + ' (before "' + escapeHtml(backup.label || 'change') + '")?</p>' +
+      '<p>This replaces your current data.</p>',
+    'Restore Backup',
+    'Cancel',
+    function() {
+      var d = backup.data || {};
+      AppState.recipes = d.recipes || [];
+      patchMissingNutrition(AppState.recipes);
+      AppState.weeklyPlan = d.weeklyPlan || AppState.weeklyPlan;
+      AppState.groceryList = d.groceryList || [];
+      AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
+      AppState.customIngredients = d.customIngredients || [];
+      AppState.customHacks = d.customHacks || [];
+      AppState.pantry = d.pantry || [];
+      AppState.userIngredients = d.userIngredients || [];
+      AppState.ingredientPrices = d.ingredientPrices || {};
+      AppState.myStores = d.myStores || [];
+      AppState.customStores = d.customStores || [];
+      AppState.cookedMeals = d.cookedMeals || [];
+      AppState.recentRecipes = d.recentRecipes || [];
+      AppState.prepModeSession = d.prepModeSession || null;
+      cacheInlinePhotos();
+      saveData();
 
-  var d = backup.data || {};
-  AppState.recipes = d.recipes || [];
-  patchMissingNutrition(AppState.recipes);
-  AppState.weeklyPlan = d.weeklyPlan || AppState.weeklyPlan;
-  AppState.groceryList = d.groceryList || [];
-  AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
-  AppState.customIngredients = d.customIngredients || [];
-  AppState.customHacks = d.customHacks || [];
-  AppState.pantry = d.pantry || [];
-  AppState.userIngredients = d.userIngredients || [];
-  AppState.ingredientPrices = d.ingredientPrices || {};
-  AppState.myStores = d.myStores || [];
-  AppState.customStores = d.customStores || [];
-  AppState.cookedMeals = d.cookedMeals || [];
-  AppState.recentRecipes = d.recentRecipes || [];
-  AppState.prepModeSession = d.prepModeSession || null;
-  cacheInlinePhotos();
-  saveData();
-
-  renderRecipes();
-  renderWeeklyPlanner();
-  renderStorageGuide();
-  renderCookingHacks();
-  renderCookedMeals();
-  renderPantry();
-  renderIngredientsTab();
-  updateNutritionGoalsDisplay();
-  updateFreshnessBadges();
-  renderFreshnessBanner();
-  showSuccessMessage('Data restored from backup (' + when + ').');
+      renderRecipes();
+      renderWeeklyPlanner();
+      renderStorageGuide();
+      renderCookingHacks();
+      renderCookedMeals();
+      renderPantry();
+      renderIngredientsTab();
+      updateNutritionGoalsDisplay();
+      updateFreshnessBadges();
+      renderFreshnessBanner();
+      showSuccessMessage('Data restored from backup (' + when + ').');
+    }
+  );
 }
 
 async function clearLocalStorage() {
-  if (!confirm('Clear ALL your saved data (recipes, pantry, plan, lists)?\n\nThis wipes it on every signed-in device. A backup is saved first — undo with the "Restore Backup" button.')) return;
+  showConfirmDialog(
+    'Clear all data?',
+    '<p>Clear ALL your saved data (recipes, pantry, plan, lists)?</p>' +
+      '<p>This wipes it on every signed-in device. A backup is saved first — undo with the "Restore Backup" button.</p>',
+    'Clear All Data',
+    'Cancel',
+    async function() {
+      createBackup('Clear All Data');
 
-  createBackup('Clear All Data');
+      // R1: PROPAGATE the wipe via tombstones + an explicit EMPTY document — never deleteDoc.
+      // Deleting the doc just lets another live client (or our own 'empty'-path save) re-create it
+      // (SYNC_AUDIT F1, proven Path B). Tombstoning every current id makes the deletion survive the merge,
+      // and writing an empty (not deleted) doc means loadFromFirestore returns 'loaded' on reload — so the
+      // 'empty'-path auto-recreate never fires either.
+      var when = new Date().toISOString();
+      if (!AppState.deletions) AppState.deletions = {};
+      TOMBSTONE_KEYS.forEach(function (key) {
+        (AppState[key] || []).forEach(function (it) { if (it && it.id != null) AppState.deletions[String(it.id)] = when; });
+        AppState[key] = [];
+      });
+      AppState.groceryList = [];
+      AppState.recentRecipes = [];
+      AppState.ingredientPrices = {};
+      AppState.myStores = [];
+      AppState.customStores = [];
+      AppState.cookHistory = [];
+      AppState.prepModeSession = null;
+      AppState.weeklyPlan = {
+        Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
+        Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
+      };
 
-  // R1: PROPAGATE the wipe via tombstones + an explicit EMPTY document — never deleteDoc.
-  // Deleting the doc just lets another live client (or our own 'empty'-path save) re-create it
-  // (SYNC_AUDIT F1, proven Path B). Tombstoning every current id makes the deletion survive the merge,
-  // and writing an empty (not deleted) doc means loadFromFirestore returns 'loaded' on reload — so the
-  // 'empty'-path auto-recreate never fires either.
-  var when = new Date().toISOString();
-  if (!AppState.deletions) AppState.deletions = {};
-  TOMBSTONE_KEYS.forEach(function (key) {
-    (AppState[key] || []).forEach(function (it) { if (it && it.id != null) AppState.deletions[String(it.id)] = when; });
-    AppState[key] = [];
-  });
-  AppState.groceryList = [];
-  AppState.recentRecipes = [];
-  AppState.ingredientPrices = {};
-  AppState.myStores = [];
-  AppState.customStores = [];
-  AppState.cookHistory = [];
-  AppState.prepModeSession = null;
-  AppState.weeklyPlan = {
-    Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Wednesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Thursday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Friday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Saturday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
-    Sunday: { breakfast: null, lunch: null, dinner: null, snacks: [] }
-  };
+      // Persist the empty + tombstoned state to BOTH local and cloud (a real versioned doc, not a deletion).
+      saveToLocalStorage();
+      if (AppState.currentUser && window.firebase) {
+        try {
+          await saveToFirestore(); // writes empty + tombstones; surfaces its own error on failure
+        } catch (e) {
+          showErrorMessage('Could not sync the wipe to the cloud: ' + (e && e.message));
+        }
+      }
 
-  // Persist the empty + tombstoned state to BOTH local and cloud (a real versioned doc, not a deletion).
-  saveToLocalStorage();
-  if (AppState.currentUser && window.firebase) {
-    try {
-      await saveToFirestore(); // writes empty + tombstones; surfaces its own error on failure
-    } catch (e) {
-      showErrorMessage('Could not sync the wipe to the cloud: ' + (e && e.message));
+      location.reload();
     }
-  }
-
-  location.reload();
+  );
 }
 
 function showErrorMessage(message) {
@@ -2190,27 +2204,33 @@ function saveRecipe(e) {
 }
 
 function deleteRecipe(recipeId) {
-  if (confirm('Are you sure you want to delete this recipe?')) {
-    AppState.recipes = AppState.recipes.filter(r => r.id !== recipeId);
-    deletePhotoDoc(recipeId);
+  showConfirmDialog(
+    'Delete recipe?',
+    '<p>Are you sure you want to delete this recipe?</p>',
+    'Delete',
+    'Cancel',
+    function() {
+      AppState.recipes = AppState.recipes.filter(r => r.id !== recipeId);
+      deletePhotoDoc(recipeId);
 
-    // Remove from weekly plan if assigned
-    Object.keys(AppState.weeklyPlan).forEach(day => {
-      Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
-        if (Array.isArray(AppState.weeklyPlan[day][meal])) {
-          AppState.weeklyPlan[day][meal] = AppState.weeklyPlan[day][meal].filter(id => id !== recipeId);
-        } else if (AppState.weeklyPlan[day][meal] === recipeId) {
-          AppState.weeklyPlan[day][meal] = null;
-        }
+      // Remove from weekly plan if assigned
+      Object.keys(AppState.weeklyPlan).forEach(day => {
+        Object.keys(AppState.weeklyPlan[day]).forEach(meal => {
+          if (Array.isArray(AppState.weeklyPlan[day][meal])) {
+            AppState.weeklyPlan[day][meal] = AppState.weeklyPlan[day][meal].filter(id => id !== recipeId);
+          } else if (AppState.weeklyPlan[day][meal] === recipeId) {
+            AppState.weeklyPlan[day][meal] = null;
+          }
+        });
       });
-    });
-    
-    renderRecipes();
-    renderWeeklyPlanner();
-    renderRecipeSelectionGrid();
-    updateWeeklyStats();
-    saveData();
-  }
+
+      renderRecipes();
+      renderWeeklyPlanner();
+      renderRecipeSelectionGrid();
+      updateWeeklyStats();
+      saveData();
+    }
+  );
 }
 
 function toggleFavorite(recipeId) {
@@ -2780,13 +2800,19 @@ function copyDay(day) {
 }
 
 function clearDay(day) {
-  if (confirm(`Are you sure you want to clear all meals for ${day}?`)) {
-    AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
-    renderWeeklyPlanner();
-    updateWeeklyStats();
-    generateGroceryList();
-    showSuccessMessage(`${day} cleared!`);
-  }
+  showConfirmDialog(
+    'Clear day?',
+    '<p>Are you sure you want to clear all meals for ' + escapeHtml(day) + '?</p>',
+    'Clear Day',
+    'Cancel',
+    function() {
+      AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+      renderWeeklyPlanner();
+      updateWeeklyStats();
+      generateGroceryList();
+      showSuccessMessage(`${day} cleared!`);
+    }
+  );
 }
 
 function showSuccessMessage(message) {
@@ -2973,14 +2999,20 @@ function getRecipeName(recipeId) {
 }
 
 function clearWeeklyPlan() {
-  if (confirm('Are you sure you want to clear the entire weekly plan?')) {
-    Object.keys(AppState.weeklyPlan).forEach(day => {
-      AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
-    });
-    renderWeeklyPlanner();
-    updateWeeklyStats();
-    generateGroceryList();
-  }
+  showConfirmDialog(
+    'Clear weekly plan?',
+    '<p>Are you sure you want to clear the entire weekly plan?</p>',
+    'Clear Plan',
+    'Cancel',
+    function() {
+      Object.keys(AppState.weeklyPlan).forEach(day => {
+        AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+      });
+      renderWeeklyPlanner();
+      updateWeeklyStats();
+      generateGroceryList();
+    }
+  );
 }
 
 function updateWeeklyStats() {
@@ -3565,10 +3597,16 @@ function dismissSuggestedGroceryItem(itemId) {
 window.dismissSuggestedGroceryItem = dismissSuggestedGroceryItem;
 
 function clearGroceryList() {
-  if (confirm('Are you sure you want to clear the grocery list?')) {
-    AppState.groceryList = [];
-    renderGroceryList();
-  }
+  showConfirmDialog(
+    'Clear grocery list?',
+    '<p>Are you sure you want to clear the grocery list?</p>',
+    'Clear List',
+    'Cancel',
+    function() {
+      AppState.groceryList = [];
+      renderGroceryList();
+    }
+  );
 }
 
 function switchShopTab(subTab) {
@@ -4535,11 +4573,17 @@ function saveIngredient(e) {
 }
 
 function deleteIngredient(ingredientId) {
-  if (confirm('Are you sure you want to delete this ingredient?')) {
-    AppState.customIngredients = AppState.customIngredients.filter(i => i.id !== ingredientId);
-    renderStorageGuide();
-    saveData();
-  }
+  showConfirmDialog(
+    'Delete ingredient?',
+    '<p>Are you sure you want to delete this ingredient?</p>',
+    'Delete',
+    'Cancel',
+    function() {
+      AppState.customIngredients = AppState.customIngredients.filter(i => i.id !== ingredientId);
+      renderStorageGuide();
+      saveData();
+    }
+  );
 }
 
 function importIngredientsFromRecipes() {
@@ -4641,11 +4685,17 @@ function saveHack(e) {
 }
 
 function deleteHack(hackId) {
-  if (confirm('Are you sure you want to delete this cooking hack?')) {
-    AppState.customHacks = AppState.customHacks.filter(h => h.id !== hackId);
-    renderCookingHacks();
-    saveData();
-  }
+  showConfirmDialog(
+    'Delete cooking hack?',
+    '<p>Are you sure you want to delete this cooking hack?</p>',
+    'Delete',
+    'Cancel',
+    function() {
+      AppState.customHacks = AppState.customHacks.filter(h => h.id !== hackId);
+      renderCookingHacks();
+      saveData();
+    }
+  );
 }
 
 // Opens the recipe selection modal pre-filtered so the user can pick a day/meal
@@ -6458,12 +6508,19 @@ function saveWeekAsTemplate() {
 function loadWeekTemplate() {
   const saved = localStorage.getItem(WEEK_TEMPLATE_KEY);
   if (!saved) return;
-  if (!confirm('This will replace your current week\'s plan with the saved one. Continue?')) return;
-  AppState.weeklyPlan = JSON.parse(saved);
-  saveData();
-  renderWeeklyPlanner();
-  generateGroceryList();
-  showSuccessMessage('Saved week loaded successfully!');
+  showConfirmDialog(
+    'Load saved week?',
+    '<p>This will replace your current week\'s plan with the saved one. Continue?</p>',
+    'Load Week',
+    'Cancel',
+    function() {
+      AppState.weeklyPlan = JSON.parse(saved);
+      saveData();
+      renderWeeklyPlanner();
+      generateGroceryList();
+      showSuccessMessage('Saved week loaded successfully!');
+    }
+  );
 }
 
 function initWeekTemplateButton() {
@@ -8611,10 +8668,17 @@ function saveUserIngredient() {
 }
 
 function deleteUserIngredient(id) {
-  if (!confirm('Remove this custom ingredient?')) return;
-  AppState.userIngredients = (AppState.userIngredients || []).filter(function(i) { return i.id !== id; });
-  saveData();
-  renderIngredientsTab();
+  showConfirmDialog(
+    'Remove custom ingredient?',
+    '<p>Remove this custom ingredient?</p>',
+    'Remove',
+    'Cancel',
+    function() {
+      AppState.userIngredients = (AppState.userIngredients || []).filter(function(i) { return i.id !== id; });
+      saveData();
+      renderIngredientsTab();
+    }
+  );
 }
 
 // ── Pantry Knowledge Base ─────────────────────────────────────────────
