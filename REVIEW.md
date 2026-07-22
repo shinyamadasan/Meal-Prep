@@ -5,6 +5,59 @@
 
 ---
 
+## Review TASK-036 — APPROVED, HELD (Replace native confirm() with showConfirmDialog())
+branch: task-036
+verdict: approved (red-zone: clearLocalStorage() touches tombstone/Firestore machinery — held for human `/merge`)
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors. Neither was permitted to edit or write any file.
+
+**security-guardian — ran, TASK-036 scope: CLEAN**
+
+Traced all ten call sites for XSS, secret leakage, and async-callback timing issues:
+
+- `restoreBackup()`: `backup.at` is normalized through `toLocaleString()` (runtime output, not a raw passthrough) then wrapped in `escapeHtml()` before interpolation into `bodyHtml`. `backup.label` is always written by `createBackup()` with hardcoded literals and is also `escapeHtml()`-wrapped. `title` and button labels are string literals. CLEAN.
+- `clearDay()`: `day` comes from `['Monday'…'Sunday']` literals in `renderWeeklyPlanner()` — not user-controlled. `escapeHtml(day)` is applied anyway. CLEAN.
+- All other eight sites pass only static string literals for all four parameters. CLEAN.
+- Async callback in `clearLocalStorage()`: `showConfirmDialog` removes the overlay on the first ok-button click before calling `onConfirm`, preventing double-invocation. `await saveToFirestore()` inside the async callback preserves the pre-change ordering (local write → cloud write → reload). No race condition introduced. CLEAN.
+- No credentials, tokens, or PII in the diff.
+
+Pre-existing finding flagged by the guardian (NOT introduced by TASK-036, NOT a blocker for this task):
+> `recipe.currentServings` is interpolated raw into `innerHTML` at `app.js:7704` (`markRecipeCooked` flow, a pre-existing `showConfirmDialog` call site not touched by this task). Severity: Medium (requires same-origin write access as a precondition). Recommended fix: coerce to `Number()` in `normalizeRecipes` or wrap in `escapeHtml(String(...))` at the injection site. Track as a follow-on bug.
+
+**quality-guardian — ran, ALL criteria CONFIRMED**
+
+Traced criterion by criterion:
+
+1. **All ten call sites converted** — MET. Confirmed by diff inspection: `restoreBackup`, `clearLocalStorage`, `deleteRecipe`, `clearDay`, `clearWeeklyPlan`, `clearGroceryList`, `deleteIngredient`, `deleteHack`, `loadWeekTemplate`, `deleteUserIngredient`. Grep for `confirm(` on task-036 returns zero matches (case-sensitive; `onConfirm()` does not match). ✓
+
+2. **No destructive action fires without confirm button** — MET. `showConfirmDialog` only calls `onConfirm()` inside the `.confirm-ok-btn` click handler. Cancel calls only `close()`. Backdrop click calls only `close()`. `onConfirm` is never called at construction time. For all ten callbacks, every state mutation and every `saveData()`/render call is inside the callback. ✓
+
+3. **Confirmation message text preserved** — MET. All ten messages carry the same semantic content as the originals, adapted to title/body/button-label shape. `\n\n` separators become `<p>` elements, which is a rendering improvement (proper spacing vs. literal newlines in a native dialog) not a content change. ✓
+
+4. **Call pattern matches existing `showConfirmDialog` usage** — MET. All ten call the function with the same five positional arguments `(title, bodyHtml, confirmLabel, cancelLabel, onConfirm)` as the pre-existing JSON-import and `addToPantry` sites. ✓
+
+5. **Constraints (mechanical change only)** — MET. No logic altered in any of the ten actions. `clearGroceryList()` omits `saveData()` both before and after the change — pre-existing omission, not a regression introduced here. ✓
+
+6. **Test steps** — all pass per CHANGELOG/TEST_REPORT: `node --check` ✓, zero `confirm(` matches ✓, smoke + button-smoke 2/2 ✓, npm test 21/21 ✓, code-trace of Cancel/Confirm for all ten flows ✓.
+
+### Findings summary
+
+No must-fix items. No REWORK.
+
+**Nit (pre-existing, carry forward as a separate task):** `clearGroceryList()` does not call `saveData()` — the cleared list does not persist to cloud for signed-in users until the next event that triggers a save. Pre-existing on `main`; out of scope for this task.
+
+**Follow-on task (from security-guardian, medium severity, not a blocker here):** `recipe.currentServings` raw in `markRecipeCooked`'s `showConfirmDialog` bodyHtml at app.js ~7704. Should be wrapped in `escapeHtml(String(Number(...)))` or coerced in `normalizeRecipes`.
+
+### Risk-gate
+
+The change is a UI delivery mechanism swap — native browser dialog → custom modal overlay. The underlying destructive logic in all ten callbacks is byte-for-bit identical to what it was before. However, `clearLocalStorage()` — one of the ten — explicitly touches the tombstone-merge-deletion machinery and calls `saveToFirestore()` directly. Per D-032, any modification to a function that contains that machinery is red-zone, even when the data logic itself is unchanged. Per the "when torn between done and approved, choose approved" rule: **approved**.
+
+→ TASK-036 status set to `approved` in TASKS.md. Land with `/merge TASK-036` then `/merge TASK-036 yes`.
+
+---
+
 ## Review TASK-039 — APPROVED, HELD (fix confirmed XSS in openPrepMode())
 branch: task-039
 verdict: approved (red-zone: security, held for human `/merge`)
