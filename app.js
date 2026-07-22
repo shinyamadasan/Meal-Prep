@@ -6214,7 +6214,7 @@ function openPrepMode(session) {
       return `
         <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
           <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
-          <span>${ing.name}${qty ? ' — ' + qty + ' ' + (ing.unit || '') : ''}</span>
+          <span>${escapeHtml(ing.name)}${qty ? ' — ' + escapeHtml(qty) + ' ' + escapeHtml(ing.unit || '') : ''}</span>
         </label>`;
     }).join('');
 
@@ -6224,14 +6224,14 @@ function openPrepMode(session) {
       return `
         <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
           <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
-          <span>${step}</span>
+          <span>${escapeHtml(step)}</span>
         </label>`;
     }).join('');
 
     return `
       <div class="prep-recipe-card">
         <div class="prep-recipe-header">
-          <strong>${recipe.name}</strong>
+          <strong>${escapeHtml(recipe.name)}</strong>
           <span class="prep-usage-badge">×${count} this week</span>
         </div>
         ${ingHTML ? `<p class="prep-section-label">Ingredients</p>${ingHTML}` : ''}
