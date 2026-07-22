@@ -1872,7 +1872,7 @@ test steps:
         this fix intends, in production.
 
 ### TASK-034 · Per-task scope note: flag builds that touch files their own task never declared
-status: approved
+status: done
 review: Claude implemented directly (tools/Run-Codex-Build.ps1, tools/Run-Claude-Review.ps1 —
   Codex cannot commit under tools/). Held at `approved` for human `/merge` — touches the AI Dev OS
   itself (D-032 red-zone). Deliberately a SOFT gate, not a hard block: an adjacent file can be a
