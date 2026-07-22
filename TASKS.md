@@ -2171,6 +2171,63 @@ test steps:
 
 ---
 
+### TASK-039 · Fix confirmed XSS in openPrepMode() — unescaped recipe/ingredient/step interpolation
+status: approved
+review: Claude implemented directly (security fix, small and well-understood — trivial-change
+  exception to the Delegation Policy). Held at `approved` — security is an explicit red-zone
+  category (D-032), never auto-merged regardless of how small the diff is.
+
+  Found while retroactively reviewing TASK-028: `REVIEW.md`'s actual TASK-027 review entry (only
+  visible after checking out that branch — this entry was on-disk the whole time, just never
+  surfaced) already contained a CONFIRMED security-guardian finding against this exact code, with
+  an explicit gate: "Branch merge gate: ... The branch MUST NOT merge to main until TASK-028's
+  review passes and the confirmed XSS in openPrepMode() is fixed." TASK-028 never got a real
+  review (see TASK-028's own entry / `docs/AI_OS_NOTES.md`), so that gate was silently never
+  enforced, and the branch merged anyway. This means the vulnerability has been live in production
+  since TASK-027/028 merged.
+owner: claude
+source: discovered while retroactively reviewing TASK-028 — a pre-existing, already-recorded
+  security-guardian finding that was never acted on because the task that should have required it
+  never completed a real review
+priority: P0
+depends-on: none
+files: app.js
+
+context:
+  `openPrepMode()` (app.js ~6185-6245) interpolates `recipe.name`, `ing.name`, `qty`, `ing.unit`,
+  and `step` directly into a template literal assigned to `.innerHTML`, with no `escapeHtml()`
+  call — `escapeHtml()` exists and is used elsewhere in the codebase, just not here. All five
+  values are user-editable (recipe form / paste-import). Before TASK-028 this required the user to
+  manually open Prep Mode (self-XSS only). TASK-028's `restorePrepModeSession()` now calls
+  `openPrepMode()` automatically on every app load/login if a session was active — so a recipe
+  containing a crafted name/ingredient/step (e.g. imported from a shared/pasted source) can now
+  execute script on ANY future login, not just when the user chooses to open Prep Mode. Confirmed
+  still present and unpatched by direct code read before starting this fix.
+
+acceptance:
+  - [x] `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step` are all passed through
+        `escapeHtml()` before interpolation into the `.innerHTML` template in `openPrepMode()`.
+  - [x] No other behavior changes — same cards, same checklist state, same layout.
+  - [x] `node --check app.js` passes.
+  - [x] Existing Playwright smoke/button-smoke suites still pass (confirms no rendering breakage
+        from the added escaping).
+
+constraints:
+  - Security fix — held at `approved`, never auto-merged, regardless of diff size (D-032).
+  - Minimal, surgical: only wrap the five identified interpolation points; no refactor of
+    `openPrepMode()` beyond that.
+
+test steps:
+  - [x] `node --check app.js` — pass.
+  - [x] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000` — 2 passed, 467 buttons discovered, 200 clicked, 0 broken.
+  - [x] Deterministic payload check: `escapeHtml('<img src=x onerror=alert(1)>')` produces
+        `&lt;img src=x onerror=alert(1)&gt;` — no raw `<img` survives.
+  - [ ] Live/human verification: a recipe with a crafted name opened in Prep Mode after this fix
+        renders as inert text, not executing script.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
