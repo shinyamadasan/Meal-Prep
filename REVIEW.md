@@ -546,6 +546,66 @@ Gate picked: `approved` (red-zone: touches `tools/Generate-Digest.ps1` and `tool
 
 → TASK-033 status set to `approved` in TASKS.md. Land with `/merge TASK-033` then `/merge TASK-033 yes`.
 
+## Review TASK-034 — APPROVED, HELD (per-task scope note, soft gate)
+branch: task-034
+verdict: approved (red-zone, held for human `/merge`)
+
+### Context
+Prompted by comparing this OS against `github.com/cathrynlavery/codex-build`, a similar
+Claude-orchestrates/Codex-builds skill. Its `check_scope.py` mechanically fails a run if a task
+touches a file outside its own declared allowlist. This repo already has `Run-Codex-Build.ps1`'s
+`$deniedPatterns` deny-list, but that's a repo-wide "never touch the OS itself" guard, not a
+per-task check — a task declaring `files: app.js` that also edits `style.css` passes the deny-list
+untouched (CSS is legitimate app-code surface) with nothing flagging the extra touch was never
+requested. The user explicitly asked for this to be a soft gate, not a hard block, after weighing
+the tradeoff: an adjacent-file touch is sometimes a legitimate dependency, and a rigid fail-closed
+check would trade silent scope creep for false-positive blocks needing manual intervention.
+
+### Findings
+**1. Detection logic — correct, and scoped to what it should check.** `Get-TaskDeclaredFiles`
+parses a task's `files:` field (single-line and the multi-line-continuation form several real
+entries in this file actually use), stripping `(new)` annotations. The out-of-scope computation
+correctly unions declared files across every tracked task in the invocation (not just the first),
+which matters for Sprint Execution Mode's chained-task case — checking only the first task's
+declared list would have false-flagged files a LATER chained task legitimately owns.
+
+**2. Soft-gate design — matches the explicit requirement.** A mismatch never blocks the build,
+never marks a task blocked, and never touches the build's own exit code. It only writes an
+advisory note, consumed once by the review step. This is the right shape for a heuristic that can
+have legitimate false positives (a shared import, a companion test file) — a hard gate here would
+have recreated the exact "guesswork that blocks real work" problem this session has spent most of
+its effort removing elsewhere (D-051's no-op/crash-resume fixes), just relocated to a new surface.
+
+**3. Cross-task-ID leak prevention — correctly handled, and tested for it specifically.** The
+handoff file is prefixed with the task ID(s) it applies to; `Run-Claude-Review.ps1` only uses it if
+the task currently under review is named there, and unconditionally deletes the file after
+reading — match or not — so a note from an unrelated earlier run can never attach to the wrong
+task, and a discarded note can't linger to confuse a later one either. Verified directly (6/6
+fixture assertions covering exactly this: matching ID, one-of-several IDs, unrelated stale ID,
+delete-on-both-paths, missing-file).
+
+**4. Reviewer-facing wording — appropriately hedged.** The injected prompt text explicitly labels
+the note "mechanically detected... not a verdict" and asks the reviewer to judge legitimate vs.
+scope creep, rather than phrasing it as an accusation — keeps the model doing the judgment call
+the check itself deliberately doesn't make.
+
+**5. Verification.** Both files parse clean. Two isolated fixture harnesses (file/scope parsing:
+8/8; note round-trip: 6/6), 14 assertions total, all pass. No live end-to-end run — a real build
+that genuinely touches an undeclared file, verified to actually surface in a real REVIEW.md entry,
+remains outstanding; honestly disclosed in TEST_REPORT.md rather than claimed.
+
+### Risk-gate
+Automation/OS-surface (Hard Rule 10, D-023): solo, never chained. Touches
+`tools/Run-Codex-Build.ps1` and `tools/Run-Claude-Review.ps1` directly — the AI Dev OS's own
+automation. Per D-032 this is red-zone regardless of how mechanically verified the diff is: held
+at `approved`, `main` NOT changed. Same disclosed same-session caveat as TASK-014/016/031/032/033
+(Claude both built and reviewed this diff) — mitigated by the isolated fixture harnesses giving
+independent-of-the-author verification of the actual branching behavior, not just a second read of
+the same code.
+
+→ TASK-034 status set to `approved` in TASKS.md. Land with `/merge TASK-034` then
+`/merge TASK-034 yes`.
+
 <!-- Entries go here, newest first. -->
 
 <!-- REVIEW TEMPLATE — copy and fill:

@@ -5,6 +5,23 @@
 
 ---
 
+## TASK-034 · 2026-07-21
+suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Run-Codex-Build.ps1 and
+  tools/Run-Claude-Review.ps1; isolated fixture harness against `Get-TaskBlockText`/
+  `Get-TaskDeclaredFiles` (extracted from the real file via brace-matching); second isolated
+  fixture harness against the note read/match/consume logic replicated from Run-Claude-Review.ps1
+result: both files parse clean. First harness: 8/8 assertions pass (single-line files field,
+  multi-line continuation with `(new)` annotations stripped, missing field returns `@()`, correct
+  isolation of one task among several with no bleed into neighbors, unknown task ID handled
+  without crash, out-of-scope diff logic correct for both an in-scope build and one with an extra
+  undeclared file). Second harness: 6/6 assertions pass (matching task ID uses the note, ID among
+  several covered IDs uses the note, an unrelated stale ID is ignored, the file is always deleted
+  after read regardless of match, a missing file returns empty without crashing).
+untested: no live end-to-end run — reproducing a real build that touches a file its task never
+  declared, and confirming the note actually reaches a real REVIEW.md entry, isn't safely
+  reproducible without running the real headless build/review pipeline against a live branch.
+  Honestly disclosed as unverified-live here rather than claimed.
+
 ## TASK-033 · 2026-07-21
 suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Generate-Digest.ps1 and
   tools/Dispatch-Commands.ps1; tools/Generate-Digest.ps1 executed against this app's own real

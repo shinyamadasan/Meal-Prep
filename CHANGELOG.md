@@ -5,6 +5,26 @@
 
 ---
 
+## TASK-034 — approved, held for /merge (branch: task-034)
+changed:
+  - tools/Run-Codex-Build.ps1 (new `Get-TaskBlockText`/`Get-TaskDeclaredFiles` helpers; after the
+    existing deny-list guard, computes changed files not declared by any tracked task and not a
+    standard evidence file; writes a task-ID-tagged note to gitignored `.scope-note.txt` on
+    mismatch, soft — never blocks the build)
+  - tools/Run-Claude-Review.ps1 (reads `.scope-note.txt`, uses it only if it names the task
+    currently under review, always deletes it after reading; folds it into the Claude reviewer
+    prompt as an explicit item to address in REVIEW.md)
+  - .gitignore (added `.scope-note.txt`, same transient-handoff-file convention as
+    `.last-phase-result.txt`)
+tests: `[System.Management.Automation.Language.Parser]::ParseFile` on both changed files (pass);
+  fixture harness against the file/scope-parsing helpers, extracted via brace-matching (8/8
+  assertions pass); second fixture harness against the note read/match/consume logic (6/6
+  assertions pass)
+blockers: none
+deviations: no live end-to-end run (would require a real build that genuinely touches an
+  undeclared file) — disclosed as unverified-live in TEST_REPORT.md rather than claimed
+→ status set to `approved` in TASKS.md
+
 ## TASK-033 — approved, held for /merge (branch: task-033)
 changed:
   - tools/Generate-Digest.ps1 (builds the digest incrementally, stops before a safe char threshold,
