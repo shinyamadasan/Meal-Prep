@@ -1943,9 +1943,109 @@ test steps:
   - [ ] Live (human-verified): a real build that touches an undeclared file produces a visible
         scope note in a real REVIEW.md entry, in production.
 
-<!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
+### TASK-036 · Replace native confirm() with showConfirmDialog() in destructive flows (iOS PWA fix)
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #2 — approved directly by the
+  human in conversation (not yet a numbered BQ item); reordered ahead of TASK-035/037 at the human's
+  explicit request since this is the active data-loss-risk item
+priority: P0
+depends-on: none
+files: app.js
 
-<!-- TASK TEMPLATE — copy and fill:
+context:
+  This app is a PWA (`manifest.json`, `sw.js` present), and `docs/FEATURES.md` already documents
+  that native `confirm()` is silently blocked in standalone mode on iOS — meaning any of these
+  buttons may appear to simply do nothing when tapped on an installed iOS PWA, with no visible
+  error. Two other flows (JSON import, duplicate pantry add) already work around this exact bug
+  using `showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm)` (app.js ~7576),
+  but ten other destructive call sites still use native `confirm()`:
+
+    - restore backup (app.js ~437)
+    - clear-all-data (app.js ~472)
+    - `deleteRecipe` (app.js ~2193)
+    - `clearDay` (app.js ~2783)
+    - `clearWeeklyPlan` (app.js ~2976)
+    - `clearGroceryList` (app.js ~3568)
+    - delete ingredient (app.js ~4538)
+    - delete cooking hack (app.js ~4644)
+    - `loadWeekTemplate` (app.js ~6460)
+    - delete custom ingredient (app.js ~8568)
+
+  `showConfirmDialog` is NON-BLOCKING (it appends a DOM overlay and calls `onConfirm` from a click
+  handler), unlike `confirm()` which blocks inline. Each of the ten call sites currently reads
+  `if (confirm(...)) { ...destructive logic... }` or `if (!confirm(...)) return; ...destructive
+  logic...` — converting these requires moving the destructive logic into the `onConfirm` callback,
+  not just swapping the condition.
+
+acceptance:
+  - [ ] All ten call sites listed above use `showConfirmDialog()` instead of native `confirm()`,
+        each preserving its existing confirmation message text (adapted to the dialog's
+        title/body/button-label shape) and its existing destructive logic, unchanged in behavior —
+        only the confirmation delivery mechanism changes.
+  - [ ] No call site's destructive action can now fire without the user tapping the dialog's
+        confirm button (i.e. the restructuring into a callback must not accidentally make anything
+        fire immediately or skip confirmation).
+
+constraints:
+  - Mechanical, single-concern change — do not alter what any of these ten actions actually do,
+    only how they ask for confirmation.
+  - Match `showConfirmDialog`'s existing call pattern exactly (see the two existing call sites in
+    `addToPantry()` and the JSON-import flow) rather than inventing a variant.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] `grep -n "confirm(" app.js` re-run after the change: only non-native usages (e.g. inside
+        `showConfirmDialog`'s own definition, or comments) should remain — zero bare `confirm(...)`
+        guard calls at the ten listed sites.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+  - [ ] For at least 2-3 of the ten (reviewer's choice), manually trace that Cancel truly cancels
+        and Confirm truly performs the original action, matching pre-change behavior.
+
+---
+
+### TASK-038 · loadWeekTemplate() should fill only empty slots, not overwrite the whole week
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #4 — approved directly by the
+  human in conversation (not yet a numbered BQ item); reordered ahead of TASK-035/037 at the human's
+  explicit request since this is the active data-loss-risk item
+priority: P0
+depends-on: TASK-036 (loadWeekTemplate's confirm() copy needs to match the new fill-empty-only
+  behavior, not still warn about a full replace — sequence after TASK-036 lands, or coordinate if
+  built in parallel)
+files: app.js
+
+context:
+  `docs/FEATURES.md` documents `loadWeekTemplate()` as "fills empty slots only," but the actual code
+  (app.js ~6460) is an unconditional `AppState.weeklyPlan = JSON.parse(saved)` — a full overwrite.
+  Combined with TASK-036 (native `confirm()` silently doing nothing on an installed iOS PWA), a
+  user on iOS could tap "Load Template" and have a week's planning silently wiped with no visible
+  warning at all.
+
+acceptance:
+  - [ ] `loadWeekTemplate()` fills only slots that are currently empty in `AppState.weeklyPlan` —
+        any slot that already has a recipe assigned is left untouched.
+  - [ ] `saveData()` and `generateGroceryList()` are still called after loading (confirm neither
+        call was lost in the change).
+  - [ ] The confirmation copy (once routed through `showConfirmDialog()` per TASK-036, or still via
+        `confirm()` if built before it) is updated to describe "fill empty slots" rather than
+        "replace your current week's plan," since the destructive framing no longer matches what
+        the function actually does.
+
+constraints:
+  - This is a real behavior change to existing data — do not also change the template
+    save/selection UI in this task; scope is limited to the load/fill logic and its confirmation
+    copy.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] Deterministic case: a week with some slots already filled and a saved template loaded —
+        confirm the already-filled slots are untouched and only empty ones receive the template's
+        recipes.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+
+---
 
 ### TASK-035 · Grocery → Pantry auto-transfer on check, with undo
 status: codex
@@ -2009,66 +2109,6 @@ test steps:
 
 ---
 
-### TASK-036 · Replace native confirm() with showConfirmDialog() in destructive flows (iOS PWA fix)
-status: codex
-source: live UX customer-journey audit this session, Tier 1 finding #2 — approved directly by the
-  human in conversation (not yet a numbered BQ item)
-priority: P1
-depends-on: none
-files: app.js
-
-context:
-  This app is a PWA (`manifest.json`, `sw.js` present), and `docs/FEATURES.md` already documents
-  that native `confirm()` is silently blocked in standalone mode on iOS — meaning any of these
-  buttons may appear to simply do nothing when tapped on an installed iOS PWA, with no visible
-  error. Two other flows (JSON import, duplicate pantry add) already work around this exact bug
-  using `showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm)` (app.js ~7576),
-  but ten other destructive call sites still use native `confirm()`:
-
-    - restore backup (app.js ~437)
-    - clear-all-data (app.js ~472)
-    - `deleteRecipe` (app.js ~2193)
-    - `clearDay` (app.js ~2783)
-    - `clearWeeklyPlan` (app.js ~2976)
-    - `clearGroceryList` (app.js ~3568)
-    - delete ingredient (app.js ~4538)
-    - delete cooking hack (app.js ~4644)
-    - `loadWeekTemplate` (app.js ~6460)
-    - delete custom ingredient (app.js ~8568)
-
-  `showConfirmDialog` is NON-BLOCKING (it appends a DOM overlay and calls `onConfirm` from a click
-  handler), unlike `confirm()` which blocks inline. Each of the ten call sites currently reads
-  `if (confirm(...)) { ...destructive logic... }` or `if (!confirm(...)) return; ...destructive
-  logic...` — converting these requires moving the destructive logic into the `onConfirm` callback,
-  not just swapping the condition.
-
-acceptance:
-  - [ ] All ten call sites listed above use `showConfirmDialog()` instead of native `confirm()`,
-        each preserving its existing confirmation message text (adapted to the dialog's
-        title/body/button-label shape) and its existing destructive logic, unchanged in behavior —
-        only the confirmation delivery mechanism changes.
-  - [ ] No call site's destructive action can now fire without the user tapping the dialog's
-        confirm button (i.e. the restructuring into a callback must not accidentally make anything
-        fire immediately or skip confirmation).
-
-constraints:
-  - Mechanical, single-concern change — do not alter what any of these ten actions actually do,
-    only how they ask for confirmation.
-  - Match `showConfirmDialog`'s existing call pattern exactly (see the two existing call sites in
-    `addToPantry()` and the JSON-import flow) rather than inventing a variant.
-
-test steps:
-  - [ ] `node --check app.js`
-  - [ ] `grep -n "confirm(" app.js` re-run after the change: only non-native usages (e.g. inside
-        `showConfirmDialog`'s own definition, or comments) should remain — zero bare `confirm(...)`
-        guard calls at the ten listed sites.
-  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
-        --workers=1 --timeout=60000`
-  - [ ] For at least 2-3 of the ten (reviewer's choice), manually trace that Cancel truly cancels
-        and Confirm truly performs the original action, matching pre-change behavior.
-
----
-
 ### TASK-037 · Make "mark cooked" reachable from the recipe card and dashboard
 status: codex
 source: live UX customer-journey audit this session, Tier 1 finding #3 — approved directly by the
@@ -2116,47 +2156,9 @@ test steps:
 
 ---
 
-### TASK-038 · loadWeekTemplate() should fill only empty slots, not overwrite the whole week
-status: codex
-source: live UX customer-journey audit this session, Tier 1 finding #4 — approved directly by the
-  human in conversation (not yet a numbered BQ item)
-priority: P1
-depends-on: TASK-036 (loadWeekTemplate's confirm() copy needs to match the new fill-empty-only
-  behavior, not still warn about a full replace — sequence after TASK-036 lands, or coordinate if
-  built in parallel)
-files: app.js
+<!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
-context:
-  `docs/FEATURES.md` documents `loadWeekTemplate()` as "fills empty slots only," but the actual code
-  (app.js ~6460) is an unconditional `AppState.weeklyPlan = JSON.parse(saved)` — a full overwrite.
-  Combined with TASK-036 (native `confirm()` silently doing nothing on an installed iOS PWA), a
-  user on iOS could tap "Load Template" and have a week's planning silently wiped with no visible
-  warning at all.
-
-acceptance:
-  - [ ] `loadWeekTemplate()` fills only slots that are currently empty in `AppState.weeklyPlan` —
-        any slot that already has a recipe assigned is left untouched.
-  - [ ] `saveData()` and `generateGroceryList()` are still called after loading (confirm neither
-        call was lost in the change).
-  - [ ] The confirmation copy (once routed through `showConfirmDialog()` per TASK-036, or still via
-        `confirm()` if built before it) is updated to describe "fill empty slots" rather than
-        "replace your current week's plan," since the destructive framing no longer matches what
-        the function actually does.
-
-constraints:
-  - This is a real behavior change to existing data — do not also change the template
-    save/selection UI in this task; scope is limited to the load/fill logic and its confirmation
-    copy.
-
-test steps:
-  - [ ] `node --check app.js`
-  - [ ] Deterministic case: a week with some slots already filled and a saved template loaded —
-        confirm the already-filled slots are untouched and only empty ones receive the template's
-        recipes.
-  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
-        --workers=1 --timeout=60000`
-
----
+<!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>
 status: todo → codex
