@@ -1947,6 +1947,217 @@ test steps:
 
 <!-- TASK TEMPLATE — copy and fill:
 
+### TASK-035 · Grocery → Pantry auto-transfer on check, with undo
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #1 — approved directly by the
+  human in conversation (not yet a numbered BQ item)
+priority: P1
+depends-on: none
+files: app.js
+
+context:
+  `FEATURES.md` documents "Grocery → Pantry auto-transfer on check (with undo)" but no such logic
+  exists. `toggleGroceryItem()` (app.js ~3546) only flips `item.checked` and calls
+  `renderGroceryList()` — it doesn't even call `saveData()` today, so the checked state itself isn't
+  persisted either. This breaks the "buy → stock" link in the core value loop (docs/PROJECT.md):
+  after shopping, a user has to separately re-enter every purchased item into Inventory by hand.
+
+  Existing helpers to reuse rather than reinvent: `inferCategory(name)`, `inferStorage(name,
+  category)`, `ingredientShelfLife(name, category)`, `todayISO()` (all used by `addToPantry()`,
+  app.js ~7928, which is the canonical shape a pantry entry should have — id, name, category,
+  purchaseDate, shelfLifeDays, storage, quantity, unit). `isInPantry(name)` (app.js ~6782) already
+  does a fuzzy substring match for presentation purposes elsewhere — decide whether that's the
+  right dedupe check here or whether an exact-name match (like `addToPantry`'s own duplicate check)
+  is more correct; state which you chose and why.
+
+  `showSuccessMessage()` (app.js ~2792) is the existing toast pattern but is text-only, no action
+  button. "With undo" will need either a small extension to it or a minimal variant — keep it
+  simple, matching the app's existing toast visual style rather than introducing a new UI system.
+
+acceptance:
+  - [ ] Checking a grocery item (not unchecking) adds it to `AppState.pantry` using the same field
+        shape `addToPantry()` produces, mapping the grocery item's `quantity`/`unit` across.
+  - [ ] If an equivalent item already exists in the pantry, do not create a silent duplicate — either
+        skip with a clear signal, or increment quantity; state which and why in `CHANGELOG.md`.
+  - [ ] Unchecking a grocery item does NOT remove anything from the pantry (only a fresh check
+        triggers the transfer) — this must never be a destructive/surprising action.
+  - [ ] `saveData()` is called after the pantry mutation (Hard Rule 5) — and after this task,
+        `toggleGroceryItem()` should persist the checked state too, since it currently doesn't.
+  - [ ] An undo affordance is shown after the transfer (a toast with an "Undo" action, or equivalent)
+        that removes the just-added pantry entry if tapped within a few seconds.
+  - [ ] Existing grocery list and pantry rendering both still work unchanged for every other path.
+
+constraints:
+  - Must not silently create duplicate pantry rows for the same ingredient without at least matching
+    this app's existing "ask before duplicate" spirit (see `addToPantry()`'s own dedupe prompt) —
+    a fully silent duplicate is not acceptable, but a fully silent skip is also worth avoiding since
+    the user may have genuinely bought a second one.
+  - Persist through `saveData()`, not `saveToLocalStorage()` alone (Hard Rule 5).
+  - No new Firestore read/write call sites — reuse the existing `saveData()` path so the
+    `cloudReady` write-guard (Hard Rule 6) is respected automatically, not bypassed.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] Deterministic case check: checking a grocery item with no pantry match creates one pantry
+        entry with the right name/quantity/unit/category/storage; checking one that already matches
+        an existing pantry item does not create a duplicate (per whichever dedupe choice was made);
+        unchecking never touches the pantry array.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+  - [ ] Manual/human verification: the undo action actually removes the added pantry entry within
+        its window.
+
+---
+
+### TASK-036 · Replace native confirm() with showConfirmDialog() in destructive flows (iOS PWA fix)
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #2 — approved directly by the
+  human in conversation (not yet a numbered BQ item)
+priority: P1
+depends-on: none
+files: app.js
+
+context:
+  This app is a PWA (`manifest.json`, `sw.js` present), and `docs/FEATURES.md` already documents
+  that native `confirm()` is silently blocked in standalone mode on iOS — meaning any of these
+  buttons may appear to simply do nothing when tapped on an installed iOS PWA, with no visible
+  error. Two other flows (JSON import, duplicate pantry add) already work around this exact bug
+  using `showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm)` (app.js ~7576),
+  but ten other destructive call sites still use native `confirm()`:
+
+    - restore backup (app.js ~437)
+    - clear-all-data (app.js ~472)
+    - `deleteRecipe` (app.js ~2193)
+    - `clearDay` (app.js ~2783)
+    - `clearWeeklyPlan` (app.js ~2976)
+    - `clearGroceryList` (app.js ~3568)
+    - delete ingredient (app.js ~4538)
+    - delete cooking hack (app.js ~4644)
+    - `loadWeekTemplate` (app.js ~6460)
+    - delete custom ingredient (app.js ~8568)
+
+  `showConfirmDialog` is NON-BLOCKING (it appends a DOM overlay and calls `onConfirm` from a click
+  handler), unlike `confirm()` which blocks inline. Each of the ten call sites currently reads
+  `if (confirm(...)) { ...destructive logic... }` or `if (!confirm(...)) return; ...destructive
+  logic...` — converting these requires moving the destructive logic into the `onConfirm` callback,
+  not just swapping the condition.
+
+acceptance:
+  - [ ] All ten call sites listed above use `showConfirmDialog()` instead of native `confirm()`,
+        each preserving its existing confirmation message text (adapted to the dialog's
+        title/body/button-label shape) and its existing destructive logic, unchanged in behavior —
+        only the confirmation delivery mechanism changes.
+  - [ ] No call site's destructive action can now fire without the user tapping the dialog's
+        confirm button (i.e. the restructuring into a callback must not accidentally make anything
+        fire immediately or skip confirmation).
+
+constraints:
+  - Mechanical, single-concern change — do not alter what any of these ten actions actually do,
+    only how they ask for confirmation.
+  - Match `showConfirmDialog`'s existing call pattern exactly (see the two existing call sites in
+    `addToPantry()` and the JSON-import flow) rather than inventing a variant.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] `grep -n "confirm(" app.js` re-run after the change: only non-native usages (e.g. inside
+        `showConfirmDialog`'s own definition, or comments) should remain — zero bare `confirm(...)`
+        guard calls at the ten listed sites.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+  - [ ] For at least 2-3 of the ten (reviewer's choice), manually trace that Cancel truly cancels
+        and Confirm truly performs the original action, matching pre-change behavior.
+
+---
+
+### TASK-037 · Make "mark cooked" reachable from the recipe card and dashboard
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #3 — approved directly by the
+  human in conversation (not yet a numbered BQ item)
+priority: P1
+depends-on: none
+files: app.js, index.html, style.css
+
+context:
+  `markRecipeCooked()`/`_doMarkCooked()` (app.js ~7602-7636) — the only function that deducts
+  pantry stock and logs cook history — is reachable from exactly one place: the "✓ Cooked" button
+  on an already-planned weekly-planner slot (app.js ~2657). The recipe card itself (`renderRecipes()`,
+  app.js ~2438-2578) only offers Edit/Delete. The dashboard's "Cook this now" suggestions
+  (`openRecipeFromHome()`, app.js ~2271-2298, wired from the cook tiers ~3178-3210) only switch to
+  the Cook tab and scroll to the card — a dead end, not an action. A user who wants to log a cook
+  for a recipe NOT in this week's plan currently has no path to do so without first planning it.
+
+acceptance:
+  - [ ] Recipe cards (Cook tab) gain a "Cooked" action alongside Edit/Delete that triggers the same
+        confirm-portions → deduct-pantry → log-history flow `markRecipeCooked()` already performs
+        for a planned slot — reusing that logic rather than duplicating it.
+  - [ ] The dashboard's "Cook this now" tiles gain a direct way to log the cook (either a dedicated
+        action on the tile, or — at minimum — landing on a card that itself now has the "Cooked"
+        action from the previous bullet, so it's no longer a pure dead end).
+  - [ ] Any new onclick handler references a recipe id in quotes (Hard Rule 3 —
+        `onclick="markRecipeCookedFromCard('${recipe.id}')"`-style, not unquoted) since Firestore
+        ids are strings.
+  - [ ] Existing behavior for the planner-slot "✓ Cooked" button is unchanged.
+
+constraints:
+  - Reuse the existing deduction/logging logic in `markRecipeCooked()`/`_doMarkCooked()` — do not
+    write a second, parallel pantry-deduction path.
+  - If `markRecipeCooked()` currently assumes a planner-slot context that a card-triggered cook
+    won't have (e.g. day/meal-slot references used only for UI, not for deduction logic), trace
+    this carefully before assuming a trivial reuse — flag as `blocked` with specifics if the
+    coupling is deeper than expected rather than guessing.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] Deterministic case: triggering "Cooked" from a recipe card not in this week's plan correctly
+        deducts pantry stock and logs history, matching what the planner-slot path already does for
+        the same recipe.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+
+---
+
+### TASK-038 · loadWeekTemplate() should fill only empty slots, not overwrite the whole week
+status: codex
+source: live UX customer-journey audit this session, Tier 1 finding #4 — approved directly by the
+  human in conversation (not yet a numbered BQ item)
+priority: P1
+depends-on: TASK-036 (loadWeekTemplate's confirm() copy needs to match the new fill-empty-only
+  behavior, not still warn about a full replace — sequence after TASK-036 lands, or coordinate if
+  built in parallel)
+files: app.js
+
+context:
+  `docs/FEATURES.md` documents `loadWeekTemplate()` as "fills empty slots only," but the actual code
+  (app.js ~6460) is an unconditional `AppState.weeklyPlan = JSON.parse(saved)` — a full overwrite.
+  Combined with TASK-036 (native `confirm()` silently doing nothing on an installed iOS PWA), a
+  user on iOS could tap "Load Template" and have a week's planning silently wiped with no visible
+  warning at all.
+
+acceptance:
+  - [ ] `loadWeekTemplate()` fills only slots that are currently empty in `AppState.weeklyPlan` —
+        any slot that already has a recipe assigned is left untouched.
+  - [ ] `saveData()` and `generateGroceryList()` are still called after loading (confirm neither
+        call was lost in the change).
+  - [ ] The confirmation copy (once routed through `showConfirmDialog()` per TASK-036, or still via
+        `confirm()` if built before it) is updated to describe "fill empty slots" rather than
+        "replace your current week's plan," since the destructive framing no longer matches what
+        the function actually does.
+
+constraints:
+  - This is a real behavior change to existing data — do not also change the template
+    save/selection UI in this task; scope is limited to the load/fill logic and its confirmation
+    copy.
+
+test steps:
+  - [ ] `node --check app.js`
+  - [ ] Deterministic case: a week with some slots already filled and a saved template loaded —
+        confirm the already-filled slots are untouched and only empty ones receive the template's
+        recipes.
+  - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
+        --workers=1 --timeout=60000`
+
+---
+
 ### TASK-001 · <short title>
 status: todo → codex
 source: BQ-<id>
