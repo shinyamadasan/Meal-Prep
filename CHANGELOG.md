@@ -35,6 +35,15 @@ blockers: none
 deviations: voice recognition behavior was verified by code trace and regression tests; live microphone/browser dictation remains human verification
 → status set to `review` in TASKS.md
 
+## TASK-026 — done (branch: task-026)
+changed:
+  - index.html (`#pantry-clear-expired` button added near pantry Select/search controls, hidden by default, 1 loc)
+  - app.js (`getExpiredPantryItems()` derives expired pantry rows, `renderPantryClearExpiredButton()` toggles visibility, `clearExpiredPantryItems()` confirms and writes explicit deletion tombstones before one `saveData()`, 46 loc)
+tests: `node --check app.js` (pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list` (2 passed, 467 buttons discovered, 200 clicked, 0 broken); `npm test -- --reporter=list` (21 passed)
+blockers: none
+deviations: bulk-delete 6+ expired items and real-device rendering remain human-verifiable; code trace confirms explicit tombstones are written before the single `saveData()` call
+→ status set to `review` in TASKS.md
+
 ## TASK-034 — approved, held for /merge (branch: task-034)
 changed:
   - tools/Run-Codex-Build.ps1 (new `Get-TaskBlockText`/`Get-TaskDeclaredFiles` helpers; after the

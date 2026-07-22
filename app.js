@@ -4735,6 +4735,7 @@ window.exitPantrySelectMode = exitPantrySelectMode;
 window.togglePantrySelected = togglePantrySelected;
 window.moveSelectedPantryItems = moveSelectedPantryItems;
 window.deleteSelectedPantryItems = deleteSelectedPantryItems;
+window.clearExpiredPantryItems = clearExpiredPantryItems;
 window.markRecipeCooked = markRecipeCooked;
 window.openManualCookedModal = openManualCookedModal;
 window.closeManualCookedModal = closeManualCookedModal;
@@ -6830,6 +6831,19 @@ function renderPantryBulkActions() {
     '<button class="btn btn--ghost btn--sm" onclick="exitPantrySelectMode()">Cancel</button>';
 }
 
+function getExpiredPantryItems() {
+  var todayMidnight = new Date(new Date().toDateString());
+  return (AppState.pantry || []).filter(function(item) {
+    return item.expiryDate && new Date(item.expiryDate) < todayMidnight;
+  });
+}
+
+function renderPantryClearExpiredButton() {
+  var btn = document.getElementById('pantry-clear-expired');
+  if (!btn) return;
+  btn.classList.toggle('hidden', getExpiredPantryItems().length === 0);
+}
+
 function togglePantrySelectMode() {
   pantrySelectMode = !pantrySelectMode;
   pantrySelectedIds.clear();
@@ -6889,6 +6903,37 @@ function deleteSelectedPantryItems() {
   renderGroceryList();
 }
 
+function clearExpiredPantryItems() {
+  var expired = getExpiredPantryItems();
+  if (expired.length === 0) return;
+
+  showConfirmDialog(
+    'Clear expired items?',
+    'Remove ' + expired.length + ' expired item(s) from your pantry?',
+    'Remove',
+    'Cancel',
+    function() {
+      var expiredIds = {};
+      var when = new Date().toISOString();
+      if (!AppState.deletions) AppState.deletions = {};
+      expired.forEach(function(item) {
+        expiredIds[String(item.id)] = true;
+        AppState.deletions[String(item.id)] = when;
+      });
+      AppState.pantry = AppState.pantry.filter(function(item) {
+        return !expiredIds[String(item.id)];
+      });
+      pantrySelectMode = false;
+      pantrySelectedIds.clear();
+      snapshotIdBaseline();
+      saveData();
+      renderPantry();
+      refreshFreshnessAlerts();
+      renderGroceryList();
+    }
+  );
+}
+
 
 function renderPantry() {
   const list = document.getElementById('pantry-list');
@@ -6902,6 +6947,7 @@ function renderPantry() {
     pantrySelectedIds.clear();
   }
   renderPantryBulkActions();
+  renderPantryClearExpiredButton();
 
   // Real-time search: filters the pantry view by name (renderPantry is the renderer, re-run on input).
   const searchWrap = document.getElementById('pantry-search-wrap');

@@ -27,6 +27,11 @@ suite: node --check app.js; npx playwright test tests/smoke.spec.js tests/button
 result: `node --check` passed. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified `startVoiceInput()` keeps `interimResults = false`, trims the parsed final line, inserts a separator only when existing textarea content does not already end in a newline, and leaves a trailing newline after each final result.
 untested: live microphone dictation remains human verification; Playwright does not drive the browser SpeechRecognition API.
 
+## TASK-026 · 2026-07-22
+suite: node --check app.js; git diff --check; static QA greps for `#pantry-clear-expired`, `clearExpiredPantryItems`, `patchMissingNutrition`, `AppState.cloudReady`, dark-mode selectors, and `:root`; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list; npm test -- --reporter=list
+result: `node --check app.js` passed. `git diff --check` passed with only Git LF-to-CRLF warnings. Static QA passed: the new inline handler has a matching global export, `saveData()` remains the persistence path in the new destructive action, load-path `patchMissingNutrition()` and Firestore `AppState.cloudReady` guard remain present, app source has zero dark-mode selector matches, and `style.css` has exactly one `:root`. Targeted Playwright smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full `npm test -- --reporter=list` passed (21/21).
+untested: the task's bulk-delete 6+ expired item reload scenario was verified by code trace rather than a dedicated committed spec; real-device rendering remains human verification
+
 ## TASK-034 · 2026-07-21
 suite: [System.Management.Automation.Language.Parser]::ParseFile on tools/Run-Codex-Build.ps1 and
   tools/Run-Claude-Review.ps1; isolated fixture harness against `Get-TaskBlockText`/
