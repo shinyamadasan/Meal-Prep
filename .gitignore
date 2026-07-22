@@ -4,6 +4,7 @@ playwright-report/
 claude-session.log
 automation.lock
 .last-phase-result.txt
+.scope-note.txt
 
 # Local agent tool state (per-machine, not project content)
 .claude/
