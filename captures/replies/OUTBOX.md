@@ -1,4 +1,1 @@
-## session-summary-20260721T171840Z
-2026-07-21T17:18:40.0562709-07:00
-
-Session summary: added a new safety check to the build system (TASK-034), matching what I found while comparing your setup to a similar tool online. The system already refuses to let the AI touch its own automation files, but it never checked whether a build stayed inside the specific files a task said it would touch. Now it does -- as a soft flag for the reviewer to consider, not a hard block, so it can't get in the way of a real fix. Tested with 14 passing checks. Same as always: touches the automation system itself, so it's held for your OK -- /merge TASK-034 then /merge TASK-034 yes when ready. Also still waiting on you: TASK-017, TASK-033.
+No pending replies.
