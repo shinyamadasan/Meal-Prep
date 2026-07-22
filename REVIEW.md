@@ -5,6 +5,51 @@
 
 ---
 
+## Review TASK-039 — APPROVED, HELD (fix confirmed XSS in openPrepMode())
+branch: task-039
+verdict: approved (red-zone: security, held for human `/merge`)
+
+### Context
+While retroactively reviewing TASK-028 (see below), checking out branch `task-036` surfaced
+`REVIEW.md`'s real, already-on-disk TASK-027 review entry — which contains a CONFIRMED
+security-guardian finding against `openPrepMode()`, with an explicit merge gate ("MUST NOT merge
+to main until TASK-028's review passes and the confirmed XSS ... is fixed") that was never
+enforced because TASK-028 never completed a real review. The branch merged anyway. This means the
+finding was correctly identified once, at the right time, by the right process step — and then
+silently bypassed by the same branch-lookup gap now documented in `docs/AI_OS_NOTES.md`. This
+task is the actual fix that gate was supposed to require.
+
+### Findings
+**1. Vulnerability confirmed still present before starting the fix.** Direct read of
+`openPrepMode()` (app.js ~6185-6245) confirmed `recipe.name`, `ing.name`, `qty`, `ing.unit`, and
+`step` were all interpolated raw into a `.innerHTML` template with no `escapeHtml()` call, exactly
+matching the original finding. `escapeHtml()` already exists and is used elsewhere in the
+codebase — this was an omission at this call site, not a missing utility.
+
+**2. Severity assessment matches the original finding.** `restorePrepModeSession()` calls
+`openPrepMode()` automatically on app load/login (app.js ~1697, 1729, 5611) whenever a session was
+active — so this is not self-XSS requiring the user to opt in; a crafted recipe name/ingredient/
+step (e.g. from a pasted/imported recipe) executes on the NEXT login, for any account where such a
+recipe exists and Prep Mode was left active.
+
+**3. Fix is minimal and correctly scoped.** Exactly the five identified interpolation points are
+wrapped in `escapeHtml()`; no other logic in `openPrepMode()` changed. `git diff main task-039 --
+app.js` confirms a 5-line diff, nothing else touched.
+
+**4. Verification.** `node --check app.js` passes. Playwright smoke + button-smoke pass unchanged
+(2/2, 467 buttons, 0 broken) — confirms escaping didn't break normal-data rendering. A
+deterministic payload check confirms `<img src=x onerror=alert(1)>` no longer survives as raw
+HTML after escaping.
+
+### Risk-gate
+Security fix — red-zone by definition (D-032), regardless of diff size. Held at `approved`, `main`
+NOT changed. Same disclosed same-session build+review caveat as other Claude-direct tasks this
+session — mitigated here by the fix being minimal, mechanical, and directly traceable to an
+already-CONFIRMED finding from an independent earlier review, not a new judgment call.
+
+→ TASK-039 status set to `approved` in TASKS.md. Land with `/merge TASK-039` then
+`/merge TASK-039 yes`.
+
 ## Review TASK-028 — APPROVED (retroactive — code already merged via TASK-027's branch)
 branch: task-027 (chained; no dedicated task-028 branch was ever created)
 verdict: done
@@ -42,6 +87,14 @@ Confirmed via `git grep prepModeSession` across every branch before concluding a
 does not trigger a new merge.
 
 → TASK-028 status set to `done` in TASKS.md.
+
+**Addendum, same session, minutes later:** this review's own acceptance-criteria check did not
+include a security pass, and missed that TASK-027's review (below) had already recorded a
+CONFIRMED XSS finding against this exact code with an explicit "must fix before merge" gate that
+was never enforced. See TASK-039 — the fix is now applied, held at `approved` for `/merge`. Leaving
+this entry as originally written rather than editing it after the fact, per this repo's own
+append-only convention for review/changelog history; the correction is the new entry, not a rewrite
+of this one.
 
 ## Review TASK-027 — APPROVED
 branch: task-027
