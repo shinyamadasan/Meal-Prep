@@ -5,6 +5,18 @@
 
 ---
 
+## TASK-039 · 2026-07-22
+suite: `node --check app.js`; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js
+  --reporter=list --workers=1 --timeout=60000`; deterministic `escapeHtml()` payload check
+result: syntax check passed. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200
+  clicked, 0 broken) — confirms the added `escapeHtml()` calls don't break Prep Mode rendering for
+  normal (non-malicious) recipe data. Deterministic check: `escapeHtml('<img src=x
+  onerror=alert(1)>')` produces `&lt;img src=x onerror=alert(1)&gt;` — the payload's `<img` tag no
+  longer survives as raw HTML.
+untested: live verification that a recipe with a crafted name, opened in Prep Mode (manually or
+  via auto-restore on login), renders as inert text rather than executing script — remains human
+  verification, same as every other DOM-rendering claim in this app's test suite.
+
 ## TASK-028 · 2026-07-22
 suite: node --check app.js; git diff --check; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js; npm test; acceptance code-trace
 result: `node --check` passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. Smoke + button-smoke passed (2/2; 467 buttons discovered, 200 clicked, 0 broken). Full Playwright suite passed (21/21). Code-trace verified `prepModeSession` is saved/loaded through localStorage, included in `buildFirestorePayload()`, read from Firestore and realtime snapshots, restored on startup, cleared by `closePrepMode()` and Clear All Data, and filters deleted recipe references before rendering.
