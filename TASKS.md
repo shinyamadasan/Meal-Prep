@@ -2063,7 +2063,9 @@ test steps:
 ---
 
 ### TASK-035 · Grocery → Pantry auto-transfer on check, with undo
-status: codex
+status: blocked
+blocker:
+  - auto: review rework, strike 1/3 -- see REVIEW.md on task-035 for must-fix items.
 source: live UX customer-journey audit this session, Tier 1 finding #1 — approved directly by the
   human in conversation (not yet a numbered BQ item)
 priority: P1
