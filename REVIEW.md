@@ -5,6 +5,63 @@
 
 ---
 
+## Review TASK-035 — RE-REVIEW: APPROVED, HELD (Grocery → Pantry auto-transfer on check, with undo)
+branch: task-035
+date: 2026-07-23
+verdict: approved (red-zone: touches AppState.pantry and saveData() — held for human merge)
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors. Neither was permitted to edit or write any file.
+
+**security-guardian — ran, CLEAN (no Critical or High findings)**
+
+Traced all new and reworked code paths:
+
+- **XSS:** All user-controlled data written via `.textContent` (`messageEl.textContent`, `actionBtn.textContent`). No `.innerHTML` introduced. CLEAN.
+- **Prototype pollution:** `previous` snapshot built from named hardcoded keys; undo closures restore exactly those keys. No dynamic key lookup or `Object.assign` from untrusted input. CLEAN.
+- **cloudReady write-guard:** All `saveData()` calls (three in `transferGroceryItemToPantry`, two in undo closures) route through the existing `saveData()` surface. `saveToFirestore()` / `cloudReady` guard is not bypassed. Hard Rules 5 and 6 intact. CLEAN.
+- **Race / double-fire:** `document.body.contains(messageEl)` guard prevents auto-dismiss from running on an already-removed element. Undo listener is released when the element is removed. CLEAN.
+- **Secret leakage:** No credentials or tokens in the diff. CLEAN.
+- **POTENTIAL LOW (functional, not security):** A rapid check → second-check-before-first-undo sequence causes the second transfer's undo closure to hold a snapshot that doesn't account for the first transfer's mutation, yielding a stale quantity on undo. Single-user, client-side; no auth bypass or data leak. Noted for awareness.
+- **Pre-existing unescaped `item.name` in `renderGroceryList()` `innerHTML`:** Pre-existing, out of scope for this task.
+
+**quality-guardian — ran, ALL 6 CRITERIA PASS**
+
+**MUST-FIX-1 verified resolved:** Both undo closures (new-entry path and increment path) now call `item.checked = false` before `renderGroceryList()`. The grocery row un-ticks correctly on undo.
+
+**MUST-FIX-2 verified resolved:** The increment-path undo restores `existing.updatedAt = previous.updatedAt` and does NOT call `stampUpdated(existing)` afterwards. The restored timestamp is preserved.
+
+Criterion-by-criterion:
+
+1. **Field shape matches `addToPantry()`** — PASS. `pantryEntry` carries all nine fields with the same helpers (`inferCategory`, `inferStorage`, `ingredientShelfLife`, `todayISO`, `INGREDIENT_DB`). `stampUpdated` called after push, consistent with `addToPantry()`. ✓
+2. **No silent duplicate; CHANGELOG states the choice** — PASS. Skip path shows "already in your kitchen" toast; increment path merges quantity. CHANGELOG deviation note documents the exact-name case-insensitive match decision and the increment/skip behaviour. ✓
+3. **Unchecking does NOT remove from pantry** — PASS. `else` branch calls only `saveData()` and `renderGroceryList()`; `AppState.pantry` untouched. ✓
+4. **`saveData()` called after mutation; checked state persisted** — PASS. All four paths (skip, increment, new-entry, uncheck) call `saveData()`. Hard Rule 5 satisfied. ✓
+5. **Undo affordance shown and functional** — PASS. Both must-fixes resolved (see above). Toast with "Undo" button shown after both transfer paths. The `document.body.contains` guard prevents auto-dismiss racing the button click. ✓
+6. **Existing rendering paths unchanged** — PASS. `showSuccessMessage`'s `action` param is optional and guarded; all existing callers unaffected. `index.html` and `style.css` unmodified. Smoke + button-smoke: 2/2, 468 buttons, 0 broken. ✓
+
+**Warnings (non-blocking):**
+- Skip path (no-quantity / unit-mismatch branch) shows a toast with no Undo button and persists `item.checked = true`. User must manually uncheck the item to reset. Not an AC requirement; noted for awareness.
+- Redundant `saveData()` in the skip path (no pantry mutation occurred there, only checked state). Harmless.
+
+### Must-Fix Items
+
+None. All must-fix items from the prior review are resolved.
+
+### Nits
+
+- The skip-path `saveData()` call is a no-op for pantry state; harmless but slightly redundant.
+- The 3-second undo window is tight; future consideration to extend to 5 s — out of scope for this task.
+
+### Risk-gate
+
+This task writes to `AppState.pantry` and calls `saveData()` (which writes to Firestore). Both are explicit red-zone surfaces under CLAUDE.md D-032 (data / sync / storage layer). Even though the feature is additive and individually reversible, pantry data mutations that reach Firestore are not safely auto-merged. Status is set to `approved` (held). The human should merge branch `task-035` after a glance.
+
+→ TASK-035 status set to `approved` in TASKS.md.
+
+---
+
 ## Review TASK-035 — REWORK (Grocery → Pantry auto-transfer on check, with undo)
 branch: task-035
 verdict: rework — quality-guardian found criterion 5 PARTIAL; two must-fix items before re-review
