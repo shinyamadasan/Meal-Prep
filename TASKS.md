@@ -2172,7 +2172,7 @@ test steps:
 ---
 
 ### TASK-039 · Fix confirmed XSS in openPrepMode() — unescaped recipe/ingredient/step interpolation
-status: approved
+status: done
 review: Claude implemented directly (security fix, small and well-understood — trivial-change
   exception to the Delegation Policy). Held at `approved` — security is an explicit red-zone
   category (D-032), never auto-merged regardless of how small the diff is.
