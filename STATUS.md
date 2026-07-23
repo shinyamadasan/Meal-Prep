@@ -5,6 +5,18 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-07-22 — Autonomous triage + plan run: 2 new captures (both rejected); BUILD_QUEUE fully reflected in TASKS.md
+
+**STEP A (Triage):** 2 new captures processed, both rejected as noise.
+- `20260719T1657Z-516` — "sd" — two-character typo, no product substance. Rejected.
+- `20260720T0856Z-527` — "/approve all" — unrecognized Telegram command, no product substance (same pattern as prior rejected commands). Rejected.
+
+**STEP B (Plan conversion):** All non-deferred BUILD_QUEUE items (BQ-017 through BQ-026) already have corresponding tasks in TASKS.md — nothing to add. BQ-013/014/015/016 remain deferred. PROP-032 (Risk: High) remains pending — awaiting human approval before BUILD_QUEUE entry.
+
+**Next:** Codex picks up TASK-035 (P1, first `status: codex` in file order). TASK-017/021/022/024/029/030/031/032/033/034 may still be at `status: approved`, each needs `/merge TASK-NNN yes` to land on main.
+
+---
+
 ## 2026-07-19 — Autonomous triage + plan run: 0 new captures; BUILD_QUEUE fully reflected in TASKS.md
 
 **STEP A (Triage):** All inbox captures already `status: triaged` — nothing to do.
