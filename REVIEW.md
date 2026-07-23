@@ -5,6 +5,41 @@
 
 ---
 
+## Review TASK-040 — APPROVED, HELD (fix pre-existing TASK-036 test regression)
+branch: task-040
+verdict: approved (held per this session's convention; test-fixture-only, arguably Low risk)
+
+### Context
+`TASK-037`'s auto-merge gate failed `npm test` — not from anything TASK-037 touched, but from a
+pre-existing gap: `TASK-036` converted `clearGroceryList()` to the non-blocking
+`showConfirmDialog()`, and `tests/buttons-functional.spec.js`'s "Clear All empties the list" test
+still listened for a native browser `dialog` event that no longer fires there. Already flagged as
+a known issue in `TASK-035`'s review nits ("carry it as an open item"); this blocks every future
+task's auto-merge until fixed, so fixing it now rather than deferring further.
+
+### Findings
+**1. Root cause confirmed by reproducing the original failure first.** Checked out `task-037`,
+ran the full suite, reproduced the exact failure: `.confirm-overlay` left un-clicked,
+`#grocery-list` still contained the test item after "Clear All." Confirmed via `grep` that no
+other test in the suite relies on a native dialog event for any of the ten call sites `TASK-036`
+converted — `button-smoke.spec.js`'s dialog listener is a global dismiss-only safety net, harmless
+either way.
+
+**2. Fix is minimal and correct.** Two-line change: click `.confirm-ok-btn` (the custom dialog's
+own confirm button, matching `showConfirmDialog`'s DOM structure) instead of registering a native
+dialog handler that no longer fires.
+
+**3. Verification.** Targeted test passes (was failing before). Full suite re-run: 21/21 passed —
+confirms the fix doesn't affect anything else and the suite is genuinely green again.
+
+### Risk-gate
+Test-fixture-only — no production code touched, no data/sync/security surface. Reasonable case for
+`done` (Low risk, reversible), but held at `approved` anyway per this session's established
+practice of never self-merging Claude-direct work, however small.
+
+→ TASK-040 status set to `approved` in TASKS.md. Land with `/merge TASK-040` then
+`/merge TASK-040 yes`.
+
 ## Review TASK-036 — APPROVED, HELD (Replace native confirm() with showConfirmDialog())
 branch: task-036
 verdict: approved (red-zone: clearLocalStorage() touches tombstone/Firestore machinery — held for human `/merge`)

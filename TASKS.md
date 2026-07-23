@@ -2232,6 +2232,49 @@ test steps:
 
 ---
 
+### TASK-040 · Fix pre-existing TASK-036 test regression: buttons-functional.spec.js clear-grocery
+status: approved
+review: Claude implemented directly (test-fixture-only, trivial fix, blocking every future
+  auto-merge — matches the Delegation Policy's "implementation required to unblock" exception).
+  Held at `approved` per this session's own convention of never self-merging, though this is
+  arguably Low risk (test file only, no production code, no data/sync/security surface).
+owner: claude
+source: discovered while investigating TASK-037's auto-merge gate failure — `npm test` failed on a
+  test unrelated to TASK-037's own changes, already flagged as a known gap in TASK-035's review
+  nits ("the pre-existing TASK-036 regression... carry it as an open item")
+priority: P1
+depends-on: none
+files: tests/buttons-functional.spec.js
+
+context:
+  `TASK-036` converted `clearGroceryList()` (and nine other call sites) from native `confirm()` to
+  the non-blocking `showConfirmDialog()` custom overlay. `tests/buttons-functional.spec.js`'s
+  "Clear All empties the list" test still used
+  `page.once('dialog', (d) => d.accept())` — a listener for the NATIVE browser dialog event, which
+  no longer fires since there's no native `confirm()` call left at that site. The click on
+  `#clear-grocery` opens the custom dialog, nothing clicks it, the test immediately asserts the
+  list is empty and fails because the item is still there. This blocks `npm test` for every future
+  task's auto-merge gate, not just TASK-037's, until fixed.
+
+acceptance:
+  - [x] The test clicks `.confirm-ok-btn` (the custom dialog's confirm button, per
+        `showConfirmDialog`'s own DOM structure) instead of listening for a native dialog event.
+  - [x] The test passes: grocery item is actually cleared and the assertion succeeds.
+  - [x] No other test in the suite relies on a native dialog event for a call site `TASK-036`
+        converted (checked: `button-smoke.spec.js`'s dialog listener is a global dismiss-only
+        safety net, unaffected either way).
+
+constraints:
+  - Test-fixture-only change — no production code (`app.js`/`index.html`/`style.css`) touched.
+
+test steps:
+  - [x] `npx playwright test tests/buttons-functional.spec.js -g "Clear All empties" --reporter=list
+        --workers=1 --timeout=60000` — 1 passed (previously failing).
+  - [x] Full suite: `npx playwright test --reporter=list --workers=1 --timeout=60000
+        --global-timeout=300000` — 21/21 passed, confirming no other regression.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

@@ -5,6 +5,19 @@
 
 ---
 
+## TASK-040 — approved, held for /merge (branch: task-040)
+changed:
+  - tests/buttons-functional.spec.js (the "Clear All empties the list" test now clicks
+    `.confirm-ok-btn` on the custom `showConfirmDialog` overlay instead of listening for a native
+    browser `dialog` event that no longer fires since TASK-036, 2 loc)
+tests: `npx playwright test tests/buttons-functional.spec.js -g "Clear All empties"` (1 passed,
+  previously failing); full suite `npx playwright test --reporter=list --workers=1
+  --timeout=60000 --global-timeout=300000` (21/21 passed)
+blockers: none
+deviations: none — discovered while investigating TASK-037's auto-merge gate failure; the
+  regression was already flagged as a known gap in TASK-035's review nits
+→ status set to `approved` in TASKS.md (held for human /merge, though test-fixture-only)
+
 ## TASK-039 — approved, held for /merge (branch: task-039)
 changed:
   - app.js (`openPrepMode()` now passes `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step`

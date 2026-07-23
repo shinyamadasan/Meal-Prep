@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-040 · 2026-07-23
+suite: `npx playwright test tests/buttons-functional.spec.js -g "Clear All empties" --reporter=list
+  --workers=1 --timeout=60000`; full suite `npx playwright test --reporter=list --workers=1
+  --timeout=60000 --global-timeout=300000`
+result: targeted test passed (was failing before the fix — confirmed by reproducing the original
+  failure first: `.confirm-overlay` was left un-clicked, `#grocery-list` still contained the test
+  item). Full suite: 21/21 passed, confirming the fix doesn't affect any other test.
+untested: none — this is a test-only change and the test itself is the verification.
+
 ## TASK-039 · 2026-07-22
 suite: `node --check app.js`; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js
   --reporter=list --workers=1 --timeout=60000`; deterministic `escapeHtml()` payload check
