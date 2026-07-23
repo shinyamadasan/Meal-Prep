@@ -6510,11 +6510,21 @@ function loadWeekTemplate() {
   if (!saved) return;
   showConfirmDialog(
     'Load saved week?',
-    '<p>This will replace your current week\'s plan with the saved one. Continue?</p>',
+    '<p>This will fill empty slots in your current week with meals from the saved one. Existing planned meals stay unchanged. Continue?</p>',
     'Load Week',
     'Cancel',
     function() {
-      AppState.weeklyPlan = JSON.parse(saved);
+      const savedPlan = JSON.parse(saved);
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(function(day) {
+        if (!savedPlan[day]) return;
+        if (!AppState.weeklyPlan[day]) AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+        ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
+          if (!AppState.weeklyPlan[day][meal] && savedPlan[day][meal]) AppState.weeklyPlan[day][meal] = savedPlan[day][meal];
+        });
+        if ((!AppState.weeklyPlan[day].snacks || AppState.weeklyPlan[day].snacks.length === 0) && savedPlan[day].snacks && savedPlan[day].snacks.length > 0) {
+          AppState.weeklyPlan[day].snacks = savedPlan[day].snacks.slice();
+        }
+      });
       saveData();
       renderWeeklyPlanner();
       generateGroceryList();

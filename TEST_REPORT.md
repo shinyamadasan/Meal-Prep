@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-038 · 2026-07-23
+suite: `node --check app.js`; deterministic fill-empty-only state check for `loadWeekTemplate()` logic; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000`; `npm test`
+result: syntax check passed. Deterministic state check passed: filled breakfast/lunch/dinner/snacks from `mealPrepWeekTemplate` only where the current `AppState.weeklyPlan` slot was empty; existing populated meal slots and populated snacks stayed unchanged. Smoke + button-smoke passed (2/2; 468 buttons discovered, 200 clicked, 0 broken). Full `npm test` ran and reported 20 passed, 1 failed: `buttons-functional.spec.js` Clear All still waits for a native browser dialog, but `clearGroceryList()` now uses `showConfirmDialog()` from TASK-036, so the custom confirm button is never clicked and the item remains.
+untested: live browser template-load flow remains human verification; Playwright subset verifies app load/button health but does not drive this saved-template confirmation path directly.
+
 ## TASK-039 · 2026-07-22
 suite: `node --check app.js`; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js
   --reporter=list --workers=1 --timeout=60000`; deterministic `escapeHtml()` payload check

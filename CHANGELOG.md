@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-038 — done (branch: task-038)
+changed:
+  - app.js (`loadWeekTemplate()` now fills only empty `AppState.weeklyPlan` meal/snack slots from `mealPrepWeekTemplate` and updates the `showConfirmDialog()` copy to describe fill-empty-only behavior, 11 loc)
+tests: `node --check app.js` (pass); deterministic fill-empty-only state check (pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed; 468 buttons discovered, 200 clicked, 0 broken); `npm test` (20 passed, 1 failed)
+blockers: none
+deviations: full `npm test` has one unrelated failure in `buttons-functional.spec.js` Clear All: the test waits for a native browser dialog, but `clearGroceryList()` now uses the custom `showConfirmDialog()` from TASK-036, so the custom confirm button is never clicked
+→ status set to `review` in TASKS.md
+
 ## TASK-039 — approved, held for /merge (branch: task-039)
 changed:
   - app.js (`openPrepMode()` now passes `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step`
