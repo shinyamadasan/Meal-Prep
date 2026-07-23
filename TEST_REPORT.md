@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-035 rework · 2026-07-23
+suite: `node --check app.js`; `git diff --check`; deterministic source check for TASK-035 review must-fixes; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000`; `npm test -- --reporter=list --workers=1 --timeout=60000`
+result: syntax check passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. Deterministic rework check passed: both undo closures now set the source grocery `item.checked = false`, and the increment undo no longer calls `stampUpdated(existing)` after restoring `existing.updatedAt = previous.updatedAt`. Smoke + button-smoke passed (2/2; 468 buttons discovered, 200 clicked, 0 broken). Full `npm test` ran 21 tests: 20 passed, 1 failed.
+untested: manual browser verification that the toast Undo button feels usable within its short display window remains human verification. The single full-suite failure remains `tests/buttons-functional.spec.js` Clear All empties the list, which is the known native-dialog expectation mismatch after TASK-036's `showConfirmDialog()` change and is unrelated to TASK-035.
+
 ## TASK-035 · 2026-07-23
 suite: `node --check app.js`; `git diff --check`; deterministic extracted-function grocery transfer harness; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000`; `npm test -- --reporter=list --workers=1 --timeout=60000`
 result: `node --check app.js` passed. `git diff --check` passed with only Git LF-to-CRLF working-copy warnings. Deterministic harness against the actual extracted `transferGroceryItemToPantry()` and `toggleGroceryItem()` functions passed: checking a grocery item with no pantry match creates one pantry entry with name/quantity/unit/category/storage; Undo removes that entry; checking an exact-name pantry match increments compatible quantity without creating a duplicate; Undo restores the prior pantry row; unchecking persists the grocery state and does not mutate pantry. Smoke + button-smoke passed (2/2; 468 buttons discovered, 200 clicked, 0 broken). Full `npm test` ran 21 tests: 20 passed, 1 failed.

@@ -3631,7 +3631,7 @@ function transferGroceryItemToPantry(item) {
         existing.storage = previous.storage;
         existing.category = previous.category;
         existing.updatedAt = previous.updatedAt;
-        stampUpdated(existing);
+        item.checked = false;
         saveData();
         renderPantry();
         renderGroceryList();
@@ -3662,6 +3662,7 @@ function transferGroceryItemToPantry(item) {
     label: 'Undo',
     onClick: function() {
       AppState.pantry = AppState.pantry.filter(function(p) { return String(p.id) !== String(pantryEntry.id); });
+      item.checked = false;
       saveData();
       renderPantry();
       renderGroceryList();
