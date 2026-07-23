@@ -2063,13 +2063,7 @@ test steps:
 ---
 
 ### TASK-035 · Grocery → Pantry auto-transfer on check, with undo
-status: blocked
-blocker:
-  - 2026-07-23: Codex session cannot satisfy the required Git Workflow for this task. Current
-    checkout is `task-038`, and attempts to switch to `main` / create `task-035` failed because
-    `.git` is read-only in the session (`Unable to create .git/index.lock` and
-    `refs/heads/task-035.lock`). Approval escalation is disabled, so building on the wrong branch
-    would violate the task workflow.
+status: codex
 source: live UX customer-journey audit this session, Tier 1 finding #1 — approved directly by the
   human in conversation (not yet a numbered BQ item)
 priority: P1
