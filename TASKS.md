@@ -889,7 +889,7 @@ test steps:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-017 · Add Send-Notification: push a Telegram notice on any Preflight abort or mid-run halt
-status: approved
+status: done
 review: Same reasoning as TASK-014 (D-040) — this touches `run-claude.ps1` directly, which Codex's
   commit-scope guard would also permanently block, so Claude wrote it directly rather than queuing
   a doomed Codex build. Verified in isolation (a scratch outbox file, no git/repo involved): empty
