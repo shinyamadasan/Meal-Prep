@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-037 — done (branch: task-037)
+changed:
+  - app.js (`renderRecipes()` adds a Cooked action to recipe cards; `renderDashboard()` adds a direct Cooked action to cook suggestions; `markRecipeCookedFromCard()` reuses the existing `markRecipeCooked()` flow without changing the planner-slot path, 8 loc)
+tests: `node --check app.js` (pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 468 buttons discovered, 200 clicked, 0 broken); `npm test` (20 passed, 1 failed in existing grocery Clear All test)
+blockers: none
+deviations: full `npm test` now fails in `tests/buttons-functional.spec.js` for Grocery list Clear All because the test still expects the old native-confirm behavior after TASK-036 moved `clearGroceryList()` to `showConfirmDialog()`; TASK-037 did not touch that flow or test file
+→ status set to `review` in TASKS.md
+
 ## TASK-039 — approved, held for /merge (branch: task-039)
 changed:
   - app.js (`openPrepMode()` now passes `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step`

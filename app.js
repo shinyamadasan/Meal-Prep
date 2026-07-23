@@ -2324,6 +2324,11 @@ function openRecipeFromHome(recipeId) {
 }
 window.openRecipeFromHome = openRecipeFromHome;
 
+function markRecipeCookedFromCard(recipeId) {
+  markRecipeCooked(recipeId, null);
+}
+window.markRecipeCookedFromCard = markRecipeCookedFromCard;
+
 // Generic "click card to edit" — runs editFn(id) unless an inner control was clicked.
 function handleCardEdit(e, editFn, id) {
   if (e.target.closest('button, input, select, a')) return;
@@ -2599,6 +2604,7 @@ function renderRecipes() {
       </div>
 
       <div class="recipe-actions">
+        <button class="btn btn--primary btn--sm" onclick="event.stopPropagation();markRecipeCookedFromCard('${recipe.id}')">Cooked</button>
         <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Edit</button>
         <button class="btn btn--outline btn--sm" onclick="deleteRecipe('${recipe.id}')">Delete</button>
       </div>
@@ -3238,10 +3244,11 @@ function renderDashboard() {
         if (tier.key === 1 && s.missingIngredients && s.missingIngredients.length === 1) {
           buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJ(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
         }
+        var cookBtn = '<button class="dash-inline-btn" onclick="event.stopPropagation();markRecipeCookedFromCard(\'' + escJ(sid) + '\')">Cooked</button>';
         return '<div class="dash-cook-row">' +
           '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJ(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
-          '</button>' + buyBtn + '</div>';
+          '</button>' + cookBtn + buyBtn + '</div>';
       }).join('');
       return '<div class="dash-cook-tier ' + tier.cls + '">' +
         '<div class="dash-cook-tier-label">' + tier.label + '</div>' + rows + '</div>';

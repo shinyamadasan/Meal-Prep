@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-037 · 2026-07-23
+suite: node --check app.js; static handler/code-trace checks for `markRecipeCookedFromCard`, quoted recipe-id onclicks, and unchanged planner-slot `markRecipeCooked()` path; npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000; npm test
+result: `node --check app.js` passed. Static checks confirmed the new card/dashboard handlers are quoted, exported globally, and delegate to the existing `markRecipeCooked()` confirmation/deduction/history flow; the planner-slot Cooked button still calls `markRecipeCooked(recipe.id, this)`. Smoke + button-smoke passed (2/2; 468 buttons discovered, 200 clicked, 0 broken). Full `npm test` ran and reported 20 passed / 1 failed: `tests/buttons-functional.spec.js` Grocery list Clear All still contained `Clearable Test Item` after clicking `#clear-grocery`.
+untested: deterministic browser drive of confirming Cooked from an unplanned recipe card remains unverified by a dedicated spec; the passing button-smoke run confirms the new buttons do not throw when clicked. The full-suite failure appears unrelated to TASK-037: it exercises `clearGroceryList()` after TASK-036's native-confirm replacement, not the recipe-card/dashboard cook path changed here.
+
 ## TASK-039 · 2026-07-22
 suite: `node --check app.js`; `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js
   --reporter=list --workers=1 --timeout=60000`; deterministic `escapeHtml()` payload check
