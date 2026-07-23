@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-035 — done (branch: task-035)
+changed:
+  - app.js (`showSuccessMessage()` accepts an optional Undo action; `transferGroceryItemToPantry()` creates or updates exact-name pantry matches from checked grocery items; `toggleGroceryItem()` now persists checked-state changes, 101 loc)
+tests: `node --check app.js` (pass); `git diff --check` (pass, LF-to-CRLF warning only); deterministic grocery transfer harness (new item, exact-name increment, both undo paths, and uncheck path all pass); `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list --workers=1 --timeout=60000` (2 passed, 468 buttons discovered, 200 clicked, 0 broken); `npm test -- --reporter=list --workers=1 --timeout=60000` (20 passed, 1 failed)
+blockers: none for TASK-035
+deviations: exact case-insensitive pantry-name matching was chosen over `isInPantry()`'s fuzzy substring check to match `addToPantry()` and avoid merging distinct ingredients accidentally; matching pantry rows increment quantity when the grocery quantity is compatible, otherwise the app skips creating a duplicate and shows an already-in-kitchen signal. Full `npm test` failure is the existing `tests/buttons-functional.spec.js` Clear All empties the list case still waiting for a native `dialog` after the app's clear-grocery flow moved to `showConfirmDialog()`; no failure traced to TASK-035.
+→ status set to `review` in TASKS.md
+
 ## TASK-039 — approved, held for /merge (branch: task-039)
 changed:
   - app.js (`openPrepMode()` now passes `recipe.name`, `ing.name`, `qty`, `ing.unit`, and `step`

@@ -2815,7 +2815,7 @@ function clearDay(day) {
   );
 }
 
-function showSuccessMessage(message) {
+function showSuccessMessage(message, action) {
   const existingMessage = document.querySelector('.success-message');
   if (existingMessage) {
     existingMessage.remove();
@@ -2824,10 +2824,23 @@ function showSuccessMessage(message) {
   const messageEl = document.createElement('div');
   messageEl.className = 'success-message';
   messageEl.textContent = message;
+  if (action && action.label && action.onClick) {
+    var actionBtn = document.createElement('button');
+    actionBtn.type = 'button';
+    actionBtn.className = 'btn btn--outline btn--sm';
+    actionBtn.textContent = action.label;
+    actionBtn.style.marginLeft = '0.75rem';
+    actionBtn.addEventListener('click', function() {
+      action.onClick();
+      messageEl.remove();
+    });
+    messageEl.appendChild(actionBtn);
+  }
   document.body.appendChild(messageEl);
   
   setTimeout(() => messageEl.classList.add('show'), 100);
   setTimeout(() => {
+    if (!document.body.contains(messageEl)) return;
     messageEl.classList.remove('show');
     setTimeout(() => messageEl.remove(), 300);
   }, 3000);
@@ -3575,10 +3588,97 @@ function renderGroceryList() {
   updateBudgetDisplay();
 }
 
+function transferGroceryItemToPantry(item) {
+  if (!item || item.fromStaple) return false;
+
+  var existing = AppState.pantry.find(function(p) {
+    return p.name.toLowerCase() === item.name.toLowerCase();
+  });
+  var qty = parseFloat(item.quantity);
+  var hasQty = !isNaN(qty) && qty > 0;
+
+  if (existing) {
+    if (!hasQty || (existing.unit && item.unit && existing.unit !== item.unit)) {
+      saveData();
+      showSuccessMessage('"' + item.name + '" is already in your kitchen');
+      return true;
+    }
+
+    var previous = {
+      quantity: existing.quantity,
+      unit: existing.unit,
+      purchaseDate: existing.purchaseDate,
+      shelfLifeDays: existing.shelfLifeDays,
+      storage: existing.storage,
+      category: existing.category,
+      updatedAt: existing.updatedAt
+    };
+    var existingQty = parseFloat(existing.quantity);
+    existing.quantity = !isNaN(existingQty) ? parseFloat((existingQty + qty).toFixed(2)) : qty;
+    if (!existing.unit) existing.unit = item.unit || '';
+    existing.purchaseDate = todayISO();
+    stampUpdated(existing);
+    saveData();
+    renderPantry();
+    refreshFreshnessAlerts();
+    showSuccessMessage('Updated "' + item.name + '" in your kitchen', {
+      label: 'Undo',
+      onClick: function() {
+        existing.quantity = previous.quantity;
+        existing.unit = previous.unit;
+        existing.purchaseDate = previous.purchaseDate;
+        existing.shelfLifeDays = previous.shelfLifeDays;
+        existing.storage = previous.storage;
+        existing.category = previous.category;
+        existing.updatedAt = previous.updatedAt;
+        stampUpdated(existing);
+        saveData();
+        renderPantry();
+        renderGroceryList();
+      }
+    });
+    return true;
+  }
+
+  var category = item.category || inferCategory(item.name);
+  var dbEntry = INGREDIENT_DB.find(function(i) { return i.name.toLowerCase() === item.name.toLowerCase(); });
+  var pantryEntry = {
+    id: Date.now() + Math.random(),
+    name: item.name,
+    category: category,
+    purchaseDate: todayISO(),
+    shelfLifeDays: ingredientShelfLife(item.name, category),
+    storage: inferStorage(item.name, category),
+    quantity: hasQty ? qty : null,
+    unit: item.unit || (dbEntry ? dbEntry.unit : ''),
+    staple: dbEntry ? !!dbEntry.isStaple : undefined
+  };
+  AppState.pantry.push(pantryEntry);
+  stampUpdated(pantryEntry);
+  saveData();
+  renderPantry();
+  refreshFreshnessAlerts();
+  showSuccessMessage('Added "' + item.name + '" to your kitchen', {
+    label: 'Undo',
+    onClick: function() {
+      AppState.pantry = AppState.pantry.filter(function(p) { return String(p.id) !== String(pantryEntry.id); });
+      saveData();
+      renderPantry();
+      renderGroceryList();
+    }
+  });
+  return true;
+}
+
 function toggleGroceryItem(itemId) {
   const item = AppState.groceryList.find(i => i.id === itemId);
   if (item) {
     item.checked = !item.checked;
+    if (item.checked) {
+      transferGroceryItemToPantry(item);
+    } else {
+      saveData();
+    }
     renderGroceryList();
   }
 }
