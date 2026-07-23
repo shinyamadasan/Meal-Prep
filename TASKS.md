@@ -2127,7 +2127,7 @@ test steps:
 ---
 
 ### TASK-037 · Make "mark cooked" reachable from the recipe card and dashboard
-status: review
+status: done
 source: live UX customer-journey audit this session, Tier 1 finding #3 — approved directly by the
   human in conversation (not yet a numbered BQ item)
 priority: P1

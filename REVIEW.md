@@ -5,6 +5,56 @@
 
 ---
 
+## Review TASK-037 — APPROVED, AUTO-MERGE (Make "mark cooked" reachable from the recipe card and dashboard)
+branch: task-037
+verdict: done (UI-additive — new buttons + thin wrapper; data logic is pre-existing, unchanged; auto-merge eligible per D-032)
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors. Neither was permitted to edit or write any file.
+
+**security-guardian — ran, TASK-037 scope: PASS**
+
+Traced all 9 changed lines in `app.js` for XSS, injection, null-safety, and secret leakage:
+
+- **Recipe card onclick (`recipe.id` unescaped in template literal):** Follows the identical pattern already used by the existing Edit and Delete buttons in the same block. Firestore auto-generated IDs are alphanumeric with no special characters; no new XSS surface is introduced beyond what is already on `main`. INFORMATIONAL, not a regression. (Follow-on opportunity: apply `escJ()` to recipe IDs in card onclicks for consistency — pre-existing, out of scope here.)
+- **Dashboard onclick (`escJ(sid)`):** Correctly uses `escJ()`, which escapes backslashes then single quotes in the right order for a JS single-quoted string context. CLEAN.
+- **`recipeId` parameter injection:** `markRecipeCooked()` uses `recipeId` only in a strict equality comparison against `AppState.recipes` in memory — no `eval`, no `innerHTML`, no `Function()`. A crafted ID that does not match any recipe safely falls through to `showErrorMessage` and returns. CLEAN.
+- **`null` as `btn` argument:** `_doMarkCooked()` wraps all `btn` usages in `if (btn) { … }`. Passing `null` is falsy; the block is safely skipped. No `.dataset` access anywhere on `btn`. No runtime exception. CLEAN.
+- **Secret leakage:** Zero credentials, tokens, or environment values in the diff. CLEAN.
+
+Pre-existing finding carried forward (NOT introduced by TASK-037, NOT a blocker):
+> `showConfirmDialog` embeds its `title` parameter via `innerHTML` without `escapeHtml()` wrapping. The title passed from `markRecipeCooked` is the hardcoded literal `'How many portions cooked?'`, not attacker-controlled, so the existing call site is safe. Fragile pattern for future callers. Pre-existing; out of scope here.
+
+**quality-guardian — ran, ALL criteria CONFIRMED (1 Warning)**
+
+Traced criterion by criterion against the diff and evidence:
+
+1. **Recipe cards gain a "Cooked" action reusing `markRecipeCooked()`** — MET. `renderRecipes()` adds a `btn--primary` "Cooked" button that calls `markRecipeCookedFromCard('${recipe.id}')`. The wrapper delegates to `markRecipeCooked(recipeId, null)`, which drives the full confirm-portions → `_doMarkCooked()` flow (pantry deduction, cook history, fridge log, `saveData()`). No logic duplicated. ✓
+2. **Dashboard tiles gain a direct "Cooked" action** — MET. `renderDashboard()` adds `cookBtn` to each `dash-cook-row` via `escJ(sid)`. This is a dedicated tile action, satisfying the stronger of the two options the acceptance criterion offered. The dashboard no longer dead-ends. ✓
+3. **New onclicks quote the recipe id (Hard Rule 3)** — MET. Card: `markRecipeCookedFromCard('${recipe.id}')` — id in single quotes inside double-quoted attribute. Dashboard: `markRecipeCookedFromCard(\'' + escJ(sid) + '\')` — id in single quotes, consistent with all other dashboard onclicks in the same block. ✓
+4. **Planner-slot "✓ Cooked" button behavior unchanged** — MET. The planner button at `app.js:~2690` still calls `markRecipeCooked('${recipe.id}', this)` directly; `markRecipeCooked()` and `_doMarkCooked()` are unmodified. ✓
+
+**`npm test` failure (1 failing test):** Pre-existing TASK-036 regression. `buttons-functional.spec.js` uses `page.once('dialog', …)` to accept a native `confirm()` dialog for `clearGroceryList()`; TASK-036 replaced that with `showConfirmDialog()` (a custom modal), so the Playwright hook fires for nothing and the item persists. TASK-037 does not touch `clearGroceryList()`, `#clear-grocery`, or the grocery tab in any way. Correctly attributed to TASK-036; unrelated to TASK-037.
+
+**Warning (not a blocker):** The TASKS.md test step called for a deterministic browser-driven end-to-end verification that "Cooked" from an unplanned recipe card correctly deducts pantry stock and logs history via a dedicated spec. This was not produced — the button-smoke run confirms the buttons are rendered and clickable without throwing, but the full confirm-portions → deduct → history → `saveData()` flow was only verified by static code-trace, not by a live spec. The logic under test is entirely pre-existing and unchanged; the risk of a regression is low. Recommended follow-on: add a recipe-actions spec to `tests/recipe-actions.spec.js` covering this path.
+
+### Findings summary
+
+No confirmed security findings. No unmet acceptance criteria. No must-fix items. No REWORK.
+
+**Nit (carried forward as separate task):** The `npm test` suite now has a known-broken test (`buttons-functional.spec.js` / Grocery Clear All) caused by TASK-036's `showConfirmDialog` migration that was not matched by a test update. Should be fixed as a standalone task to keep the suite green.
+
+**Informational (security, pre-existing):** `recipe.id` in recipe-card onclick attributes is not wrapped in `escJ()`, unlike the dashboard path. The pattern matches existing Edit/Delete buttons; no regression here. Consider a follow-on to normalize.
+
+### Risk-gate
+
+The diff is 9 lines: one wrapper function (`markRecipeCookedFromCard`) + one button in `renderRecipes()` + one button + variable in `renderDashboard()`. It does not modify `saveData()`, the `cloudReady` guard, Firestore read/write paths, tombstone machinery, auth, security, or AI Dev OS files. The new buttons invoke the pre-existing `markRecipeCooked()` flow — which has been live in production and unchanged by this task. Both guardians pass. This is additive UI surface wiring to unchanged data logic. The change is reversible (removing the buttons would not lose any data). Per D-032: **done**.
+
+→ TASK-037 status set to `done` in TASKS.md. Auto-merges to `main`.
+
+---
+
 ## Review TASK-036 — APPROVED, HELD (Replace native confirm() with showConfirmDialog())
 branch: task-036
 verdict: approved (red-zone: clearLocalStorage() touches tombstone/Firestore machinery — held for human `/merge`)
