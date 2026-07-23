@@ -5,6 +5,69 @@
 
 ---
 
+## Review TASK-035 — REWORK (Grocery → Pantry auto-transfer on check, with undo)
+branch: task-035
+verdict: rework — quality-guardian found criterion 5 PARTIAL; two must-fix items before re-review
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors. Neither was permitted to edit or write any file.
+
+**security-guardian — ran, TASK-035 scope: CLEAN (no Critical/High findings)**
+
+Traced all new code paths for XSS, prototype pollution, authorization bypass, and secret leakage:
+
+- **XSS:** Every insertion of user-controlled data into the DOM uses `.textContent` — both `messageEl.textContent = message` and `actionBtn.textContent = action.label`. Item names inserted via string concatenation into the message string are safe because `.textContent` HTML-encodes them automatically. No `.innerHTML` path was introduced. CLEAN.
+- **Prototype pollution:** The `previous` snapshot is a plain object literal with seven hardcoded keys. The undo closure restores exactly those seven keys onto `existing`. No dynamic key lookup, no `Object.assign` from untrusted input. CLEAN.
+- **cloudReady write-guard:** All three `saveData()` call sites inside `transferGroceryItemToPantry()`, plus the two inside the undo closures, route through the existing `saveData()` surface. No new Firestore call site was introduced. Hard Rule 6 is intact. CLEAN.
+- **Race/double-fire of undo:** The `document.body.contains(messageEl)` guard at `app.js:2843` prevents the auto-dismiss from running on an already-removed element. The Undo button's listener is attached to `actionBtn`, which is a child of `messageEl` — once `messageEl.remove()` is called, the listener is released and cannot fire again. CLEAN.
+- **Secret leakage:** No credentials, tokens, or API keys in the diff. CLEAN.
+- **Low — rapid double-tap (introduced, no exploit path):** `toggleGroceryItem` flips `item.checked` before calling `transferGroceryItemToPantry`. A rapid double-tap (check → uncheck → check) triggers the increment branch twice, accumulating 2× the quantity. No cross-user path; single-user, client-side scope. UX/data concern, not a security vulnerability. Noted, not a blocker.
+- **Pre-existing unescaped `item.name` in grocery list `innerHTML` (not introduced by this diff):** `app.js:3572` interpolates `item.name` raw into `groceryListEl.innerHTML`. Out of scope for this task; flagged for a future escaping task.
+
+**quality-guardian — ran; TWO criteria PARTIAL → triggers REWORK**
+
+Traced criterion by criterion:
+
+1. **Field shape matches `addToPantry()`** — PASS. `pantryEntry` at `app.js:3645-3655` carries `id`, `name`, `category`, `purchaseDate`, `shelfLifeDays`, `storage`, `quantity`, `unit`, `staple` — the same nine fields `addToPantry()` uses. `inferCategory`, `inferStorage`, `ingredientShelfLife`, `todayISO`, and `INGREDIENT_DB` lookups are all reused. `quantity` and `unit` are mapped from the grocery item. ✓
+
+2. **No silent duplicate; CHANGELOG documents the choice** — PARTIAL (warning only, not a blocker). The primary requirement — no silent duplicate — is met: skip branch shows a toast; increment branch merges quantity. CHANGELOG deviation note accurately describes the exact-name case-insensitive matching choice and the increment/skip behaviour. Minor warning: `saveData()` is called in the skip branch before any pantry mutation, which is redundant (the checked state is saved by the caller regardless). Minor fidelity issue: the increment-path undo callback calls `stampUpdated(existing)` immediately after restoring `existing.updatedAt = previous.updatedAt`, overwriting the snapshot with the undo moment. See MUST-FIX-2. Criterion is substantially met; one must-fix consequence noted under criterion 5.
+
+3. **Unchecking never removes from pantry** — PASS. The `else` branch in `toggleGroceryItem` at `app.js:3680` calls only `saveData()` and `renderGroceryList()`. `AppState.pantry` is untouched. ✓
+
+4. **`saveData()` called after mutation; checked state persisted** — PASS. New-entry path: `push` at `app.js:3656` then `saveData()` at `app.js:3658`. Increment path: fields updated then `saveData()` at `app.js:3621`. Uncheck path: `saveData()` at `app.js:3680`. No direct call to `saveToLocalStorage()` alone. Hard Rule 5 satisfied. ✓
+
+5. **Undo affordance shown and functional** — PARTIAL (MUST-FIX). Undo button appears after both transfer paths, and the undo closures correctly remove the pantry entry (new-entry path) or restore all six tracked fields (increment path). However, **neither undo callback resets `item.checked` to `false`** on the grocery list entry. After undo, the pantry entry is gone but the grocery row remains visually checked — `AppState.groceryList` still has `item.checked === true`. The user cannot re-trigger the transfer by re-checking (the item is already checked; a tap would un-check it). The undo is functionally incomplete: the grocery item's state is not rolled back to match. See MUST-FIX-1.
+
+6. **Existing rendering paths unaffected** — PASS. `showSuccessMessage`'s new `action` parameter is optional and guarded by `if (action && action.label && action.onClick)` — all existing callers pass one argument; no button appears. The `fromStaple` guard at `app.js:3592` ensures staple items are excluded. Smoke + button-smoke: 2/2, 468 buttons, 0 broken. ✓
+
+### Must-Fix Items
+
+**MUST-FIX-1 — Undo callbacks do not restore `item.checked = false` on the grocery list entry.**
+
+Both undo closures (new-entry path at `app.js:3663-3668` and increment path at `app.js:3626-3638`) remove/restore the pantry record correctly, but they do not set `item.checked = false` on the source grocery entry before calling `renderGroceryList()`. After undo, `AppState.groceryList` still shows the item as checked; the grocery row renders ticked; the user cannot re-check the item to re-trigger the transfer without first unchecking it manually.
+
+Fix: pass the grocery `item` reference (already available in `toggleGroceryItem`'s scope) into `transferGroceryItemToPantry` as a second argument (e.g., `function transferGroceryItemToPantry(item, groceryItem)`), capture it in both undo closures, and add `groceryItem.checked = false;` before each `renderGroceryList()` inside those closures. Alternatively, restructure so `toggleGroceryItem` owns the undo closures and closes over `item` directly.
+
+**MUST-FIX-2 — Increment-path undo callback stomps the restored `updatedAt` with `stampUpdated`.**
+
+At `app.js:3633`, `existing.updatedAt = previous.updatedAt` restores the snapshot timestamp. At `app.js:3634`, `stampUpdated(existing)` immediately overwrites it with the current moment. Six of the seven snapshot fields are correctly restored; `updatedAt` is not. The undo is internally contradictory.
+
+Fix: remove the `stampUpdated(existing)` call from the undo callback. The snapshot's `updatedAt` field already carries the correct pre-transfer timestamp. (The new-entry path's undo does not have this issue because it removes the entry entirely rather than restoring fields.)
+
+### Nits (non-blocking)
+
+- **Nit:** `saveData()` in the skip branch at `app.js:3602` fires with no pantry mutation; the checked state is already saved by `toggleGroceryItem`'s own path. Redundant but harmless.
+- **Note (pre-existing test failure):** The single `npm test` failure attributed to `tests/buttons-functional.spec.js` clear-grocery dialog is the pre-existing TASK-036 regression. Carry it as an open item in `planning/ROADMAP.md` if not already tracked.
+
+### Risk-gate
+
+REWORK required — task returns to Codex. Risk-gate is moot at this verdict; status is set to `codex`. If Codex fixes the two must-fix items and re-submits for review, the re-review will gate by what the task touches: `AppState.pantry` and `saveData()` are data/sync-layer surfaces (Hard Rule 5) → red-zone → will land at `approved` unless the re-review surface has changed materially.
+
+→ TASK-035 status set to `codex` in TASKS.md.
+
+---
+
 ## Review TASK-036 — APPROVED, HELD (Replace native confirm() with showConfirmDialog())
 branch: task-036
 verdict: approved (red-zone: clearLocalStorage() touches tombstone/Firestore machinery — held for human `/merge`)
