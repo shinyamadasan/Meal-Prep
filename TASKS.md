@@ -2127,7 +2127,9 @@ test steps:
 ---
 
 ### TASK-037 · Make "mark cooked" reachable from the recipe card and dashboard
-status: codex
+status: blocked
+blocker:
+  - auto: build stopped -- TASK-037 build reached REVIEW (1 of 1 tracked task(s)) after 352s, pushed to task-037. -> auto-review: Review passed, but auto-merge BLOCKED: npm test failed on task-037 (exit 1). Main was not changed.
 source: live UX customer-journey audit this session, Tier 1 finding #3 — approved directly by the
   human in conversation (not yet a numbered BQ item)
 priority: P1
