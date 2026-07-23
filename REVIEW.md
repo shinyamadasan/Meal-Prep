@@ -5,6 +5,64 @@
 
 ---
 
+## Review TASK-038 — APPROVED, HELD (loadWeekTemplate() fill-only-empty-slots behavior)
+branch: task-038
+verdict: approved (red-zone: task calls `saveData()` and mutates `AppState.weeklyPlan` — held for human `/merge`)
+
+### Guardian Gauntlet
+
+Both specialists ran as read-only advisors. Neither was permitted to edit or write any file.
+
+**security-guardian — ran, TASK-038 scope: NO CONFIRMED FINDINGS**
+
+The guardian traced the diff for XSS, prototype pollution, secret leakage, and unsafe data handling. Key findings:
+
+- **`JSON.parse(saved)` (note: pre-existing):** The old code already contained `AppState.weeklyPlan = JSON.parse(saved)`. The diff changes only what is done with the parsed result — storing it in `savedPlan` instead of assigning directly. The prototype-pollution vector flagged by the guardian (POTENTIAL-1) is therefore pre-existing, not introduced by this diff. No `__proto__`-based attack is possible from this change alone. Practical impact is low in a single-user PWA where localStorage requires same-origin access.
+- **`snacks.slice()`:** Shallow copy of an array of recipe ID strings. Clean.
+- **`showConfirmDialog` arguments:** All four are static string literals — no user data interpolated. Clean.
+- **Data assignment → `innerHTML` sinks:** Values written by the new logic into `AppState.weeklyPlan[day][meal]` are recipe ID strings used only as lookup keys against `AppState.recipes`. No new direct injection path introduced.
+- **No secrets or PII in the diff.**
+
+No CONFIRMED vulnerabilities introduced by this diff.
+
+Pre-existing findings flagged (NOT introduced by this task, NOT blockers here):
+> **PRE-EXISTING-A (High):** `recipe.name`, `recipe.category`, `recipe.photo` rendered without `escapeHtml()` in `innerHTML` template literals in `renderWeeklyPlanner` (~line 2681), `renderStorageAlerts` (~line 2764), and the recipe-selection modal (~line 2898). Stored XSS vector — the `escapeHtml()` helper already exists and is used elsewhere. Track as a follow-on security task.
+> **PRE-EXISTING-B (Low):** `JSON.parse` in `loadWeekTemplate` (and several other sites) lacks a `try/catch`. Corrupted localStorage can throw an uncaught `SyntaxError`. Pre-dates this diff; the main `loadFromLocalStorage` path is already guarded.
+
+**quality-guardian — ran, ALL criteria CONFIRMED MET**
+
+Traced criterion by criterion:
+
+1. **Fill only empty slots** — MET. For breakfast/lunch/dinner: `if (!AppState.weeklyPlan[day][meal] && savedPlan[day][meal])` — writes only when current slot is falsy and template slot is truthy. An occupied slot cannot be overwritten. For snacks: fills only when current day's snacks array is absent or empty and template has at least one snack; `.slice()` prevents aliasing. Logic is correct. ✓
+
+2. **`saveData()` and `generateGroceryList()` still called** — MET. Both calls are present inside the confirm callback after the fill loop, identical in position to the pre-change code. ✓
+
+3. **Confirmation copy updated** — MET. Old copy: "replace your current week's plan." New copy: "fill empty slots in your current week with meals from the saved one. Existing planned meals stay unchanged." Accurately describes the new behavior; routed through `showConfirmDialog()` as TASK-036 required. ✓
+
+4. **Constraint (scope limited to load/fill logic and copy)** — MET. The only `app.js` change is inside `loadWeekTemplate()`: 14 lines replacing one-liner overwrite with fill loop plus copy update plus additive `showSuccessMessage()`. No template save/selection UI touched. ✓
+
+5. **Test steps** — all required steps ran: `node --check` ✓, deterministic fill-empty-only state check ✓ (existing vs. empty slots, snacks), Playwright smoke + button-smoke 2/2 ✓.
+
+6. **One failing test (`npm test`)** — the CHANGELOG correctly attributes the failure to TASK-036, not this task. `buttons-functional.spec.js` Clear All waits for a native `window.confirm()`, but `clearGroceryList()` was converted to `showConfirmDialog()` by TASK-036. This diff makes zero changes to `clearGroceryList()`. Failure predates this branch. ✓ (attribution correct)
+
+### Findings summary
+
+No must-fix items. No REWORK.
+
+**Follow-on task (security, pre-existing, not a blocker):** Wrap `recipe.name`, `recipe.category`, and `recipe.photo` in `escapeHtml()` at render sites in `renderWeeklyPlanner`, `renderStorageAlerts`, and the recipe-selection modal. These are stored XSS vectors. The `escapeHtml()` helper exists; adding the wrapper is a one-line fix per site.
+
+**Test debt (from TASK-036, visible here):** `buttons-functional.spec.js:251` uses native-dialog detection for `clearGroceryList()` — the test needs updating to click the custom confirm button instead. Track as a follow-on task (TASK-036's debt, not TASK-038's).
+
+**Note:** Snacks are treated at day granularity (all-or-nothing per day) rather than per-snack-item. The acceptance criterion does not specify per-item snack granularity, so this is within scope. Worth documenting in `docs/FEATURES.md` if a per-item snack merge is ever desired.
+
+### Risk-gate
+
+`loadWeekTemplate()` calls `saveData()` after mutating `AppState.weeklyPlan`. `saveData()` writes to both localStorage and Firestore. Per D-032, any task touching `saveData()` call sites or the data layer is red-zone — held, not auto-shipped. The behavioral change (selective fill vs. full overwrite) reduces data-loss risk, but the principle is about what is touched, not the direction of risk. The two POTENTIAL findings from the security guardian (both pre-existing in origin) further support holding for a human glance. **Choosing `approved` over `done`.**
+
+→ TASK-038 status set to `approved` in TASKS.md. Land with `/merge TASK-038` then `/merge TASK-038 yes`.
+
+---
+
 ## Review TASK-036 — APPROVED, HELD (Replace native confirm() with showConfirmDialog())
 branch: task-036
 verdict: approved (red-zone: clearLocalStorage() touches tombstone/Firestore machinery — held for human `/merge`)
