@@ -1959,7 +1959,7 @@ test steps:
         scope note in a real REVIEW.md entry, in production.
 
 ### TASK-036 · Replace native confirm() with showConfirmDialog() in destructive flows (iOS PWA fix)
-status: approved
+status: done
 source: live UX customer-journey audit this session, Tier 1 finding #2 — approved directly by the
   human in conversation (not yet a numbered BQ item); reordered ahead of TASK-035/037 at the human's
   explicit request since this is the active data-loss-risk item
