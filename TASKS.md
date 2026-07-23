@@ -1827,7 +1827,7 @@ test steps:
         spawning real `codex`/`claude` CLI processes against a live branch.
 
 ### TASK-033 · Port ChronaSense's digest-length + stale-lock fixes back here
-status: approved
+status: done
 review: Claude implemented directly (tools/Generate-Digest.ps1, tools/Dispatch-Commands.ps1 —
   Codex cannot commit under tools/). Held at `approved` for human `/merge` — touches the AI Dev OS
   itself (D-032 red-zone). Digest fix run against this app's own real planning/PROPOSALS.md (530
