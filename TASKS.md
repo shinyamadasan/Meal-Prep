@@ -2233,7 +2233,7 @@ test steps:
 ---
 
 ### TASK-040 · Fix pre-existing TASK-036 test regression: buttons-functional.spec.js clear-grocery
-status: approved
+status: done
 review: Claude implemented directly (test-fixture-only, trivial fix, blocking every future
   auto-merge — matches the Delegation Policy's "implementation required to unblock" exception).
   Held at `approved` per this session's own convention of never self-merging, though this is
