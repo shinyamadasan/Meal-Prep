@@ -248,8 +248,8 @@ test.describe('Grocery list', () => {
     await loadApp(page);
     await addCustomItem(page, 'Clearable Test Item');
 
-    page.once('dialog', (d) => d.accept()); // confirm the clear
     await page.locator('#clear-grocery').click();
+    await page.locator('.confirm-ok-btn').click(); // confirm the clear (custom dialog, not native confirm())
 
     await expect(page.locator('#grocery-list')).not.toContainText('Clearable Test Item');
   });
