@@ -2020,7 +2020,7 @@ test steps:
 ---
 
 ### TASK-038 · loadWeekTemplate() should fill only empty slots, not overwrite the whole week
-status: codex
+status: approved
 source: live UX customer-journey audit this session, Tier 1 finding #4 — approved directly by the
   human in conversation (not yet a numbered BQ item); reordered ahead of TASK-035/037 at the human's
   explicit request since this is the active data-loss-risk item
