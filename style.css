@@ -1383,6 +1383,116 @@ select.form-control {
 .pf-dim  { color: var(--color-text-muted, #6b7280); }
 .pf-proceed-btn { margin-top: 0.6rem; align-self: flex-start; }
 
+.import-mode-tabs {
+  display: flex;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.import-mode-tab {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0.5rem 0.25rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+}
+
+.import-mode-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.import-help-text {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.import-url-row {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.import-url-row .form-control {
+  flex: 1;
+}
+
+.import-preview {
+  margin-top: var(--space-12);
+  padding: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.import-preview.hidden { display: none; }
+
+.import-preview__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+  align-items: flex-start;
+  margin-bottom: var(--space-12);
+}
+
+.import-preview__header h4 {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+}
+
+.import-preview__source {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.import-preview__status {
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.import-preview__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.import-preview__stats div {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.5rem;
+}
+
+.import-preview__stats strong,
+.import-preview__stats span {
+  display: block;
+}
+
+.import-preview__stats strong {
+  font-size: 0.92rem;
+}
+
+.import-preview__stats span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.import-preview__issues,
+.import-preview__ingredients {
+  margin-top: var(--space-8);
+}
+
+.import-preview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+
 /* Ingredients List */
 .ingredient-item {
   display: flex;

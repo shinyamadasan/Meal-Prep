@@ -366,8 +366,8 @@ function normalizeRecipes(recipes) {
     }
     if (recipe.category == null) recipe.category = 'Main Dish';
     if (recipe.instructions == null) recipe.instructions = '';
-    if (recipe.fridgeLife == null) recipe.fridgeLife = 0;
-    if (recipe.freezerLife == null) recipe.freezerLife = 0;
+    if (recipe.fridgeLife === undefined) recipe.fridgeLife = 0;
+    if (recipe.freezerLife === undefined) recipe.freezerLife = 0;
     recipe.baseIngredients.forEach(function(ing) {
       if (ing.unit == null) ing.unit = 'g';
       if (ing.baseQuantity == null) ing.baseQuantity = 0;
@@ -1994,11 +1994,36 @@ function showTab(tabId) {
 
 // Recipe management functions
 function openAddRecipeModal() {
+  setRecipeFormMode('manual');
   AppState.currentEditingRecipe = null;
   document.getElementById('modal-title').textContent = 'Add New Recipe';
   clearRecipeForm();
   addIngredientField(); // Add one ingredient field by default
   document.getElementById('recipe-modal').classList.remove('hidden');
+}
+
+function parseNullableDayValue(value) {
+  if (value == null || String(value).trim() === '') return null;
+  var days = parseInt(value, 10);
+  return isNaN(days) ? null : days;
+}
+
+function formatStorageLife(days) {
+  if (days === null || days === undefined) return 'Unknown';
+  return days + ' day' + (days === 1 ? '' : 's');
+}
+
+function persistRecipe(recipe) {
+  const index = AppState.recipes.findIndex(r => String(r.id) === String(recipe.id));
+  if (index >= 0) AppState.recipes[index] = recipe;
+  else AppState.recipes.push(recipe);
+
+  renderRecipes();
+  renderRecipeSelectionGrid();
+  saveData();
+
+  if (recipe.photo) savePhotoDoc(recipe.id, recipe.photo);
+  else deletePhotoDoc(recipe.id);
 }
 
 function updateServingSize(recipeId, newServings) {
@@ -2026,6 +2051,7 @@ function resetServingSize(recipeId) {
 }
 
 function openEditRecipeModal(recipeId) {
+  setRecipeFormMode('edit');
   const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
   
@@ -2038,8 +2064,8 @@ function openEditRecipeModal(recipeId) {
   document.getElementById('prep-time').value = recipe.basePrepTime || recipe.prepTime;
   document.getElementById('cook-time').value = recipe.baseCookTime || recipe.cookTime;
   document.getElementById('servings').value = recipe.baseServings || recipe.servings;
-  document.getElementById('fridge-life').value = recipe.fridgeLife;
-  document.getElementById('freezer-life').value = recipe.freezerLife;
+  document.getElementById('fridge-life').value = recipe.fridgeLife == null ? '' : recipe.fridgeLife;
+  document.getElementById('freezer-life').value = recipe.freezerLife == null ? '' : recipe.freezerLife;
   document.getElementById('estimated-cost').value = recipe.estimatedCost || '';
   const np = recipe.nutritionPerServing || {};
   document.getElementById('nutrition-calories').value = np.calories || '';
@@ -2075,6 +2101,7 @@ function openEditRecipeModal(recipeId) {
 
 function closeRecipeModal() {
   document.getElementById('recipe-modal').classList.add('hidden');
+  setRecipeFormMode('manual');
   clearRecipeForm();
 }
 
@@ -2119,6 +2146,11 @@ function removeIngredientField(button) {
 
 function saveRecipe(e) {
   e.preventDefault();
+  if (recipeFormMode === 'import-review') {
+    updateCurrentImportDraftFromRecipeForm();
+    saveCurrentRecipeImportDraft();
+    return;
+  }
   
   const formData = new FormData(e.target);
   const ingredientItems = document.querySelectorAll('.ingredient-item');
@@ -2161,8 +2193,8 @@ function saveRecipe(e) {
     baseCookTime: parseInt(getElementValue('cook-time')) || 0,
     baseServings: parseInt(getElementValue('servings')) || 1,
     currentServings: parseInt(getElementValue('servings')) || 1,
-    fridgeLife: parseInt(getElementValue('fridge-life')) || 3,
-    freezerLife: parseInt(getElementValue('freezer-life')) || 30,
+    fridgeLife: parseNullableDayValue(getElementValue('fridge-life')),
+    freezerLife: parseNullableDayValue(getElementValue('freezer-life')),
     estimatedCost: getElementValueAsNumber('estimated-cost', 0),
     costPerServing: getElementValueAsNumber('estimated-cost', 0) / (parseInt(getElementValue('servings')) || 1),
     storageNotes: getElementValue('storage-notes'),
@@ -2175,6 +2207,14 @@ function saveRecipe(e) {
       category: ing.category
     }))
   };
+  if (AppState.currentEditingRecipe) {
+    const existingRecipe = AppState.recipes.find(r => String(r.id) === String(AppState.currentEditingRecipe));
+    if (existingRecipe) {
+      if (existingRecipe.sourceUrl) recipe.sourceUrl = existingRecipe.sourceUrl;
+      if (existingRecipe.sourceSite) recipe.sourceSite = existingRecipe.sourceSite;
+      if (existingRecipe.importedAt) recipe.importedAt = existingRecipe.importedAt;
+    }
+  }
 
   const nutCal  = getElementValueAsNumber('nutrition-calories', 0);
   const nutPro  = getElementValueAsNumber('nutrition-protein', 0);
@@ -2184,23 +2224,8 @@ function saveRecipe(e) {
     recipe.nutritionPerServing = { calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat, fiber: 0, sodium: 0 };
   }
   
-  if (AppState.currentEditingRecipe) {
-    // Update existing recipe
-    const index = AppState.recipes.findIndex(r => r.id === AppState.currentEditingRecipe);
-    AppState.recipes[index] = recipe;
-  } else {
-    // Add new recipe
-    AppState.recipes.push(recipe);
-  }
-  
-  renderRecipes();
-  renderRecipeSelectionGrid();
+  persistRecipe(recipe);
   closeRecipeModal();
-  saveData();
-
-  // Persist the photo to its own doc (or remove it if the photo was cleared).
-  if (recipe.photo) savePhotoDoc(recipe.id, recipe.photo);
-  else deletePhotoDoc(recipe.id);
 }
 
 function deleteRecipe(recipeId) {
@@ -2259,9 +2284,9 @@ function buildDetailIngList(recipe, servings) {
     const showBoth = servings !== recipe.currentServings || recipe.currentServings !== recipe.baseServings;
     return `<li class="ingredient-quantity">${
       showBoth
-        ? `<span class="quantity-original">${formatQuantity(baseQty)} ${ingredient.unit}</span>
-           <span class="quantity-scaled">${formatQuantity(scaledQty)} ${ingredient.unit} ${ingredient.name}</span>`
-        : `<span>${formatQuantity(baseQty)} ${ingredient.unit} ${ingredient.name}</span>`
+        ? `<span class="quantity-original">${escapeHtml(formatQuantity(baseQty))} ${escapeHtml(ingredient.unit || '')}</span>
+           <span class="quantity-scaled">${escapeHtml(formatQuantity(scaledQty))} ${escapeHtml(ingredient.unit || '')} ${escapeHtml(ingredient.name || '')}</span>`
+        : `<span>${escapeHtml(formatQuantity(baseQty))} ${escapeHtml(ingredient.unit || '')} ${escapeHtml(ingredient.name || '')}</span>`
     }</li>`;
   }).join('');
 }
@@ -2458,7 +2483,7 @@ function renderRecipes() {
   if (filteredRecipes.length === 0) {
     recipesGrid.innerHTML = AppState.recipes.length > 0
       ? emptyState('search', 'No recipes match', 'Try a different search term or filter.')
-      : emptyState('square-pen', 'No recipes yet', 'Tap <b>Add New Recipe</b> to create your first — or <b>Paste Recipe</b> to add one from text you copied.');
+      : emptyState('square-pen', 'No recipes yet', 'Tap <b>Add New Recipe</b> to create your first — or <b>Import Recipe</b> to add one from a URL or text.');
     return;
   }
 
@@ -2482,7 +2507,7 @@ function renderRecipes() {
     <div class="recipe-card" data-recipe-id="${recipe.id}" onclick="handleRecipeCardClick(event, '${recipe.id}')" title="Click to edit">
       ${recipe.photo ? `
         <div class="recipe-photo">
-          <img src="${recipe.photo}" alt="${recipe.name}" class="recipe-image">
+          <img src="${escapeHtml(recipe.photo)}" alt="${escapeHtml(recipe.name)}" class="recipe-image">
         </div>
       ` : `
         <div class="recipe-photo recipe-photo--ph cat-${catSlug(recipe.category)}">
@@ -2490,8 +2515,8 @@ function renderRecipes() {
         </div>
       `}
       <div class="recipe-card-header">
-        <h3 class="recipe-title">${recipe.name}</h3>
-        <span class="recipe-category">${recipe.category}</span>
+        <h3 class="recipe-title">${escapeHtml(recipe.name)}</h3>
+        <span class="recipe-category">${escapeHtml(recipe.category)}</span>
         ${isSampleRecipe(recipe) ? '<span class="recipe-sample-badge" title="A built-in example to get you started — edit or delete it anytime">Sample</span>' : ''}
         <button class="recipe-fav-btn${recipe.favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${recipe.id}')" title="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
       </div>
@@ -2528,8 +2553,8 @@ function renderRecipes() {
       </div>
 
       <div class="recipe-storage">
-        <div class="storage-info">${icon('refrigerator')} Fridge: ${recipe.fridgeLife} days</div>
-        <div class="storage-info">${icon('snowflake')} Freezer: ${recipe.freezerLife} days</div>
+        <div class="storage-info">${icon('refrigerator')} Fridge: ${formatStorageLife(recipe.fridgeLife)}</div>
+        <div class="storage-info">${icon('snowflake')} Freezer: ${formatStorageLife(recipe.freezerLife)}</div>
       </div>
       
       <!-- Nutrition Information -->
@@ -2574,7 +2599,7 @@ function renderRecipes() {
       <!-- Highlights -->
       ${recipe.highlights ? `
       <div class="recipe-highlights">
-        ${recipe.highlights.map(highlight => `<span class="highlight-tag">${highlight}</span>`).join('')}
+        ${recipe.highlights.map(highlight => `<span class="highlight-tag">${escapeHtml(highlight)}</span>`).join('')}
       </div>
       ` : ''}
       
@@ -2595,7 +2620,7 @@ function renderRecipes() {
       </div>
       <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false" data-show-label="Instructions ▾" data-hide-label="Hide instructions ▴">Instructions ▾</button>
       <div class="recipe-instructions hidden">
-        <p><strong>Instructions:</strong> ${recipe.instructions}</p>
+        <p><strong>Instructions:</strong> ${escapeHtml(recipe.instructions || '')}</p>
       </div>
 
       <div class="recipe-actions">
@@ -2637,7 +2662,8 @@ function updateMobileDayNav() {
 }
 
 function willExpire(recipe, day) {
-  const fridgeLife = recipe.fridgeLife || recipe.fridgeLife === 0 ? recipe.fridgeLife : 999;
+  if (recipe.fridgeLife == null) return false;
+  const fridgeLife = recipe.fridgeLife;
   return fridgeLife < DAY_FRIDGE_INDEX[day];
 }
 
@@ -6545,19 +6571,517 @@ function downloadCSVTemplate() {
 }
 // â”€â”€ Paste Recipe Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+var currentRecipeImportDraft = null;
+var recipeFormMode = 'manual';
+var importDuplicateOverride = false;
+var importSaveInProgress = false;
+
+function setRecipeFormMode(mode) {
+  recipeFormMode = mode || 'manual';
+  const submitBtn = document.getElementById('recipe-submit-btn');
+  if (submitBtn) submitBtn.textContent = 'Save Recipe';
+}
+
+function openRecipeImportModal() {
+  resetRecipeImportModal();
+  document.getElementById('paste-recipe-modal').classList.remove('hidden');
+  setRecipeImportMode('url');
+  setTimeout(() => document.getElementById('recipe-import-url').focus(), 50);
+}
+window.openRecipeImportModal = openRecipeImportModal;
+
 function openPasteRecipeModal() {
+  resetRecipeImportModal();
+  document.getElementById('paste-recipe-modal').classList.remove('hidden');
+  setRecipeImportMode('text');
+  setTimeout(() => document.getElementById('paste-recipe-text').focus(), 50);
+}
+window.openPasteRecipeModal = openPasteRecipeModal;
+
+function resetRecipeImportModal() {
+  currentRecipeImportDraft = null;
+  importDuplicateOverride = false;
+  importSaveInProgress = false;
+  _lastParsedRecipe = null;
+  const urlEl = document.getElementById('recipe-import-url');
+  if (urlEl) urlEl.value = '';
   document.getElementById('paste-recipe-text').value = '';
   var fb = document.getElementById('parse-feedback');
   if (fb) { fb.className = 'parse-feedback hidden'; fb.innerHTML = ''; }
-  document.getElementById('paste-recipe-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('paste-recipe-text').focus(), 50);
+  clearRecipeImportStatus();
+  clearRecipeImportPreview();
+  setRecipeImportLoading(false);
 }
 
 function closePasteRecipeModal() {
   document.getElementById('paste-recipe-modal').classList.add('hidden');
+  resetRecipeImportModal();
 }
+window.closePasteRecipeModal = closePasteRecipeModal;
 
 var _lastParsedRecipe = null;
+
+function setRecipeImportMode(mode) {
+  const useText = mode === 'text';
+  document.getElementById('import-url-panel').classList.toggle('hidden', useText);
+  document.getElementById('import-text-panel').classList.toggle('hidden', !useText);
+  document.getElementById('import-url-tab').classList.toggle('active', !useText);
+  document.getElementById('import-text-tab').classList.toggle('active', useText);
+  document.getElementById('parse-btn').classList.toggle('hidden', !useText);
+  clearRecipeImportStatus();
+  if (useText) {
+    currentRecipeImportDraft = null;
+    clearRecipeImportPreview();
+  }
+}
+window.setRecipeImportMode = setRecipeImportMode;
+
+function getRecipeImportEndpoint() {
+  return (window.RECIPE_IMPORT_ENDPOINT || '').trim();
+}
+
+function clearRecipeImportStatus() {
+  const el = document.getElementById('recipe-import-status');
+  if (el) { el.className = 'parse-feedback hidden'; el.innerHTML = ''; }
+}
+
+function showRecipeImportStatus(message, type) {
+  const el = document.getElementById('recipe-import-status');
+  if (!el) return;
+  el.className = 'parse-feedback ' + (type === 'error' ? 'parse-feedback--error' : type === 'warn' ? 'parse-feedback--warn' : 'parse-feedback--summary');
+  el.textContent = message;
+}
+
+function showRecipeImportError(error) {
+  const el = document.getElementById('recipe-import-status');
+  if (!el) return;
+  el.className = 'parse-feedback parse-feedback--error';
+  el.innerHTML = '<div>' + escapeHtml(recipeImportErrorMessage(error)) + '</div>' +
+    '<div class="import-preview__actions">' +
+    '<button type="button" class="btn btn--outline btn--sm" onclick="importRecipeFromUrl()">Try Again</button>' +
+    '<button type="button" class="btn btn--outline btn--sm" onclick="setRecipeImportMode(\'text\')">Paste Recipe Text</button>' +
+    '<button type="button" class="btn btn--outline btn--sm" onclick="openAddRecipeModal(); closePasteRecipeModal();">Add Manually</button>' +
+    '</div>';
+}
+
+function clearRecipeImportPreview() {
+  const el = document.getElementById('recipe-import-preview');
+  if (el) { el.className = 'import-preview hidden'; el.innerHTML = ''; }
+}
+
+function normalizeRecipeSourceUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.href;
+  } catch (e) {
+    return raw.replace(/\/+$/, '');
+  }
+}
+
+function setRecipeImportLoading(isLoading) {
+  const btn = document.getElementById('recipe-import-url-btn');
+  if (!btn) return;
+  btn.disabled = !!isLoading;
+  btn.textContent = isLoading ? 'Importing...' : 'Import';
+}
+
+function recipeImportErrorMessage(error) {
+  const code = error && error.code;
+  const messages = {
+    IMPORT_NOT_CONFIGURED: "Recipe importing isn't configured yet.",
+    INVALID_URL: 'Enter a valid recipe URL.',
+    BLOCKED_TARGET: "This URL can't be imported.",
+    FETCH_FAILED: "We couldn't access this recipe page.",
+    TIMEOUT: 'The recipe site took too long to respond.',
+    UNSUPPORTED_CONTENT: "This page doesn't appear to be a supported recipe page.",
+    NO_RECIPE_FOUND: "We found the page but couldn't detect structured recipe data.",
+    INVALID_RESPONSE: "Recipe importing didn't return a usable response."
+  };
+  return messages[code] || "Recipe importing didn't work. Try again or paste the recipe text.";
+}
+
+function validateRecipeImportUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    const err = new Error('Please enter a recipe URL.');
+    err.code = 'BLANK_URL';
+    throw err;
+  }
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol');
+    return url.href;
+  } catch (e) {
+    const err = new Error('Enter a valid recipe URL.');
+    err.code = 'INVALID_URL';
+    throw err;
+  }
+}
+
+async function fetchRecipeImportSource(url) {
+  const endpoint = getRecipeImportEndpoint();
+  if (!endpoint) {
+    const err = new Error('Recipe importing is not configured.');
+    err.code = 'IMPORT_NOT_CONFIGURED';
+    throw err;
+  }
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    });
+  } catch (e) {
+    const err = new Error('Recipe import network failed.');
+    err.code = 'FETCH_FAILED';
+    throw err;
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    const err = new Error('Recipe import response was not JSON.');
+    err.code = 'INVALID_RESPONSE';
+    throw err;
+  }
+
+  if (!response.ok || !data || data.ok === false) {
+    const err = new Error((data && data.message) || 'Recipe import failed.');
+    err.code = (data && data.errorCode) || 'FETCH_FAILED';
+    throw err;
+  }
+  if (!data.recipe || typeof data.recipe !== 'object') {
+    const err = new Error('Recipe import response did not include a recipe.');
+    err.code = 'INVALID_RESPONSE';
+    throw err;
+  }
+  return data;
+}
+window.fetchRecipeImportSource = fetchRecipeImportSource;
+
+async function importRecipeFromUrl() {
+  const urlEl = document.getElementById('recipe-import-url');
+  let url;
+  try {
+    url = validateRecipeImportUrl(urlEl ? urlEl.value : '');
+  } catch (e) {
+    showRecipeImportStatus(e.code === 'BLANK_URL' ? 'Please enter a recipe URL.' : 'Enter a valid recipe URL.', 'error');
+    return;
+  }
+
+  currentRecipeImportDraft = null;
+  importDuplicateOverride = false;
+  clearRecipeImportPreview();
+  showRecipeImportStatus('Importing recipe...', 'summary');
+  setRecipeImportLoading(true);
+  try {
+    const source = await fetchRecipeImportSource(url);
+    currentRecipeImportDraft = normalizeRecipeImportDraft(source.recipe, source.warnings || []);
+    clearRecipeImportStatus();
+    renderRecipeImportPreview(currentRecipeImportDraft);
+  } catch (e) {
+    showRecipeImportError(e);
+  } finally {
+    setRecipeImportLoading(false);
+  }
+}
+window.importRecipeFromUrl = importRecipeFromUrl;
+
+function renderRecipeImportPreview(draft) {
+  const el = document.getElementById('recipe-import-preview');
+  if (!el || !draft) return;
+  const status = draft.status || getRecipeImportDraftStatus(draft);
+  const ingredients = draft.ingredients || [];
+  const reviewIngredients = ingredients.filter(function(ing) { return ing.needsReview; });
+  const stepCount = draft.instructions ? parseInstructionSteps(draft.instructions).length : 0;
+  const nutritionState = draft.nutritionPerServing ? 'Found' : 'Not found';
+  const title = draft.name || 'Imported recipe';
+  const source = draft.sourceSite || sourceHostFromUrl(draft.sourceUrl) || 'Source unknown';
+  const statusLabel = status.canSaveDirectly ? 'Ready to save' : (status.blockingIssues || []).length ? 'Cannot save yet' : 'Needs review';
+  const statusClass = status.canSaveDirectly ? 'pf-ok' : 'pf-warn';
+  const issues = []
+    .concat((status.blockingIssues || []).map(function(issue) { return issue.message; }))
+    .concat(reviewIngredients.length ? [reviewIngredients.length + ' ingredient' + (reviewIngredients.length === 1 ? ' needs' : 's need') + ' quantity/unit review.'] : [])
+    .concat((draft.warnings || []).map(function(w) { return w.message || String(w); }));
+
+  el.className = 'import-preview';
+  el.innerHTML = `
+    <div class="import-preview__header">
+      <div>
+        <h4>${escapeHtml(title)}</h4>
+        <div class="import-preview__source">${escapeHtml(source)}</div>
+      </div>
+      <span class="import-preview__status ${statusClass}">${escapeHtml(statusLabel)}</span>
+    </div>
+    <div class="import-preview__stats">
+      <div><strong>${draft.baseServings || escapeHtml(draft.yieldText || 'Unknown')}</strong><span>Servings</span></div>
+      <div><strong>${draft.basePrepTime == null ? 'Unknown' : draft.basePrepTime + ' min'}</strong><span>Prep</span></div>
+      <div><strong>${draft.baseCookTime == null ? 'Unknown' : draft.baseCookTime + ' min'}</strong><span>Cook</span></div>
+      <div><strong>${ingredients.length}</strong><span>Ingredients</span></div>
+      <div><strong>${stepCount}</strong><span>Steps</span></div>
+      <div><strong>${nutritionState}</strong><span>Nutrition</span></div>
+    </div>
+    ${issues.length ? '<div class="import-preview__issues">' + issues.map(function(issue) { return '<div class="pf-row pf-warn">! ' + escapeHtml(issue) + '</div>'; }).join('') + '</div>' : '<div class="pf-row pf-ok">Recipe imported successfully.</div>'}
+    <div class="import-preview__ingredients">
+      ${ingredients.slice(0, 8).map(function(ing) {
+        return '<div class="pf-row ' + (ing.needsReview ? 'pf-warn' : 'pf-ok') + '">' + (ing.needsReview ? '! ' : 'OK ') + escapeHtml(ing.raw || ing.name) + '</div>';
+      }).join('')}
+      ${ingredients.length > 8 ? '<div class="pf-row pf-dim">+' + (ingredients.length - 8) + ' more ingredients</div>' : ''}
+    </div>
+    <div class="import-preview__actions">
+      ${status.canSaveDirectly ? '<button type="button" class="btn btn--primary btn--sm" onclick="saveCurrentRecipeImportDraft()">Save Recipe</button>' : ''}
+      <button type="button" class="btn btn--primary btn--sm" onclick="reviewImportedRecipeDraft()">Review / Edit Details</button>
+      <button type="button" class="btn btn--outline btn--sm" onclick="setRecipeImportMode('text')">Paste Recipe Text</button>
+      <button type="button" class="btn btn--outline btn--sm" onclick="openAddRecipeModal(); closePasteRecipeModal();">Add Manually</button>
+    </div>
+  `;
+}
+
+function sourceHostFromUrl(value) {
+  try {
+    return value ? new URL(value).hostname : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function findDuplicateImportedRecipe(draft) {
+  const sourceUrl = normalizeRecipeSourceUrl(draft && draft.sourceUrl);
+  if (!sourceUrl) return null;
+  return AppState.recipes.find(function(recipe) {
+    return normalizeRecipeSourceUrl(recipe.sourceUrl) === sourceUrl;
+  }) || null;
+}
+
+function showDuplicateImportWarning(existingRecipe) {
+  const el = document.getElementById('recipe-import-status');
+  if (!el) return;
+  el.className = 'parse-feedback parse-feedback--warn';
+  el.innerHTML = '<div>This recipe appears to already be in your library.</div>' +
+    '<div class="pf-row pf-dim">Existing: ' + escapeHtml(existingRecipe.name || 'Imported recipe') + '</div>' +
+    '<div class="import-preview__actions">' +
+    '<button type="button" class="btn btn--outline btn--sm" onclick="viewDuplicateImportedRecipe()">View Existing</button>' +
+    '<button type="button" class="btn btn--primary btn--sm" onclick="importDuplicateOverride = true; saveCurrentRecipeImportDraft();">Import Anyway</button>' +
+    '<button type="button" class="btn btn--outline btn--sm" onclick="clearRecipeImportStatus()">Cancel</button>' +
+    '</div>';
+}
+window.viewDuplicateImportedRecipe = viewDuplicateImportedRecipe;
+
+function viewDuplicateImportedRecipe() {
+  const existing = findDuplicateImportedRecipe(currentRecipeImportDraft);
+  if (!existing) return;
+  closePasteRecipeModal();
+  openEditRecipeModal(existing.id);
+}
+
+function validateRecipeImportDraftForSave(draft) {
+  const errors = [];
+  if (!draft || typeof draft !== 'object') errors.push({ code: 'MISSING_DRAFT', message: 'No imported recipe is ready to save.', blocking: true });
+  if (!draft || !String(draft.name || '').trim()) errors.push({ code: 'MISSING_NAME', message: 'Recipe name is missing.', field: 'name', blocking: true });
+  if (!draft || !(Number(draft.baseServings) > 0)) errors.push({ code: 'MISSING_SERVINGS', message: 'Recipe servings need review.', field: 'baseServings', blocking: true });
+  if (!draft || !String(draft.instructions || '').trim()) errors.push({ code: 'MISSING_INSTRUCTIONS', message: 'Recipe instructions are missing.', field: 'instructions', blocking: true });
+
+  const ingredients = draft && Array.isArray(draft.ingredients) ? draft.ingredients : [];
+  if (!ingredients.length) {
+    errors.push({ code: 'NO_VALID_INGREDIENTS', message: 'At least one ingredient needs a quantity, unit, and name.', field: 'ingredients', blocking: true });
+  }
+  ingredients.forEach(function(ing) {
+    if (!ing || !String(ing.name || '').trim() || !(Number(ing.quantity) > 0) || !String(ing.unit || '').trim() || !String(ing.category || '').trim() || ing.needsReview) {
+      errors.push({ code: 'INGREDIENT_NEEDS_REVIEW', message: 'All ingredients need a name, quantity, unit, and category before saving.', field: 'ingredients', blocking: true });
+    }
+  });
+  return errors;
+}
+
+function refreshRecipeImportDraftStatus(draft) {
+  if (!draft) return null;
+  draft.errors = validateRecipeImportDraftForSave(draft);
+  draft.status = getRecipeImportDraftStatus(draft);
+  return draft.status;
+}
+
+function buildRecipeFromImportDraft(draft) {
+  const saveErrors = validateRecipeImportDraftForSave(draft);
+  if (saveErrors.length) {
+    const err = new Error('Imported recipe is not ready to save.');
+    err.validationErrors = saveErrors;
+    throw err;
+  }
+  const servings = Number(draft.baseServings);
+  const recipe = {
+    id: Date.now(),
+    name: String(draft.name || '').trim(),
+    category: draft.category || 'Main Dish',
+    basePrepTime: draft.basePrepTime == null ? 0 : Number(draft.basePrepTime),
+    baseCookTime: draft.baseCookTime == null ? 0 : Number(draft.baseCookTime),
+    baseServings: servings,
+    currentServings: servings,
+    fridgeLife: draft.fridgeLife == null ? null : Number(draft.fridgeLife),
+    freezerLife: draft.freezerLife == null ? null : Number(draft.freezerLife),
+    estimatedCost: 0,
+    costPerServing: 0,
+    storageNotes: draft.storageNotes || '',
+    instructions: String(draft.instructions || '').trim(),
+    photo: null,
+    baseIngredients: draft.ingredients.map(function(ing) {
+      return {
+        name: String(ing.name || '').trim(),
+        baseQuantity: Number(ing.quantity),
+        unit: ing.unit,
+        category: ing.category
+      };
+    }),
+    sourceUrl: normalizeRecipeSourceUrl(draft.sourceUrl),
+    sourceSite: draft.sourceSite || sourceHostFromUrl(draft.sourceUrl) || '',
+    importedAt: draft.importedAt || new Date().toISOString()
+  };
+  if (draft.nutritionPerServing) recipe.nutritionPerServing = draft.nutritionPerServing;
+  return recipe;
+}
+window.buildRecipeFromImportDraft = buildRecipeFromImportDraft;
+
+function showImportSaveValidationErrors(draft) {
+  document.getElementById('paste-recipe-modal').classList.remove('hidden');
+  setRecipeImportMode('url');
+  renderRecipeImportPreview(draft);
+  showRecipeImportStatus('Review the highlighted import issues before saving.', 'warn');
+}
+
+function saveCurrentRecipeImportDraft() {
+  if (!currentRecipeImportDraft || importSaveInProgress) return;
+  refreshRecipeImportDraftStatus(currentRecipeImportDraft);
+  if (currentRecipeImportDraft.status && currentRecipeImportDraft.status.blockingIssues.length) {
+    showImportSaveValidationErrors(currentRecipeImportDraft);
+    return;
+  }
+
+  const duplicate = importDuplicateOverride ? null : findDuplicateImportedRecipe(currentRecipeImportDraft);
+  if (duplicate) {
+    showDuplicateImportWarning(duplicate);
+    return;
+  }
+
+  let recipe;
+  try {
+    recipe = buildRecipeFromImportDraft(currentRecipeImportDraft);
+  } catch (e) {
+    currentRecipeImportDraft.errors = e.validationErrors || currentRecipeImportDraft.errors || [];
+    currentRecipeImportDraft.status = getRecipeImportDraftStatus(currentRecipeImportDraft);
+    showImportSaveValidationErrors(currentRecipeImportDraft);
+    return;
+  }
+
+  importSaveInProgress = true;
+  persistRecipe(recipe);
+  closeRecipeModal();
+  closePasteRecipeModal();
+  showSuccessMessage('Imported "' + recipe.name + '".');
+}
+window.saveCurrentRecipeImportDraft = saveCurrentRecipeImportDraft;
+
+function reviewImportedRecipeDraft() {
+  if (!currentRecipeImportDraft) return;
+  closePasteRecipeModalForReview();
+  populateRecipeFormFromImportDraft(currentRecipeImportDraft);
+}
+window.reviewImportedRecipeDraft = reviewImportedRecipeDraft;
+
+function closePasteRecipeModalForReview() {
+  document.getElementById('paste-recipe-modal').classList.add('hidden');
+}
+
+function populateRecipeFormFromImportDraft(draft) {
+  AppState.currentEditingRecipe = null;
+  setRecipeFormMode('import-review');
+  document.getElementById('modal-title').textContent = 'Review Imported Recipe';
+  clearRecipeForm();
+  removePhoto();
+
+  document.getElementById('recipe-name').value = draft.name || '';
+  document.getElementById('recipe-category').value = draft.category || '';
+  document.getElementById('prep-time').value = draft.basePrepTime == null ? '' : draft.basePrepTime;
+  document.getElementById('cook-time').value = draft.baseCookTime == null ? '' : draft.baseCookTime;
+  document.getElementById('servings').value = draft.baseServings == null ? '' : draft.baseServings;
+  document.getElementById('fridge-life').value = draft.fridgeLife == null ? '' : draft.fridgeLife;
+  document.getElementById('freezer-life').value = draft.freezerLife == null ? '' : draft.freezerLife;
+  document.getElementById('storage-notes').value = draft.storageNotes || '';
+  document.getElementById('instructions').value = draft.instructions || '';
+
+  const nutrition = draft.nutritionPerServing || {};
+  document.getElementById('nutrition-calories').value = nutrition.calories || '';
+  document.getElementById('nutrition-protein').value = nutrition.protein || '';
+  document.getElementById('nutrition-carbs').value = nutrition.carbs || '';
+  document.getElementById('nutrition-fat').value = nutrition.fat || '';
+
+  const ingredientsList = document.getElementById('ingredients-list');
+  ingredientsList.innerHTML = '';
+  (draft.ingredients || []).forEach(function(ing) {
+    addIngredientField({
+      name: ing.name || ing.raw || '',
+      quantity: ing.quantity,
+      unit: ing.unit || '',
+      category: ing.category || guessIngredientCategory(ing.name || ing.raw || '')
+    });
+  });
+  if (!ingredientsList.children.length) addIngredientField();
+  document.getElementById('recipe-modal').classList.remove('hidden');
+}
+
+function updateCurrentImportDraftFromRecipeForm() {
+  if (!currentRecipeImportDraft) return;
+  const ingredients = [];
+  document.querySelectorAll('.ingredient-item').forEach(function(item) {
+    const inputs = item.querySelectorAll('input, select');
+    const name = inputs[0].value.trim();
+    const quantity = parseFloat(inputs[1].value);
+    const unit = inputs[2].value;
+    const category = inputs[3].value;
+    if (!name) return;
+    ingredients.push({
+      raw: [isNaN(quantity) ? '' : quantity, unit, name].filter(Boolean).join(' '),
+      name: name,
+      quantity: isNaN(quantity) ? null : quantity,
+      unit: unit,
+      category: category,
+      needsReview: !name || isNaN(quantity) || !unit || !category,
+      warnings: !name || isNaN(quantity) || !unit || !category ? ['Ingredient needs quantity/unit review.'] : []
+    });
+  });
+
+  const nutrition = {};
+  const calories = parseFloat(document.getElementById('nutrition-calories').value);
+  const protein = parseFloat(document.getElementById('nutrition-protein').value);
+  const carbs = parseFloat(document.getElementById('nutrition-carbs').value);
+  const fat = parseFloat(document.getElementById('nutrition-fat').value);
+  if (!isNaN(calories)) nutrition.calories = calories;
+  if (!isNaN(protein)) nutrition.protein = protein;
+  if (!isNaN(carbs)) nutrition.carbs = carbs;
+  if (!isNaN(fat)) nutrition.fat = fat;
+
+  currentRecipeImportDraft.name = document.getElementById('recipe-name').value.trim();
+  currentRecipeImportDraft.category = document.getElementById('recipe-category').value;
+  currentRecipeImportDraft.basePrepTime = parseNullableDayValue(document.getElementById('prep-time').value);
+  currentRecipeImportDraft.baseCookTime = parseNullableDayValue(document.getElementById('cook-time').value);
+  currentRecipeImportDraft.baseServings = parseNullableDayValue(document.getElementById('servings').value);
+  currentRecipeImportDraft.fridgeLife = parseNullableDayValue(document.getElementById('fridge-life').value);
+  currentRecipeImportDraft.freezerLife = parseNullableDayValue(document.getElementById('freezer-life').value);
+  currentRecipeImportDraft.storageNotes = document.getElementById('storage-notes').value;
+  currentRecipeImportDraft.ingredients = ingredients;
+  currentRecipeImportDraft.instructions = document.getElementById('instructions').value.trim();
+  currentRecipeImportDraft.nutritionPerServing = Object.keys(nutrition).length ? nutrition : null;
+  currentRecipeImportDraft.errors = [];
+  if (!currentRecipeImportDraft.name) currentRecipeImportDraft.errors.push({ code: 'MISSING_NAME', message: 'Recipe name is missing.', field: 'name', blocking: true });
+  if (!currentRecipeImportDraft.baseServings) currentRecipeImportDraft.errors.push({ code: 'MISSING_SERVINGS', message: 'Recipe servings need review.', field: 'baseServings', blocking: true });
+  if (!ingredients.some(function(ing) { return !ing.needsReview && ing.quantity != null && ing.unit && ing.name; })) currentRecipeImportDraft.errors.push({ code: 'NO_VALID_INGREDIENTS', message: 'At least one ingredient needs a quantity, unit, and name.', field: 'ingredients', blocking: true });
+  if (!currentRecipeImportDraft.instructions) currentRecipeImportDraft.errors.push({ code: 'MISSING_INSTRUCTIONS', message: 'Recipe instructions are missing.', field: 'instructions', blocking: true });
+  currentRecipeImportDraft.status = getRecipeImportDraftStatus(currentRecipeImportDraft);
+}
 
 function parseAndPreview() {
   const text = document.getElementById('paste-recipe-text').value.trim();
@@ -6653,6 +7177,189 @@ window.proceedToRecipeForm = proceedToRecipeForm;
 // Keep old name as alias so any existing calls still work
 function parseAndImportRecipe() { parseAndPreview(); }
 window.parseAndImportRecipe = parseAndImportRecipe;
+
+function parseIsoDurationMinutes(value) {
+  if (value == null || value === '') return null;
+  var s = String(value).trim();
+  var match = s.match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (!match) return null;
+  var days = parseInt(match[1] || '0', 10);
+  var hours = parseInt(match[2] || '0', 10);
+  var minutes = parseInt(match[3] || '0', 10);
+  if (!days && !hours && !minutes && !/0D|0H|0M/i.test(s)) return null;
+  return (days * 24 * 60) + (hours * 60) + minutes;
+}
+
+function parseRecipeYield(value) {
+  var values = Array.isArray(value) ? value : (value == null ? [] : [value]);
+  var yieldText = values.map(function(v) { return String(v || '').trim(); }).filter(Boolean).join(', ');
+  if (!yieldText) return { servings: null, yieldText: '' };
+
+  for (var i = 0; i < values.length; i++) {
+    var itemText = String(values[i] || '').trim();
+    if (/^\d+(?:\.\d+)?$/.test(itemText)) return { servings: parseFloat(itemText), yieldText: yieldText };
+    var itemServingMatch = itemText.match(/\b(?:serves?|servings?|portion)s?\s*:?\s*(\d+(?:\.\d+)?)/i) ||
+                           itemText.match(/(\d+(?:\.\d+)?)\s+(?:servings?|portions?|people|persons?)\b/i);
+    if (itemServingMatch) return { servings: parseFloat(itemServingMatch[1]), yieldText: yieldText };
+  }
+
+  var servingMatch = yieldText.match(/\b(?:serves?|servings?|portion)s?\s*:?\s*(\d+(?:\.\d+)?)/i) ||
+                     yieldText.match(/(\d+(?:\.\d+)?)\s+(?:servings?|portions?|people|persons?)\b/i);
+  if (servingMatch) return { servings: parseFloat(servingMatch[1]), yieldText: yieldText };
+
+  if (/^\d+(?:\.\d+)?$/.test(yieldText)) return { servings: parseFloat(yieldText), yieldText: yieldText };
+  return { servings: null, yieldText: yieldText };
+}
+
+function normalizeImportedIngredient(raw) {
+  var source = raw == null ? '' : String(raw).trim();
+  var result = { raw: source, name: '', quantity: null, unit: '', category: '', needsReview: false, warnings: [] };
+  if (!source) {
+    result.needsReview = true;
+    result.warnings.push('Ingredient line is blank.');
+    return result;
+  }
+
+  var parsed = parseIngredientLine(source);
+  var hasExplicitAmount = importedIngredientHasExplicitAmount(source);
+  if (!parsed || !hasExplicitAmount) {
+    result.name = source;
+    result.category = guessIngredientCategory(source);
+    result.needsReview = true;
+    result.warnings.push('Ingredient needs quantity/unit review.');
+    return result;
+  }
+
+  result.name = parsed.name || '';
+  result.quantity = parsed.quantity == null || isNaN(parsed.quantity) ? null : parsed.quantity;
+  result.unit = parsed.unit || '';
+  result.category = parsed.category || guessIngredientCategory(result.name);
+  if (!result.name || result.quantity == null || !result.unit) {
+    result.needsReview = true;
+    result.warnings.push('Ingredient could not be fully parsed.');
+  }
+  return result;
+}
+
+function importedIngredientHasExplicitAmount(line) {
+  var s = normalizeUnicodeFractions(String(line || '').trim());
+  return /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/.test(s);
+}
+
+function normalizeImportedInstructions(instructions) {
+  var items = Array.isArray(instructions) ? instructions : (instructions == null ? [] : [instructions]);
+  var lines = [];
+  items.forEach(function(item) {
+    var section = '';
+    var text = '';
+    if (typeof item === 'string') {
+      text = item.trim();
+    } else if (item && typeof item === 'object') {
+      section = item.section ? String(item.section).trim() : '';
+      text = item.text ? String(item.text).trim() : '';
+    }
+    if (!text) return;
+    if (section) lines.push(section + ': ' + text);
+    else lines.push(text);
+  });
+  return lines.join('\n');
+}
+
+function parseImportedNutritionValue(value) {
+  if (value == null || value === '') return null;
+  var match = String(value).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+function normalizeImportedNutrition(nutrition) {
+  if (!nutrition || typeof nutrition !== 'object') return null;
+  var map = {
+    calories: 'calories',
+    proteinContent: 'protein',
+    carbohydrateContent: 'carbs',
+    fatContent: 'fat',
+    fiberContent: 'fiber',
+    sodiumContent: 'sodium'
+  };
+  var out = {};
+  Object.keys(map).forEach(function(sourceKey) {
+    var parsed = parseImportedNutritionValue(nutrition[sourceKey]);
+    if (parsed != null) out[map[sourceKey]] = parsed;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function normalizeRecipeImportDraft(workerRecipe, workerWarnings) {
+  var source = workerRecipe && typeof workerRecipe === 'object' ? workerRecipe : {};
+  var warnings = (workerWarnings || []).map(function(w) {
+    return typeof w === 'string' ? { code: 'WORKER_WARNING', message: w, field: null, blocking: false } : w;
+  });
+  var errors = [];
+
+  var name = source.name == null ? '' : String(source.name).trim();
+  if (!name) errors.push({ code: 'MISSING_NAME', message: 'Recipe name is missing.', field: 'name', blocking: true });
+
+  function parsedDuration(field) {
+    var raw = source[field];
+    var minutes = parseIsoDurationMinutes(raw);
+    if (raw && minutes == null) warnings.push({ code: 'UNPARSED_DURATION', message: 'Could not parse ' + field + '.', field: field, blocking: false });
+    return minutes;
+  }
+
+  var yieldInfo = parseRecipeYield(source.recipeYield);
+  if (!yieldInfo.servings) errors.push({ code: 'MISSING_SERVINGS', message: 'Recipe servings need review.', field: 'baseServings', blocking: true });
+
+  var ingredients = (Array.isArray(source.rawIngredients) ? source.rawIngredients : []).map(normalizeImportedIngredient);
+  if (!ingredients.some(function(ing) { return !ing.needsReview && ing.quantity != null && ing.unit && ing.name; })) {
+    errors.push({ code: 'NO_VALID_INGREDIENTS', message: 'At least one ingredient needs a quantity, unit, and name.', field: 'ingredients', blocking: true });
+  }
+
+  var instructions = normalizeImportedInstructions(source.instructions);
+  if (!instructions) errors.push({ code: 'MISSING_INSTRUCTIONS', message: 'Recipe instructions are missing.', field: 'instructions', blocking: true });
+
+  var prep = parsedDuration('prepTime');
+  var cook = parsedDuration('cookTime');
+  var total = parsedDuration('totalTime');
+  if (prep != null && cook != null && total != null && prep + cook !== total) {
+    warnings.push({ code: 'TIME_MISMATCH', message: 'Source total time differs from prep + cook time.', field: 'totalTime', blocking: false });
+  }
+
+  var draft = {
+    name: name,
+    description: source.description == null ? '' : String(source.description).trim(),
+    category: guessRecipeCategory((name + ' ' + (source.description || '')).trim()),
+    basePrepTime: prep,
+    baseCookTime: cook,
+    totalTime: total,
+    baseServings: yieldInfo.servings,
+    yieldText: yieldInfo.yieldText,
+    fridgeLife: null,
+    freezerLife: null,
+    storageNotes: '',
+    ingredients: ingredients,
+    instructions: instructions,
+    nutritionPerServing: normalizeImportedNutrition(source.nutrition),
+    imageUrl: source.image == null ? '' : String(source.image).trim(),
+    sourceUrl: source.finalUrl || source.requestedUrl || '',
+    requestedUrl: source.requestedUrl || '',
+    sourceSite: source.sourceSite || '',
+    importedAt: new Date().toISOString(),
+    warnings: warnings,
+    errors: errors
+  };
+  draft.status = getRecipeImportDraftStatus(draft);
+  return draft;
+}
+
+function getRecipeImportDraftStatus(draft) {
+  var blockingIssues = (draft.errors || []).filter(function(e) { return e && e.blocking; });
+  var ingredientNeedsReview = (draft.ingredients || []).some(function(ing) { return ing.needsReview; });
+  return {
+    canSaveDirectly: blockingIssues.length === 0 && !ingredientNeedsReview,
+    needsReview: blockingIssues.length > 0 || ingredientNeedsReview || (draft.warnings || []).length > 0,
+    blockingIssues: blockingIssues
+  };
+}
 
 function parseRecipeText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -6770,6 +7477,22 @@ function parseFraction(str) {
   return parseFloat(str) || 1;
 }
 
+function normalizeUnicodeFractions(line) {
+  return String(line || '')
+    .replace(/(\d)\s*½/g, '$1 1/2')
+    .replace(/(\d)\s*¼/g, '$1 1/4')
+    .replace(/(\d)\s*¾/g, '$1 3/4')
+    .replace(/(\d)\s*⅓/g, '$1 1/3')
+    .replace(/(\d)\s*⅔/g, '$1 2/3')
+    .replace(/(\d)\s*⅛/g, '$1 1/8')
+    .replace(/½/g, '1/2')
+    .replace(/¼/g, '1/4')
+    .replace(/¾/g, '3/4')
+    .replace(/⅓/g, '1/3')
+    .replace(/⅔/g, '2/3')
+    .replace(/⅛/g, '1/8');
+}
+
 function normalizeUnit(raw) {
   if (!raw) return 'pieces';
   const u = raw.toLowerCase().replace(/\.$/, '');
@@ -6809,6 +7532,7 @@ function guessRecipeCategory(name) {
 }
 
 function parseIngredientLine(line) {
+  line = normalizeUnicodeFractions(line);
   line = line.replace(/Â¼/g,'1/4').replace(/Â½/g,'1/2').replace(/Â¾/g,'3/4')
              .replace(/â…“/g,'1/3').replace(/â…”/g,'2/3').replace(/â…›/g,'1/8');
 
@@ -7712,8 +8436,8 @@ function _doMarkCooked(recipe, btn, multiplier = 1) {
     name: recipe.name,
     cookedDate: todayISO(),
     storage: 'fridge',
-    fridgeLife: recipe.fridgeLife || 0,
-    freezerLife: recipe.freezerLife || 0
+    fridgeLife: recipe.fridgeLife == null ? null : recipe.fridgeLife,
+    freezerLife: recipe.freezerLife == null ? null : recipe.freezerLife
   });
 
   var sum = deductIngredientsForRecipe(recipe, multiplier);
@@ -7845,7 +8569,8 @@ function saveManualCookedMeal() {
 }
 
 function cookedShelfLife(m) {
-  return m.storage === 'freezer' ? (m.freezerLife || 0) : (m.fridgeLife || 0);
+  var days = m.storage === 'freezer' ? m.freezerLife : m.fridgeLife;
+  return days == null ? null : days;
 }
 
 function setCookedStorage(id, storage) {
@@ -7889,8 +8614,9 @@ function renderCookedMeals() {
   if (section) section.classList.remove('hidden');
 
   function buildCookedCard(m) {
-    var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
-    var fs = freshnessStatus(dl);
+    var shelfLife = cookedShelfLife(m);
+    var dl = shelfLife == null ? null : daysLeftFrom(m.cookedDate, shelfLife);
+    var fs = shelfLife == null ? { cls: 'fresh-unknown', label: '', icon: '' } : freshnessStatus(dl);
     var sourceLabel = m.source === 'takeout' ? 'Takeout' : (m.source === 'leftovers' ? 'Leftovers' : '');
     var h = '<div class="cooked-card ' + fs.cls + '">';
     h += '<div class="cooked-card-main">';
@@ -7900,8 +8626,8 @@ function renderCookedMeals() {
     h += '<div class="cooked-card-meta">';
     h += '<label class="cooked-field" title="Date cooked">' + icon('chef-hat') + ' <input type="date" value="' + (m.cookedDate || '') + '" onchange="updateCookedDate(\'' + m.id + '\', this.value)"></label>';
     h += '<div class="cooked-storage-toggle">';
-    h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">' + icon('refrigerator') + ' Fridge ' + (m.fridgeLife || 0) + 'd</button>';
-    h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">' + icon('snowflake') + ' Freezer ' + (m.freezerLife || 0) + 'd</button>';
+    h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">' + icon('refrigerator') + ' Fridge ' + formatStorageLife(m.fridgeLife) + '</button>';
+    h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">' + icon('snowflake') + ' Freezer ' + formatStorageLife(m.freezerLife) + '</button>';
     h += '</div>';
     h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">' + icon('check') + ' Done</button>';
     h += '</div>';

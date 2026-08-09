@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "test": "playwright test",
+    "test:worker": "node --test workers/recipe-import/test/*.node.js",
     "test:smoke": "playwright test tests/button-smoke.spec.js",
     "test:functional": "playwright test tests/buttons-functional.spec.js"
   },
