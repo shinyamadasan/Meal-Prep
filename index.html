@@ -85,7 +85,7 @@
                                 <button class="btn btn--outline btn--sm" onclick="importData()"><span class="ic" data-icon="upload"></span> Import</button>
                                 <button class="btn btn--outline btn--sm" onclick="exportData()"><span class="ic" data-icon="download"></span> Export</button>
                             </div>
-                            <button class="btn btn--secondary" onclick="openPasteRecipeModal()"><span class="ic" data-icon="square-pen"></span> Paste Recipe</button>
+                            <button class="btn btn--secondary" onclick="openRecipeImportModal()"><span class="ic" data-icon="square-pen"></span> Import Recipe</button>
                             <button class="btn btn--primary" id="add-recipe-btn">Add New Recipe</button>
                         </div>
                     </div>
@@ -169,11 +169,11 @@
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label class="form-label">Fridge Life (days)</label>
-                                        <input type="number" class="form-control" id="fridge-life" min="1" required>
+                                        <input type="number" class="form-control" id="fridge-life" min="1">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Freezer Life (days)</label>
-                                        <input type="number" class="form-control" id="freezer-life" min="1" required>
+                                        <input type="number" class="form-control" id="freezer-life" min="1">
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">Estimated Cost (₱)</label>
@@ -243,7 +243,7 @@
 
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn--outline" id="cancel-btn">Cancel</button>
-                                    <button type="submit" class="btn btn--primary">Save Recipe</button>
+                                    <button type="submit" class="btn btn--primary" id="recipe-submit-btn">Save Recipe</button>
                                 </div>
                             </form>
                         </div>
@@ -588,6 +588,9 @@
       window.firebase = { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, doc, setDoc, getDoc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, runTransaction };
     </script>
     
+    <script>
+      window.RECIPE_IMPORT_ENDPOINT = 'https://meal-prep-recipe-import.shinyamadasan.workers.dev/recipe-import';
+    </script>
     <script src="app.js"></script>
 
     <!-- Add/Edit Ingredient Modal -->
@@ -1019,24 +1022,41 @@
         </div>
     </div>
 
-    <!-- Paste Recipe Modal -->
+    <!-- Recipe Import Modal -->
     <div id="paste-recipe-modal" class="modal hidden">
         <div class="modal-content modal-content--lg">
             <div class="modal-header">
-                <h3><span class="ic" data-icon="square-pen"></span> Paste Recipe Text</h3>
+                <h3><span class="ic" data-icon="square-pen"></span> Import Recipe</h3>
                 <button class="modal-close" onclick="closePasteRecipeModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom:0.75rem;color:var(--text-secondary);font-size:0.875rem;">
-                    Copy a recipe from any website (Panlasang Pinoy, AllRecipes, etc.) and paste it below. The app will auto-fill the recipe form — you can review and adjust before saving.
-                </p>
-                <textarea id="paste-recipe-text" class="form-control" rows="16"
-                    placeholder="Paste the full recipe page text here..."></textarea>
+                <div class="import-mode-tabs" role="tablist" aria-label="Recipe import method">
+                    <button type="button" class="import-mode-tab active" id="import-url-tab" onclick="setRecipeImportMode('url')">From URL</button>
+                    <button type="button" class="import-mode-tab" id="import-text-tab" onclick="setRecipeImportMode('text')">Paste Text</button>
+                </div>
+                <div id="import-url-panel" class="import-mode-panel">
+                    <p class="import-help-text">
+                        Paste a recipe URL. The app will import structured recipe details when the source provides them.
+                    </p>
+                    <div class="import-url-row">
+                        <input type="url" class="form-control" id="recipe-import-url" placeholder="https://example.com/recipe">
+                        <button id="recipe-import-url-btn" class="btn btn--primary" onclick="importRecipeFromUrl()">Import</button>
+                    </div>
+                    <div id="recipe-import-status" class="parse-feedback hidden"></div>
+                    <div id="recipe-import-preview" class="import-preview hidden"></div>
+                </div>
+                <div id="import-text-panel" class="import-mode-panel hidden">
+                    <p class="import-help-text">
+                        Copy a recipe from any website (Panlasang Pinoy, AllRecipes, etc.) and paste it below. The app will auto-fill the recipe form — you can review and adjust before saving.
+                    </p>
+                    <textarea id="paste-recipe-text" class="form-control" rows="16"
+                        placeholder="Paste the full recipe page text here..."></textarea>
+                </div>
                 <div id="parse-feedback" class="parse-feedback hidden"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closePasteRecipeModal()">Cancel</button>
-                <button id="parse-btn" class="btn btn--primary" onclick="parseAndPreview()">Parse Recipe →</button>
+                <button id="parse-btn" class="btn btn--primary hidden" onclick="parseAndPreview()">Parse Recipe →</button>
             </div>
         </div>
     </div>

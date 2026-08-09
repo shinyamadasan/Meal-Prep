@@ -1,0 +1,9 @@
+{
+  "name": "meal-prep-recipe-import-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.node.js",
+    "deploy": "wrangler deploy"
+  }
+}
