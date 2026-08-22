@@ -5,6 +5,127 @@
 
 ---
 
+## Review TASK-043 — APPROVED (ready-food-first wave, D-056)
+branch: wave-ready-food-first → main
+verdict: approved — merged to `main` as `352a799` (`--no-ff`), deployed and re-verified live
+date: 2026-08-22
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude at the operator's explicit instruction rather than delegated to
+Codex (CLAUDE.md Delegation Policy). This is therefore a review of Claude's own work, stated
+plainly. The independent evidence is the test suite — in particular the production smoke, which
+runs against the deployed bundle rather than the working tree.
+
+### What was reviewed
+- `8ea8519` — portion fields, normalizer, capture UI, one-tap use, Home ready-food card
+- `3599ba3` — `.gitignore` entry resolving the automation blocker
+- `352a799` — the merge commit
+
+### Findings
+
+**1. Hard Rules hold.**
+- **HR3 (quote recipe ids in handlers)** — new inline handlers pass cooked-meal ids, all quoted
+  and `escJ`-escaped: `useCookedPortion('...')`, `finishCookedMeal('...')`. The pre-existing
+  `removeCookedMeal` handler was also switched to `escJ` in passing, which is strictly safer.
+- **HR4 (`patchMissingNutrition()` after load)** — untouched.
+- **HR5 (persist through `saveData()`)** — `useCookedPortion()` calls `saveData()`;
+  `finishCookedMeal()` delegates to `removeCookedMeal()`, which already did. No direct
+  `saveToLocalStorage()` anywhere in the new code.
+- **HR6 (never write Firestore before reading it)** — `saveToFirestore()` and its `cloudReady`
+  guard are not touched by this wave.
+- **HR7 (one `:root` block)** — `style.css` still has exactly one, at line 1.
+- **HR9 (match existing style)** — plain top-level functions, imperative `render*()`, no
+  framework or build step.
+
+**2. The data-safety constraint was honoured.** The brief said to prefer additive fields on
+existing `cookedMeals` objects, avoid new top-level state, and stop and report before adding one.
+None was added. `cookedMeals` already round-trips generically, so **no sync registry was edited**
+— verified by diffing the registry call sites. The Firestore payload, localStorage record, backup
+snapshot, export and import union all carry portions with no code change.
+
+**3. Normalization coverage is complete, and that mattered.** `cookedMeals` had no normalizer at
+all before this wave. All **six** assignment sites are now covered — including the live cloud
+listener, which is easy to miss because it sits far from the other five and is the path a second
+device takes. A `grep` for `AppState.cookedMeals = ` shows every remaining assignment is either
+normalized or the deletion filter.
+
+**4. Legacy behaviour is preserved and tested, not assumed.** A cooked meal saved without portion
+fields loads, normalizes to `{initialPortions: null, portionsRemaining: null}`, renders with no
+portion badge and no `Used 1`, and keeps its pre-existing `Done` button. Asserted both locally and
+against the deployed build.
+
+**5. The UX constraint is enforced by assertion, not by claim.** The brief's most important rule
+was that using stored food should require one tap. Two tests assert
+`document.querySelectorAll('.modal:not(.hidden), .confirm-overlay').length === 0` immediately
+after the tap — so a future change that introduces a confirmation dialog will fail the suite.
+
+**6. Zero/finished behaviour reuses the existing path.** The last portion routes into
+`removeCookedMeal()` rather than introducing an archive flag or a second deletion concept. That
+keeps one tombstone behaviour instead of two, which is the right call in a codebase whose worst
+historical incidents were sync/deletion bugs. Negative portions are impossible: guarded at the
+decrement (`next <= 0` finishes) and again in the normalizer.
+
+**7. Refusing to suggest expired food is a correctness decision, not a nicety.**
+`getReadyFoodSuggestions()` excludes batches past their date. The freshness banner still flags
+them for disposal, so nothing is hidden — but the app will not tell someone to eat spoiled food.
+Tested on both the local and deployed builds.
+
+**8. No Landers special-casing.** The end-to-end test asserts the stored object's exact key set
+after the full workflow, so a future shortcut that smuggles in a bespoke field would fail.
+
+**9. The automation blocker was resolved conservatively.** `recipe-request.json` was investigated
+before action: zero references repo-wide, never tracked on any branch, created the day the
+recipe-import Worker was hand-built. It was **ignored rather than deleted** — the 2026-08-21
+recovery sweep audited every untracked file and left this one, so it may still be a manual test
+payload. The rule is root-anchored (`/recipe-request.json`) and verified to newly ignore exactly
+one path. Reversible; deletion would not be.
+
+### Risk gate (D-032)
+Landed as **`done`**, not held at `approved`. Justification: no red-zone surface is touched — no
+Firestore write/read-guard code, no `saveData()` internals, no tombstone/merge-deletion machinery,
+no auth, no `:root`, no AI Dev OS files. The change is two optional fields on an existing synced
+collection plus UI, and the one behavioural change to deletion is *delegation to the existing
+path*, not a new one. The operator also gave an explicit merge instruction (Decision Priority 1).
+
+`wave1-portion-truth` — the genuinely red-zone sibling — remains parked and untouched.
+
+### Verification evidence
+- `npx playwright test tests/` → **100/100 pass** on merged `main` (18 spec files)
+- Pages build `352a799` = `built`, 35.8s, `2026-08-22T06:51:22Z`
+- Live `app.js` contains `normalizeCookedMeal`, `useCookedPortion`, `getReadyFoodSuggestions`,
+  `renderReadyFoodCard`, `readyFoodBucket`, `portionsRemaining`; live `index.html` contains
+  `manual-cooked-portions`
+- `tests/production-smoke-ready-food.spec.js` → **8/8 against the deployed site**
+- `git ls-remote origin refs/heads/main` → `352a799`
+- `git status --porcelain` → empty (the automation preflight condition)
+
+### Must-fix
+None.
+
+### Follow-ups (not blocking)
+1. `_doMarkCooked()` still does not call `stampUpdated()` on the batch it creates, so
+   recipe-cooked batches carry no `updatedAt` and lose tombstone LWW against a stale tombstone.
+   Pre-existing; deliberately not fixed here because it is sync-adjacent and this wave was scoped
+   away from it. Deserves its own small task.
+2. Portions count meals, not mass — two people eating one batch at different rates will drift
+   from the number on the card. Accepted; per-person servings is exactly what the parked
+   `wave1-portion-truth` does.
+3. Moving a batch fridge → freezer keeps its portions correctly but restarts freezer life from
+   the original `cookedDate`. Pre-existing freshness behaviour, unchanged by this wave.
+4. Two of my own earlier tests froze a cooking-hack count at 13 and broke when a 14th was added.
+   Both now derive the count from `defaultCookingHacks.length`. Worth watching for the same
+   pattern elsewhere — a frozen count is a test that will fail on unrelated growth.
+5. `wave1-portion-truth` still needs a merge/rework/abandon decision; it claims D-054 and
+   abandoning it leaves a permanent gap in the decision log.
+
+### Note on direction
+The operator has re-pointed the roadmap away from the full "What should we eat?" engine toward
+**keeping grocery/fridge inventory truthful with almost no maintenance**. That is the right read:
+`getCookableRecipes()`, the expiry scan and this wave's ready-food ranking all degrade quietly
+when the pantry drifts from reality, so inventory truth is load-bearing for everything already
+shipped. No design work has been done on it; it needs its own brief.
+
+---
 ## Review TASK-042 — APPROVED (low-effort cooking wave, D-055)
 branch: wave-low-effort-cooking → main
 verdict: approved — merged to `main` as `944c8b0` (`--no-ff`) after verification, deployed and re-verified live

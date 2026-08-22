@@ -5,6 +5,87 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-22 — Ready-food-first wave merged and deployed (D-056); next direction re-pointed at inventory truth
+
+Second feature wave in two days. `wave1-portion-truth` remains parked and untouched.
+
+### What shipped — `wave-ready-food-first` → `main` (`352a799`)
+
+Goal: make the app prefer food that is **already cooked and ready** before telling us to cook
+something new — without becoming an inventory-management system.
+
+- **Two optional additive fields on the existing `cookedMeals[]`**: `initialPortions` and
+  `portionsRemaining`. Both null = an untracked batch, which behaves exactly as before.
+  **No new top-level `AppState` key**, so no sync registry was edited — `cookedMeals` already
+  round-trips through localStorage, Firestore, backup, export/import and the union merge.
+- **`normalizeCookedMeal/s()`** — the first normalizer this collection has ever had. Wired at all
+  **six** points `cookedMeals` is assigned from stored data (localStorage load, backup restore,
+  Firestore load, the live cloud listener, the import union, the sign-in merge). Idempotent; only
+  repairs an incoherent pair, never invents portions.
+- **Portion capture**: the existing "How many portions cooked?" dialog gained a count pre-filled
+  from `recipe.currentServings` that follows the batch multiplier until the user types their own.
+  Manual takeout/leftovers gained an optional Portions field. Blank = untracked = pre-wave.
+- **One tap**: `Used 1` decrements and re-renders. No modal, no fields, no per-person logging.
+  The last portion routes into the existing `removeCookedMeal()`, so there is one deletion path
+  and one tombstone behaviour — not a second archive concept. Portions cannot go negative.
+- **Home "Ready to eat"**: top 3 from `getReadyFoodSuggestions()`, ranked expiring-fridge →
+  fridge → freezer, then soonest-to-spoil, then smallest remainder. Rendered **above** the D-055
+  cook suggestions. Expired batches are excluded — the freshness banner already flags those for
+  disposal, and suggesting someone eat them would be harmful.
+- The **Landers lechon manok** workflow works entirely through the general manual-cooked-food +
+  portions flow. No Landers-specific code; a test asserts the stored object's exact key set.
+
+### Automation blocker resolved
+`recipe-request.json` — an untracked 53-byte curl payload in the repo root, created 2026-08-09
+during the recipe-import build — had been failing the overnight automation's "working tree clean"
+preflight. Commits `5f79c9f` (abort notice) and `3fdbd03` (notice cleared) are that loop.
+Investigated: zero references anywhere in the repo, never tracked on any branch. **Ignored rather
+than deleted** (`/recipe-request.json`, root-anchored) because the 2026-08-21 recovery sweep
+audited every untracked file and deliberately left this one; ignoring unblocks the automation just
+as well and is reversible. Working tree is now clean.
+
+### Verification
+- Playwright: **100/100 pass** (18 spec files), run on merged `main`.
+- 18 new wave tests + 8 new production-facing checks.
+- **Deployment verified, not assumed:** Pages build `352a799` = `built` (35.8s,
+  2026-08-22T06:51:22Z); live `app.js` re-fetched and confirmed to contain `normalizeCookedMeal`,
+  `useCookedPortion`, `getReadyFoodSuggestions`, `renderReadyFoodCard`, `readyFoodBucket`,
+  `portionsRemaining`; live `index.html` contains `manual-cooked-portions`.
+- **Production smoke against the deployed site** (`tests/production-smoke-ready-food.spec.js`,
+  8/8): code present, pre-wave records still render, Home ranking + placement, expired excluded,
+  one-tap decrement with zero overlays, Landers end to end, storage round-trip, no `NaN` anywhere.
+
+### Merge hygiene
+`--no-ff` merge commit `352a799`; no force-push, no history rewrite. Local `main` and
+`origin/main` both at `352a799`. Local `main` was fast-forwarded to pick up the automation's two
+OUTBOX commits before merging.
+
+### Two test-hygiene fixes worth noting
+Both of my own earlier tests froze a cooking-hack count at 13; adding a 14th hack broke them. Both
+now read `defaultCookingHacks.length` instead of a literal, so a later wave adding a hack cannot
+break them again. The ready-food production smoke also needed the bootstrap-once localStorage
+guard so its reload test doesn't wipe the data it is checking.
+
+### Next — direction changed by the operator
+We are **not** proceeding to the full "What should we eat?" engine. The operator identified a more
+fundamental friction: **keeping grocery/fridge inventory truthful with almost no maintenance.**
+Everything built so far (low-effort discovery D-055, ready-food-first D-056) leans on inventory
+being roughly accurate — `getCookableRecipes()`, the expiry scan, and the ready-food ranking all
+degrade quietly when the pantry drifts from reality. That makes inventory truth the load-bearing
+problem, and the recommendation engine premature until it is solved.
+
+No design work has been done on this yet. It needs its own brief.
+
+### Carried forward
+- `wave1-portion-truth` (`88b5598`) still parked, still claiming D-054, still needing a
+  merge/rework/abandon decision. Abandoning it leaves D-054 a permanent gap.
+- `_doMarkCooked()` still does not call `stampUpdated()` on the batch it creates — pre-existing
+  gap leaving recipe-cooked batches without `updatedAt` for tombstone LWW. Deliberately untouched
+  (sync-adjacent); needs its own task.
+- `recipeEffortScore()` still infers effort from active time when `effort` is unset.
+- TASK-037 remains unmerged on `task-037` (`7c4785d`); its original blocker is stale.
+
+---
 ## 2026-08-21 — Low-effort cooking wave built, reviewed, merged, deployed and verified live (D-055)
 
 First feature session since the 2026-08-21 repository recovery. Two waves were worked; **one

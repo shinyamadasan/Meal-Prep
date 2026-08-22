@@ -2417,6 +2417,95 @@ follow-ups:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     Ready-food-first wave · D-056
+     Risk: Low · Execution: Solo (Claude-implemented, human-directed)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-043 · Ready food first: portion counts on cookedMeals, one-tap use, and a Home ready-to-eat card
+status: done
+owner: claude
+source: direct operator brief (not BQ — see notes)
+depends-on: TASK-042 (reuses D-055 `mealBalance` for the side-dish hint only)
+files: app.js, index.html, style.css, .gitignore, docs/DECISIONS.md, docs/DATA_MODEL.md,
+        docs/FEATURES.md, tests/ready-food-portions.spec.js (new),
+        tests/ready-food-home.spec.js (new), tests/production-smoke-ready-food.spec.js (new),
+        tests/low-effort-discovery.spec.js, tests/production-smoke-low-effort.spec.js
+
+objective:
+  Make the app prefer food that is already cooked and ready before telling the user to cook
+  something new — without becoming an inventory-management system, and without adding a daily
+  chore. Using stored food must usually take one tap.
+
+acceptance:
+  - [x] Old cooked-food records still load and render (no portion badge, no Used 1, Done intact)
+  - [x] New cooked batches can optionally carry a portion count
+  - [x] Manual cooked food can optionally carry a portion count
+  - [x] `Used 1` decrements one portion with a single tap — asserted: zero overlays open after
+  - [x] Portions cannot go negative (guarded at decrement AND in the normalizer)
+  - [x] Finished food is removed via the EXISTING `removeCookedMeal()` path — one deletion
+        concept, one tombstone behaviour
+  - [x] Fridge/freezer freshness behaviour unchanged (`cookedShelfLife`, `daysLeftFrom`,
+        `getFreshnessAlerts` untouched; asserted)
+  - [x] Home surfaces ready food ABOVE the cook suggestions; both cards coexist
+  - [x] Expiring fridge food ranks ahead of general fridge, which ranks ahead of freezer
+  - [x] Existing low-effort Home suggestions (D-055) still work
+  - [x] Landers lechon manok representable with no special-case architecture — asserted by
+        checking the stored object's exact key set
+  - [x] No macro or per-person input introduced
+  - [x] Export/import/reload preserves portion data
+  - [x] LocalStorage/Firestore payload round-trip preserves portion data
+  - [x] Plan → Shop → Cook stays green
+  - [x] Full existing test suite stays green (100/100)
+  - [x] Mobile interaction remains simple (mobile Home + stored-food screenshots)
+
+constraints:
+  - Additive fields on existing `cookedMeals` only — no new top-level `AppState` key
+    (none was added; no sync registry edited)
+  - No gram weights, per-person portions, calories/macros, thaw-state enums, or freezer
+    location systems
+  - Do not modify the Firestore/sync architecture
+  - Preserve the D-055 low-effort cooking system
+
+verification:
+  - `npx playwright test tests/` → 100/100 pass on merged `main` (18 spec files)
+  - Pages build `352a799` = `built`, 35.8s, 2026-08-22T06:51:22Z
+  - `curl https://shinyamadasan.github.io/Meal-Prep/app.js` → contains `normalizeCookedMeal`,
+    `useCookedPortion`, `getReadyFoodSuggestions`, `renderReadyFoodCard`, `portionsRemaining`
+  - `tests/production-smoke-ready-food.spec.js` → 8/8 against the deployed site
+  - `git ls-remote origin refs/heads/main` → `352a799`
+
+notes:
+  - Implemented directly by Claude at the operator's explicit instruction rather than delegated
+    to Codex (CLAUDE.md Delegation Policy). Recorded here as a backfill so the pipeline record
+    matches what shipped — same pattern as TASK-041 and TASK-042.
+  - Merged `--no-ff` as `352a799`; no force-push, no history rewrite. Landed `done` per D-032:
+    no red-zone surface touched.
+  - `normalizeCookedMeal/s()` is the first normalizer `cookedMeals` has ever had. Wired at all
+    six assignment sites, including the live cloud listener.
+  - Also resolved the `recipe-request.json` automation blocker: an untracked 53-byte curl payload
+    in the repo root, zero references, never tracked. Ignored (root-anchored) rather than deleted,
+    because the 2026-08-21 recovery sweep audited untracked files and deliberately left it.
+
+follow-ups:
+  - `_doMarkCooked()` does not call `stampUpdated()` on the batch it creates, so recipe-cooked
+    batches have no `updatedAt` and lose tombstone LWW to a stale tombstone. Pre-existing;
+    deliberately untouched here (sync-adjacent). Needs its own task.
+  - Portions count meals, not mass — two people eating one batch at different rates drift from
+    the card. Accepted; per-person servings is what the parked `wave1-portion-truth` does.
+  - Moving a batch fridge → freezer restarts freezer life from the original `cookedDate`.
+    Pre-existing freshness behaviour.
+  - `wave1-portion-truth` (`88b5598`) still parked, still claiming D-054.
+
+next:
+  - The operator has re-pointed the roadmap away from the full "What should we eat?" engine
+    toward **keeping grocery/fridge inventory truthful with almost no maintenance**. Everything
+    shipped so far leans on inventory accuracy — `getCookableRecipes()`, the expiry scan, and this
+    wave's ready-food ranking all degrade quietly when the pantry drifts from reality. No design
+    work has been done; it needs its own brief before any task is written.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

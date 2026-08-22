@@ -198,26 +198,31 @@ test('Home cook suggestions render on the deployed site', async ({ page }) => {
 test('the new cooking hacks ship with the deployed build', async ({ page }) => {
   await loadLiveApp(page);
 
-  const titles = await page.evaluate(() => {
+  const result = await page.evaluate(() => {
     // The real seeded defaults, straight from the deployed bundle.
     AppState.customHacks = defaultCookingHacks.map((h) => Object.assign({}, h));
     showTab('hacks');
     renderCookingHacks();
-    return Array.prototype.slice
-      .call(document.querySelectorAll('#cooking-hacks .hack-item-title'))
-      .map((el) => el.textContent.trim());
+    return {
+      titles: Array.prototype.slice
+        .call(document.querySelectorAll('#cooking-hacks .hack-item-title'))
+        .map((el) => el.textContent.trim()),
+      defaultCount: defaultCookingHacks.length
+    };
   });
 
-  expect(titles).toContain('Two Lechon Manok Hack');
-  expect(titles).toContain('Rice and Steamed Veg in One Pot');
-  expect(titles).toContain('Oven Chicken, Three Sauces');
-  expect(titles).toContain('Freeze the Protein, Cook Rice Fresh');
-  expect(titles).toContain('Frozen Vegetables Skip the Chopping');
-  expect(titles).toContain('Pressure-Cooker Batch Meat');
-  expect(titles).toContain('Make Sauces Separately');
+  expect(result.titles).toContain('Two Lechon Manok Hack');
+  expect(result.titles).toContain('Rice and Steamed Veg in One Pot');
+  expect(result.titles).toContain('Oven Chicken, Three Sauces');
+  expect(result.titles).toContain('Freeze the Protein, Cook Rice Fresh');
+  expect(result.titles).toContain('Frozen Vegetables Skip the Chopping');
+  expect(result.titles).toContain('Pressure-Cooker Batch Meat');
+  expect(result.titles).toContain('Make Sauces Separately');
   // The originals are still there — the additions did not replace them.
-  expect(titles).toContain('Egg Prep Strategy');
-  expect(titles.length).toBe(13);
+  expect(result.titles).toContain('Egg Prep Strategy');
+  // Every default renders — count read from the deployed source of truth, not
+  // frozen, so a later wave adding a hack doesn't break this smoke.
+  expect(result.titles.length).toBe(result.defaultCount);
 });
 
 test('recipe edit preservation holds on the deployed site', async ({ page }) => {
