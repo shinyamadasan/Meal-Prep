@@ -58,6 +58,30 @@ Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngred
    (staples are never deducted; depleted items are removed),
 3. prepends an entry to `AppState.cookHistory` (max 100, surfaced on the Dashboard).
 
+## Shop -> inventory loop
+`toggleGroceryItem()` is the only inbound path from shopping, and it is one tap (D-057):
+1. `stockPurchasedGroceryItem()` either MERGES into an existing pantry record or creates a new one.
+   Merge requires `findPantryByExactName()` (exact, never fuzzy) AND `canMergePurchase()`, which
+   refuses printed-expiry records and already-expired ones. A merge never rewrites `purchaseDate`.
+2. A staple purchase sets `stockLevel: 'full'` and lets `syncStapleToGrocery()` drop its auto row.
+3. The transfer returns a receipt stored as `groceryItem.stocked`, so unchecking calls
+   `unstockPurchasedGroceryItem()` and reverses exactly that change.
+4. `checkAndReplenishLowStock()` + `saveData()` close the loop; `groceryItemChecked()` decides how
+   the row renders (a user tap outranks the "already at home" auto-tick).
+
+## Attention loop
+`collectAttentionItems()` is the single classifier behind Home's "What needs attention?" card. It
+scans `AppState.pantry` (via `pantryDaysLeft()`) and `AppState.cookedMeals` (via `cookedShelfLife()`)
+in one pass and returns `{ expired, useSoon, low }`. The two record types keep separate shapes — this
+unifies the attention experience, not the data model.
+
+Actions: `keepAttentionItem()` writes `keptOn = todayISO()` (suppresses the record from attention
+surfaces for the day; alters no dates), `removeAttentionItem()` removes one, `removeAllExpired()`
+removes the whole `expired` bucket. Both removal paths write EXPLICIT tombstones into
+`AppState.deletions` and call `snapshotIdBaseline()` before dropping records, because
+`recordLocalDeletions()` deliberately ignores more than `MASS_DELETE_GUARD` simultaneous
+disappearances. `getExpiredPantryItems()` and `getFreshnessAlerts()` honour `keptOn` too.
+
 ## Nutrition lookup
 `calculateRecipeNutrition(recipe)` uses `nutritionPerServing` if present, else ingredient lookup.
 `searchNutritionDB()` checks `LOCAL_NUTRITION_DB` first (instant/offline), falls back to the USDA
@@ -75,6 +99,7 @@ FoodData Central API with `DEMO_KEY` (D-007).
 ## Data-flow diagram
 ```mermaid
 flowchart LR
+  Shop[toggleGroceryItem] -->|stockPurchasedGroceryItem| State
   UI[render*() functions] -->|mutate| State[AppState]
   State -->|saveData| LS[(localStorage)]
   State -->|saveData if online| FS[(Firestore users/uid)]

@@ -137,8 +137,21 @@ portions for a batch that has none. Read portions through the helpers:
   staple?,            // boolean — staple cycles: none → staple → running low; staples not deducted on cook
   stockLevel?,        // 'full' | 'ok' | 'low' | 'empty' — for staples
   suggestDismissed?,  // boolean — user dismissed the auto-grocery suggestion; skip re-add until restocked
+  keptOn?,            // 'YYYY-MM-DD' — user tapped Keep on an expired item; suppresses it from the
+                      //   attention surfaces for that day only. Never alters dates. (D-057)
+  updatedAt?,         // ISO — set by stampUpdated(); tombstone last-write-wins
 }
 ```
+`keptOn` also exists on **cooked meal** objects, with identical meaning.
+
+### Merge rules for a purchase (D-057)
+`stockPurchasedGroceryItem()` folds a checked-off grocery item into an existing
+pantry record only when `findPantryByExactName()` matches AND `canMergePurchase()`
+holds. A purchase stays a **separate record** when the existing one uses
+`dateMode: 'expiry'` or is already expired — merging either would make old food
+look fresh. On a merge, `purchaseDate` is deliberately **not** touched (the oldest
+portion governs freshness), and `quantity` only sums when both sides are known —
+otherwise it becomes `null` (unknown) rather than an invented number.
 
 ## Grocery item
 ```js
@@ -154,6 +167,12 @@ portions for a batch that has none. Read portions through the helpers:
   fromStaple?,      // boolean — auto-added by checkAndReplenishLowStock / syncStapleToGrocery
   suggested?,       // boolean — true on auto-suggested items (fromStaple items only)
   suggestedReason?, // string — why it was suggested (e.g. 'low stock')
+  userSet?,         // boolean — the user actually tapped this row. When true, `checked` is
+                    //   authoritative; when absent, an untouched row still auto-ticks if the
+                    //   item is already in the pantry (groceryItemChecked()). (D-057)
+  stocked?,         // receipt of the inventory transfer, so unchecking undoes exactly what
+                    //   checking did: { mode: 'created'|'merge'|'staple', pantryId,
+                    //   prevQty?, prevLevel? }. (D-057)
 }
 ```
 

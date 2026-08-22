@@ -118,8 +118,14 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 
 ### Dead / orphaned code
 - **`#storage` tab** — full UI + `renderStorageGuide()` but no nav button (superseded by Inventory).
-- **Orphaned pantry reads** — `addToPantry()` still calls `getElementById` on the removed
-  `#pantry-qty-input` / `#pantry-storage` (resolves null, no crash).
+- ~~**Orphaned pantry reads**~~ — fixed in D-057; `addToPantry()` no longer reads the removed
+  `#pantry-qty-input` / `#pantry-add-where`.
+- **Cook-path deletes lack explicit tombstones** — `deductIngredientsForRecipe()` removes depleted
+  pantry items by filtering the array and relying on the `recordLocalDeletions()` vanish-diff.
+  Depleting more than `MASS_DELETE_GUARD` (5) tracked items in one cook records NO tombstones, so
+  another device can resurrect them on the next merge. Fix is the explicit-tombstone pattern already
+  used by `clearExpiredPantryItems()` / `removeAllExpired()`. Found during the D-057 audit; left out
+  of that wave because it sits on the cook path, not the inventory path.
 - **`colorScheme` localStorage key** — now fully unused (light-only release, D-013); harmless orphan in some users' storage.
 - **`recipe.highlights`** — rendered as tag chips but no edit-form input to set it.
 - Hidden features: Family Sharing modal, Community Feed / `sharedRecipes`.

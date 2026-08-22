@@ -6270,6 +6270,37 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .dash-expiry-more { font-size: 0.77rem; color: var(--color-text-secondary); padding: 0.2rem 0; }
 .dash-l1-cta { display: block; margin-top: 0.5rem; font-size: 0.82rem; }
 
+/* Expired rows carry the only destructive actions on Home. Keep / Remove are
+   real tap targets (not the underlined text links used elsewhere) so a
+   one-handed phone tap can't miss and hit the wrong one. */
+.dash-attn-row--expired { gap: 0.35rem; flex-wrap: wrap; }
+.dash-attn-row--expired .dash-attn-name { flex: 1 1 6rem; margin-right: 0; }
+.dash-expiry-tag--expired {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.12);
+}
+.dash-keep-btn,
+.dash-remove-btn {
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.3rem 0.6rem;
+  min-height: 30px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-card-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+.dash-keep-btn { color: var(--color-text-secondary); }
+.dash-remove-btn { color: #b91c1c; border-color: rgba(220, 38, 38, 0.35); }
+.dash-remove-all-btn { color: #b91c1c; }
+.confirm-note { font-size: 0.8rem; }
+
+@media (max-width: 480px) {
+  .dash-attn-row--expired .dash-attn-name { flex: 1 1 100%; }
+  .dash-keep-btn, .dash-remove-btn { min-height: 34px; padding: 0.35rem 0.7rem; }
+}
+
 /* ── LEVEL 2: What can I do? ────────────────────────────────────────────────── */
 .dash-l2-split {
   display: flex;
