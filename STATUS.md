@@ -4,6 +4,105 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-22 — Cook-path depletion tombstones merged and deployed (TASK-045, D-057 addendum) — second owner-authorised D-032 red-zone merge
+
+A small red-zone safety patch, not a feature wave. `wave1-portion-truth` remains parked and
+untouched at `88b5598`.
+
+### What shipped — `fix/cook-depletion-tombstones` → `main` (`0ccd121`, `--no-ff`)
+
+This closes the follow-up the kitchen-truth wave recorded rather than silently absorbing:
+**cooking could delete pantry items in a way that never synced.**
+
+`deductIngredientsForRecipe()` drops a pantry record once cooking empties it, and wrote no
+tombstone — the delete rode entirely on the generic vanish-diff in `recordLocalDeletions()`,
+which returns early and records **nothing** when more than `MASS_DELETE_GUARD` (5) ids disappear at
+once. So a cook that emptied six or more tracked items removed them locally with nothing to sync,
+and the next merge from another device brought the food back. Same class of bug D-057 fixed for
+bulk expired cleanup; the cook path was the one remaining consumer that had never been given the
+pattern.
+
+The fix is 15 lines inside the existing `if (depleted.length)` block of that one function:
+tombstone every depleted id → remove the records → `snapshotIdBaseline()`, all before the caller's
+existing `saveData()`. Byte-for-byte the sequence `removeAllExpired()` and
+`unstockPurchasedGroceryItem()` already use. **No second deletion mechanism, and no change to
+tombstone architecture, `MASS_DELETE_GUARD`, `cloudReady`, `saveData()` semantics or the Firestore
+merge/conflict code** — verified by grepping the diff for every one of those symbols. Partially
+depleted items are untouched: only a record the cook actually empties is tombstoned.
+
+One incidental change worth naming: the pantry filter now keys on `String(p.id)` against a lookup
+object instead of `depleted.indexOf(p.id)` identity, so the set of records removed and the set of
+ids tombstoned cannot diverge on a numeric-vs-string id.
+
+### Blast radius was checked, not assumed
+`deductIngredientsForRecipe()` has a single call site (`_doMarkCooked()`), and
+`checkAndReplenishLowStock()` — the only thing running between the deduction and `saveData()` —
+mutates `groceryList` only. No other cook-path helper removes pantry records.
+
+### The tests are provably not vacuous
+`tests/cook-depletion-tombstones.spec.js` (9 tests) covers 1-, 6- and 8-item depletion, partial
+depletion, the ×2 multiplier path, unknown-quantity items, the insufficient-inventory dialog, batch
+creation, local reload and the Firestore payload. Two things make it worth trusting:
+
+- **A control arm.** The 6-item test first removes the same six ids naively and calls
+  `recordLocalDeletions()` → zero tombstones. That proves both that the guard really does swallow a
+  delete this size, and that the fix does not depend on the vanish-diff.
+- **A mutation check.** Reverting `app.js` to `main`'s version fails **all nine**, the end-to-end
+  resurrection case with `Expected: 0, Received: 6` — the production bug reproduced exactly. Fix
+  restored and re-verified.
+
+### Why this was red zone, and how it was released
+Under D-032 anything writing into `AppState.deletions` is **`approved`, not `done`**, regardless of
+diff size — a broken UI change is reverted in a minute; lost user data cannot be reverted at all
+(north-star goal #2). Claude recommended `approved`, returned the branch **unmerged and unpushed**,
+and did not merge on its own judgement. The operator then gave explicit written authorisation naming
+the SHA (`163586a`). **This was not an automatic merge.** Recorded in REVIEW.md TASK-045 and in the
+merge commit itself.
+
+Audit trail deliberately split across three commits, matching the TASK-044 precedent:
+- `7759670` — approval recorded on `main` **before** the merge (REVIEW.md, TASKS.md, D-057
+  addendum), per the D-040 addendum in CLAUDE.md: the pipeline reads `TASKS.md` from `main`, not
+  from the branch.
+- `0ccd121` — the `--no-ff` merge itself. No history rewritten; `163586a` survives intact.
+- this commit — written **after** the deploy, so it records what actually happened rather than what
+  was intended.
+
+### Deployment evidence
+- Pages build `0ccd121` reached **built** in 44.3s (`created_at` 15:39:18Z → `updated_at`
+  15:40:02Z).
+- Deployed `app.js` re-fetched with cache-busting: SHA1 `9d0c05a1fa86d1663ff80828305aa007839455e6`,
+  555,329 bytes — **byte-for-byte identical** to `git show main:app.js`. The fix is present in the
+  shipped bundle at lines 9206 / 9222.
+
+### Test results on final `main`
+- **`npm test` — 151 passed, 0 failed** (147 before this patch + 4 new production smokes).
+- **Production smokes against the deployed build — 15/15** run together: the new
+  `production-smoke-cook-tombstones.spec.js` 4/4, and D-057's `production-smoke-kitchen-truth.spec.js`
+  still 11/11. The new smoke asserts the **shipped** code: that six simultaneous depletions cross
+  `MASS_DELETE_GUARD` and tombstone every id, that partial stock keeps its correct quantity, that
+  the batch is still created, and that a stale remote copy merged back over the top is killed again
+  by `applyTombstones()`.
+
+### Docs corrected where they disagreed with code
+`planning/ROADMAP.md` Known Issues listed the cook-path deletes as open, and D-057 recorded it as a
+deliberate follow-up. Both are now false: the ROADMAP entry is removed and D-057 carries a narrowly
+scoped addendum closing it.
+
+### Blockers
+None.
+
+### Next
+- `wave1-portion-truth` (`88b5598`) still parked, still claiming D-054. Untouched by this patch, as
+  instructed.
+- The second D-057 follow-up is still open: the grocery row is a ~33px tap target on phones
+  (pre-existing `.grocery-item` padding under the narrow breakpoint). D-057 promoted that row to the
+  primary inventory-write interaction, so it carries more weight than it used to. Still in ROADMAP
+  Known Issues.
+- Two waves in a row have now shipped a fix for something a previous wave's own audit found and
+  deferred. That is the system working, but it is worth watching whether follow-ups are being
+  deferred faster than they are being closed.
+
+---
 ## 2026-08-22 — Kitchen-truth wave merged and deployed (D-057) — first owner-authorised D-032 red-zone merge
 
 Third feature wave in three days. `wave1-portion-truth` remains parked and untouched at `88b5598`.

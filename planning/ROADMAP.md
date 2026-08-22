@@ -124,12 +124,6 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
   breakpoint sets `padding: 5px 6px`, giving a ~33px row against the 44px guideline. Pre-existing,
   but D-057 made that row the primary inventory-write interaction, so it now carries more weight
   than it used to. Found by the D-057 mobile smoke; left unfixed to keep that wave scoped.
-- **Cook-path deletes lack explicit tombstones** — `deductIngredientsForRecipe()` removes depleted
-  pantry items by filtering the array and relying on the `recordLocalDeletions()` vanish-diff.
-  Depleting more than `MASS_DELETE_GUARD` (5) tracked items in one cook records NO tombstones, so
-  another device can resurrect them on the next merge. Fix is the explicit-tombstone pattern already
-  used by `clearExpiredPantryItems()` / `removeAllExpired()`. Found during the D-057 audit; left out
-  of that wave because it sits on the cook path, not the inventory path.
 - **`colorScheme` localStorage key** — now fully unused (light-only release, D-013); harmless orphan in some users' storage.
 - **`recipe.highlights`** — rendered as tag chips but no edit-form input to set it.
 - Hidden features: Family Sharing modal, Community Feed / `sharedRecipes`.

@@ -2596,11 +2596,13 @@ merge gate:
 ---
 
 ### TASK-045 · Cook-path depletion tombstones: stop sync resurrecting pantry items emptied by cooking
-status: approved
+status: done
 owner: claude
 source: D-057 follow-up #1 / planning/ROADMAP.md Known Issues (not BQ — direct operator brief)
 depends-on: TASK-044 (reuses the explicit-tombstone pattern D-057 established)
-files: app.js, tests/cook-depletion-tombstones.spec.js (new), docs/DECISIONS.md
+files: app.js, tests/cook-depletion-tombstones.spec.js (new),
+        tests/production-smoke-cook-tombstones.spec.js (new), docs/DECISIONS.md,
+        planning/ROADMAP.md
 
 objective:
   Prevent pantry items depleted during cooking from being silently resurrected by sync when more
@@ -2652,8 +2654,9 @@ verification:
   - [x] `npm test` on the branch — 147 passed, 0 failed
   - [x] Mutation check: reverting `app.js` to `main`'s version fails all 9, the resurrection case
         with `Expected: 0, Received: 6` — the exact bug. Fix restored and re-verified.
-  - [x] `npm test` on final `main` after the merge
-  - [x] Production smoke against the deployed GitHub Pages build
+  - [x] `npm test` on final `main` after the merge — 151 passed, 0 failed
+  - [x] Production smoke against the deployed GitHub Pages build — 4/4 new, and the
+        D-057 kitchen-truth smoke still 11/11 (15/15 run together)
 
 merge gate:
   D-032 **red zone** — deletion/tombstone behaviour. Claude recommended `approved` (held) and did
