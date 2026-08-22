@@ -2443,7 +2443,12 @@ function saveRecipe(e) {
     return element ? parseFloat(element.value) || defaultValue : defaultValue;
   };
 
-  const recipe = {
+  const existingRecipe = AppState.currentEditingRecipe
+    ? AppState.recipes.find(r => String(r.id) === String(AppState.currentEditingRecipe))
+    : null;
+
+  // Exactly the fields this form owns and is authoritative for.
+  const formFields = {
     id: AppState.currentEditingRecipe || Date.now(),
     name: getElementValue('recipe-name'),
     category: getElementValue('recipe-category'),
@@ -2465,21 +2470,33 @@ function saveRecipe(e) {
       category: ing.category
     }))
   };
-  if (AppState.currentEditingRecipe) {
-    const existingRecipe = AppState.recipes.find(r => String(r.id) === String(AppState.currentEditingRecipe));
-    if (existingRecipe) {
-      if (existingRecipe.sourceUrl) recipe.sourceUrl = existingRecipe.sourceUrl;
-      if (existingRecipe.sourceSite) recipe.sourceSite = existingRecipe.sourceSite;
-      if (existingRecipe.importedAt) recipe.importedAt = existingRecipe.importedAt;
-    }
-  }
+
+  // An edit REBUILDS only what the form owns and carries everything else across.
+  // Before this, saving from the edit form replaced the whole recipe object, so
+  // any property without a form input was silently dropped: favorite, highlights,
+  // import provenance, updatedAt (which tombstone LWW depends on), and any field
+  // a later feature adds. Starting from the existing recipe makes preservation the
+  // default, so a new field can never be forgotten here again.
+  const recipe = existingRecipe ? Object.assign({}, existingRecipe, formFields) : formFields;
 
   const nutCal  = getElementValueAsNumber('nutrition-calories', 0);
   const nutPro  = getElementValueAsNumber('nutrition-protein', 0);
   const nutCarb = getElementValueAsNumber('nutrition-carbs', 0);
   const nutFat  = getElementValueAsNumber('nutrition-fat', 0);
   if (nutCal || nutPro || nutCarb || nutFat) {
-    recipe.nutritionPerServing = { calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat, fiber: 0, sodium: 0 };
+    // Fiber and sodium have no inputs on this form, so they are NOT the form's to
+    // set — keep whatever the recipe already had instead of zeroing them on
+    // every edit (which is what "fiber: 0, sodium: 0" used to do).
+    const prevNutrition = (existingRecipe && existingRecipe.nutritionPerServing) || {};
+    recipe.nutritionPerServing = {
+      calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat,
+      fiber: Number(prevNutrition.fiber) || 0,
+      sodium: Number(prevNutrition.sodium) || 0
+    };
+  } else if (existingRecipe) {
+    // All four inputs cleared — unchanged behaviour: treat that as clearing the
+    // recipe's nutrition rather than silently keeping the old numbers.
+    delete recipe.nutritionPerServing;
   }
 
   readRecipeMetaFromForm(recipe); // optional low-effort metadata

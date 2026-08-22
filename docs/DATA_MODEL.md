@@ -85,7 +85,7 @@ cookTime` turns a legitimate `0` into `undefined` and then `NaN`:
 | `recipeHasEquipment(recipe, ids)` / `recipeHasTag(recipe, tag)` | membership tests |
 | `daysSinceCooked(id)` / `varietyPenalty(id)` | from `AppState.cookHistory`; penalty only re-orders suggestions |
 
-See DECISIONS D-054.
+See DECISIONS D-055.
 Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` hold one id or
 `null`; `snacks` is an array of ids.
 

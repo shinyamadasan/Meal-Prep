@@ -596,7 +596,7 @@ Trade-off: Purely heuristic — a task with an out-of-date or incompletely-decla
 
 Supersedes: nothing directly; extends the existing deny-list scope guard (undated, predates this decision log) with a narrower, task-specific, advisory-only companion check.
 
-## D-054 — Low-effort cooking metadata: optional recipe fields, deterministic Home suggestions, and the zero-minute fix
+## D-055 — Low-effort cooking metadata: optional recipe fields, deterministic Home suggestions, and the zero-minute fix
 
 Context: The app could tell you what you *could* cook from your pantry, but nothing about what it would *cost you in effort*. Every recipe looked equally expensive to make, so "what should we cook tonight" stayed a decision the user had to make unaided — and the answer they actually wanted ("the rice cooker one", "the one where I just shred a bought chicken") wasn't representable at all. Separately, `recipe.baseCookTime || recipe.cookTime` (10 call sites) turned a legitimate `0` into `undefined`, so a genuinely no-cook recipe rendered "NaN min" on its card, in the planner slot, and in the week stats.
 
@@ -614,4 +614,6 @@ Trade-off: `recipeEffortScore()` infers a rank from active time when `effort` is
 
 Explicitly deferred, not built: household/person entities, per-person portions, planned-vs-eaten logging, freezer portion tracking, thaw workflows, sauce composition, recipe-to-recipe composition, appliance timers, and any AI/model-driven recommendation. The weekly-plan slot shape is unchanged — slots still hold bare recipe ids.
 
-Supersedes: nothing. Note for whoever merges: the unmerged `wave1-portion-truth` branch also claims the number D-054; if that work ever lands, one of the two must be renumbered.
+Also in this wave, a narrow fix to an older bug the work surfaced: `saveRecipe()` rebuilt the whole recipe object from the edit form and copied across only `sourceUrl`/`sourceSite`/`importedAt`, so any property without a form input was silently destroyed by an unrelated edit — `favorite`, `highlights`, `updatedAt` (which the tombstone last-write-wins in `applyTombstones()` depends on), the `fiber` and `sodium` nutrition values that have no inputs, and every field this wave added. An edit now starts from the existing recipe and overlays only the fields the form owns, so preservation is the DEFAULT and a future field cannot be forgotten here again. Deliberately unchanged: the form is still authoritative for what it owns (clearing an input still clears the value), emptying all four nutrition inputs still clears the recipe's nutrition, and adding a new recipe inherits nothing. The recipe model itself was not refactored.
+
+Supersedes: nothing. Numbering note: `main` ends at D-053 and the unmerged `wave1-portion-truth` branch claims D-054, so this branch takes D-055 to stay collision-free whichever lands first.
