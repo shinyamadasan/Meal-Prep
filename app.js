@@ -3028,6 +3028,321 @@ function getCookSuggestions() {
   return out.sort(function(a, b) { return displayOrder[a.key] - displayOrder[b.key]; });
 }
 
+// ── "What should we eat?" — one deterministic answer ─────────────────────────
+// Composes helpers that already exist rather than starting a second
+// recommendation system. Ready food comes straight from getReadyFoodSuggestions()
+// (D-056); pantry availability from getCookableRecipes(); expiry pressure from
+// getExpirySuggestions(), which is the SAME scan the dashboard's own "Use before
+// they expire" block uses; effort/variety from recipeEffortScore() and
+// varietyPenalty() (D-055). Nothing here recomputes a freshness boundary, and
+// nothing here is persisted — the answer is derived fresh every render.
+//
+// Ranking is a plain additive cost. LOWER IS BETTER, matching the existing
+// recipeEffortScore()/varietyPenalty() convention. No model, no weights to tune,
+// no stored preferences. See DECISIONS D-059.
+
+// How much of a chore each appliance is to run AND to wash. The order is the
+// point, not the numbers: no-cook < small appliance < set-and-forget pot <
+// oven < pan. It is one signal among six, so a genuinely better recipe still
+// beats a slightly-lower-friction worse one.
+var APPLIANCE_FRICTION = {
+  'no-cook': 0,
+  'microwave': 1,
+  'egg-boiler': 1,
+  'rice-cooker': 2,
+  'rice-cooker-steamer': 2,
+  'instant-pot': 2,
+  'pressure-cooker': 2,
+  'oven': 3,
+  'pan': 4
+};
+// A recipe that never declared its equipment sits in the middle: not rewarded
+// for being unknown, not condemned for it. Most pre-D-055 recipes are here.
+var APPLIANCE_FRICTION_UNKNOWN = 2;
+
+// The single least-annoying appliance a recipe declares, or '' if it declares none.
+function lowestFrictionEquipment(recipe) {
+  var eq = (recipe && recipe.equipment) || [];
+  var best = '', bestCost = Infinity;
+  eq.forEach(function(id) {
+    var c = APPLIANCE_FRICTION[id];
+    if (c != null && c < bestCost) { bestCost = c; best = id; }
+  });
+  return best;
+}
+
+function applianceFriction(recipe) {
+  var eq = (recipe && recipe.equipment) || [];
+  if (!eq.length) return APPLIANCE_FRICTION_UNKNOWN;
+  var best = lowestFrictionEquipment(recipe);
+  var cost = best ? APPLIANCE_FRICTION[best] : APPLIANCE_FRICTION_UNKNOWN;
+  // Juggling two separate appliances is its own chore and its own washing up.
+  // A rice-cooker-steamer is ONE device doing two jobs, so it never counts as a
+  // second appliance.
+  var distinct = eq.filter(function(id) { return id !== 'rice-cooker-steamer'; });
+  if (distinct.length >= 2) cost += 1;
+  return cost;
+}
+
+// Hands-on minutes, bucketed. Deliberately NOT total cook time: a 40-minute
+// pressure-cooker recipe you start and walk away from is easier than a 20-minute
+// pan recipe you have to stand over. recipeActiveMinutes() already falls back to
+// total time for recipes that never declared it, which is the safe direction.
+function activeTimeFriction(recipe) {
+  var m = recipeActiveMinutes(recipe);
+  if (m <= 5) return 0;
+  if (m <= 10) return 1;
+  if (m <= 20) return 2;
+  if (m <= 35) return 3;
+  return 4;
+}
+
+// Protein + vegetables + carb. Two of three is a near miss worth one point; one
+// or none is two. "Nothing declared" lands on the same 2 as "only one" — unknown
+// is not evidence of imbalance, but it is not evidence of balance either.
+function mealBalanceFriction(recipe) {
+  var mb = normalizeMealBalance(recipe && recipe.mealBalance);
+  var have = (mb.protein ? 1 : 0) + (mb.vegetables ? 1 : 0) + (mb.carb ? 1 : 0);
+  if (have === 3) return 0;
+  if (have === 2) return 2;
+  return 4;
+}
+
+// The one thing the user asked for by name. Small on purpose — a tag, not a model.
+function cleanupFriction(recipe) {
+  return recipeHasTag(recipe, 'minimal-cleanup') ? -2 : 0;
+}
+
+// Every cook candidate, scored. Exposed separately from the picker so tests can
+// assert the ranking directly instead of inferring it from rendered HTML.
+function eatCookCandidates() {
+  var recipes = AppState.recipes || [];
+  if (!recipes.length) return [];
+
+  var cookable = getCookableRecipes();
+  var missingById = {};
+  cookable.forEach(function(c) { missingById[String(c.recipe.id)] = c.missing; });
+
+  // Which recipes use something that needs using up. Same scan the dashboard's
+  // "Use before they expire" block runs — one expiry rule, not two.
+  var expiringBy = {};
+  getExpirySuggestions().forEach(function(e) {
+    var k = String(e.recipe.id);
+    if (!expiringBy[k]) expiringBy[k] = e.ingredient;
+  });
+
+  // With a pantry too empty to say anything, getCookableRecipes() returns [] and
+  // we fall back to the whole book rather than recommending nothing — the same
+  // fallback getCookSuggestions() already uses.
+  var pantryInformed = cookable.length > 0;
+  var pool = pantryInformed ? cookable.map(function(c) { return c.recipe; }) : recipes;
+
+  return pool.map(function(r) {
+    var id = String(r.id);
+    var missing = pantryInformed ? (missingById[id] || 0) : 0;
+    // Weights follow the priority order this wave was briefed with: expiry
+    // pressure first, then balance, effort, hands-on time, cleanup, appliance,
+    // and variety last as a tie-breaker. Each is small enough that no single
+    // signal can drag an obviously worse recipe to the top on its own.
+    var parts = {
+      expiry: expiringBy[id] ? -8 : 0,
+      balance: mealBalanceFriction(r),
+      effort: recipeEffortScore(r) * 2,
+      activeTime: activeTimeFriction(r),
+      cleanup: cleanupFriction(r),
+      appliance: applianceFriction(r),
+      variety: varietyPenalty(r.id)
+    };
+    var score = 0;
+    Object.keys(parts).forEach(function(k) { score += parts[k]; });
+    return {
+      recipe: r,
+      missing: missing,
+      pantryInformed: pantryInformed,
+      expiringIngredient: expiringBy[id] || '',
+      parts: parts,
+      score: score
+    };
+  }).sort(function(a, b) {
+    // Shopping is a different KIND of cost from effort: it happens before you
+    // can start, and often means not eating tonight. So it is a tier, not a
+    // weight — anything cookable right now outranks anything that isn't, and
+    // the score only breaks ties inside a tier. That is also what makes the
+    // card explainable: "you have everything for this one" is the first reason.
+    return a.missing - b.missing ||
+      a.score - b.score ||
+      String(a.recipe.name).localeCompare(String(b.recipe.name));
+  });
+}
+
+// Deterministic side-dish nudge toward protein + veg + carb. Reads the SAME
+// normalizeMealBalance() the recipe badges and readyFoodBalanceHint() read — it
+// only phrases it for this card. No composition engine, nothing saved, nothing
+// to confirm, and no hint at all unless there is a protein to build around.
+function mealCompletionHint(mealBalance, equipment) {
+  var mb = normalizeMealBalance(mealBalance);
+  if (!mb.protein) return '';
+  var eq = equipment || [];
+  if (!mb.vegetables && !mb.carb) return 'Add rice + steamed veg';
+  if (!mb.vegetables) {
+    return eq.indexOf('rice-cooker-steamer') >= 0
+      ? 'Steam veg above the rice'
+      : 'Add steamed veg';
+  }
+  if (!mb.carb) return 'Add rice or bread';
+  return '';
+}
+
+// A cooked batch inherits its hint from the recipe it came from, when it came
+// from one. A manually added batch has no balance data and gets no hint.
+function readyFoodCompletionHint(meal) {
+  if (!meal || meal.recipeId == null) return '';
+  var recipe = (AppState.recipes || []).find(function(r) {
+    return String(r.id) === String(meal.recipeId);
+  });
+  if (!recipe) return '';
+  return mealCompletionHint(recipe.mealBalance, recipe.equipment);
+}
+
+function buildReadyEatPick(meal) {
+  var reasons = ['Ready now'];
+  var freezer = (meal.storage || 'fridge') === 'freezer';
+  var daysLeft = daysLeftFrom(meal.cookedDate, cookedShelfLife(meal));
+  if (freezer) reasons.push('Freezer');
+  else if (daysLeft != null && daysLeft <= FRESHNESS_WARN_DAYS) {
+    reasons.push(daysLeft === 0 ? 'Use today' : 'Use soon');
+  }
+  if (cookedMealTracksPortions(meal)) reasons.push(formatPortions(meal.portionsRemaining));
+
+  var tracks = cookedMealTracksPortions(meal);
+  return {
+    key: 'eat-first',
+    kind: 'ready',
+    icon: 'soup',
+    label: 'Eat this first',
+    id: String(meal.id),
+    name: meal.name,
+    reasons: reasons,
+    hint: readyFoodCompletionHint(meal),
+    action: {
+      type: tracks ? 'use-portion' : 'finish',
+      id: String(meal.id),
+      label: tracks ? 'Used 1' : 'Done'
+    }
+  };
+}
+
+function buildRecipeEatPick(key, cand) {
+  var r = cand.recipe;
+  var reasons = [];
+
+  // Most-specific reason first — the card shows at most four.
+  if (cand.expiringIngredient) reasons.push('Uses ' + cand.expiringIngredient);
+  if (key === 'different') {
+    var days = daysSinceCooked(r.id);
+    reasons.push(days == null ? "Haven't cooked this yet" : 'Not for ' + days + ' days');
+  }
+  var eqId = lowestFrictionEquipment(r);
+  if (eqId) reasons.push(EQUIPMENT_BY_ID[eqId].label);
+  var active = normalizeActiveTime(r.activeTime);
+  if (active != null) reasons.push(active + ' min active');
+  var mb = normalizeMealBalance(r.mealBalance);
+  if (mb.protein && mb.vegetables && mb.carb) reasons.push('Balanced');
+  if (recipeHasTag(r, 'minimal-cleanup')) reasons.push('Minimal cleanup');
+  if (cand.pantryInformed && cand.missing === 0) reasons.push('Have everything');
+  else if (cand.missing > 0) reasons.push('Missing ' + cand.missing);
+  if (recipeHasTag(r, 'batch-friendly')) reasons.push('Batch-friendly');
+
+  return {
+    key: key,
+    kind: 'recipe',
+    icon: key === 'easiest' ? 'timer' : 'salad',
+    label: key === 'easiest' ? 'Easiest' : 'Something different',
+    id: String(r.id),
+    name: r.name,
+    reasons: reasons.slice(0, 4),
+    hint: mealCompletionHint(r.mealBalance, r.equipment),
+    action: { type: 'open-recipe', id: String(r.id), label: 'Cook' },
+    // Carried for tests and debugging only. Never rendered — the user reads
+    // reasons, not arithmetic.
+    score: cand.score,
+    parts: cand.parts
+  };
+}
+
+// The answer to "what should we eat?". Up to three picks, in the order they
+// should be acted on. Returns FEWER when the data doesn't support more — a
+// missing category is omitted, never filled with a weak guess.
+function getWhatShouldWeEatSuggestions() {
+  var picks = [];
+
+  // A. Eat this first. Reuses getReadyFoodSuggestions() verbatim, which already
+  // ranks fridge-expiring → fridge → freezer, then soonest-to-spoil, then the
+  // smallest remainder — and already excludes expired batches outright.
+  var ready = getReadyFoodSuggestions(1)[0];
+  if (ready) picks.push(buildReadyEatPick(ready));
+
+  var candidates = eatCookCandidates();
+  var used = {};
+
+  // B. Easiest. Best-scoring candidate, but only if it is GENUINELY easy — if
+  // the easiest thing available is still a normal-effort cook, there is nothing
+  // honest to label "Easiest" and the category is dropped.
+  var easiest = candidates[0];
+  if (easiest && recipeEffortScore(easiest.recipe) <= 2) {
+    used[String(easiest.recipe.id)] = true;
+    picks.push(buildRecipeEatPick('easiest', easiest));
+  }
+
+  // C. Something different. Only meaningful once there IS a history to differ
+  // from; with none, everything is equally new and the reason would be invented.
+  if ((AppState.cookHistory || []).length) {
+    var different = candidates.filter(function(c) {
+      return !used[String(c.recipe.id)] && varietyPenalty(c.recipe.id) <= 0;
+    })[0];
+    if (different) picks.push(buildRecipeEatPick('different', different));
+  }
+
+  return picks.slice(0, 3);
+}
+
+// Home card. Rendering only — every ranking decision was already made above, so
+// the ranking can be tested without touching the DOM.
+function renderWhatShouldWeEatCard() {
+  var picks = getWhatShouldWeEatSuggestions();
+  if (!picks.length) return '';
+
+  var rows = picks.map(function(p) {
+    var chips = p.reasons.map(function(t) {
+      return '<span class="wse-chip">' + escapeHtml(t) + '</span>';
+    }).join('');
+    var open = p.kind === 'ready'
+      ? 'goToFreshnessTab()'
+      : 'openRecipeFromHome(\'' + escJ(p.id) + '\')';
+    var act = p.action;
+    var onAction = act.type === 'use-portion' ? 'useCookedPortion(\'' + escJ(p.id) + '\')'
+      : act.type === 'finish' ? 'finishCookedMeal(\'' + escJ(p.id) + '\')'
+      : 'openRecipeFromHome(\'' + escJ(p.id) + '\')';
+
+    return '<div class="wse-row">' +
+      '<button class="wse-item" onclick="' + open + '">' +
+        '<span class="wse-label">' + icon(p.icon) + ' ' + escapeHtml(p.label) + '</span>' +
+        '<span class="wse-name">' + escapeHtml(p.name) + '</span>' +
+        '<span class="wse-chips">' + chips + '</span>' +
+        (p.hint ? '<span class="wse-hint">' + escapeHtml(p.hint) + '</span>' : '') +
+      '</button>' +
+      '<button class="dash-inline-btn wse-action" onclick="' + onAction + '">' +
+        escapeHtml(act.label) + '</button>' +
+      '</div>';
+  }).join('');
+
+  return '<div class="dash-card dash-card--eat">' +
+    '<div class="dash-level-header">' + icon('utensils') + ' What should we eat?</div>' +
+    rows +
+    '</div>';
+}
+
+
 // Home card: "do we already have something we can eat?" answered before the app
 // suggests cooking anything new. Compact by design — 3 items, not an inventory.
 function renderReadyFoodCard() {
@@ -4035,6 +4350,7 @@ function renderDashboard() {
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
     leftoverPromptCard +
     level1Card +
+    renderWhatShouldWeEatCard() +
     renderReadyFoodCard() +
     renderCookSuggestionCard() +
     level2Card +
