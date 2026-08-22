@@ -4,6 +4,117 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-044 — APPROVED (kitchen-truth wave, D-057) — owner-approved D-032 red-zone merge
+branch: wave-kitchen-truth → main
+verdict: approved — **red zone**, merged only on the operator's explicit written instruction
+date: 2026-08-22
+
+### The gate, stated plainly
+Under D-032 this wave is **red zone**, not `done`. It adds a bulk-delete path and writes tombstones
+into `AppState.deletions`. A broken UI change is reverted in a minute; lost user data cannot be
+reverted at all (north-star goal #2). I recommended `approved` (held for human merge) rather than
+`done` (auto-merge), and did not merge on my own judgement. The operator then explicitly instructed:
+*"Approve and merge wave-kitchen-truth into current main with --no-ff … as an explicitly
+owner-approved D-032 red-zone merge."* That instruction is the gate being satisfied — priority 1 in
+the CLAUDE.md Decision Priority list. Recorded here so the audit trail shows a human, not Claude,
+released the red-zone work.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude at the operator's explicit instruction rather than delegated to Codex
+(CLAUDE.md Delegation Policy). This is a review of Claude's own work, stated plainly. The independent
+evidence is the test suite — in particular the production smoke, which runs against the deployed
+bundle rather than the working tree.
+
+### What was reviewed
+- `0ccb16d` — grocery→inventory transfer, safe merge, attention model, expired cleanup, docs
+- `d465f1e` — pre-merge verification: bulk-control tap target, keptOn lifecycle regression lock
+
+### Findings
+
+**1. Hard Rules hold — each verified against the diff, not assumed.**
+- **HR3 (quote recipe ids in handlers)** — the two new inline handlers build their arguments as
+  `var args = '\'' + e.kind + '\', \'' + escJ(String(e.id)) + '\''`, so both the kind and the id are
+  single-quoted and `escJ`-escaped. `removeAllExpired()` takes no arguments.
+- **HR4 (`patchMissingNutrition()` after load)** — zero occurrences in the diff; untouched.
+- **HR5 (persist through `saveData()`)** — zero occurrences of `saveToLocalStorage` in the added
+  lines. Every new mutator (`toggleGroceryItem`, `keepAttentionItem`, `removeAttentionItem`,
+  `removeAllExpired`) ends in `saveData()`.
+- **HR6 (never write Firestore before reading it)** — a grep of the diff for `cloudReady`,
+  `saveToFirestore`, `saveData` (definition), `mergeCloudConflict`, `unionByIdLWW`,
+  `applyTombstones`, `recordLocalDeletions` and `MASS_DELETE_GUARD` returns **nothing**. The write
+  guard is not touched.
+- **HR7 (one `:root` block)** — `style.css` still has exactly one, at line 1.
+- **HR9 (match existing style)** — plain top-level functions, imperative `render*()`, no framework,
+  no build step, no module system.
+- **HR10** — not applicable; this was not a chained sprint group.
+
+**2. The tombstone mechanism was USED, not CHANGED — and that distinction is the whole review.**
+The brief said to stop and report before altering tombstone architecture. Nothing in that
+architecture moved. What the new code does is write `AppState.deletions[id] = now` and then call
+`snapshotIdBaseline()` before dropping records — which is **exactly** what `deleteSelectedPantryItems()`
+(`main:app.js:8326`) and `clearExpiredPantryItems()` (`main:app.js:8352`) already did before this
+wave. I verified those two call sites exist on `main` rather than taking the pattern on trust.
+
+This matters because the naive implementation is silently broken: `recordLocalDeletions()`
+deliberately ignores more than `MASS_DELETE_GUARD` (5) simultaneous disappearances as a suspected
+load race. A nine-item cleanup relying on the vanish-diff would record **zero** tombstones and
+another device would resurrect the food on the next merge. The bulk test seeds six expired pantry
+items specifically to cross that threshold and asserts a tombstone for every removed id.
+
+**3. The data-safety constraint was honoured.** No new top-level `AppState` collection. Three
+additive fields on existing objects: `pantry[].keptOn` / `cookedMeals[].keptOn`,
+`groceryList[].userSet`, `groceryList[].stocked`. All three ride the existing generic round-trip
+through localStorage, `buildFirestorePayload()`, backup, export/import and the union merges with no
+registry edit. A test asserts the Firestore payload's top-level key set is unchanged.
+
+**4. Two judgement calls I want on the record, because both could have gone the other way.**
+
+*Merge date.* On an accepted merge the code deliberately does **not** rewrite `purchaseDate`.
+Stamping today is the obvious implementation and is quietly destructive — six-day-old chicken becomes
+fresh chicken the moment you buy more, and the freshness system stops being trustworthy. Keeping the
+older date under-claims freshness for the new stock, which is visible and self-correcting;
+over-claiming is invisible. Refusing to merge into an already-expired record follows from the same
+reasoning taken one step further: there is no date to keep that would be honest.
+
+*Keep.* The brief permitted omitting Keep if it could not be built without asking for a new date, and
+it cannot — the app has no way to know the real remaining life of food someone has just eyeballed. So
+Keep touches no dates: it writes `keptOn = todayISO()` and suppresses the record from the attention
+surfaces for that day. Because `isKeptToday()` is a strict equality against `todayISO()`, the
+suppression lapses on its own at midnight; it is an acknowledgement, not a dismissal. Verified by a
+regression test that advances the wall clock via `page.clock.setFixedTime()`, and **mutation-checked** —
+replacing `isKeptToday()` with permanent suppression fails that test, so the coverage is not vacuous.
+
+**5. Two real defects were found and fixed during verification, not waved through.**
+- `getExpiredPantryItems()` matched on `item.expiryDate` alone while every badge computes freshness
+  through `pantryDaysLeft()`. Bought-date items — the common case — never matched, so the Inventory
+  "Clear expired" button stayed hidden while the banner directly above it read "2 expired". A bulk
+  cleanup that existed and could not fire. Now classifies through `pantryDaysLeft()`.
+- The bulk **Remove expired (N)** control inherited `.dash-l1-cta`, a `padding: 0` text link, and
+  shipped at **12px tall** on a phone — a hairline tap target for the most destructive action in the
+  wave. Caught by the mobile smoke, fixed, and regression-locked: the committed mobile test now
+  asserts every Keep / Remove / Remove-expired control meets 30×44px and sits inside the viewport.
+
+**6. A docs/code disagreement was resolved in the code's favour, then the docs corrected.**
+`docs/FEATURES.md` already listed "Grocery → Pantry auto-transfer on check (with undo)" as *Working*.
+It did not exist: `toggleGroceryItem()` flipped a flag, never wrote to `AppState.pantry`, and never
+called `saveData()` — so the tick did not even survive a reload. The feature now matches its
+long-standing description.
+
+### Follow-ups recorded, deliberately NOT fixed here
+Both are logged in `planning/ROADMAP.md` Known Issues rather than silently absorbed:
+1. **`deductIngredientsForRecipe()` removes depleted pantry items without explicit tombstones**,
+   relying on the vanish-diff. Depleting more than five tracked items in one cook records no
+   tombstones and lets another device resurrect them. Same fix pattern as above, but it sits on the
+   cook path, not the inventory path — out of this wave's scope.
+2. **The grocery row is a ~33px tap target on phones** (pre-existing `.grocery-item` padding under the
+   narrow breakpoint, untouched by this wave). D-057 promoted that row to the primary inventory-write
+   interaction, so it now carries more weight than it did.
+
+### Verdict
+**Approved**, and merged to `main` with `--no-ff` on the operator's explicit red-zone authorisation.
+Tests: 127 passed (100 pre-existing unchanged, 27 new). `wave1-portion-truth` untouched at `88b5598`.
+
+---
 
 ## Review TASK-043 — APPROVED (ready-food-first wave, D-056)
 branch: wave-ready-food-first → main

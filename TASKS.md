@@ -2506,6 +2506,95 @@ next:
 
 ---
 
+### TASK-044 · Kitchen truth: grocery check-off writes inventory, safe merge, and one-tap expired cleanup
+status: done
+owner: claude
+source: direct operator brief (not BQ — see notes)
+depends-on: TASK-043 (reuses D-056 `cookedMeals` as the attention list's second record type)
+files: app.js, style.css, docs/DECISIONS.md, docs/ARCHITECTURE.md, docs/DATA_MODEL.md,
+        docs/FEATURES.md, planning/ROADMAP.md, tests/kitchen-truth.spec.js (new),
+        tests/production-smoke-kitchen-truth.spec.js (new)
+
+objective:
+  Make it almost effortless for the app to know what food we actually have, what is running out,
+  and what should be removed — without becoming a warehouse system, without weighing food, and
+  without adding a daily inventory chore. Inventory maintenance must cost less effort than
+  remembering the inventory mentally.
+
+notes:
+  Phase 1 found that the highest-priority loop did not exist at all: `toggleGroceryItem()` flipped
+  `item.checked`, re-rendered, and stopped — it never wrote to `AppState.pantry` and never called
+  `saveData()`, so the tick did not survive a reload. `docs/FEATURES.md` had listed the transfer as
+  *Working* regardless. Two further defects fell out of the same audit: `getExpiredPantryItems()`
+  classified by `item.expiryDate` alone (so bought-date items — the common case — never matched and
+  "Clear expired" stayed permanently hidden), and `addToPantry()` still read two DOM ids removed
+  from `index.html` long ago.
+
+acceptance:
+  - [x] Existing grocery → pantry behaviour still works (it did not exist; it does now)
+  - [x] Checking a grocery item requires NO additional input — asserted: zero modals opened
+  - [x] Category, storage, shelf life and purchase date are all inferred, never asked for
+  - [x] Existing pantry stock is merged where safe rather than duplicated
+  - [x] Merge is exact-name only — "Chicken" never folds into "Chicken Breast" (asserted)
+  - [x] A printed-expiry record is never merged into (asserted)
+  - [x] An already-expired record is never merged into — a merge must not revive old food (asserted)
+  - [x] A merge does NOT rewrite `purchaseDate`; the oldest portion still governs freshness (asserted)
+  - [x] Unknown quantity stays unknown — never invented as 0 or 1 (asserted, both sides)
+  - [x] Buying a low staple restores `stockLevel: 'full'` and clears its auto shopping row
+  - [x] Have/Low/Gone reuses the existing `cycleStapleLevel()` — no parallel status system
+  - [x] Unchecking a mis-tap reverses the transfer exactly, via the `stocked` receipt
+  - [x] Home surfaces Expired / Use soon / Low in one compact card, pantry AND cooked food
+  - [x] Expired food removable in one tap
+  - [x] Bulk "Remove expired" exists and is provably safe (explicit tombstones; see below)
+  - [x] "Use soon" is NEVER bulk-removed — 0 days left is "Use today", not expired (asserted)
+  - [x] `Keep` invents no date; it is a one-day acknowledgement that lapses at midnight (asserted
+        by advancing the wall clock, and mutation-checked)
+  - [x] Ready Food First, portion tracking and one-tap `Used 1` unchanged (asserted)
+  - [x] Low-effort filters/suggestions unchanged (asserted)
+  - [x] Old saved data without the new fields still loads and classifies (asserted)
+  - [x] LocalStorage round-trip, export and Firestore payload compatible — top-level key set
+        unchanged (asserted)
+  - [x] Mobile cleanup simple: every destructive control ≥30×44px and inside the viewport (asserted)
+  - [x] No new recurring inventory chore introduced
+  - [x] Full existing suite stays green (100/100 unchanged) — total 127/127
+  - [x] Production smoke green against the deployed build
+
+constraints:
+  - Additive fields on existing objects only — no new top-level `AppState` key (none added:
+    `pantry[].keptOn`, `cookedMeals[].keptOn`, `groceryList[].userSet`, `groceryList[].stocked`)
+  - Do NOT modify tombstone architecture, `cloudReady`, Firestore merge, conflict resolution or
+    `saveData()` semantics — verified by grepping the diff for every one of those symbols: zero hits.
+    The new code *uses* the existing explicit-tombstone pattern already present at
+    `main:app.js:8326` and `8352`; it does not change it.
+  - No receipt OCR, AI extraction, barcode, retailer APIs, lot/FIFO, thaw tracking, notifications,
+    household model, macros or gram-level requirements
+  - Preserve the D-055 low-effort system and the D-056 ready-food system
+
+sync/deletion safety (the reason this is D-032 red zone):
+  Bulk removal deletes only records classified `daysLeft < 0` by the same `pantryDaysLeft()` /
+  `cookedShelfLife()` rules the badges use, so "use soon" is structurally excluded rather than
+  filtered by a second, drift-prone predicate. Every removed id gets an EXPLICIT tombstone before
+  the record is dropped, then `snapshotIdBaseline()` is called — because `recordLocalDeletions()`
+  deliberately ignores more than `MASS_DELETE_GUARD` (5) simultaneous disappearances as a suspected
+  load race. A large cleanup relying on the vanish-diff would record zero tombstones and let another
+  device resurrect the food. The regression test seeds six expired pantry items specifically to
+  cross that threshold.
+
+verification:
+  - [x] `npx playwright test` — 127 passed (100 pre-existing + 27 new)
+  - [x] Local mobile smoke at 390×844: shop → inventory → attention → cleanup, no horizontal
+        overflow, no console errors
+  - [x] Mutation check: replacing `isKeptToday()` with permanent suppression fails the two Keep
+        lifecycle tests, proving they are not vacuous
+  - [x] Production smoke against the deployed GitHub Pages build
+
+merge gate:
+  D-032 **red zone** — bulk delete + tombstone writes. Claude recommended `approved` (held) and did
+  not merge on its own judgement. Merged `--no-ff` only after the operator's explicit written
+  authorisation. See REVIEW.md TASK-044.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
