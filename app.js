@@ -9203,9 +9203,23 @@ function deductIngredientsForRecipe(recipe, multiplier = 1) {
     }
   });
   if (depleted.length) {
-    AppState.pantry = AppState.pantry.filter(function(p) {
-      return depleted.indexOf(p.id) === -1;
+    // Explicit tombstone before removal — the same pattern removeAllExpired() uses.
+    // The MASS_DELETE_GUARD diff in recordLocalDeletions() ignores >5 simultaneous
+    // disappearances as a suspected load race, so a cook that empties more than five
+    // tracked items would drop them locally with NO tombstone and let another device
+    // resurrect the food on the next merge. Recording the deletes we already know
+    // about here makes the cook path independent of the vanish-diff entirely.
+    if (!AppState.deletions) AppState.deletions = {};
+    var when = new Date().toISOString();
+    var doomed = {};
+    depleted.forEach(function(id) {
+      doomed[String(id)] = true;
+      AppState.deletions[String(id)] = when;
     });
+    AppState.pantry = AppState.pantry.filter(function(p) {
+      return !doomed[String(p.id)];
+    });
+    snapshotIdBaseline(); // baseline re-aligned before the caller's saveData()
   }
   return { deducted: deducted, outOfStock: outOfStock };
 }
