@@ -6751,6 +6751,93 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 
 /* Home: "What should I cook?" -------------------------------------------- */
 
+/* ── "What should we eat?" card ─────────────────────────────────────────────
+   Reuses the existing dash-card / dash-inline-btn tokens — no :root block
+   (Hard Rule 7). Compact by design: 3 rows maximum, reasons as chips, and the
+   action button never wraps below the row on a phone. */
+.wse-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+}
+.wse-row + .wse-row { border-top: 1px solid var(--color-border); }
+
+.wse-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.wse-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+
+.wse-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wse-item:hover .wse-name { color: var(--color-primary); }
+
+.wse-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 1px;
+}
+
+.wse-chip {
+  font-size: 0.68rem;
+  line-height: 1.5;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--color-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wse-hint {
+  font-size: 0.73rem;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Comfortable to hit with a thumb without making the card tall — the bare
+   .dash-inline-btn is 16px, which is fine mid-sentence and not fine here. */
+.wse-action {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 32px;
+  padding: 0 0.35rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+
 .dash-sugg-row {
   display: flex;
   align-items: center;
