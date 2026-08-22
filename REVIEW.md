@@ -4,6 +4,133 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-047 — APPROVED (what-should-we-eat ranking, D-059) — D-032 `done`, operator-approved
+branch: wave-what-should-we-eat @ df1a905 → main
+verdict: approved — reversible, outside the red zone
+date: 2026-08-22
+
+### The gate
+D-032 **`done`**, not `approved`/held. This wave adds derived ranking and one additive Home card. It
+writes nothing: the diff against `main` greps clean for `saveData(`, `saveToFirestore`, `cloudReady`,
+`AppState.deletions`, `snapshotIdBaseline`, `tombstone`, `onAuthStateChanged`, `serviceWorker`,
+`showNotification` and `FOOD_ALERTS_KEY`, and introduces no `AppState.<key> =` assignment. A broken
+ranking is a bad suggestion the user ignores and a one-commit revert — not lost data. The operator
+approved explicitly and instructed the landing; recorded here for the trail.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude at the operator's instruction rather than delegated to Codex
+(CLAUDE.md Delegation Policy). Review of Claude's own work, stated plainly — same disclosed caveat
+as TASK-044/045/046. Mitigated here by the ranking being a pure function with no DOM access, so
+every weight is asserted independently by test rather than inferred from rendered HTML; two of the
+three weighting defects below were found by those tests, not by reading the code.
+
+### What I checked
+**1. No parallel recommendation system.** `getWhatShouldWeEatSuggestions()` composes existing
+helpers: ready food is `getReadyFoodSuggestions(1)[0]` verbatim, availability is
+`getCookableRecipes()`, expiry pressure is `getExpirySuggestions()`, effort/variety are
+`recipeEffortScore()` / `recipeActiveMinutes()` / `varietyPenalty()`, balance is
+`normalizeMealBalance()`. No freshness boundary is recomputed anywhere in the wave, and a test
+asserts the expiry signal comes from the shared scan rather than a private copy.
+
+**2. Ranking is separable from rendering.** `eatCookCandidates()` returns scored candidates with a
+named `parts` field per signal; `renderWhatShouldWeEatCard()` only draws. That is what made
+one-signal-at-a-time assertions possible, and it is why the two weighting bugs surfaced.
+
+**3. Shopping as a tier — the one structural decision.** The first cut priced missing ingredients at
+2 each and recommended a shopping trip over dinner: a no-cook, assembly-effort, minimal-cleanup
+recipe missing two items scored 5 against 12 for an ordinary pan recipe that could actually be
+cooked. Correctly re-framed: needing to shop happens *before* you can start and often means not
+eating tonight, so it is a tier, not a weight. Also the more explainable shape — "you have
+everything for this one" is the first reason a person wants. The test now asserts the assembly
+recipe still scores *better* and still loses, which is a sharper proof than a score comparison.
+
+**4. Expiry weight.** −3 lost to an easier rival's effort-plus-appliance edge, contradicting the
+briefed priority order that puts expiry second only to availability. Raised to −8 and locked by a
+competing-reasons test.
+
+**5. Effort reads hands-on time, not total.** A 40-minute pressure-cooker recipe beats a 20-minute
+pan recipe, with a test asserting the inversion explicitly (total 40 vs 20; active-time cost 0 vs 2).
+`recipeActiveMinutes()` falls back to total time when `activeTime` is undeclared — the safe
+direction, so an unlabelled recipe is never mistaken for an effortless one.
+
+**6. Honesty by omission, each with its own test.** No ready food → no "Eat this first". Nothing with
+`recipeEffortScore() <= 2` → no "Easiest", because mislabelling a normal cook is a lie the user
+notices once. Empty `cookHistory` → no "Something different", because with no history everything is
+equally new and the reason would be fabricated. Zero picks hides the card entirely.
+
+**7. Legacy data.** None of the 26 seeded recipes carry D-055 metadata. Undeclared appliance scores
+the neutral middle (2) and undeclared balance is neither rewarded nor condemned (4), so pre-D-055
+recipes rank sensibly instead of being buried. A test loads a legacy save and asserts those defaults
+land, the card renders, and no hint is invented from absent balance data.
+
+**8. Completion hints invent nothing.** Deterministic sentences off the existing `mealBalance`,
+offered only when a protein is declared to build around. A manually added batch with no source
+recipe, and a legacy recipe with no balance data, both get `''` rather than a guess.
+
+**9. Reads only.** A test hammers rank → candidates → render card → render dashboard twice and
+asserts pantry, cooked meals, grocery list, deletions, cook history and the `mealPrepFoodAlerts`
+notification ledger are byte-identical afterwards. Displaying a recommendation consumes nothing;
+only the pre-existing `useCookedPortion()` / `finishCookedMeal()` / cook actions mutate anything, and
+none were modified.
+
+**10. Existing surfaces intact.** The Ready-to-eat and What-should-I-cook cards are unchanged and
+still render below the new one — their own tests assert presence, contents and relative order. The
+recipe quick-filters are untouched and a new test exercises every chip (rice cooker, rice + steamer,
+Instant Pot, oven, pan, no-cook, lowest effort).
+
+**11. Presentation.** Reasons render as chips; `score` and `parts` ride on the object for tests only,
+and a test asserts no rendered chip looks like a number. Labels use inline Lucide icons rather than
+the sketched emoji — 🍱 and 🍽️ rendered as tofu boxes in the first review screenshots, and the repo
+already migrated off emoji for that reason (`ICON_PATHS` comment).
+
+### Merge-time finding
+`origin/main` had advanced one commit since the branch was cut: `b488750 replies: cleared after send`
+— the n8n reply-relay clearing `captures/replies/OUTBOX.md` back to its placeholder after sending the
+notifications-wave Telegram summary, exactly as `captures/replies/README.md` documents. Verified
+docs-only and with **zero file overlap** against the wave's diff before merging. Local `main` was
+fast-forwarded to it; the branch was merged `--no-ff` on top, unrebased, so the reviewed commits
+land byte-for-byte as reviewed.
+
+### Post-merge verification (filled in after deployment)
+- Pages deployment succeeded for final `main`; deployed bytes compared against the committed blobs
+  rather than assumed.
+- Production smoke `tests/production-smoke-what-should-we-eat.spec.js` against the live site.
+- Full suite on final `main`.
+(See the numbers recorded in STATUS.md's entry for this wave.)
+
+### Pre-existing CI/live-smoke flake — flagged again, still not absorbed
+A single live-site production smoke fails per full-suite run, a **different test each time**, and
+passes in isolation: this session saw `production-smoke-ready-food.spec.js:212` and
+`production-smoke-kitchen-truth.spec.js:386` fail on separate runs, the latter then passing 11/11 on
+its own. These specs hit the *deployed* site, which cannot contain branch code, so they can never be
+evidence about a branch under review. Already logged in `docs/AI_OS_NOTES.md` (2026-08-22) with
+candidate fixes: raise the timeout for `production-smoke-*`, pin them to one worker, or split
+live-site smoke into its own workflow. Deliberately left alone here rather than folded into an
+unrelated wave.
+
+### Known follow-up — recorded, NOT fixed here
+Home now carries three suggestion surfaces: the new decision card plus the two older cards it
+summarises. That is real redundancy and the one place this wave arguably works against its own UX
+goal. It was kept deliberately — the existing cards' tests assert their presence *and* relative
+order, and the brief said not to redesign Home. **Dogfood the new card first.** If it proves
+sufficient, a later UX wave should consolidate or remove the redundant surfaces; that is a UI
+decision with its own test churn and belongs in its own wave.
+
+### Inherited / deferred, carried forward unchanged
+- Pantry ingredient matching remains substring-based (`"Rice"` matches `"Rice Vinegar"`) — pre-existing.
+- No shopping/grocery-planning expansion: the availability tier makes missing-ingredient recipes a
+  last resort, and turning them into a shopping nudge was out of scope.
+- No portion-aware serving maths.
+- `wave1-portion-truth` remains parked and untouched at `88b5598`.
+- No persisted recommendation state; results are derived fresh every render.
+
+### Risk-gate
+**D-032 `done`** — approved and reversible. No red-zone surface touched. Landed `--no-ff`.
+
+→ TASK-047 status set to `approved` in TASKS.md before the merge, then `done` after deployment and
+production smoke.
+
+---
 ## Review TASK-046 — APPROVED (food attention notifications, D-058) — owner-approved D-032 red-zone merge
 branch: wave-food-attention-notifications @ 31bf98d → main
 verdict: approved — **red zone**, merged only on the operator's explicit written instruction

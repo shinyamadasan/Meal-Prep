@@ -2749,6 +2749,95 @@ merge gate:
 
 ---
 
+### TASK-047 · "What should we eat?" — one deterministic recommendation composed from the existing helpers
+status: approved
+owner: claude
+source: direct operator brief ("Help us decide what to eat with the least possible friction") — not BQ
+depends-on: TASK-042 (D-055 recipe metadata), TASK-043 (D-056 ready-food ranking),
+        TASK-044 (D-057 Kitchen Truth attention model)
+files: app.js, style.css, tests/what-should-we-eat.spec.js (new),
+        tests/production-smoke-what-should-we-eat.spec.js (new),
+        docs/DECISIONS.md, docs/FEATURES.md,
+        docs/screenshots/wave-what-should-we-eat/ (review evidence)
+
+objective:
+  Answer "what should we eat?" in one compact Home card with at most three explainable picks,
+  ranked deterministically from data the app already holds. Not an AI feature, not a reminder
+  platform, and not a new recommendation subsystem — a ranking + UX composition wave.
+
+notes:
+  Phase 1 characterised every existing helper before any code was written. Home already knew
+  everything needed; it just never combined it. `getReadyFoodSuggestions()` (D-056) already ranked
+  cooked food fridge-expiring → fridge → freezer and already excluded expired batches;
+  `getCookableRecipes()` knew pantry availability; `getExpirySuggestions()` knew what was about to
+  spoil; `recipeEffortScore()` / `recipeActiveMinutes()` / `varietyPenalty()` (D-055) knew effort and
+  repetition; `normalizeMealBalance()` knew protein/veg/carb. One helper composes them.
+
+  A material Phase 1 finding: **none of the 26 seeded sample recipes carry any D-055 metadata** —
+  no equipment, effort, activeTime, mealBalance or tags. Every default in this wave was therefore
+  chosen so a pre-D-055 recipe ranks sensibly rather than being buried (undeclared appliance scores
+  the neutral middle, undeclared balance is neither rewarded nor condemned).
+
+  Two ranking weights were wrong on the first cut and were caught by tests, not by eyeballing the
+  card. Shopping priced at 2/missing recommended a shopping trip over dinner (a no-cook assembly
+  recipe missing two items scored 5 against 12 for a pan recipe that could actually be cooked), so
+  availability became a **tier** rather than a weight. The expiry bonus at −3 lost to an easier
+  rival's effort-plus-appliance edge, contradicting the briefed priority order, and was raised
+  to −8. Both are recorded in D-059.
+
+acceptance:
+  - [x] One helper, `getWhatShouldWeEatSuggestions()`, returning at most 3 structured picks;
+        ranking contains no DOM access so it is testable directly
+  - [x] Eat this first / Easiest / Something different, in that order
+  - [x] Ready food reuses `getReadyFoodSuggestions()` verbatim — expiring fridge → fridge → freezer,
+        then soonest-to-spoil, then smallest remainder
+  - [x] Expired food is never recommended (inherited from the existing filter, asserted anyway)
+  - [x] Cook candidates tier on availability, then score on expiry / balance / effort / active time
+        / cleanup / appliance / variety
+  - [x] Hands-on time drives effort, NOT total cook time — a 40-min walk-away pot beats a 20-min pan
+  - [x] Appliance and `minimal-cleanup` are real but bounded signals
+  - [x] Use-soon ingredients boost a recipe, via the SAME `getExpirySuggestions()` scan
+  - [x] Categories are omitted rather than guessed: no ready food, no genuinely-easy recipe, or no
+        cook history each drop their category; 1–2 picks is a valid answer; 0 hides the card
+  - [x] Deterministic completion hints, only when a protein is declared to build around
+  - [x] Reasons shown as chips; no numeric score ever rendered
+  - [x] One-tap actions reuse `useCookedPortion()` / `finishCookedMeal()` / `openRecipeFromHome()`
+  - [x] Existing Ready-to-eat and What-should-I-cook cards unchanged and still below it
+  - [x] Existing recipe equipment/effort quick-filters unchanged, every chip covered by a test
+  - [x] Zero new persisted state — no `AppState` key, no localStorage key
+  - [x] Displaying a recommendation mutates nothing
+  - [x] Old saved data with no recipe metadata ranks and renders
+  - [x] Mobile card compact with no horizontal overflow; no console/page errors
+
+constraints:
+  - Do NOT add AI/LLM, external APIs, or any learned ranking
+  - Do NOT persist recommendation results or add a preference/weights screen
+  - Do NOT expand into grocery planning, portion maths, macros, or meal-component architecture
+  - Do NOT change sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service
+    worker, or any D-058 notification state
+  - Do NOT touch `wave1-portion-truth`
+
+sync/deletion safety:
+  Nothing to assess: this wave writes nothing. `git diff` against `main` greps clean for
+  `saveData(`, `saveToFirestore`, `cloudReady`, `AppState.deletions`, `snapshotIdBaseline`,
+  `tombstone`, `onAuthStateChanged`, `serviceWorker`, `showNotification` and `FOOD_ALERTS_KEY`, and
+  adds no `AppState.<key> =` assignment. A regression test hammers the read path — rank, build
+  candidates, render the card, render the dashboard twice — and asserts pantry, cooked meals,
+  grocery list, deletions, cook history and the `mealPrepFoodAlerts` ledger are byte-identical
+  afterwards.
+
+verification:
+  - [x] `npx playwright test tests/what-should-we-eat.spec.js` — 26 passed
+  - [x] Full suite on the branch — 209 passed, 4 skipped, 0 failed
+  - [x] Full suite on final `main` after the merge — see REVIEW.md TASK-047
+  - [x] Production smoke against the deployed GitHub Pages build — see REVIEW.md TASK-047
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Derived ranking plus one additive Home card; no
+  red-zone surface is touched. Landed `--no-ff` on the operator's explicit approval.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
