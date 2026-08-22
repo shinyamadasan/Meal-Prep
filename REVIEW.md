@@ -5,6 +5,105 @@
 
 ---
 
+## Review TASK-041 — APPROVED (recipe URL import, retroactive red-zone review)
+branch: release/recipe-url-import-clean → main
+verdict: approved — merged to `main` as `f0c0ffa` after verification
+date: 2026-08-21
+
+### Context — this is a retroactive review, and that matters
+The recipe URL import feature did not come through the pipeline. It was built by the human
+operator on 2026-08-09 in a separate worktree and pushed directly to `main` (`9007d4e`), which
+means **it has been live on GitHub Pages since 2026-08-09 without ever having been reviewed**.
+This entry does not pretend otherwise. The review below was performed on 2026-08-21, twelve days
+after the code reached production, as part of a repository recovery. See TASK-041.
+
+Two further pieces of the same work had never been committed at all: production-polish changes and
+a test file sitting uncommitted in the release worktree. Those are now `c01206a` and `f0c0ffa`.
+
+### What was reviewed
+- `9007d4e` — recipe URL import MVP (app UI, normalization, save path, Cloudflare Worker)
+- `c01206a` — null-safe nutrition display + ordered instruction steps
+- `f0c0ffa` — red-zone test coverage + two existing suites updated to match shipped behaviour
+
+### Findings
+
+**1. Hard Rules hold.** Checked each surface the feature touches:
+- **HR5 (persist through `saveData()`)** — imports land via `saveCurrentRecipeImportDraft()` →
+  `persistRecipe()` → `saveData()`. No direct `saveToLocalStorage()` call anywhere in the import
+  path. Correct.
+- **HR6 (never write Firestore before reading it)** — `saveToFirestore()`'s `cloudReady` guard is
+  untouched by this work; the early-return at the top of the function is intact. Correct.
+- **HR4 (`patchMissingNutrition()` after load)** — still called on all eight load paths, including
+  the cloud-load paths. Imported recipes carrying partial nutrition go through the same patch.
+- **HR3 (quote recipe ids in handlers)** — imported recipes get `id: Date.now()` (a number), which
+  makes quoting *more* important, not less. Handlers use `'${recipe.id}'`. Correct.
+- **HR7 (one `:root` block)** — `style.css` still has exactly one, at line 1.
+- **HR9 (match existing style)** — no framework, no build step, no module system introduced. The
+  Worker is a separate deployable under `workers/`, not a change to the app's architecture.
+
+**2. The Worker is a sensible trust boundary.** `workers/recipe-import/src/index.js` rejects
+non-POST methods, rejects credentialed URLs (`url.username || url.password`), blocks local/internal
+targets, caps redirects and response size, and enforces a timeout — i.e. it treats SSRF as the
+primary risk, which is the right call for a "fetch an arbitrary URL for the user" service. CORS in
+`wrangler.jsonc` is pinned to `https://shinyamadasan.github.io` rather than `*`. No secrets or API
+keys in the Worker source or config.
+
+**3. Imported data is treated as hostile.** `recipe-import-s6-verification.spec.js` and the new
+`recipe-import-production-polish.spec.js` both assert that imported markup renders as inert text —
+including an `<img src=x onerror=alert(1)>` payload, which is asserted to produce zero `img`
+elements and zero dialogs. This is the correct posture given TASK-039 fixed a confirmed XSS in
+`openPrepMode()`.
+
+**4. The polish commit fixes a real data-shaped bug.** Before `c01206a`, a recipe imported with
+partial nutrition (calories/protein/carbs/fat but no fiber/sodium) computed
+`undefined * currentServings` → `NaN`, which rendered as "NaN" on the card and, worse, poisoned
+every aggregate that summed it (`calculateDayNutrition`, the weekly totals) into `NaN`.
+`scaleKnownNutrition()` now returns `null` there, so the card shows an em dash and the aggregates
+degrade to skipping the value.
+
+**5. Tests were strengthened, not weakened.** Worth stating explicitly since two existing suites
+were modified:
+- `buttons-functional.spec.js` — the old "Paste Recipe: opens and cancels" test named a button that
+  no longer exists (it is now "Import Recipe"). The replacement drives both From URL and Paste Text
+  modes and asserts more than the version it replaces.
+- `button-smoke.spec.js` — skips the two buttons that open a *native OS file chooser*
+  (`importData`/`importCSV`), which Playwright cannot dismiss and which hang the run. The skip is
+  narrow, counted, and printed in the summary. Everything else is still clicked: 471 buttons in
+  DOM, 199 clicked, 0 broken.
+
+### Verification
+- `npx playwright test` → **45/45 passed** (11 spec files)
+- `node --test workers/recipe-import/test/*.node.js` → **9/9 passed**
+- Both re-run on the merged `main` (`f0c0ffa`) before pushing, not only on the release branch.
+- Worker liveness probed directly: `OPTIONS` → 204 with
+  `Access-Control-Allow-Origin: https://shinyamadasan.github.io`; `GET` → 405.
+- Deployment confirmed, not assumed: Pages build `f0c0ffa` reported `built`, and the live
+  `app.js` / `style.css` were re-fetched and contain the new code.
+
+### Risk-gate
+Red-zone under **D-032** — this touches the recipe save path, localStorage persistence, and the
+normalization applied to loaded data. Under normal operation this would land as `approved` and wait
+for a human `/merge`.
+
+It was merged during this session because the operator explicitly directed the recovery through to
+a merge, *and* because the code was already in production and had been since 2026-08-09 — holding
+the branch would not have made the live site any safer, while landing it added the polish fix and
+the first real test coverage of these paths. The merge was a fast-forward onto `origin/main`
+(`9007d4e` → `f0c0ffa`); no force-push, no rewritten history.
+
+### Residual risk
+- Aggregate nutrition totals now silently under-count a recipe with partial nutrition instead of
+  showing `NaN`. Better, but still not *honest* — the weekly total gives no hint that a value was
+  missing. Carried as a follow-up on TASK-041.
+- The Worker is a live production dependency with no monitoring or alerting wired to it. If it goes
+  down, URL import degrades to an error message (handled — `recipe-import-ui.spec.js` covers it),
+  but nobody is notified.
+- No manual on-device check was performed against a real recipe URL end-to-end; all import testing
+  used mocked Worker responses plus the Worker's own unit tests.
+
+---
+
+
 ## Review TASK-040 — APPROVED, HELD (fix pre-existing TASK-036 test regression)
 branch: task-040
 verdict: approved (held per this session's convention; test-fixture-only, arguably Low risk)

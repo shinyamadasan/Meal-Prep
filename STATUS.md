@@ -5,6 +5,62 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-21 — Repository recovery: parked rebase cleared, out-of-band recipe-import work reconciled, verified, merged, deployed
+
+**This was a recovery session, not a feature session.** No new meal-prep features were built.
+
+### What was wrong
+1. **A parked rebase had frozen the repo for a month.** The main working directory sat mid
+   `git rebase` of `task-037` onto `main`, started 2026-07-23, stopped on a `REVIEW.md` conflict
+   and never finished. HEAD was detached the whole time.
+2. **That silently killed the overnight automation.** With no branch name resolvable, the nightly
+   run aborted its "Correct branch" preflight *every night from 2026-07-23 to 2026-08-21* —
+   ~50 consecutive aborted runs, all logged to `captures/replies/OUTBOX.md` and never read.
+3. **A whole feature had bypassed the pipeline.** Recipe URL import (app UI + a Cloudflare Worker)
+   was built by hand on 2026-08-09 in a second worktree and pushed straight to `main` (`9007d4e`).
+   No capture, no BQ item, no task, no review — and live on GitHub Pages since 2026-08-09.
+4. **Real work was sitting uncommitted.** The release worktree held unrecorded production-polish
+   changes plus an entire uncommitted test file.
+
+### What was done
+- **Rebase:** inspected first, aborted second. Nothing lost — both `task-037` commits remain at
+  `7c4785d` on the branch and on `origin/task-037`.
+- **Reconciliation:** every untracked file in the main tree was proven byte-identical to
+  `release/recipe-url-import-clean` before removal. The ~8 "extra" lines in `app.js` turned out to
+  be TASK-037's own Cooked-button change, which the `-clean` branch deliberately excludes — so it
+  was left on `task-037` rather than mixed into the release.
+- **Committed the genuinely-new work:** `c01206a` (null-safe nutrition + ordered instruction
+  steps) and `f0c0ffa` (red-zone test coverage, plus two suites updated to match shipped UI).
+- **Red-zone review** performed against D-032 and all applicable Hard Rules → `REVIEW.md`.
+- **Merged** to `main` as a fast-forward (`9007d4e` → `f0c0ffa`). No force-push, no rewrite.
+- **Deployment verified, not assumed:** Pages build `f0c0ffa` = `built`; live `app.js` and
+  `style.css` re-fetched and confirmed to contain the new code.
+
+### Verification
+- Playwright: **45/45 pass** (11 spec files; button smoke 471 in DOM, 199 clicked, 0 broken)
+- Worker: **9/9 pass** (`node --test`)
+- Both re-run on merged `main`, not just on the release branch. No test was weakened to get green.
+
+### Correction to the record
+An earlier read in this session reported that recipe import "was never merged and is not live."
+That was wrong — it came from a stale remote-tracking ref. `origin/main` had carried the feature
+since 2026-08-09; a `git fetch` revealed it. The local release commit `a6b42c1` and the pushed
+`9007d4e` are content-identical duplicates (same tree `eff4c15`), so `main` was rebuilt on the
+real `origin/main` and only the two genuinely-new commits were cherry-picked on top — avoiding a
+duplicate feature commit in `main`'s history.
+
+**Next:** TASK-037 is still unmerged on `task-037` (`7c4785d`, status `blocked`). Its blocker — the
+TASK-036 test regression — was fixed by TASK-040 and is now on `main`, so the blocker is stale. It
+needs a fresh rebase onto `main` and a re-run before it can land. The overnight automation should
+resume now that the repo is on a real branch; worth confirming after the next scheduled run.
+
+**Open risks:** the recipe-import Worker is an unmonitored production dependency; partial-nutrition
+recipes now under-count silently in weekly totals rather than showing `NaN`; no end-to-end manual
+import against a real URL has been run on-device.
+
+---
+
+
 ## 2026-07-22 — Autonomous triage + plan run: 2 new captures (both rejected); BUILD_QUEUE fully reflected in TASKS.md
 
 **STEP A (Triage):** 2 new captures processed, both rejected as noise.

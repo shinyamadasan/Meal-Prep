@@ -2275,6 +2275,69 @@ test steps:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     RECOVERY · Recipe URL import backfill (out-of-band work)
+     Risk: High · Execution: Solo
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-041 · Backfill: recipe URL import landed outside the Claude→Codex pipeline
+status: done
+owner: claude
+source: none — recovery task. This work did NOT originate from `planning/BUILD_QUEUE.md` and was
+  never a `TASKS.md` handoff. It is recorded here after the fact so the OS record matches the repo.
+priority: P1
+depends-on: none
+files: app.js, index.html, style.css, package.json, tests/recipe-import-*.spec.js,
+  tests/recipe-storage-persistence.spec.js, tests/button-smoke.spec.js,
+  tests/buttons-functional.spec.js, workers/recipe-import/**
+
+context:
+  - On 2026-08-09 a recipe URL import feature (app UI + a Cloudflare Worker at
+    `workers/recipe-import/`) was built directly by the human operator in a separate git worktree
+    (`Meal prep app - recipe import release`) and pushed straight to `main` as `9007d4e`.
+  - It bypassed Triage → BUILD_QUEUE → TASKS.md → Codex → REVIEW.md entirely. There is no
+    originating capture, no BQ item, no task entry, and no `CHANGELOG.md`/`TEST_REPORT.md`
+    evidence from Codex. This entry exists so that gap is visible, not hidden.
+  - Because it was pushed straight to `main`, GitHub Pages has been serving it since 2026-08-09
+    (Pages build `9007d4e`, 2026-08-09T21:20:35Z) with no red-zone review having been performed.
+  - Separately, the main working directory sat in a parked interactive rebase of `task-037` from
+    2026-07-23. That left HEAD detached, which made the overnight automation abort its
+    "Correct branch" preflight every single night from 2026-07-23 to 2026-08-21 — roughly 50
+    consecutive aborted runs recorded in `captures/replies/OUTBOX.md`.
+
+acceptance:
+  - [x] Parked `task-037` rebase resolved without losing work (aborted; both commits still on
+        `task-037` and `origin/task-037` at `7c4785d`)
+  - [x] Working tree reconciled against `release/recipe-url-import-clean`; every untracked file
+        proven byte-identical or committed
+  - [x] Uncommitted production-polish work found in the release worktree committed (`c01206a`)
+  - [x] New test coverage for the red-zone surfaces committed (`f0c0ffa`)
+  - [x] Full suite green: Playwright 45/45, Worker `node --test` 9/9
+  - [x] Red-zone review performed and recorded in `REVIEW.md`
+  - [x] `main` updated without force-push or history rewrite (fast-forward `9007d4e` → `f0c0ffa`)
+  - [x] Deployment verified live, not assumed (Pages build `f0c0ffa` = `built`; live assets
+        re-fetched and confirmed to contain the new code)
+
+constraints:
+  - No new meal-prep product features during recovery — reconciliation and verification only
+  - No force-push, no rewriting of published `main` history
+  - No weakening of existing tests to obtain a green run
+
+verification:
+  - `node --test workers/recipe-import/test/*.node.js` → 9/9 pass
+  - `npx playwright test` → 45/45 pass (11 spec files; button smoke 471 in DOM / 199 clicked /
+    0 broken)
+  - `gh api repos/shinyamadasan/Meal-Prep/pages/builds` → `built f0c0ffa`
+  - `curl https://shinyamadasan.github.io/Meal-Prep/app.js` → contains `nutritionDisplayValue`
+
+follow-ups:
+  - TASK-037 is still unmerged on branch `task-037` (`7c4785d`), status `blocked`. Its original
+    blocker (the TASK-036 test regression) was fixed by TASK-040 and is now on `main`, so the
+    blocker is stale. It needs a fresh rebase onto `main` and a re-run before it can land.
+  - Aggregate nutrition totals now treat a missing metric as 0 rather than poisoning the total
+    with `NaN`. That is an improvement, but partial-nutrition recipes now under-count silently in
+    weekly/daily totals. Worth a follow-up decision on whether to surface "incomplete" there too.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
