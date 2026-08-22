@@ -984,6 +984,10 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">Portions</label>
+                        <input type="number" id="manual-cooked-portions" class="form-control" min="1" step="1" placeholder="e.g. 6">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Fridge life (days)</label>
                         <input type="number" id="manual-cooked-fridge-life" class="form-control" min="0" step="1" value="3">
                     </div>
@@ -992,7 +996,7 @@
                         <input type="number" id="manual-cooked-freezer-life" class="form-control" min="0" step="1" value="90">
                     </div>
                 </div>
-                <p style="margin:0;color:var(--text-secondary);font-size:0.875rem">This only tracks storage freshness. It will not deduct pantry ingredients.</p>
+                <p style="margin:0;color:var(--text-secondary);font-size:0.875rem">This only tracks storage freshness. It will not deduct pantry ingredients. Portions are optional — leave blank to skip counting.</p>
             </div>
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closeManualCookedModal()">Cancel</button>

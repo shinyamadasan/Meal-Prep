@@ -6748,3 +6748,104 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ── Ready-to-eat portions ──────────────────────────────────────────────────
+   Portion badge + one-tap "Used 1" on the stored-food card, and the Home
+   "Ready to eat" card. Reuses existing tokens — no :root block (Hard Rule 7). */
+
+/* Stored-food card ------------------------------------------------------- */
+
+.cooked-portions {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.cooked-use-one {
+  font: inherit;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cooked-use-one:hover {
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+}
+
+/* Home "Ready to eat" ---------------------------------------------------- */
+
+.dash-ready-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+}
+.dash-ready-row + .dash-ready-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.dash-ready-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.dash-ready-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-ready-item:hover .dash-ready-name { color: var(--color-primary); }
+
+.dash-ready-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-ready-hint {
+  color: var(--color-primary);
+}
+
+/* The one tap this whole wave exists for — keep it a comfortable target. */
+.dash-ready-use {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.dash-ready-note {
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .cooked-use-one { padding: 0.35rem 0.7rem; font-size: 0.82rem; }
+  .dash-ready-use { padding: 0.35rem 0.7rem; }
+  .dash-ready-name { font-size: 0.9rem; }
+}

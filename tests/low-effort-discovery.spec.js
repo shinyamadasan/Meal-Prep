@@ -428,9 +428,12 @@ test('the low-effort cooking hacks exist and backfill onto an older install', as
     return { before, after, afterTwice, edited, emptied, defaults: titles(defaultCookingHacks) };
   });
 
+  // The backfill adds every default the device is missing, whatever the current
+  // count is — asserted against defaultCookingHacks rather than a frozen number,
+  // so adding a hack in a later wave doesn't break this test.
   expect(result.before).toHaveLength(6);
-  expect(result.after).toHaveLength(13);
-  expect(result.afterTwice).toHaveLength(13);
+  expect(result.after).toHaveLength(result.defaults.length);
+  expect(result.afterTwice).toHaveLength(result.defaults.length);
   expect(result.edited).toBe('My own words');
   expect(result.emptied).toBe(0);
 
@@ -449,18 +452,22 @@ test('the low-effort cooking hacks exist and backfill onto an older install', as
 test('the hacks render on the Hacks tab', async ({ page }) => {
   await loadLocalApp(page);
 
-  const titles = await page.evaluate(() => {
+  const result = await page.evaluate(() => {
     AppState.customHacks = defaultCookingHacks.map((h) => Object.assign({}, h));
     showTab('hacks');
     renderCookingHacks();
-    return Array.prototype.slice
-      .call(document.querySelectorAll('#cooking-hacks .hack-item-title'))
-      .map((el) => el.textContent.trim());
+    return {
+      titles: Array.prototype.slice
+        .call(document.querySelectorAll('#cooking-hacks .hack-item-title'))
+        .map((el) => el.textContent.trim()),
+      defaultCount: defaultCookingHacks.length
+    };
   });
 
-  expect(titles).toContain('Two Lechon Manok Hack');
-  expect(titles).toContain('Pressure-Cooker Batch Meat');
-  expect(titles.length).toBe(13);
+  expect(result.titles).toContain('Two Lechon Manok Hack');
+  expect(result.titles).toContain('Pressure-Cooker Batch Meat');
+  // Every default renders — count taken from the source of truth, not frozen.
+  expect(result.titles.length).toBe(result.defaultCount);
 });
 
 // ── Existing flow ───────────────────────────────────────────────────────────

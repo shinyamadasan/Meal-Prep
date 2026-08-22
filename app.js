@@ -330,7 +330,7 @@ function loadFromLocalStorage() {
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
-      AppState.cookedMeals = data.cookedMeals || [];
+      AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -652,7 +652,7 @@ function restoreBackup() {
       AppState.ingredientPrices = d.ingredientPrices || {};
       AppState.myStores = d.myStores || [];
       AppState.customStores = d.customStores || [];
-      AppState.cookedMeals = d.cookedMeals || [];
+      AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
       cacheInlinePhotos();
@@ -848,6 +848,14 @@ const defaultCookingHacks = [
     title: "Make Sauces Separately",
     description: "Cook plain protein and rice, and keep 2-3 sauces in jars. The same batch becomes a different meal each day without cooking again.",
     timeSaved: "30 minutes per meal",
+    costSavings: ""
+  },
+  {
+    id: 14,
+    category: "Storage",
+    title: "Count Portions When You Store It",
+    description: "When you put cooked food away, add it under Inventory with a portion count — e.g. Landers lechon manok, 6 portions, fridge. Then tap \"Used 1\" each time you eat some. Home shows what is already cooked before it suggests cooking anything new, so ready food gets eaten before it is wasted.",
+    timeSaved: "A whole cook session per week",
     costSavings: ""
   }
 ];
@@ -2544,6 +2552,8 @@ function toggleFavorite(recipeId) {
 }
 window.toggleFavorite = toggleFavorite;
 window.setRecipeQuickFilter = setRecipeQuickFilter;
+window.useCookedPortion = useCookedPortion;
+window.finishCookedMeal = finishCookedMeal;
 
 // Click anywhere on a recipe card to edit it — except on interactive controls
 // (serving steppers, quick-serve buttons, Cooked/Edit/Delete).
@@ -3012,6 +3022,35 @@ function getCookSuggestions() {
   // between visits just because a different category claimed a recipe first.
   var displayOrder = { easiest: 0, 'use-soon': 1, different: 2 };
   return out.sort(function(a, b) { return displayOrder[a.key] - displayOrder[b.key]; });
+}
+
+// Home card: "do we already have something we can eat?" answered before the app
+// suggests cooking anything new. Compact by design — 3 items, not an inventory.
+function renderReadyFoodCard() {
+  var ready = getReadyFoodSuggestions(3);
+  if (!ready.length) return '';
+
+  var rows = ready.map(function(m) {
+    var id = escJ(m.id);
+    var hint = readyFoodBalanceHint(m);
+    var action = cookedMealTracksPortions(m)
+      ? '<button class="dash-inline-btn dash-ready-use" onclick="useCookedPortion(\'' + id + '\')">Use 1</button>'
+      : '<button class="dash-inline-btn dash-ready-use" onclick="finishCookedMeal(\'' + id + '\')">Done</button>';
+    return '<div class="dash-ready-row">' +
+      '<button class="dash-ready-item" onclick="goToFreshnessTab()">' +
+        '<span class="dash-ready-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + '</span>' +
+        '<span class="dash-ready-meta">' + escapeHtml(readyFoodMetaLine(m)) +
+          (hint ? ' · <span class="dash-ready-hint">' + escapeHtml(hint) + '</span>' : '') +
+        '</span>' +
+      '</button>' + action +
+      '</div>';
+  }).join('');
+
+  return '<div class="dash-card dash-card--ready">' +
+    '<div class="dash-level-header">' + icon('utensils') + ' Ready to eat</div>' +
+    rows +
+    '<div class="dash-ready-note">Eat what is already cooked before making something new.</div>' +
+    '</div>';
 }
 
 function renderCookSuggestionCard() {
@@ -3964,6 +4003,7 @@ function renderDashboard() {
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
     leftoverPromptCard +
     level1Card +
+    renderReadyFoodCard() +
     renderCookSuggestionCard() +
     level2Card +
     level3Card +
@@ -5594,7 +5634,7 @@ function importData() {
             AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
             AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
             AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
-            AppState.cookedMeals = unionById(AppState.cookedMeals, importedData.cookedMeals || []);
+            AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
@@ -6150,7 +6190,7 @@ async function loadFromFirestore() {
       AppState.ingredientPrices = data.ingredientPrices || {};
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
-      AppState.cookedMeals = data.cookedMeals || [];
+      AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -6255,6 +6295,7 @@ async function loadUserData() {
           (AppState[key] || []).forEach(function(it) { if (it && it.updatedAt == null) it.updatedAt = localNow; });
         });
         patchMissingNutrition(AppState.recipes);
+        normalizeCookedMeals(AppState.cookedMeals); // portions may arrive from the other device
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
@@ -6391,7 +6432,7 @@ function setupRealtimeListeners() {
         AppState.ingredientPrices = data.ingredientPrices || {};
         AppState.myStores = data.myStores || [];
         AppState.customStores = data.customStores || [];
-        AppState.cookedMeals = data.cookedMeals || [];
+        AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
         AppState.prepModeSession = data.prepModeSession || null;
@@ -9043,7 +9084,7 @@ function showConfirmDialog(title, bodyHtml, confirmLabel, cancelLabel, onConfirm
   overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
 }
 
-function _doMarkCooked(recipe, btn, multiplier = 1) {
+function _doMarkCooked(recipe, btn, multiplier = 1, portions = null) {
   AppState.cookHistory = AppState.cookHistory || [];
   AppState.cookHistory.unshift({
     recipeId: String(recipe.id),
@@ -9054,15 +9095,19 @@ function _doMarkCooked(recipe, btn, multiplier = 1) {
   if (AppState.cookHistory.length > 100) AppState.cookHistory.length = 100;
 
   AppState.cookedMeals = AppState.cookedMeals || [];
-  AppState.cookedMeals.push({
+  // portions == null keeps the pre-wave shape: an untracked batch.
+  var storedPortions = portionCountOrNull(portions, 1);
+  AppState.cookedMeals.push(normalizeCookedMeal({
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     recipeId: String(recipe.id),
     name: recipe.name,
     cookedDate: todayISO(),
     storage: 'fridge',
     fridgeLife: recipe.fridgeLife == null ? null : recipe.fridgeLife,
-    freezerLife: recipe.freezerLife == null ? null : recipe.freezerLife
-  });
+    freezerLife: recipe.freezerLife == null ? null : recipe.freezerLife,
+    initialPortions: storedPortions,
+    portionsRemaining: storedPortions
+  }));
 
   var sum = deductIngredientsForRecipe(recipe, multiplier);
   checkAndReplenishLowStock();
@@ -9093,18 +9138,27 @@ function markRecipeCooked(recipeId, btn) {
   if (!recipe) { showErrorMessage('Recipe not found'); return; }
 
   var multiplierInput = null;
+  var portionsInput = null;
+  var suggestedPortions = Math.max(1, Math.round(Number(recipe.currentServings) || 1));
+
   showConfirmDialog(
     'How many portions cooked?',
     '<p style="margin:0 0 0.5rem">Base recipe: <strong>' + recipe.currentServings + ' servings</strong></p>' +
       '<div style="display:flex;align-items:center;gap:0.5rem">' +
         '<input id="cook-portion-multiplier" type="number" min="0.25" step="0.25" value="1" class="form-control" style="max-width:6rem">' +
         '<span>× the recipe</span>' +
-      '</div>',
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.6rem">' +
+        '<input id="cook-portion-count" type="number" min="1" step="1" value="' + suggestedPortions + '" class="form-control" style="max-width:6rem">' +
+        '<span>meal portions to store</span>' +
+      '</div>' +
+      '<p style="margin:0.4rem 0 0;font-size:0.8rem;color:var(--color-text-secondary)">Leave blank if you would rather not track portions.</p>',
     'Continue',
     'Cancel',
     function() {
       var m = multiplierInput ? parseFloat(multiplierInput.value) : 1;
       if (isNaN(m) || m <= 0) m = 1;
+      var portions = portionCountOrNull(portionsInput ? portionsInput.value : null, 1);
 
       var missing = checkMissingIngredients(recipe, m);
       if (missing.length > 0) {
@@ -9114,14 +9168,27 @@ function markRecipeCooked(recipeId, btn) {
             '<p>Did you already buy them but forgot to add to the app?</p>',
           'Yes, mark as cooked anyway',
           'Cancel',
-          function() { _doMarkCooked(recipe, btn, m); }
+          function() { _doMarkCooked(recipe, btn, m, portions); }
         );
         return;
       }
-      _doMarkCooked(recipe, btn, m);
+      _doMarkCooked(recipe, btn, m, portions);
     }
   );
+
   multiplierInput = document.getElementById('cook-portion-multiplier');
+  portionsInput = document.getElementById('cook-portion-count');
+  // Keep the suggested portion count in step with the batch multiplier, but stop
+  // the moment the user types their own number — their count always wins.
+  if (multiplierInput && portionsInput) {
+    portionsInput.addEventListener('input', function() { portionsInput.dataset.touched = '1'; });
+    multiplierInput.addEventListener('input', function() {
+      if (portionsInput.dataset.touched) return;
+      var mult = parseFloat(multiplierInput.value);
+      if (!Number.isFinite(mult) || mult <= 0) return;
+      portionsInput.value = Math.max(1, Math.round(suggestedPortions * mult));
+    });
+  }
 }
 
 function openManualCookedModal() {
@@ -9139,6 +9206,8 @@ function openManualCookedModal() {
   if (fridgeEl) fridgeEl.value = '3';
   var freezerEl = document.getElementById('manual-cooked-freezer-life');
   if (freezerEl) freezerEl.value = '90';
+  var portionsEl = document.getElementById('manual-cooked-portions');
+  if (portionsEl) portionsEl.value = ''; // blank = untracked, the pre-wave behaviour
   modal.classList.remove('hidden');
   if (nameEl) setTimeout(function() { nameEl.focus(); }, 50);
 }
@@ -9171,7 +9240,10 @@ function saveManualCookedMeal() {
 
   var source = sourceEl && sourceEl.value === 'takeout' ? 'takeout' : 'leftovers';
   var storage = storageEl && storageEl.value === 'freezer' ? 'freezer' : 'fridge';
-  var meal = {
+  var portionsEl = document.getElementById('manual-cooked-portions');
+  var portions = portionCountOrNull(portionsEl ? portionsEl.value : null, 1);
+
+  var meal = normalizeCookedMeal({
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     recipeId: null,
     source: source,
@@ -9179,8 +9251,10 @@ function saveManualCookedMeal() {
     cookedDate: dateEl && dateEl.value ? dateEl.value : todayISO(),
     storage: storage,
     fridgeLife: manualCookedDays(fridgeEl ? fridgeEl.value : '', 3),
-    freezerLife: manualCookedDays(freezerEl ? freezerEl.value : '', 90)
-  };
+    freezerLife: manualCookedDays(freezerEl ? freezerEl.value : '', 90),
+    initialPortions: portions,
+    portionsRemaining: portions
+  });
   stampUpdated(meal);
 
   AppState.cookedMeals = AppState.cookedMeals || [];
@@ -9190,6 +9264,201 @@ function saveManualCookedMeal() {
   renderCookedMeals();
   refreshFreshnessAlerts();
   showSuccessMessage('Added "' + name + '" to your stored meals.');
+}
+
+// ── Ready-to-eat portions on cooked meals ────────────────────────────────────
+// Two OPTIONAL, additive fields on the existing cookedMeals[] objects. No new
+// top-level AppState key, so the sync registries are untouched — cookedMeals
+// already round-trips through localStorage, Firestore, export/import and the
+// union merge, so these ride along for free.
+//
+//   meal.initialPortions    how many meal-sized portions the batch started with
+//   meal.portionsRemaining  how many are left
+//
+// BOTH null = an untracked batch, which behaves exactly as it did before this
+// existed. Portions are whole meals, never grams, never per-person. See D-056.
+
+var PORTION_COUNT_MAX = 99;
+
+// A portion count, or null for "not tracked". Fractions are floored — half a
+// meal portion is not a concept this app has, and pretending otherwise would
+// invite exactly the weighing behaviour this wave is meant to avoid.
+function portionCountOrNull(value, min) {
+  if (value == null || value === '') return null;
+  var n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  n = Math.floor(n);
+  if (n < min) return null;
+  if (n > PORTION_COUNT_MAX) return PORTION_COUNT_MAX;
+  return n;
+}
+
+// Idempotent. Only ever repairs an incoherent pair; never invents portions for a
+// batch that has none, so records saved before this wave stay untracked.
+function normalizeCookedMeal(meal) {
+  if (!meal || typeof meal !== 'object') return meal;
+
+  var initial = portionCountOrNull(meal.initialPortions, 1);
+  var remaining = portionCountOrNull(meal.portionsRemaining, 0);
+
+  // Only one side present (a hand-edited record, or a partial import): mirror it
+  // so the pair is coherent rather than half-tracked.
+  if (initial == null && remaining != null && remaining > 0) initial = remaining;
+  if (remaining == null && initial != null) remaining = initial;
+
+  // Remaining must never exceed the original count. Raise the original rather
+  // than clamping remaining down — clamping would silently delete food the user
+  // says they still have.
+  if (initial != null && remaining != null && remaining > initial) initial = remaining;
+
+  meal.initialPortions = initial;
+  meal.portionsRemaining = remaining;
+  return meal;
+}
+
+function normalizeCookedMeals(meals) {
+  if (!Array.isArray(meals)) return [];
+  meals.forEach(normalizeCookedMeal);
+  return meals;
+}
+
+function findCookedMeal(id) {
+  return (AppState.cookedMeals || []).find(function(m) { return String(m.id) === String(id); }) || null;
+}
+
+// Does this batch track portions at all?
+function cookedMealTracksPortions(meal) {
+  return !!meal && portionCountOrNull(meal.portionsRemaining, 0) != null;
+}
+
+function formatPortions(n) {
+  return n + (n === 1 ? ' portion' : ' portions');
+}
+
+// ── Consuming a portion ──────────────────────────────────────────────────────
+
+// One tap = one portion gone. No modal, no fields, no per-person logging.
+// The last portion finishes the batch through the SAME removal path the existing
+// "Done" button uses, so there is no second deletion concept to keep in sync.
+function useCookedPortion(id) {
+  var meal = findCookedMeal(id);
+  if (!meal) return;
+
+  if (!cookedMealTracksPortions(meal)) {
+    // Untracked batch — nothing to count down. Treat it as finished, which is
+    // what "Done" already meant for these.
+    finishCookedMeal(id);
+    return;
+  }
+
+  var next = meal.portionsRemaining - 1;
+  if (next <= 0) {
+    finishCookedMeal(id, meal.name);
+    return;
+  }
+
+  meal.portionsRemaining = next;
+  stampUpdated(meal);
+  saveData();
+  renderCookedMeals();
+  renderDashboard();
+  refreshFreshnessAlerts();
+  showSuccessMessage(escapeHtml(meal.name) + ' — ' + formatPortions(next) + ' left.');
+}
+
+// Batch is gone. Reuses removeCookedMeal() so the tombstone/deletion behaviour is
+// identical to the pre-existing "Done" action.
+function finishCookedMeal(id, name) {
+  var meal = findCookedMeal(id);
+  var label = name || (meal && meal.name) || 'Meal';
+  removeCookedMeal(id);
+  renderDashboard();
+  showSuccessMessage('Finished ' + escapeHtml(label) + ' — removed from your fridge.');
+}
+
+// ── "Do we already have something we can eat?" ───────────────────────────────
+
+// Ranking bucket, lower eats first:
+//   0  fridge food expiring soon    (use it before it is wasted)
+//   1  fridge food generally        (fresher, but still perishable)
+//   2  freezer food                 (keeps — the last resort)
+function readyFoodBucket(meal) {
+  var isFreezer = (meal.storage || 'fridge') === 'freezer';
+  if (isFreezer) return 2;
+  var daysLeft = daysLeftFrom(meal.cookedDate, cookedShelfLife(meal));
+  if (daysLeft != null && daysLeft <= FRESHNESS_WARN_DAYS) return 0;
+  return 1;
+}
+
+// Deterministic answer to "what ready food should we use first?".
+// Uses only data the app already holds — storage, the existing freshness
+// calculation, and portions. No model calls, no server, no new state.
+//
+// Expired batches are deliberately EXCLUDED: the freshness banner and the Home
+// attention card already flag those for disposal, and recommending someone eat
+// food that is past its date would be actively harmful.
+function getReadyFoodSuggestions(limit) {
+  var meals = (AppState.cookedMeals || []).filter(function(m) {
+    if (!m || !m.name) return false;
+    if (cookedMealTracksPortions(m) && m.portionsRemaining <= 0) return false;
+    var daysLeft = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
+    if (daysLeft != null && daysLeft < 0) return false; // expired — not a meal suggestion
+    return true;
+  });
+
+  meals.sort(function(a, b) {
+    var bucketDiff = readyFoodBucket(a) - readyFoodBucket(b);
+    if (bucketDiff) return bucketDiff;
+
+    // Within a bucket: soonest to spoil first (unknown shelf life sorts last).
+    var da = daysLeftFrom(a.cookedDate, cookedShelfLife(a));
+    var db = daysLeftFrom(b.cookedDate, cookedShelfLife(b));
+    if (da == null && db != null) return 1;
+    if (db == null && da != null) return -1;
+    if (da != null && db != null && da !== db) return da - db;
+
+    // Then finish the smaller remainder first, so odd single portions clear out
+    // instead of lingering. Untracked batches sort after tracked ones.
+    var pa = cookedMealTracksPortions(a) ? a.portionsRemaining : Infinity;
+    var pb = cookedMealTracksPortions(b) ? b.portionsRemaining : Infinity;
+    if (pa !== pb) return pa - pb;
+
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  return limit ? meals.slice(0, limit) : meals;
+}
+
+// Reuses the recipe's existing mealBalance (D-055) when the batch came from one.
+// Purely a nudge — no composition logic, no new model. Returns '' when the
+// recipe has no balance data or the batch was added manually.
+function readyFoodBalanceHint(meal) {
+  if (!meal || meal.recipeId == null) return '';
+  var recipe = (AppState.recipes || []).find(function(r) {
+    return String(r.id) === String(meal.recipeId);
+  });
+  if (!recipe) return '';
+  var mb = normalizeMealBalance(recipe.mealBalance);
+  if (!mb.protein) return ''; // only worth suggesting sides for a protein batch
+  var missing = [];
+  if (!mb.vegetables) missing.push('veg');
+  if (!mb.carb) missing.push('rice');
+  return missing.length ? 'add ' + missing.join(' + ') : '';
+}
+
+// One short line describing where it is and how long it keeps.
+function readyFoodMetaLine(meal) {
+  var parts = [];
+  if (cookedMealTracksPortions(meal)) parts.push(formatPortions(meal.portionsRemaining));
+  parts.push((meal.storage || 'fridge') === 'freezer' ? 'freezer' : 'fridge');
+
+  var daysLeft = daysLeftFrom(meal.cookedDate, cookedShelfLife(meal));
+  if (daysLeft != null) {
+    if (daysLeft === 0) parts.push('use today');
+    else if (daysLeft <= FRESHNESS_WARN_DAYS) parts.push('use soon · ' + daysLeft + 'd left');
+    else parts.push(daysLeft + 'd left');
+  }
+  return parts.join(' · ');
 }
 
 function cookedShelfLife(m) {
@@ -9245,6 +9514,9 @@ function renderCookedMeals() {
     var h = '<div class="cooked-card ' + fs.cls + '">';
     h += '<div class="cooked-card-main">';
     h += '<span class="cooked-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + (sourceLabel ? ' <span class="cooked-source">' + sourceLabel + '</span>' : '') + '</span>';
+    if (cookedMealTracksPortions(m)) {
+      h += '<span class="cooked-portions">' + formatPortions(m.portionsRemaining) + '</span>';
+    }
     if (fs.label) h += '<span class="cooked-badge">' + fs.icon + ' ' + fs.label + '</span>';
     h += '</div>';
     h += '<div class="cooked-card-meta">';
@@ -9253,7 +9525,10 @@ function renderCookedMeals() {
     h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">' + icon('refrigerator') + ' Fridge ' + formatStorageLife(m.fridgeLife) + '</button>';
     h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">' + icon('snowflake') + ' Freezer ' + formatStorageLife(m.freezerLife) + '</button>';
     h += '</div>';
-    h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + m.id + '\')" title="Ate it / remove">' + icon('check') + ' Done</button>';
+    if (cookedMealTracksPortions(m)) {
+      h += '<button class="cooked-use-one" onclick="useCookedPortion(\'' + escJ(m.id) + '\')" title="Ate one portion">' + icon('utensils') + ' Used 1</button>';
+    }
+    h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + escJ(m.id) + '\')" title="Ate it all / remove">' + icon('check') + ' Done</button>';
     h += '</div>';
     h += '</div>';
     return h;

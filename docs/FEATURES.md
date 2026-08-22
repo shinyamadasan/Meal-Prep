@@ -11,6 +11,7 @@
   - L3 Planning strip: 7-day dot row + links to Planner/Nutrition.
 - **Cook History card** — Working · last 10 of `AppState.cookHistory`, hidden when empty.
 - Personalized greeting (display name / email prefix).
+- **"Ready to eat"** — Working · `getReadyFoodSuggestions()` / `renderReadyFoodCard()` · up to 3 stored cooked meals, ranked expiring-fridge → fridge → freezer, each with a one-tap **Use 1**. Rendered ABOVE the cook suggestions so the priority is ready food → easiest cook → everything else. Expired batches are excluded. See DECISIONS D-056.
 - **"What should I cook?"** — Working · `getCookSuggestions()` / `renderCookSuggestionCard()` · up to 3 deterministic options: ⚡ Easiest (lowest effort score), 🥬 Use soon (`getExpirySuggestions()`, shared with the existing attention card), 🍽️ Something different (least-recently cooked, from `cookHistory`). A category with no supporting data is OMITTED, never guessed. No model calls, no server. See DECISIONS D-055.
 
 ## Cook (My Recipes)
@@ -35,7 +36,8 @@
 - **Ingredient Browser modal** — Working · `openIngredientBrowser()`, `#ingredient-browser-modal`.
 - **Bulk add + voice** — Working · `openBulkAddModal()`, `confirmBulkAdd()`, `startVoiceInput()` (Web Speech API; Chrome/Edge only, text fallback elsewhere).
 - **Freshness alert banner** — Working · top-of-app on load; dismissable per session.
-- **Mark recipe cooked** — Working · `markRecipeCooked()` → deducts pantry + logs cook history.
+- **Mark recipe cooked** — Working · `markRecipeCooked()` → deducts pantry + logs cook history. The same dialog optionally captures how many meal portions the batch made (pre-filled from the recipe's servings, follows the batch multiplier until the user overrides it).
+- **Portion tracking on stored food** — Working · `cookedMeal.initialPortions` / `portionsRemaining` · optional. A tracked batch shows a portion badge and a one-tap **Used 1**; the last portion finishes the batch through the existing removal path. Untracked batches render exactly as before. See DECISIONS D-056.
 
 ## Shop (Grocery)
 - **Auto grocery list** — Working · `renderGroceryList()` · aggregated from plan, scaled, grouped by category (A→Z, "Other" last), per-item cost, in-stock badges, check-off, recipe source labels.
