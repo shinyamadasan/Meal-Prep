@@ -2557,7 +2557,7 @@ acceptance:
   - [x] Mobile cleanup simple: every destructive control ≥30×44px and inside the viewport (asserted)
   - [x] No new recurring inventory chore introduced
   - [x] Full existing suite stays green (100/100 unchanged) — total 127/127
-  - [x] Production smoke green against the deployed build
+  - [x] Production smoke green against the deployed build — 11/11 against `cb7fcd7`
 
 constraints:
   - Additive fields on existing objects only — no new top-level `AppState` key (none added:

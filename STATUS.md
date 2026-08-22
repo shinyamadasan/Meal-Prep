@@ -4,6 +4,107 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-22 — Kitchen-truth wave merged and deployed (D-057) — first owner-authorised D-032 red-zone merge
+
+Third feature wave in three days. `wave1-portion-truth` remains parked and untouched at `88b5598`.
+
+### What shipped — `wave-kitchen-truth` → `main` (`cb7fcd7`, `--no-ff`)
+
+Goal: make it almost effortless for the app to know what food we actually have, what is running
+out, and what should be removed — without a warehouse system, without weighing food, and without
+adding a daily chore.
+
+**Phase 1 found the headline defect: the highest-priority loop did not exist at all.**
+`toggleGroceryItem()` flipped `item.checked`, re-rendered, and stopped. It never wrote to
+`AppState.pantry`, and it never called `saveData()` — so the tick did not even survive a reload.
+`docs/FEATURES.md` had listed "Grocery → Pantry auto-transfer on check (with undo)" as **Working**
+the whole time. That is the second time in three waves that a doc claim outran the code; worth
+watching.
+
+- **Bought ✓ is the whole interaction.** Checking a grocery row calls `stockPurchasedGroceryItem()`,
+  which infers category, storage, shelf life and purchase date exactly the way manual pantry adds
+  do. No modal, no quantity prompt, no date entry — asserted (zero overlays opened). Unchecking
+  calls `unstockPurchasedGroceryItem()` and reverses precisely that change via a `stocked` receipt,
+  so a mis-tap costs one tap instead of leaving a phantom record.
+- **Safe merge, not lot tracking.** `findPantryByExactName()` is exact and case-insensitive —
+  deliberately NOT the fuzzy `findPantryMatch()`, so "Chicken" can never fold into a "Chicken
+  Breast" record. `canMergePurchase()` refuses printed-expiry records and already-expired ones.
+  **A merge does not rewrite `purchaseDate`** — the oldest portion keeps governing freshness.
+  Stamping today is the obvious implementation and is quietly destructive: six-day-old chicken
+  becomes fresh chicken the moment you buy more. Under-claiming freshness is visible and
+  self-correcting; over-claiming is invisible. Quantity sums only when both sides are known,
+  otherwise it stays `null` — the app does not invent numbers it cannot know.
+- **Fast states reuse `stockLevel`.** Buying a low staple sets `'full'` and lets the existing
+  `syncStapleToGrocery()` drop its auto shopping row. No parallel status system was added.
+- **One attention experience over two data models.** `collectAttentionItems()` scans pantry items
+  and cooked meals in one pass and returns Expired / Use soon / Low. The two record types keep
+  their own shapes and their own shelf-life rules — unified *experience*, not unified schema.
+- **`Keep` invents no date.** It writes `keptOn = todayISO()` and suppresses the record from the
+  attention surfaces for that day only; `isKeptToday()` is a strict equality against `todayISO()`,
+  so it lapses at midnight on its own. It is an acknowledgement, not a dismissal. The Inventory tab
+  still shows "Expired 4d ago" throughout — truth stays where the food is listed.
+- **Cleanup**: one tap per expired item, plus a bulk `Remove expired (N)`.
+
+### Two further defects fixed on the way through
+- `getExpiredPantryItems()` classified by `item.expiryDate` alone while every badge computes
+  freshness through `pantryDaysLeft()`. Bought-date items — the common case — never matched, so the
+  Inventory "Clear expired" button stayed permanently hidden while the banner directly above it read
+  "2 expired". A bulk cleanup that existed and could not fire.
+- The bulk **Remove expired** control inherited `.dash-l1-cta`, a `padding: 0` text link, and
+  shipped at **12px tall** on a phone — a hairline tap target for the most destructive action in the
+  wave. Caught by the mobile smoke during pre-merge verification, fixed, and regression-locked.
+- Also removed two dead DOM reads in `addToPantry()` (`#pantry-add-where`, `#pantry-qty-input`),
+  gone from `index.html` long ago. That resolves a ROADMAP dead-code entry.
+
+### Why this was red zone, and how it was released
+Under D-032 this wave is **`approved`, not `done`**: it adds a bulk-delete path and writes
+tombstones. A broken UI change is reverted in a minute; lost user data cannot be reverted at all.
+Claude recommended holding it and did **not** merge on its own judgement. The operator gave explicit
+written authorisation, and the merge happened on that instruction — the first time this project has
+run that gate deliberately rather than by default. The approval record was committed to `main`
+(`54ae79a`) **before** the merge, per the D-040 addendum, so the audit trail reads in the right order.
+
+**The tombstone mechanism was used, not changed.** Grepping the diff for `cloudReady`,
+`saveToFirestore`, `saveData`, `mergeCloudConflict`, `unionByIdLWW`, `applyTombstones`,
+`recordLocalDeletions` and `MASS_DELETE_GUARD` returns **zero hits**. The new cleanup writes
+`AppState.deletions[id]` then calls `snapshotIdBaseline()` — exactly what `deleteSelectedPantryItems()`
+(`app.js:8326`) and `clearExpiredPantryItems()` (`app.js:8352`) already did. This matters because
+`recordLocalDeletions()` deliberately ignores more than `MASS_DELETE_GUARD` (5) simultaneous
+disappearances as a suspected load race: a large cleanup relying on the vanish-diff would record
+zero tombstones and another device would resurrect the food. Both the local and production tests
+seed **six** expired items specifically to cross that threshold.
+
+No new top-level `AppState` key. Three additive fields on existing objects: `pantry[].keptOn`,
+`cookedMeals[].keptOn`, `groceryList[].userSet`, `groceryList[].stocked`.
+
+### Verification
+- **127/127 local** (100 pre-existing unchanged + 27 new in `tests/kitchen-truth.spec.js`), green on
+  the merged `main` **before** pushing.
+- **11/11 production smoke** (`tests/production-smoke-kitchen-truth.spec.js`) against the deployed
+  build, including the merge-date rule, the MASS_DELETE_GUARD-crossing bulk cleanup, and the Keep
+  day-N → day-N+1 lapse driven by a real `page.clock` advance.
+- **Pages evidence**: build `cb7fcd7` status `built`, duration 38.5s; live `app.js` SHA1
+  `9975f06a…` matches `git show main:app.js` byte-for-byte.
+- **Mutation check**: replacing `isKeptToday()` with permanent suppression fails the two Keep
+  lifecycle tests, proving that coverage is not vacuous.
+
+### Follow-ups carried, not absorbed
+Both logged in `planning/ROADMAP.md` Known Issues rather than silently expanded into:
+1. **`deductIngredientsForRecipe()` removes depleted pantry items without explicit tombstones**,
+   relying on the vanish-diff. Cooking something that depletes more than five tracked items records
+   no tombstones and lets another device resurrect them. Same fix pattern as the cleanup path, but
+   it sits on the *cook* path — deliberately out of this wave.
+2. **The grocery row is a ~33px tap target on phones** (pre-existing `.grocery-item` padding under
+   the narrow breakpoint). D-057 promoted that row to the primary inventory-write interaction, so it
+   now carries more weight than it did.
+
+next:
+  - Neither follow-up is urgent, but #1 is the same class of silent-data-loss bug this wave existed
+    to prevent, and it is the obvious next small task. It touches deletion, so it is red zone too.
+  - No further inventory work is briefed. `wave1-portion-truth` (`88b5598`) still parked, still
+    claiming D-054.
+
+---
 
 ## 2026-08-22 — Ready-food-first wave merged and deployed (D-056); next direction re-pointed at inventory truth
 
