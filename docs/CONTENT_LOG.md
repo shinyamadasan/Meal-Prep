@@ -136,3 +136,86 @@ matter how confident the AI is) — and landed only after an explicit "yes."
 blind trust. And the fix wasn't "be more careful next time" — it was closing the actual hole in
 the system so the *next* person (or the same person, three weeks from now, less alert) doesn't
 have to catch it by hand again.
+
+## 2026-08-22 — I could have shipped "push notifications." I shipped the honest version instead.
+
+The feature request was simple and obvious: tell me when my food is going bad. The app already
+knows — it tracks what's in the fridge, when it was bought, how long it keeps. It just doesn't
+speak up. You have to open it and look.
+
+So: notifications. Everyone knows what those are. Your phone buzzes, you look, you use the chicken
+before it turns. Straightforward.
+
+Before writing a line of it, the assistant went and checked what the app could actually do. That
+turned out to be the whole story.
+
+This app is a web page. It lives on free static hosting — files on a server, nothing running,
+nothing thinking. And a web page that isn't open cannot do anything at all. It has no heartbeat.
+For a phone to buzz while the app is closed, something *else* has to be awake and decide to buzz
+it: a server, somewhere, that wakes up on a schedule, reads through everyone's fridge contents,
+works out whose milk went off today, and pushes a message to their specific device.
+
+That server does not exist here. Building it isn't a weekend of work either — it means standing up
+an always-on service, registering every device that wants alerts, keeping those registrations in
+sync, and — the part that actually gives you pause — having a machine somewhere continuously
+reading every user's private food inventory so it can decide who to bother. For an app whose whole
+promise is "your data stays yours," that's not a small addition. That's a different app.
+
+There were three tempting escape hatches. The assistant checked all three, and all three were
+mirages. One browser feature that sounds like it does this ("wake up occasionally in the
+background") only works in one browser family, only if you've installed the app to your home
+screen, only if the browser decides you use it enough — and is explicitly allowed to just never
+run. Another feature that would have solved it perfectly — schedule a notification for Tuesday, no
+server needed — was tried by browser makers years ago and quietly abandoned. It ships nowhere. And
+on iPhones, in a normal browser tab, the notification system isn't merely restricted; it isn't
+there at all.
+
+So the honest answer was: **no, this app cannot buzz your phone while it's closed, and no amount of
+cleverness changes that.**
+
+Here's the part I think is worth telling. The easy move — the one that would have looked better —
+was to build it anyway. Add the server, wire up the plumbing, and put "push notifications" in the
+changelog. It would have demoed beautifully. It also would have quietly failed for a chunk of
+users, on platforms where the browser just declines to deliver, and they'd never know why. And
+that's the actual danger with a food-safety alert: someone who *trusts* a notification that never
+comes throws away good food, or eats bad food, because they were waiting for a buzz that the
+system was never going to send. **A promise you can't keep is worse than no promise.**
+
+What got built instead: the app tells you the moment you open it, or the moment you switch back to
+it. One message for the whole kitchen — not one buzz per vegetable. It says "3 foods expired — open
+Meal Prep to review them," never "eat these," because telling someone to eat expired food is the
+one thing this feature must never do. And if you've already looked at something and decided it's
+fine, it shuts up about it. It never nags you twice about food that hasn't changed.
+
+Then the smallest thing that genuinely does work when the app is closed: if you install it to your
+home screen, the icon carries a little number, like an unread badge. No server, no permissions
+theatre, no promises. Just a quiet count of things that want attention.
+
+And in the settings, in plain English, right under the on/off switch: *this app has no notification
+server, so nothing arrives while it is closed.* Written down where a user will actually read it —
+not buried in a technical document nobody opens.
+
+**Two smaller moments from the same day, both about the same instinct.**
+
+The first: the app is meant to be used on a phone, so the obvious final step was to test it on one.
+There wasn't one available — the tooling was installed, but no device was plugged in and none could
+be. The tempting move is to wave that away ("it'll be fine, the code is the same"). Instead it got
+written down, in three separate places, as an explicit *you still need to do this on your phone*
+list: install it, turn alerts on, tap the notification, check the badge. Unfinished work that's
+written down is a task. Unfinished work that's quietly skipped is a bug waiting to be discovered by
+a user.
+
+The second is smaller and funnier. The automated test that was supposed to prove "the notification
+actually fires" kept failing. The cause: the invisible browser the tests run in *always* refuses
+notification permission, no matter what you tell it. Which means the test could have been made to
+"pass" trivially — by asserting the thing that always happens anyway. A green tick that proves
+nothing. Instead the test now runs for real in a visible browser, and when it *can't*, it says so
+out loud and marks itself skipped rather than silently pretending. Nine real checks against the
+actual live site, or an honest "didn't run." No third option.
+
+**Why this is worth telling:** the interesting decision in software usually isn't what got built.
+It's what someone talked themselves out of building — and whether they wrote down why. The
+temptation here wasn't laziness. It was the opposite: a whole impressive pile of infrastructure
+that would have made the feature *sound* better while making it *work* worse. Saying "here is
+exactly what this can and cannot do" is less exciting than saying "we have push notifications." It
+is also the only version that doesn't eventually make someone throw away good chicken.

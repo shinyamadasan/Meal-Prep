@@ -50,3 +50,34 @@
   (e.g. a `branch:` field alongside `status:`) so review/lookup doesn't have to assume
   `task-<id>` universally, and so a task whose branch already merged under a sibling's identity can
   be recognized and auto-resolved to `done` instead of retried forever.
+- 2026-08-22: headless Chromium **hard-denies** the Notifications permission regardless of
+  Playwright's `context.grantPermissions(['notifications'])` — `Notification.permission` reads
+  `denied` headless and `granted` headed, confirmed with an isolated probe. Any test asserting
+  notification behaviour therefore passes *vacuously* under the default `npm test` unless it either
+  forces `--headed` (which breaks CI on a display-less runner) or detects the denial and skips
+  loudly. Cost a full smoke-suite debug cycle before the cause was spotted — the first four failures
+  all looked like app bugs. Handled in `tests/production-smoke-attention-notifications.spec.js` by
+  granting, re-reading the actual permission, and `test.skip(...)` with an explicit reason plus an
+  `npm run test:smoke:notifications` (`--headed`) escape hatch. Candidate OS-level improvement, not
+  yet built: a shared `tests/_helpers` module for "capability-gated" specs, so the next
+  permission-dependent feature (camera, geolocation, clipboard) doesn't rediscover this by hand.
+- 2026-08-22: repo files have **mixed line endings** (`core.autocrlf` checks out CRLF, but several
+  tracked docs — `REVIEW.md`, `CONTENT_LOG.md` — are LF in the working tree while `TASKS.md`,
+  `STATUS.md`, `app.js` are CRLF). Every scripted doc edit that hard-codes `\n` in an anchor string
+  silently fails to match on the CRLF files, and every one that hard-codes `\r\n` fails on the LF
+  ones — hit four times in one session, each costing a retry. Working rule that fixed it: detect per
+  file with `const NL = s.includes('\r\n') ? '\r\n' : '\n'` and normalise the inserted block to it.
+  Related trap: `md5sum` on a local checkout will never match the same file fetched from GitHub
+  Pages, because Pages serves the LF blob — deployment verification must compare
+  `git show main:<file>` against the fetched copy with `tr -d '\r'`, not the working-tree file.
+  Candidate fix: a `.gitattributes` with explicit `text eol=` rules, or a small shared edit helper.
+- 2026-08-22: the "Button tests" CI workflow fails intermittently with a single 30s
+  `locator.click` timeout, a **different test each run** (`ready-food-portions.spec.js:307` on run
+  32582675564, `production-smoke-ready-food.spec.js:212` on run 32586471466, then green on run
+  32587435063), while the same specs pass locally every time. The suite runs 2 workers against the
+  **live** GitHub Pages site, so several specs contend for the same remote origin under a short
+  per-test timeout. Effect on the OS: a red CI badge that means nothing, which trains everyone to
+  ignore it — and would hide a real regression. Not fixed (out of scope for the wave that noticed
+  it); candidate fixes are raising the timeout for the `production-smoke-*` specs specifically,
+  pinning them to a single worker, or splitting live-site smoke into its own workflow from the
+  local-file suite.
