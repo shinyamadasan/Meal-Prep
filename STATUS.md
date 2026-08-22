@@ -4,6 +4,132 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-22 — Food attention notifications merged and deployed (TASK-046, D-058) — third owner-authorised D-032 red-zone merge
+
+A small feature wave that started by proving what the platform **cannot** do, and then built only
+what it can. `wave1-portion-truth` remains parked and untouched at `88b5598`.
+
+### What shipped — `wave-food-attention-notifications` → `main` (`8fbf89d`, `--no-ff`)
+
+The app already tells the truth about food: `collectAttentionItems()` (D-057) produces Expired /
+Use soon over both pantry items and cooked meals, and Keep / Remove live on that Home card. The gap
+was that you had to **open the app** to find out.
+
+### Phase 1 came back negative, and that shaped everything
+
+Before any code: **this app cannot deliver a notification while it is closed, and nothing short of
+new backend infrastructure would change that.**
+
+- Hosting is static GitHub Pages — no server-side compute. The only backend is
+  `workers/recipe-import`, a stateless Worker with no scheduler and no state.
+- `sw.js` was cache-only — no `push`, no `notificationclick`, no `periodicsync`.
+- Firebase is Auth + Firestore. No FCM registration, no VAPID key, no messaging SDK. Web Push would
+  need a VAPID keypair, a per-device subscription store, and a scheduled service reading every
+  user's inventory — a much larger security and privacy surface than this app has.
+- Periodic Background Sync: Chromium-only, installed-PWA-only, engagement-gated, and free to never
+  fire. Absent on Safari/iOS and Firefox.
+- The Notification Triggers API — the one thing that would have given local scheduling with no
+  server — never shipped past origin trial.
+
+The operator's decision gate ("if reliable background notifications need significant backend push
+infrastructure, stop and report") was hit, reported, and honoured. **No push stack was built.**
+
+### What was built instead
+
+`maybeNotifyAttention()` runs at app open (all three load paths) and on `visibilitychange` →
+visible. It **consumes** `collectAttentionItems()` and defines no expiry boundary of its own —
+proven structurally by a test that stubs `collectAttentionItems()` and asserts the notification
+follows the stub, so a second freshness model can never be introduced silently.
+
+One grouped notification per pass, `tag: 'meal-prep-attention'` so a later alert replaces rather
+than stacks. Three copy shapes; every expired body says **"Open Meal Prep to review"**, never eat /
+use / cook. Dedup ledger `"<kind>:<id>" → state`, rewritten from the current world each pass:
+unchanged food is silent forever, use-soon → expired announces once more, removed food drops out so
+a re-add can announce again. Keep suppression (D-057) is **inherited, not re-implemented** — there
+is no `keptOn` reference anywhere in the new code.
+
+Permission is requested from exactly one function, reachable only from Settings → Notifications.
+Nothing on page load asks. Denial, and a browser with no `Notification` object at all, both leave
+the app fully working.
+
+`updateAppAttentionBadge()` sets the PWA app-icon badge from the existing expired+expiring count —
+the only "while you're away" signal this architecture can honestly provide. The in-app Inventory
+tab badge is unchanged.
+
+### No new synced state
+
+The ledger lives in the device-local `localStorage` key `mealPrepFoodAlerts`, alongside
+`mealPrepHelpSeen` / `pantryOnboardingDone` / `mealPrepWeekTemplate`. A test asserts that neither
+`AppState` nor the persisted `mealPrepAppData` payload grows an alert field. **Sync, tombstones,
+`saveData()`, the `cloudReady` write-guard and auth are untouched.**
+
+### Why this was red zone, and how it was released
+
+Not because of data: the wave writes nothing to `AppState` or Firestore. Because of **`sw.js`** —
+the offline-cache surface every user loads through, where a broken worker can wedge a cached app on
+a device that then never fetches the fix. Under D-032 that is `approved`, not `done`. Claude
+recommended held, returned the branch unmerged and unpushed, and did not merge on its own judgement.
+The operator then gave explicit written authorisation naming the SHA (`31bf98d`). **This was not an
+automatic merge.** Recorded in REVIEW.md TASK-046 and in the merge commit.
+
+The `sw.js` change is additive: one `notificationclick` listener plus `CACHE` v4 → v5. The
+`install` / `activate` / `fetch` handlers are unchanged, so the network-first app-shell strategy
+that makes deploys go live immediately is intact.
+
+### Deployment verified, not assumed
+
+Pages deployment `github-pages` succeeded for SHA `8fbf89d5edf685f45f590b6bc674ca8642c7efa3` —
+matching final `main`. The deployed bytes were then fetched and checked directly: `sw.js` contains
+the `notificationclick` handler and **no** `push` / `periodicsync` / `pushManager`; `app.js` carries
+all six new functions; `index.html` carries the Settings row and **no** `firebase-messaging` /
+`getMessaging` / `vapid`.
+
+### Real-device verification could NOT be performed — owner/manual item
+
+`adb` is installed (platform-tools 37.0.0) but reports **zero devices attached and zero configured
+AVDs**, and the session is non-interactive. Recorded rather than skipped or claimed.
+
+The substitute that WAS run: production smoke against the deployed HTTPS site in Chromium with a
+live registered service worker and a **browser-granted** notification permission — the same Blink
+service-worker path Android Chrome uses. It proves the SW `showNotification()` path is the one
+taken (constructor path asserted unused), one grouped notification for five items, no repeat on
+unchanged food across passes and a reload, and no push subscription ever created.
+
+Still outstanding for a phone: PWA install from the Chrome menu, the real OS permission prompt, an
+actual thumb-tap on the tray notification, `setAppBadge` on the launcher icon, and a real
+close/reopen cycle. Listed in REVIEW.md TASK-046.
+
+One thing worth knowing for future waves: **headless Chromium hard-denies the Notifications
+permission** regardless of `grantPermissions()`. The smoke therefore skips its four
+permission-dependent cases with an explicit reason under headless, and `npm run
+test:smoke:notifications` runs them headed for real coverage. Silent vacuous passes were the
+alternative and were rejected.
+
+### Test evidence
+- `tests/food-attention-notifications.spec.js` — 27 passed
+- `tests/production-smoke-attention-notifications.spec.js` — **9 passed headed**; 5 passed / 4
+  skipped headless
+- Full suite on final `main` — see the run recorded in REVIEW.md TASK-046
+- Baseline on `main@4de1512` before the wave was 151 passed
+
+### Pre-existing CI condition, NOT introduced here
+The "Button tests" workflow reports 1 failure per run, and has done so since **before** this wave:
+the TASK-045 docs commit (`32582675564`) failed on `ready-food-portions.spec.js:307`, and this
+wave's merge (`32586471466`) failed on `production-smoke-ready-food.spec.js:212`. Different test
+each time, neither touched by this wave, both passing locally. That is a flaky-CI signal (30s
+timeout, 2 workers, tests hitting the live site), not a regression. Left alone deliberately rather
+than absorbed into this wave; worth a dedicated look.
+
+### Where we are
+Notifications are done to the honest limit of this architecture. Real push remains **not
+recommended** unless dogfooding shows multi-day gaps between app opens — that is the only condition
+under which the foreground alert actually fails the user. If it is ever wanted, it is its own wave
+with its own security review, not an extension of this one.
+
+Next: the real-device pass on a phone, then whatever the operator points at. `wave1-portion-truth`
+still parked.
+
+---
 ## 2026-08-22 — Cook-path depletion tombstones merged and deployed (TASK-045, D-057 addendum) — second owner-authorised D-032 red-zone merge
 
 A small red-zone safety patch, not a feature wave. `wave1-portion-truth` remains parked and

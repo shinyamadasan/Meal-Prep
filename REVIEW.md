@@ -131,6 +131,32 @@ not touched on Claude's judgement. Merged `--no-ff` only after the operator's ex
 authorisation, with the real-device check recorded above as an outstanding manual item the operator
 chose to accept rather than block on.
 
+### Post-merge verification (filled in after deployment)
+- Pages deployment `github-pages` **succeeded** for SHA `8fbf89d5edf685f45f590b6bc674ca8642c7efa3`,
+  matching final `main`. Deployed bytes were fetched and checked directly, not assumed: `sw.js`
+  carries the `notificationclick` handler and **no** `push` / `periodicsync` / `pushManager`;
+  `app.js` carries all six new functions; `index.html` carries the Settings row and **no**
+  `firebase-messaging` / `getMessaging` / `vapid`.
+- Production smoke (`tests/production-smoke-attention-notifications.spec.js`): **9/9 headed**
+  against the live site, with a real registered service worker and a browser-granted permission. It
+  proves the SW `showNotification()` path is the one actually taken (the constructor path is
+  asserted unused — that is the Android Chrome constraint), one grouped notification for five items
+  spanning pantry AND cooked food, silence on unchanged food across three passes and a reload, and
+  that no push subscription is ever created.
+- Headless it reports **5 passed / 4 skipped** with an explicit reason. Headless Chromium
+  hard-denies the Notifications permission regardless of `grantPermissions()`, so those four cases
+  would have passed vacuously. Skipping loudly was chosen over a green tick that proves nothing;
+  `npm run test:smoke:notifications` runs them headed for real coverage.
+- Full suite on final `main`: **183 passed, 4 skipped, 0 failed**.
+
+### Pre-existing CI condition — flagged, not absorbed
+The "Button tests" workflow reports one failure per run, and did so **before** this wave: the
+TASK-045 docs commit (run `32582675564`) failed on `ready-food-portions.spec.js:307`; this wave's
+merge (run `32586471466`) failed on `production-smoke-ready-food.spec.js:212`. A different test each
+time, neither touched by this wave, both passing locally. That is flaky CI — 30s timeout, 2 workers,
+tests hitting the live site — not a regression introduced here. Deliberately left alone rather than
+quietly folded into this wave; it deserves its own look.
+
 → TASK-046 status set to `approved` in TASKS.md before the merge, then `done` after deployment and
 production smoke.
 

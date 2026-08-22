@@ -2666,7 +2666,7 @@ merge gate:
 ---
 
 ### TASK-046 · Food attention notifications: foreground-only alerts, dedup ledger, and the PWA app badge
-status: approved
+status: done
 owner: claude
 source: direct operator brief ("Build a small Food Attention Notifications wave") — not BQ
 depends-on: TASK-044 (consumes D-057 `collectAttentionItems()` and its `keptOn` suppression)
@@ -2732,9 +2732,11 @@ sync/deletion safety (why this is D-032 red zone despite touching no sync code):
 verification:
   - [x] `npx playwright test tests/food-attention-notifications.spec.js` — 27 passed
   - [x] `npm test` on the branch — 178 passed, 0 failed (baseline on `main@4de1512` was 151)
-  - [x] `npm test` on final `main` after the merge — see REVIEW.md TASK-046
+  - [x] `npm test` on final `main` after the merge — 183 passed, 4 skipped, 0 failed
   - [x] Production smoke against the deployed GitHub Pages build over real HTTPS with a live
-        service worker and a genuinely granted notification permission
+        service worker and a genuinely granted notification permission — 9/9 headed
+        (`npm run test:smoke:notifications`); 5 passed / 4 skipped headless, because headless
+        Chromium hard-denies the Notifications permission and a vacuous pass was refused
   - [ ] **Real Android device / installed PWA — NOT PERFORMED. Owner/manual item.** See the
         merge gate below and REVIEW.md TASK-046 for the exact residual list.
 

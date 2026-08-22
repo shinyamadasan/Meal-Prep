@@ -7,7 +7,8 @@
     "test": "playwright test",
     "test:worker": "node --test workers/recipe-import/test/*.node.js",
     "test:smoke": "playwright test tests/button-smoke.spec.js",
-    "test:functional": "playwright test tests/buttons-functional.spec.js"
+    "test:functional": "playwright test tests/buttons-functional.spec.js",
+    "test:smoke:notifications": "playwright test tests/production-smoke-attention-notifications.spec.js --headed"
   },
   "repository": {
     "type": "git",
