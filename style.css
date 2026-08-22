@@ -5069,6 +5069,25 @@ select.form-control {
 .settings-row--danger:hover { background: rgba(var(--color-error-rgb), 0.08); }
 .settings-sep { height: 1px; background: var(--color-border); margin: 0.75rem 0; }
 
+/* Notifications row: state pill on the right, explanatory note beneath. */
+.settings-row-state {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.settings-row-state--on { color: var(--color-success, var(--color-primary)); }
+.settings-row:disabled { opacity: 0.6; cursor: default; }
+.settings-row:disabled:hover { background: var(--color-secondary); }
+.settings-row-note {
+  margin: -0.1rem 0 0.4rem;
+  padding: 0 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
 /* Settings gear button in header */
 .settings-btn {
   background: none;

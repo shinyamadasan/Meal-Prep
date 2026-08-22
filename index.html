@@ -1221,6 +1221,13 @@
                     <span class="ic" data-icon="lightbulb"></span> How to use this app
                 </button>
 
+                <p class="settings-section-label">Notifications</p>
+                <button class="settings-row" id="settings-food-alerts-row" onclick="toggleFoodAlerts()">
+                    <span class="ic" data-icon="triangle-alert"></span> Food expiry alerts
+                    <span class="settings-row-state" id="settings-food-alerts-state">Off</span>
+                </button>
+                <p class="settings-row-note">Alerts appear when you open the app and find food that has expired or needs using soon. This app has no notification server, so nothing arrives while it is closed.</p>
+
                 <p class="settings-section-label">Data</p>
                 <button class="settings-row" onclick="exportData()">
                     <span class="ic" data-icon="download"></span> Export Data
