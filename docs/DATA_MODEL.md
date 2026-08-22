@@ -10,7 +10,7 @@ AppState.recipes            // [] recipe objects (includes sampleRecipes on firs
 AppState.weeklyPlan         // { Monday: { breakfast, lunch, dinner, snacks[] }, ... Sunday }
 AppState.groceryList        // [] aggregated + custom grocery items
 AppState.pantry             // [] pantry items (see shape below)
-AppState.cookedMeals        // [] cooked batches with storage location + date
+AppState.cookedMeals        // [] cooked batches with storage location + date (see "Cooked meal" below)
 AppState.cookHistory        // [{ recipeId, recipeName, date, servings }] newest-first, max 100
 AppState.nutritionGoals     // { calories, protein, carbs, fat, fiber, sodium }
 AppState.customIngredients  // [] storage-guide items (feeds dead #storage tab)
@@ -88,6 +88,43 @@ cookTime` turns a legitimate `0` into `undefined` and then `NaN`:
 See DECISIONS D-055.
 Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` hold one id or
 `null`; `snacks` is an array of ids.
+
+## Cooked meal object
+```js
+{
+  id,                  // 'cm_<timestamp>_<rand>'
+  recipeId,            // string id of the source recipe, or null for manually added food
+  source?,             // 'leftovers' | 'takeout' — manual adds only
+  name,
+  cookedDate,          // 'YYYY-MM-DD' (LOCAL calendar date — daysLeftFrom() parses it as local midnight)
+  storage,             // 'fridge' | 'freezer' — drives which shelf life applies
+  fridgeLife,          // days, or null = unknown
+  freezerLife,         // days, or null = unknown
+  updatedAt?,          // ISO string — set by stampUpdated() on manual adds and edits.
+                       // NOTE: _doMarkCooked() does NOT set it (pre-existing gap, see D-056).
+
+  // ── Ready-food portions — OPTIONAL and additive (D-056) ──
+  initialPortions,     // whole meal portions the batch started with, or null
+  portionsRemaining    // whole meal portions left, or null
+                       // BOTH null = an untracked batch, which behaves exactly as it
+                       // did before portions existed. Never grams, never per-person.
+}
+```
+
+`normalizeCookedMeals()` runs at all six points `cookedMeals` is assigned from stored data
+(localStorage load, backup restore, Firestore load, the live cloud listener, the import union,
+the sign-in merge). It is idempotent and only repairs an incoherent pair — it never invents
+portions for a batch that has none. Read portions through the helpers:
+
+| Helper | Returns |
+|---|---|
+| `cookedMealTracksPortions(meal)` | whether this batch counts portions at all |
+| `useCookedPortion(id)` | one-tap decrement; the last portion routes into `removeCookedMeal()` |
+| `finishCookedMeal(id)` | finish now, via the same existing removal/tombstone path |
+| `getReadyFoodSuggestions(limit)` | ranked ready food — expiring fridge, then fridge, then freezer. Excludes EXPIRED batches. |
+| `readyFoodBucket(meal)` | 0 = fridge expiring soon, 1 = fridge, 2 = freezer |
+| `readyFoodMetaLine(meal)` | "2 portions · fridge · use soon · 1d left" |
+| `readyFoodBalanceHint(meal)` | "add veg + rice" from the source recipe's `mealBalance` (D-055), or '' |
 
 ## Pantry item
 ```js
