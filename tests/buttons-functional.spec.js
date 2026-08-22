@@ -84,12 +84,15 @@ test.describe('Modals open and close', () => {
     await expect(page.locator('#recipe-modal')).toBeHidden();
   });
 
-  test('Paste Recipe: opens and cancels', async ({ page }) => {
+  test('Import Recipe: opens URL import and Paste Text modes, then cancels', async ({ page }) => {
     await loadApp(page);
     await openTab(page, 'recipes');
-    await page.getByRole('button', { name: /Paste Recipe/ }).click();
+    await page.getByRole('button', { name: /Import Recipe/ }).click();
     const modal = page.locator('.modal:not(.hidden)');
     await expect(modal).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'From URL' })).toBeVisible();
+    await modal.getByRole('button', { name: 'Paste Text' }).click();
+    await expect(modal.locator('#import-text-panel')).toBeVisible();
     await modal.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.locator('.modal:not(.hidden)')).toHaveCount(0);
   });
