@@ -73,9 +73,15 @@
 - 6 built-in Filipino hacks + user add/edit/delete — Working · `renderCookingHacks()`.
 
 ## Settings & Help
-- Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, export/import, restore backup, clear all (snapshots first).
+- Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, **Food expiry alerts** opt-in, export/import, restore backup, clear all (snapshots first).
 - Help modal — Working · `#help-modal` · 6-step guide · reachable via Settings; does NOT auto-open on first run when the Kitchen Setup Wizard will also fire (`pantryOnboardingDone` gate in `initApp()`).
 - **Kitchen Setup Wizard** — Working · `openKitchenSetupModal()` / `seedPantryIfEmpty()` · auto-opens on first run only (when pantry is empty and `pantryOnboardingDone` not set); only onboarding gate on brand-new first run.
+
+## Notifications
+- **Food expiry alerts** — Working · `maybeNotifyAttention()` / `buildAttentionNotification()` / `toggleFoodAlerts()` · **foreground-only**: one grouped notification is raised when the app is opened or brought back to the foreground and Kitchen Truth reports newly expired or newly use-soon food. Consumes `collectAttentionItems()` — there is no second freshness model. Opt-in from Settings only; `Notification.requestPermission()` is never called on page load. Deduplicated by the `mealPrepFoodAlerts` ledger, so unchanged food never repeats. Tapping the notification opens the Home **Needs Attention** card (`openAttentionView()`), where Keep / Remove / Use already live. Expired food is only ever offered for review, never for eating. See DECISIONS D-058.
+- **App-icon badge** — Working · `updateAppAttentionBadge()` · `navigator.setAppBadge()` with the outstanding expired+expiring count on an installed PWA; silently absent where unsupported. The in-app Inventory tab badge (`updateFreshnessBadges()`) is unchanged.
+- **Notification click routing** — Working · `sw.js` `notificationclick` → focus an existing window and `postMessage({ type: 'show-attention' })`, else `openWindow(scope)`. The service worker schedules and sends nothing; it only routes the tap.
+- **NOT built, and not achievable on this architecture**: notifications while the app is closed. That requires a push server, and this app is static GitHub Pages. See DECISIONS D-058.
 
 ## Auth & Security
 - Email sign-in/sign-up, email verification (gates sharing), sign-out — Working.

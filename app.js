@@ -1972,6 +1972,8 @@ function initApp() {
         updateFreshnessBadges();
         renderFreshnessBanner();
         restorePrepModeSession();
+        updateAppAttentionBadge();
+        maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
         initWeekTemplateButton();
       }
     });
@@ -2005,6 +2007,8 @@ function initApp() {
     updateFreshnessBadges();
     renderFreshnessBanner();
     restorePrepModeSession();
+    updateAppAttentionBadge();
+    maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
   }
 
   initWeekTemplateButton();
@@ -4826,6 +4830,24 @@ function renderWeeklyCostSummary() {
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', initApp);
 
+// Resume: coming back to the app is the closest thing this architecture has to a
+// background check. Food that crossed a Kitchen Truth boundary while the app sat
+// in the background gets announced here — deduplicated, so nothing unchanged
+// repeats. See DECISIONS D-058.
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+  refreshFreshnessAlerts();
+  maybeNotifyAttention();
+});
+
+// Clicking a notification raised by the service worker posts back here; land the
+// user on the Needs Attention card rather than acting on their food.
+if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+  navigator.serviceWorker.addEventListener('message', function(e) {
+    if (e && e.data && e.data.type === 'show-attention') openAttentionView();
+  });
+}
+
 // Nutrition tracking functions
 function calculateRecipeNutrition(recipe) {
   if (recipe.nutritionPerServing && recipe.nutritionPerServing.calories > 0) {
@@ -5785,6 +5807,7 @@ function getDisplayName() {
 }
 
 function updateSettingsModal() {
+  renderFoodAlertSetting();
   var signedIn = document.getElementById('settings-signed-in');
   var signedOut = document.getElementById('settings-signed-out');
   var emailEl = document.getElementById('settings-user-email');
@@ -5804,6 +5827,7 @@ function updateSettingsModal() {
 window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.saveDisplayName = saveDisplayName;
+window.toggleFoodAlerts = toggleFoodAlerts;
 window.exportData = exportData;
 window.importData = importData;
 window.restoreBackup = restoreBackup;
@@ -6380,6 +6404,8 @@ async function loadUserData() {
   updateFreshnessBadges();
   renderFreshnessBanner();
   restorePrepModeSession();
+  updateAppAttentionBadge();
+  maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
   loadProfile(); // load (or prompt for) the community display name
 }
 
@@ -9938,6 +9964,238 @@ function updateFreshnessBadges() {
 function refreshFreshnessAlerts() {
   renderFreshnessBanner();
   updateFreshnessBadges();
+  updateAppAttentionBadge();
+}
+
+// ── Food attention notifications ─────────────────────────────────────────────
+// HONEST SCOPE. This app is a static GitHub Pages PWA with no push server, so a
+// notification can only be raised while the page is actually running: at app
+// open, and when the app is brought back to the foreground. Nothing here fires
+// while the app is closed. See DECISIONS D-058.
+//
+// Everything below CONSUMES collectAttentionItems() / pantryDaysLeft() /
+// cookedShelfLife(). It never recomputes an expiry boundary of its own — the
+// Kitchen Truth model (D-057) stays the single source of freshness.
+//
+// State lives in its own device-local localStorage key, NOT in AppState: this is
+// per-device notification bookkeeping, and syncing it would mean one device's
+// "already told you" silencing another device. Matches the existing precedent of
+// mealPrepHelpSeen / pantryOnboardingDone.
+
+var FOOD_ALERTS_KEY = 'mealPrepFoodAlerts';
+
+function loadFoodAlertPrefs() {
+  try {
+    var raw = localStorage.getItem(FOOD_ALERTS_KEY);
+    if (!raw) return { enabled: false, announced: {} };
+    var p = JSON.parse(raw) || {};
+    return {
+      enabled: !!p.enabled,
+      announced: (p.announced && typeof p.announced === 'object') ? p.announced : {}
+    };
+  } catch (e) {
+    return { enabled: false, announced: {} };
+  }
+}
+
+function saveFoodAlertPrefs(prefs) {
+  try { localStorage.setItem(FOOD_ALERTS_KEY, JSON.stringify(prefs)); } catch (e) {}
+}
+
+// iOS Safari only exposes Notification to an installed home-screen PWA, so this
+// is a real "no" on plenty of devices, not a formality.
+function notificationsSupported() {
+  return typeof Notification !== 'undefined';
+}
+
+function notificationPermission() {
+  return notificationsSupported() ? Notification.permission : 'unsupported';
+}
+
+// One ledger row per record: "<kind>:<id>" -> the state last announced for it.
+// The ledger is rewritten from the CURRENT world on every run, so food that was
+// eaten, removed or kept stops being remembered and a genuine relapse later can
+// announce again.
+function attentionSignature(attention) {
+  var sig = {};
+  attention.useSoon.forEach(function(e) { sig[e.kind + ':' + e.id] = 'use-soon'; });
+  attention.expired.forEach(function(e) { sig[e.kind + ':' + e.id] = 'expired'; });
+  return sig;
+}
+
+// Only records whose state CHANGED are worth a notification. Unchanged food is
+// silent forever; use-soon food that crosses into expired is genuinely new news
+// and announces once more.
+function findNewAttention(attention, announced) {
+  var seen = announced || {};
+  function pick(list, state) {
+    return list.filter(function(e) { return seen[e.kind + ':' + e.id] !== state; });
+  }
+  return {
+    expired: pick(attention.expired, 'expired'),
+    useSoon: pick(attention.useSoon, 'use-soon')
+  };
+}
+
+function attentionNameList(list) {
+  var n = list.map(function(e) { return e.name; });
+  if (n.length === 0) return '';
+  if (n.length === 1) return n[0];
+  if (n.length === 2) return n[0] + ' and ' + n[1];
+  return n[0] + ', ' + n[1] + ' and ' + (n.length - 2) + ' more';
+}
+
+// Grouped copy: ONE notification for the whole kitchen, never one per item.
+// Expired food is only ever offered for review — never for eating. Returns null
+// when there is nothing new, which is the common case.
+function buildAttentionNotification(fresh) {
+  var exp = (fresh && fresh.expired) || [];
+  var soon = (fresh && fresh.useSoon) || [];
+  if (exp.length + soon.length === 0) return null;
+
+  var soonTail = soon.length
+    ? ' ' + attentionNameList(soon) + ' should be used soon.'
+    : '';
+
+  if (exp.length === 1) {
+    return {
+      title: exp[0].name + ' expired',
+      body: 'Open Meal Prep to review it.' + soonTail
+    };
+  }
+  if (exp.length > 1) {
+    return {
+      title: exp.length + ' foods expired',
+      body: 'Open Meal Prep to review them.' + soonTail
+    };
+  }
+  return {
+    title: 'Food needs attention',
+    body: attentionNameList(soon) + ' should be used soon.'
+  };
+}
+
+// A notification never acts on food. It only lands the user back on the Needs
+// Attention card, where Keep / Remove / Use already live.
+function openAttentionView() {
+  try { window.focus(); } catch (e) {}
+  showTab('dashboard');
+  var card = document.querySelector('.dash-card--warn');
+  if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Android Chrome forbids the page-side `new Notification()` constructor and
+// requires the service worker's showNotification(). Prefer the SW path and fall
+// back to the constructor where there is no registration (desktop, file://).
+function showAttentionNotification(payload) {
+  var opts = {
+    body: payload.body,
+    tag: 'meal-prep-attention', // replaces the previous alert instead of stacking
+    renotify: true,
+    icon: './icon.svg',
+    badge: './icon.svg',
+    data: { action: 'show-attention' }
+  };
+  var reg = null;
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      reg = navigator.serviceWorker.getRegistration();
+    }
+  } catch (e) { reg = null; }
+
+  return Promise.resolve(reg).catch(function() { return null; }).then(function(r) {
+    if (r && r.showNotification) return r.showNotification(payload.title, opts);
+    return showAttentionNotificationFallback(payload, opts);
+  }).catch(function() {
+    return showAttentionNotificationFallback(payload, opts);
+  });
+}
+
+function showAttentionNotificationFallback(payload, opts) {
+  try {
+    var n = new Notification(payload.title, opts);
+    n.onclick = function() { openAttentionView(); n.close(); };
+  } catch (e) {
+    // Some platforms refuse page-constructed notifications. Nothing to do —
+    // the in-app banner and badge still carry the same information.
+  }
+}
+
+// The single entry point. Called at app open and on resume. Silent unless the
+// user opted in AND the browser granted permission.
+function maybeNotifyAttention() {
+  var prefs = loadFoodAlertPrefs();
+  if (!prefs.enabled) return Promise.resolve(null);
+  if (notificationPermission() !== 'granted') return Promise.resolve(null);
+
+  var attention = collectAttentionItems(); // Kitchen Truth, untouched
+  var fresh = findNewAttention(attention, prefs.announced);
+  prefs.announced = attentionSignature(attention);
+  saveFoodAlertPrefs(prefs);
+
+  var payload = buildAttentionNotification(fresh);
+  if (!payload) return Promise.resolve(null);
+  return showAttentionNotification(payload).then(function() { return payload; });
+}
+
+// App-icon badge for outstanding attention items. No permission of its own, no
+// server, and it survives the app being closed on an installed PWA — the one
+// piece of "while you're away" signal this architecture can honestly provide.
+function updateAppAttentionBadge() {
+  try {
+    if (!navigator.setAppBadge) return;
+    var a = getFreshnessAlerts();
+    var count = a.expired + a.expiring;
+    if (count > 0) navigator.setAppBadge(count).catch(function() {});
+    else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function() {});
+  } catch (e) { /* unsupported or blocked — the in-app badge still shows it */ }
+}
+
+// ── Settings: Food expiry alerts ─────────────────────────────────────────────
+
+function foodAlertStatusText() {
+  if (!notificationsSupported()) return 'Not supported on this browser';
+  if (Notification.permission === 'denied') return 'Blocked in browser settings';
+  return (loadFoodAlertPrefs().enabled && Notification.permission === 'granted') ? 'On' : 'Off';
+}
+
+function renderFoodAlertSetting() {
+  var el = document.getElementById('settings-food-alerts-state');
+  if (!el) return;
+  var state = foodAlertStatusText();
+  el.textContent = state;
+  el.className = 'settings-row-state' + (state === 'On' ? ' settings-row-state--on' : '');
+  var btn = document.getElementById('settings-food-alerts-row');
+  if (btn) btn.disabled = !notificationsSupported() || Notification.permission === 'denied';
+}
+
+// The ONLY place that calls Notification.requestPermission(). Nothing on page
+// load asks. A denial changes nothing else about the app.
+function toggleFoodAlerts() {
+  if (loadFoodAlertPrefs().enabled) {
+    var off = loadFoodAlertPrefs();
+    off.enabled = false;
+    saveFoodAlertPrefs(off);
+    renderFoodAlertSetting();
+    return Promise.resolve(false);
+  }
+  if (!notificationsSupported()) { renderFoodAlertSetting(); return Promise.resolve(false); }
+
+  return Promise.resolve()
+    .then(function() { return Notification.requestPermission(); })
+    .catch(function() { return 'denied'; })
+    .then(function(result) {
+      if (result !== 'granted') {
+        renderFoodAlertSetting();
+        return false;
+      }
+      var on = loadFoodAlertPrefs();
+      on.enabled = true;
+      saveFoodAlertPrefs(on);
+      renderFoodAlertSetting();
+      maybeNotifyAttention();
+      return true;
+    });
 }
 
 function togglePantryCard(safeId) {

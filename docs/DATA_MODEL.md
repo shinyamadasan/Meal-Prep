@@ -191,6 +191,8 @@ otherwise it becomes `null` (unknown) rather than an invented number.
 | `mealPrepDisplayName` | display name |
 | `mealPrepHelpSeen` | first-run flag — set on first load; gates Help modal auto-open (only opens if wizard already done) |
 | `pantryOnboardingDone`, `mealPrepStartDone` | first-run flags — `pantryOnboardingDone` set by wizard skip or confirm; gates Kitchen Setup Wizard auto-open and Help modal auto-open |
+| `mealPrepFoodAlerts` | `{ enabled, announced }` — food-expiry notification opt-in plus the per-record dedup ledger (`"<kind>:<id>" -> "expired" | "use-soon"`). **Device-local by design and never synced** — see D-058 |
+| `mealPrepWeekTemplate` | saved weekly-plan template (device-local) |
 
 ## Hardcoded databases (in app.js)
 | Object | ~Size | Entry shape / purpose |

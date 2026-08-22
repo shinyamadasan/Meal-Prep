@@ -1,4 +1,4 @@
-const CACHE = 'meal-prep-v4';
+const CACHE = 'meal-prep-v5';
 const STATIC = ['./index.html', './app.js', './style.css', './chart.min.js', './icon.svg', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -58,4 +58,24 @@ self.addEventListener('fetch', e => {
       return cached || networkFetch;
     })
   );
+});
+
+// Notification click. The app raises these from the page (see maybeNotifyAttention
+// in app.js) via registration.showNotification(), because Android Chrome forbids
+// the page-side Notification constructor. This worker does NOT schedule or send
+// anything on its own — there is no push server behind this app. It only routes
+// the tap back to the Needs Attention view.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clients) {
+      if (c.url.startsWith(self.registration.scope)) {
+        await c.focus();
+        c.postMessage({ type: 'show-attention' });
+        return;
+      }
+    }
+    await self.clients.openWindow(self.registration.scope);
+  })());
 });
