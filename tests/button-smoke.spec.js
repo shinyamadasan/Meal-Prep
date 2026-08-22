@@ -64,6 +64,7 @@ test('button smoke: every visible button is clickable without errors', async ({ 
 
   const broken = [];
   let clicked = 0;
+  let skipped = 0;
 
   // Walk the whole UI: repeatedly grab the first VISIBLE button we haven't
   // clicked yet (stamped via data-smoked), click it, and move on. Clicking a tab
@@ -75,6 +76,7 @@ test('button smoke: every visible button is clickable without errors', async ({ 
   const MAX_CLICKS = 200;
 
   for (let n = 0; n < MAX_CLICKS; n++) {
+    await closeAllModals();
     if ((await unsmoked.count()) === 0) break; // nothing visible left to click
     const handle = await unsmoked.first().elementHandle().catch(() => null);
     if (!handle) break;
@@ -98,6 +100,15 @@ test('button smoke: every visible button is clickable without errors', async ({ 
     const ceBefore = consoleErrors.length;
     const peBefore = pageErrors.length;
     const entryErrors = [];
+    const opensFileChooser = await handle.evaluate((el) => {
+      const action = el.getAttribute('onclick') || '';
+      return /\b(importData|importCSV)\s*\(/.test(action);
+    }).catch(() => false);
+
+    if (opensFileChooser) {
+      skipped++;
+      continue;
+    }
 
     try {
       await handle.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
@@ -127,6 +138,7 @@ test('button smoke: every visible button is clickable without errors', async ({ 
   console.log('\n──────────────── BUTTON SMOKE SUMMARY ────────────────');
   console.log(`Buttons in DOM      : ${totalInDom}`);
   console.log(`Clicked             : ${clicked}`);
+  console.log(`Skipped             : ${skipped} file import button(s)`);
   console.log(`Broken              : ${broken.length}`);
 
   if (broken.length) {
