@@ -2595,6 +2595,73 @@ merge gate:
 
 ---
 
+### TASK-045 · Cook-path depletion tombstones: stop sync resurrecting pantry items emptied by cooking
+status: approved
+owner: claude
+source: D-057 follow-up #1 / planning/ROADMAP.md Known Issues (not BQ — direct operator brief)
+depends-on: TASK-044 (reuses the explicit-tombstone pattern D-057 established)
+files: app.js, tests/cook-depletion-tombstones.spec.js (new), docs/DECISIONS.md
+
+objective:
+  Prevent pantry items depleted during cooking from being silently resurrected by sync when more
+  than five items are removed at once. Smallest consistent fix, reusing the established deletion
+  path — a red-zone safety patch, not a product feature wave.
+
+notes:
+  `deductIngredientsForRecipe()` drops a pantry record once cooking empties it, but wrote no
+  tombstone — the delete rode entirely on the generic vanish-diff in `recordLocalDeletions()`,
+  which returns early and records NOTHING when more than `MASS_DELETE_GUARD` (5) ids disappear at
+  once. A cook emptying six or more tracked items therefore removed them locally with nothing to
+  sync, and the next merge from another device brought the food back. Single call site:
+  `_doMarkCooked()`. `checkAndReplenishLowStock()`, which runs between the deduction and
+  `saveData()`, only touches `groceryList` — no other cook-path helper removes pantry records.
+
+acceptance:
+  - [x] A depleted pantry record gets an explicit tombstone written before it is removed
+  - [x] Removal, then `snapshotIdBaseline()`, then the caller's existing `saveData()` — ordering
+        preserved exactly as the current sync model requires
+  - [x] Works past `MASS_DELETE_GUARD`: 6- and 8-item depletions tombstone every removed id
+  - [x] Does NOT depend on vanish-diff detection — asserted by a control arm in the same test
+  - [x] Items merely decremented keep their record, keep the correct quantity, get no tombstone
+  - [x] Unknown-quantity (`null`) items are still neither deducted nor removed (unchanged)
+  - [x] Insufficient-inventory warning dialog still fires, then clamps at zero (unchanged)
+  - [x] Cooked-food batch creation, portion count and `cookHistory` still work (unchanged)
+  - [x] Local save + reload preserves the result; nothing is resurrected
+  - [x] The Firestore payload carries every expected tombstone
+  - [x] Existing Kitchen Truth bulk-cleanup tests stay green
+  - [x] Full Playwright suite stays green
+
+constraints:
+  - Do NOT change tombstone architecture, `MASS_DELETE_GUARD`, `cloudReady`, Firestore
+    merge/conflict logic, `saveData()` semantics, grocery behaviour, freshness logic, Ready Food
+    First, the recipe planner, notifications or the recommendation engine
+  - Do NOT create a second deletion mechanism — reuse the D-057 pattern exactly
+  - Do NOT refactor the cook pipeline
+  - Do NOT touch `wave1-portion-truth`
+
+sync/deletion safety (the reason this is D-032 red zone):
+  This task exists solely to write into `AppState.deletions`. The diff is 15 lines inside the
+  existing `if (depleted.length)` block of one function: build the id set, stamp
+  `AppState.deletions[String(id)] = now` for each, filter the pantry by that set, call
+  `snapshotIdBaseline()`. The array filter now keys on `String(p.id)` to match the tombstone map's
+  own keying — strictly more inclusive than the previous `indexOf(p.id)` identity check, and the
+  ids come from the same objects either way. Nothing else in the file changed.
+
+verification:
+  - [x] `npx playwright test tests/cook-depletion-tombstones.spec.js` — 9 passed
+  - [x] `npm test` on the branch — 147 passed, 0 failed
+  - [x] Mutation check: reverting `app.js` to `main`'s version fails all 9, the resurrection case
+        with `Expected: 0, Received: 6` — the exact bug. Fix restored and re-verified.
+  - [x] `npm test` on final `main` after the merge
+  - [x] Production smoke against the deployed GitHub Pages build
+
+merge gate:
+  D-032 **red zone** — deletion/tombstone behaviour. Claude recommended `approved` (held) and did
+  not merge on its own judgement. Merged `--no-ff` only after the operator's explicit written
+  authorisation. See REVIEW.md TASK-045.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

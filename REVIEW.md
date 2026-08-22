@@ -4,6 +4,108 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-045 — APPROVED (cook-path depletion tombstones, D-057 addendum) — owner-approved D-032 red-zone merge
+branch: fix/cook-depletion-tombstones → main
+verdict: approved — **red zone**, merged only on the operator's explicit written instruction
+date: 2026-08-22
+
+### The gate, stated plainly
+This patch exists to write into `AppState.deletions`. Under D-032 that is **red zone**, not `done`,
+regardless of how small the diff is — a broken UI change is reverted in a minute; lost user data
+cannot be reverted at all (north-star goal #2). I recommended `approved` (held for a human) rather
+than `done` (auto-merge), returned the branch unmerged and unpushed, and did not merge on my own
+judgement. The operator then explicitly instructed: *"Owner approves fix/cook-depletion-tombstones @
+163586a under D-032 … Merge the branch into current main with --no-ff."* That instruction is the
+gate being satisfied — priority 1 in the CLAUDE.md Decision Priority list. Recorded here so the
+audit trail shows a human, not Claude, released the red-zone work. **This was not an automatic
+merge.**
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude at the operator's explicit instruction rather than delegated to Codex
+(CLAUDE.md Delegation Policy). This is a review of Claude's own work, stated plainly. The
+independent evidence is the mutation check and the production smoke, which runs against the deployed
+bundle rather than the working tree.
+
+### What was reviewed
+- `163586a` — explicit tombstones on the cook-depletion path, plus the new regression spec
+
+### The bug, confirmed rather than assumed
+`deductIngredientsForRecipe()` ended its depletion branch with a bare
+`AppState.pantry.filter(...)` and no tombstone. The delete relied entirely on the vanish-diff in
+`recordLocalDeletions()`, which returns early — recording **nothing** — when more than
+`MASS_DELETE_GUARD` (5) ids disappear at once. So a cook that emptied six or more tracked pantry
+items removed them locally with nothing to sync, and the next merge from another device resurrected
+the food. This is exactly the failure D-057 designed the explicit-tombstone pattern to prevent for
+bulk expired cleanup; the cook path was the one remaining consumer that had never been given it.
+
+I verified the blast radius rather than trusting the brief: `deductIngredientsForRecipe()` has a
+single call site (`_doMarkCooked()`), and `checkAndReplenishLowStock()` — the only thing running
+between the deduction and `saveData()` — mutates `groceryList` only. No other cook-path helper
+removes pantry records.
+
+### Findings
+
+**1. The mechanism was USED, not CHANGED — again the whole review.**
+The new code writes `AppState.deletions[String(id)] = now`, filters, then calls
+`snapshotIdBaseline()`. That is byte-for-byte the sequence `removeAllExpired()` and
+`unstockPurchasedGroceryItem()` already perform on `main`. No new deletion mechanism. A grep of the
+diff confirms zero edits to `TOMBSTONE_KEYS`, `MASS_DELETE_GUARD`, `recordLocalDeletions()`,
+`snapshotIdBaseline()`, `collectSyncedIds()`, `mergeDeletions()`, `applyTombstones()`,
+`purgeOldTombstones()`, `saveData()`, `saveToFirestore()` or the `cloudReady` write guard.
+
+**2. Hard Rules hold — verified against the diff.**
+- **HR3 (quote recipe ids in handlers)** — no handler markup in the diff; untouched.
+- **HR4 (`patchMissingNutrition()` after load)** — zero occurrences; untouched.
+- **HR5 (persist through `saveData()`)** — no `saveToLocalStorage` in the added lines. The
+  function does not persist at all; its single caller `_doMarkCooked()` still ends in `saveData()`,
+  unchanged.
+- **HR6 (never write Firestore before reading it)** — zero hits for `cloudReady` /
+  `saveToFirestore`; the write guard is not touched.
+- **HR7 (one `:root` block)** — `style.css` not in the diff.
+- **HR9 (match existing style)** — plain `var`, `function(){}` callbacks, no framework, no build
+  step, matching the surrounding file.
+- **HR10** — not applicable; not a chained sprint group.
+
+**3. Save/snapshot ordering preserved.** Tombstone → remove → `snapshotIdBaseline()`, all before
+the caller's existing `saveData()`. The re-baseline moved inside the deduction rather than sitting
+at the call site, which is what `removeAllExpired()` does at its own equivalent point; it is
+recorded as a risk below.
+
+**4. The blast radius really is limited to emptied records.** Only ids pushed into `depleted` —
+records whose quantity reached `<= 0` — are tombstoned. A partially depleted item keeps its
+record, its (correct) reduced quantity and gets no tombstone; that is asserted in two separate
+tests, one of them with a ×2 multiplier so the scaling path is covered too.
+
+**5. One incidental change, called out because it is not cosmetic.** The pantry filter now keys on
+`String(p.id)` against a lookup object instead of `depleted.indexOf(p.id)` identity. This is
+deliberate — it matches how the tombstone map itself is keyed, so the set of records removed and
+the set of ids tombstoned cannot diverge on a numeric-vs-string id. Strictly more inclusive than the
+previous check, and the ids come from the same objects either way.
+
+**6. The tests are not vacuous, and that was proven rather than asserted.** Mutation check: `app.js`
+reverted to `main`'s version, spec re-run → **9/9 failed**, the end-to-end resurrection case
+failing with `Expected: 0, Received: 6`, which is the production bug reproduced exactly. Fix
+restored and re-verified. The 6-item test also carries a **control arm**: the same six ids removed
+naively, then `recordLocalDeletions()` called → zero tombstones, proving both that the guard really
+does swallow this size of delete and that the fix does not depend on the diff.
+
+**7. A docs/code disagreement resolved in the code's favour.** `planning/ROADMAP.md` Known Issues
+listed this as an open defect and D-057 recorded it as a deliberate follow-up. Both are now false;
+the ROADMAP entry is removed and D-057 carries an addendum closing it.
+
+### Risks accepted, on the record
+- `snapshotIdBaseline()` now fires inside the deduction rather than at the call site. If a future
+  edit puts a *different* real pantry deletion between `deductIngredientsForRecipe()` and
+  `saveData()` without its own tombstone, that one would be re-baselined away. Same exposure
+  `removeAllExpired()` already carries; no current caller does this.
+- Existing tombstone LWW still applies: an item re-added on another device with an `updatedAt` newer
+  than the cook survives. By design, unchanged by this patch.
+
+### Verdict
+**Approved**, and merged to `main` with `--no-ff` on the operator's explicit red-zone
+authorisation. `wave1-portion-truth` untouched at `88b5598`.
+
+---
 ## Review TASK-044 — APPROVED (kitchen-truth wave, D-057) — owner-approved D-032 red-zone merge
 branch: wave-kitchen-truth → main
 verdict: approved — **red zone**, merged only on the operator's explicit written instruction
