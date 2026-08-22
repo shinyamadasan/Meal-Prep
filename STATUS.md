@@ -5,6 +5,81 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-21 — Low-effort cooking wave built, reviewed, merged, deployed and verified live (D-055)
+
+First feature session since the 2026-08-21 repository recovery. Two waves were worked; **one
+shipped, one is parked unmerged.**
+
+### What shipped — `wave-low-effort-cooking` → `main` (`944c8b0`)
+
+Goal: reduce the friction around *what to cook, what to buy, how to cook with least effort*,
+without turning the app into a macro-tracking or daily-logging tool.
+
+- **Optional recipe metadata** (additive, no new top-level `AppState` key): `equipment[]`,
+  `effort`, `activeTime`, `mealBalance{}`, `tags[]`. Filled by `normalizeRecipes()` →
+  `normalizeRecipeMeta()`; valid values preserved, unknown slugs dropped, idempotent.
+- **Quick-filter chips** on the recipe list (lowest effort / rice cooker / rice + steamer /
+  Instant Pot / oven / pan / no-cook / batch-friendly), ANDed on top of the existing
+  search / category / time / favourites filters. Chips matching nothing are hidden.
+- **Home "What should I cook?"** — up to 3 deterministic suggestions (⚡ Easiest, 🥬 Use soon,
+  🍽️ Something different) from effort, the existing pantry-expiry scan, and `cookHistory`.
+  A category with no supporting data is omitted, never guessed. No model calls, no server.
+- **7 new cooking hacks** + `seedNewDefaultHacks()` backfill for devices seeded before they existed.
+- **`NaN min` bug fixed at all 10 call sites.** `baseCookTime || cookTime` turned a legitimate `0`
+  into `undefined`; a no-cook recipe rendered "NaN min" on its card, in the planner slot and in the
+  week stats. Times now read through `recipePrepMinutes()` / `recipeCookMinutes()`.
+- **`saveRecipe()` edit-path data loss fixed.** An edit rebuilt the whole recipe object and copied
+  across only `sourceUrl`/`sourceSite`/`importedAt`, so an unrelated rename silently destroyed
+  `favorite`, `highlights`, `updatedAt` (which tombstone LWW depends on), the input-less
+  `fiber`/`sodium` nutrition values, and every field this wave added. An edit now starts from the
+  existing recipe and overlays only form-owned fields, so preservation is the default.
+
+The weekly-plan slot shape is **unchanged** — slots still hold bare recipe ids.
+
+### What is parked — `wave1-portion-truth` (`88b5598`), NOT merged
+
+Per-person planned servings (household model, portion steppers, per-person nutrition, grocery =
+sum of planned servings). Built and green, but deliberately held: it is red-zone (Firestore
+payload, localStorage, import/sign-in merges) and it visibly changes grocery quantities for
+existing plans. It claims decision number **D-054**; the shipped wave was renumbered to **D-055**
+so the two stay collision-free. If portion-truth is ever abandoned, D-054 becomes a gap in the log.
+
+### Verification
+- Playwright: **74/74 pass** (15 spec files), run on merged `main`, not just on the branch.
+  68 local + 6 new production-facing checks.
+- New tests: 23 across `low-effort-metadata`, `low-effort-zero-time`, `low-effort-discovery`,
+  `recipe-edit-preservation`, `production-smoke-low-effort`.
+- The edit-preservation tests were proven to **fail (4 of 5) against the pre-fix `saveRecipe()`**
+  and pass after it — they are not vacuous.
+- **Deployment verified, not assumed:** Pages build `944c8b0` = `built` (37.7s, 2026-08-22T03:41Z);
+  live `app.js` re-fetched and confirmed to contain `RECIPE_EQUIPMENT`,
+  `renderRecipeQuickFilters`, `getCookSuggestions`, `recipeCookMinutes`, `seedNewDefaultHacks`
+  and the new `saveRecipe()` merge.
+- **Production smoke run against the deployed site** (`tests/production-smoke-low-effort.spec.js`,
+  6/6): vocabularies live, filters narrow correctly, Home suggestions render in fixed order,
+  all 13 cooking hacks present, edit preservation holds, and no `NaN` on any tab — checked both
+  with the real seeded sample recipes and with a planted zero-cook-time recipe.
+
+### Merge hygiene
+`--no-ff` merge commit `944c8b0`; no force-push, no history rewrite. Local `main` and
+`origin/main` both at `944c8b0`, confirmed by `git ls-remote`.
+
+### Known caveats carried forward
+- `recipeEffortScore()` infers effort from active time when `effort` is unset, so a long recipe
+  with a short hands-on phase reads as harder than it is until someone fills the field in.
+- `seedNewDefaultHacks()` writes to `customHacks` (a synced, tombstoned list). It is
+  additive-by-id and tombstone-safe, but a hack deleted more than 180 days ago could reappear once
+  its tombstone is purged.
+- The two live-site suites (`button-smoke`, `buttons-functional`) test the deployed build, so they
+  only became meaningful for this wave *after* the merge — before it they were validating the old
+  `main`. The new production smoke closes that gap explicitly.
+
+### Next
+- Decide the fate of `wave1-portion-truth`: merge (accepting the grocery-quantity change and the
+  red-zone surface), rework, or abandon.
+- TASK-037 remains unmerged on `task-037` (`7c4785d`); its original blocker is stale.
+
+---
 ## 2026-08-21 — Repository recovery: parked rebase cleared, out-of-band recipe-import work reconciled, verified, merged, deployed
 
 **This was a recovery session, not a feature session.** No new meal-prep features were built.

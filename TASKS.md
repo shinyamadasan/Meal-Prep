@@ -2338,6 +2338,85 @@ follow-ups:
     with `NaN`. That is an improvement, but partial-nutrition recipes now under-count silently in
     weekly/daily totals. Worth a follow-up decision on whether to surface "incomplete" there too.
 
+<!-- ═══════════════════════════════════════════════════════
+     Low-effort cooking wave · D-055
+     Risk: Low · Execution: Solo (Claude-implemented, human-directed)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-042 · Low-effort cooking metadata, discovery, Home suggestions, and the recipe-edit data-loss fix
+status: done
+owner: claude
+source: direct operator brief (not BQ — see notes)
+depends-on: none
+files: app.js, index.html, style.css, docs/DECISIONS.md, docs/DATA_MODEL.md, docs/FEATURES.md,
+        tests/low-effort-metadata.spec.js (new), tests/low-effort-zero-time.spec.js (new),
+        tests/low-effort-discovery.spec.js (new), tests/recipe-edit-preservation.spec.js (new),
+        tests/production-smoke-low-effort.spec.js (new)
+
+objective:
+  Reduce the friction around "what should we cook, what should we buy, and how can we cook with
+  the least effort", while keeping daily usage input-free. Explicitly NOT a macro-tracking or
+  logging feature.
+
+acceptance:
+  - [x] Existing recipes without the new metadata still load and render unchanged (no metadata strip)
+  - [x] A recipe can be marked rice cooker / rice cooker + steamer / Instant Pot / pressure cooker /
+        oven / pan / egg boiler / microwave / no-cook, multiple values allowed
+  - [x] Active time and a simple effort level can be set
+  - [x] Protein / vegetables / carb can be marked — informational only, no grams, no goals, no warnings
+  - [x] batch-friendly / minimal-cleanup / cook-fresh / freezer-friendly / shortcut are markable
+  - [x] The recipe list can surface low-effort recipes quickly (8 quick-filter chips)
+  - [x] Home shows a small deterministic suggestion set without a new screen (max 3 rows)
+  - [x] Recent cook history influences variety without blocking any choice
+  - [x] A `0` cook-time recipe never displays `NaN min` — all 10 call sites fixed
+  - [x] Lechon-manok-style shortcuts are representable (no-cook + shortcut + assembly)
+  - [x] Rice-cooker + steamer recipes are representable
+  - [x] Instant Pot / pressure-cooker recipes are representable
+  - [x] Existing Plan → Shop → Cook flow still works (asserted end to end)
+  - [x] Existing grocery / pantry / freshness behaviour unchanged
+  - [x] Existing test suite stays green
+  - [x] Editing a recipe preserves properties the form does not own (favorite, highlights,
+        provenance, updatedAt, fiber/sodium)
+
+constraints:
+  - Additive only — no new top-level `AppState` key (none was added; sync registries untouched)
+  - Weekly-plan slot shape unchanged (still bare recipe ids — asserted in tests)
+  - No household/person model, no per-person portions, no eaten-logging, no gram entry,
+    no calorie/protein targets, no freezer portion tracking, no thaw workflow, no sauce engine,
+    no recipe composition, no appliance timers, no AI/model calls, no server dependency,
+    no dashboard redesign, no sync refactor, no unrelated tech-debt cleanup
+  - Do not add daily chores: metadata is entered once per recipe and every field is optional
+
+verification:
+  - `npx playwright test tests/` → 74/74 pass on merged `main` (15 spec files)
+  - Edit-preservation suite re-run against the PRE-FIX `saveRecipe()` → 4/5 fail, proving the
+    tests actually bite; all 5 pass after the fix
+  - `gh api .../pages/builds/latest` → `built`, commit `944c8b0`, 37.7s, 2026-08-22T03:41:26Z
+  - `curl https://shinyamadasan.github.io/Meal-Prep/app.js` → contains the new code
+  - `tests/production-smoke-low-effort.spec.js` → 6/6 against the deployed site
+  - `git ls-remote origin refs/heads/main` → `944c8b0`
+
+notes:
+  - Implemented directly by Claude at the operator's explicit instruction rather than delegated to
+    Codex (CLAUDE.md Delegation Policy). Recorded here as a backfill so the pipeline record matches
+    what actually shipped — same pattern as TASK-041.
+  - Merged `--no-ff` as `944c8b0`; no force-push, no history rewrite. Landed `done` per D-032:
+    no red-zone surface is touched (no Firestore guard, no tombstone machinery, no `saveData()`
+    internals, no auth, no `:root`, no OS files).
+  - Decision recorded as **D-055**, not D-054: the unmerged `wave1-portion-truth` branch claims
+    D-054, so this took the next number to stay collision-free.
+
+follow-ups:
+  - `wave1-portion-truth` (`88b5598`) remains unmerged and unreviewed-for-merge: per-person planned
+    servings, red-zone (Firestore payload, localStorage, import/sign-in merges), and it visibly
+    changes grocery quantities for existing plans. Needs an explicit merge/rework/abandon decision.
+  - `recipeEffortScore()` infers effort from active time when `effort` is unset — an unlabelled
+    long-but-passive recipe under-ranks until the field is filled.
+  - `seedNewDefaultHacks()` writes to the synced, tombstoned `customHacks` list; a hack deleted
+    more than 180 days ago could reappear once its tombstone is purged.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

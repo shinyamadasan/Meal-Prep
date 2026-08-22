@@ -5,6 +5,126 @@
 
 ---
 
+## Review TASK-042 — APPROVED (low-effort cooking wave, D-055)
+branch: wave-low-effort-cooking → main
+verdict: approved — merged to `main` as `944c8b0` (`--no-ff`) after verification, deployed and re-verified live
+date: 2026-08-21
+
+### Context — Claude-implemented, human-directed
+This wave was implemented directly by Claude at the human operator's explicit instruction, not
+delegated to Codex (CLAUDE.md Delegation Policy: "explicitly requested by the human"). The brief,
+the scope boundaries and the merge instruction all came from the operator. This entry is therefore
+a review of Claude's own work — stated plainly rather than dressed up as an independent gate. The
+strongest independent evidence here is the test suite, and specifically the fact that the
+edit-preservation tests were proven to fail against the pre-fix code.
+
+### What was reviewed
+- `eb23227` — low-effort metadata, discovery chips, Home suggestions, hacks, `NaN min` fix
+- `32d01b8` — `saveRecipe()` edit-path preservation fix + D-054 → D-055 renumber
+- `944c8b0` — the merge commit
+
+### Findings
+
+**1. Hard Rules hold.**
+- **HR3 (quote recipe ids in handlers)** — new inline handlers are `setRecipeQuickFilter('<slug>')`
+  and the existing `openRecipeFromHome('${escJ(sid)}')` / `planRecipeForToday('${escJ(sid)}')` in
+  the suggestion card. Ids are quoted and `escJ`-escaped. Correct.
+- **HR4 (`patchMissingNutrition()` after load)** — untouched; `normalizeRecipeMeta()` was added
+  *inside* `normalizeRecipes()`, which `patchMissingNutrition()` already calls first, so every
+  existing load path picks up the new defaults without a new call site.
+- **HR5 (persist through `saveData()`)** — the only new mutator, `saveRecipe()`, still routes
+  through `persistRecipe()` → `saveData()`. `seedNewDefaultHacks()` deliberately does NOT save;
+  it mutates in-memory and lets the next ordinary `saveData()` carry it.
+- **HR6 (never write Firestore before reading it)** — `saveToFirestore()` and its `cloudReady`
+  guard are not touched by this wave at all.
+- **HR7 (one `:root` block)** — `style.css` still has exactly one, at line 1. The two other grep
+  hits are prose inside comments.
+- **HR9 (match existing style)** — no framework, no build step, no module system; plain top-level
+  functions and imperative `render*()`, consistent with the surrounding file.
+
+**2. The data-safety constraint was honoured.** The brief said to prefer fields on existing recipe
+objects and to stop and report before adding any new top-level `AppState` key. No new top-level key
+was added. Recipes already round-trip generically through `saveToLocalStorage()`,
+`buildFirestorePayload()`, `snapshotData()`, `exportData()` and the import `unionById()` merge, so
+the new fields sync for free and **no sync registry was edited**. The one new piece of state — the
+active filter chip — is a module-level `var` precisely because it is view state that must not
+persist or sync.
+
+**3. Backwards compatibility is tested, not assumed.** A recipe object carrying none of the new
+fields loads, normalizes to empty defaults, and renders with **no metadata strip at all**
+(`low-effort-metadata.spec.js`). The weekly-plan slot shape is unchanged and asserted to still be
+a bare string id in `low-effort-discovery.spec.js`.
+
+**4. The `NaN min` fix is complete, not partial.** The brief explicitly said not to fix only some
+call sites. All 10 occurrences of the `basePrepTime || prepTime` / `baseCookTime || cookTime`
+pattern were replaced: edit-form population (×2), the recipe-list time filter, recipe-card totals
+(×2), the card's scaled base annotations (×2), the planner slot, the recipe-selection card, and
+week stats (×2). A `grep` for the old pattern now returns only the explanatory comment. Regression
+coverage asserts the whole rendered page contains no `NaN`.
+
+**5. The `saveRecipe()` fix is narrow and its tests are not vacuous.** The fix changes one object
+construction — an edit now starts from the existing recipe and overlays form-owned fields — and
+does not refactor the recipe model. Crucially, the fix was **reverted and the new suite re-run**:
+4 of 5 tests failed against the old code and all 5 pass against the new. The fifth
+(`adding a brand-new recipe is unaffected`) passes both ways by design, guarding against
+over-applying the merge to the create path. Behaviour deliberately preserved: the form stays
+authoritative for what it owns (clearing an input still clears), emptying all four nutrition
+inputs still clears nutrition, and a new recipe inherits nothing.
+
+**6. Suggestion logic refuses to guess.** `getCookSuggestions()` omits a category rather than
+filling it: "Something different" requires a non-empty `cookHistory`, and "Easiest" is dropped
+when the easiest available recipe is still normal-effort. Verified by a dedicated test that
+asserts `renderCookSuggestionCard()` returns an empty string rather than an empty shell.
+
+**7. One design flaw was found and fixed during the wave, by screenshot.** The first cut ranked
+"Easiest" before "Use soon", so a recipe that was both got labelled with the weaker reason and the
+expiring-ingredient prompt vanished. Claim order is now use-soon → easiest → different while
+*display* order is pinned to easiest → use-soon → different, so food about to spoil wins a
+contested recipe but the card does not reshuffle between visits.
+
+### Risk gate (D-032)
+Landed as **`done`**, not held at `approved`. Justification: this wave touches no red-zone surface
+— no Firestore write/read-guard code, no `saveData()` internals, no tombstone/merge-deletion
+machinery, no auth, no `:root` block, no AI Dev OS files. It is additive recipe fields plus UI, and
+the one behavioural fix (`saveRecipe`) strictly *reduces* data loss. The operator additionally gave
+an explicit merge instruction, which is Decision Priority 1.
+
+The genuinely red-zone sibling work (`wave1-portion-truth`) was **not** merged and remains parked.
+
+### Verification evidence
+- `npx playwright test tests/` → **74/74 pass** on merged `main` (15 spec files; button smoke
+  471 in DOM / 199 clicked / 0 broken)
+- Pre-fix revert check → 4/5 edit-preservation tests fail, confirming they bite
+- `gh api repos/shinyamadasan/Meal-Prep/pages/builds/latest` → `built`, commit `944c8b0`,
+  duration 37.7s, `2026-08-22T03:41:26Z`
+- `curl https://shinyamadasan.github.io/Meal-Prep/app.js` → contains `RECIPE_EQUIPMENT`,
+  `renderRecipeQuickFilters`, `getCookSuggestions`, `recipeCookMinutes`, `seedNewDefaultHacks`,
+  and the new `Object.assign({}, existingRecipe, formFields)` merge
+- `tests/production-smoke-low-effort.spec.js` → **6/6 against the deployed site**: vocabularies
+  live, filters narrow correctly, Home suggestions render in fixed display order, all 13 hacks
+  present, edit preservation holds, no `NaN` on any tab (both with the real seeded samples and
+  with a planted zero-cook-time recipe)
+- `git ls-remote origin refs/heads/main` → `944c8b0`
+
+### Must-fix
+None.
+
+### Follow-ups (not blocking)
+1. `recipeEffortScore()` infers effort from active time when `effort` is unset; a long recipe with
+   a short hands-on phase reads as harder than it is until the field is filled in. Accepted
+   deliberately — the alternative was excluding unlabelled recipes from discovery entirely.
+2. `seedNewDefaultHacks()` writes to `customHacks`, a synced and tombstoned list. Additive-by-id,
+   never overwrites an edited copy, leaves a deliberately-emptied list alone, and runs before
+   `applyTombstones()` / `snapshotIdBaseline()`. Residual: a hack deleted >180 days ago could
+   reappear once its tombstone is purged.
+3. The production smoke filters a `requestStorageAccess: Permission denied` console error emitted
+   by the real Firebase SDK under Chromium's headless storage partitioning. It is environmental,
+   not app code — but the filter is a place a genuine error could hide, so it is scoped to that
+   exact string.
+4. Decide the fate of `wave1-portion-truth` (`88b5598`). It claims D-054; this wave took D-055 to
+   avoid the collision. Abandoning it leaves D-054 as a permanent gap in the decision log.
+
+---
 ## Review TASK-041 — APPROVED (recipe URL import, retroactive red-zone review)
 branch: release/recipe-url-import-clean → main
 verdict: approved — merged to `main` as `f0c0ffa` after verification
