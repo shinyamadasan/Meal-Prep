@@ -117,6 +117,8 @@
                         </label>
                     </div>
 
+                    <div id="recipe-quick-filters" class="recipe-quick-filters hidden"></div>
+
                     <div id="recipe-count" class="recipe-count" aria-live="polite"></div>
 
                     <div id="recipes-grid" class="recipes-grid">
@@ -178,6 +180,42 @@
                                     <div class="form-group">
                                         <label class="form-label">Estimated Cost (₱)</label>
                                         <input type="number" class="form-control" id="estimated-cost" min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <div class="lowfx-form">
+                                    <div class="lowfx-form-head">
+                                        <span class="form-label">How you cook it</span>
+                                        <span class="lowfx-optional">all optional</span>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label" for="recipe-effort">Effort</label>
+                                            <select class="form-control" id="recipe-effort"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label" for="recipe-active-time">Active time (min)</label>
+                                            <input type="number" class="form-control" id="recipe-active-time" min="0" placeholder="hands-on only">
+                                        </div>
+                                        <div class="form-group">
+                                            <span class="form-label">Includes</span>
+                                            <div class="lowfx-chips">
+                                                <label class="lowfx-check"><input type="checkbox" id="balance-protein" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Protein</label>
+                                                <label class="lowfx-check"><input type="checkbox" id="balance-vegetables" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Veg</label>
+                                                <label class="lowfx-check"><input type="checkbox" id="balance-carb" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Carb</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <span class="form-label">Equipment</span>
+                                        <div class="lowfx-chips" id="recipe-equipment-chips"></div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <span class="form-label">Tags</span>
+                                        <div class="lowfx-chips" id="recipe-tag-chips"></div>
                                     </div>
                                 </div>
 

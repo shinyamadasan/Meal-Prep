@@ -11,6 +11,7 @@
   - L3 Planning strip: 7-day dot row + links to Planner/Nutrition.
 - **Cook History card** — Working · last 10 of `AppState.cookHistory`, hidden when empty.
 - Personalized greeting (display name / email prefix).
+- **"What should I cook?"** — Working · `getCookSuggestions()` / `renderCookSuggestionCard()` · up to 3 deterministic options: ⚡ Easiest (lowest effort score), 🥬 Use soon (`getExpirySuggestions()`, shared with the existing attention card), 🍽️ Something different (least-recently cooked, from `cookHistory`). A category with no supporting data is OMITTED, never guessed. No model calls, no server. See DECISIONS D-055.
 
 ## Cook (My Recipes)
 - **Recipe card grid** — Working · `renderRecipes()` · photo, nutrition, cost, shelf-life badges.
@@ -40,6 +41,12 @@
 - **Auto grocery list** — Working · `renderGroceryList()` · aggregated from plan, scaled, grouped by category (A→Z, "Other" last), per-item cost, in-stock badges, check-off, recipe source labels.
 - Add custom item, Clear All, Copy to clipboard, Prices→Price Book, weekly cost summary.
 - Grocery → Pantry auto-transfer on check (with undo).
+
+### Low-effort discovery
+- **Quick filter chips** — Working · `renderRecipeQuickFilters()` / `setRecipeQuickFilter()` → `#recipe-quick-filters` · lowest effort, rice cooker, rice + steamer, Instant Pot, oven, pan, no-cook, batch-friendly. One chip at a time, ANDed on top of the existing search/category/time/favourites filters. A chip matching nothing is hidden; tapping the active chip clears it. Transient view state — not persisted, not synced.
+- **Recipe metadata strip** — Working · `renderRecipeMetaStrip()` · hands-on time, effort, equipment, tags, and a "Protein ✓ · Veg ✓ · Carb ✓" line. Renders nothing at all for a recipe with no metadata.
+- **Metadata editor** — Working · `renderRecipeMetaFields()` / `readRecipeMetaFromForm()` · compact "How you cook it" block in the recipe modal; all fields optional.
+- **Edit preserves unowned properties** — Working · `saveRecipe()` starts an edit from the existing recipe and overlays only form-owned fields, so `favorite`, `highlights`, import provenance, `updatedAt`, and the input-less `fiber`/`sodium` nutrition values survive an unrelated edit. The form stays authoritative for what it does own. See DECISIONS D-055.
 
 ## Plan (Weekly Planner)
 - **7-day grid** — Working · `renderWeeklyPlanner()` · click slot → recipe selection modal; multi-day assign; expiry warnings; week stats; mobile day navigator.

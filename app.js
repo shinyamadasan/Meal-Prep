@@ -368,6 +368,9 @@ function normalizeRecipes(recipes) {
     if (recipe.instructions == null) recipe.instructions = '';
     if (recipe.fridgeLife === undefined) recipe.fridgeLife = 0;
     if (recipe.freezerLife === undefined) recipe.freezerLife = 0;
+    // Optional low-effort metadata. Valid values are preserved untouched; only
+    // absent/garbage values are replaced with an empty default.
+    normalizeRecipeMeta(recipe);
     recipe.baseIngredients.forEach(function(ing) {
       if (ing.unit == null) ing.unit = 'g';
       if (ing.baseQuantity == null) ing.baseQuantity = 0;
@@ -375,6 +378,201 @@ function normalizeRecipes(recipes) {
     });
   });
   return recipes;
+}
+
+// ── Low-effort cooking metadata ──────────────────────────────────────────────
+// Additive, OPTIONAL fields on the existing recipe object. Nothing here is a new
+// top-level AppState key, so the sync registries are untouched. A recipe saved
+// before these existed loads and renders exactly as it did — normalizeRecipes()
+// fills in empty defaults and drops garbage, but never invents a value.
+//
+//   recipe.equipment    []  slugs from RECIPE_EQUIPMENT
+//   recipe.effort       ''  one of RECIPE_EFFORTS, or null
+//   recipe.activeTime   n   minutes you actually have to DO something, or null
+//   recipe.mealBalance  {}  { protein, vegetables, carb } booleans
+//   recipe.tags         []  slugs from RECIPE_TAGS
+
+var RECIPE_EQUIPMENT = [
+  { id: 'rice-cooker', label: 'Rice cooker', icon: '🍚' },
+  { id: 'rice-cooker-steamer', label: 'Rice cooker + steamer', icon: '♨️' },
+  { id: 'instant-pot', label: 'Instant Pot', icon: '⏲️' },
+  { id: 'pressure-cooker', label: 'Pressure cooker', icon: '⏲️' },
+  { id: 'oven', label: 'Oven', icon: '🔥' },
+  { id: 'pan', label: 'Pan', icon: '🍳' },
+  { id: 'egg-boiler', label: 'Egg boiler', icon: '🥚' },
+  { id: 'microwave', label: 'Microwave', icon: '⚡' },
+  { id: 'no-cook', label: 'No cook', icon: '🥗' }
+];
+
+var RECIPE_EFFORTS = [
+  { id: 'assembly', label: 'Assembly only' },
+  { id: 'very-low', label: 'Very low' },
+  { id: 'low', label: 'Low' },
+  { id: 'normal', label: 'Normal' }
+];
+
+var RECIPE_TAGS = [
+  { id: 'batch-friendly', label: 'Batch-friendly' },
+  { id: 'minimal-cleanup', label: 'Minimal cleanup' },
+  { id: 'cook-fresh', label: 'Cook fresh' },
+  { id: 'freezer-friendly', label: 'Freezer-friendly' },
+  { id: 'shortcut', label: 'Shortcut' }
+];
+
+function idLookup(list) {
+  var map = {};
+  list.forEach(function(item) { map[item.id] = item; });
+  return map;
+}
+var EQUIPMENT_BY_ID = idLookup(RECIPE_EQUIPMENT);
+var EFFORT_BY_ID = idLookup(RECIPE_EFFORTS);
+var TAG_BY_ID = idLookup(RECIPE_TAGS);
+
+// Keep only recognised slugs, deduped and in a stable order. Anything unknown
+// (a typo, a value from a future version, junk from an import) is dropped rather
+// than left to leak into filters and badges.
+function normalizeSlugList(value, lookup) {
+  if (!Array.isArray(value)) return [];
+  var out = [];
+  value.forEach(function(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (s && lookup[s] && out.indexOf(s) < 0) out.push(s);
+  });
+  return out;
+}
+
+function normalizeEffort(value) {
+  var s = String(value == null ? '' : value).trim();
+  return EFFORT_BY_ID[s] ? s : null;
+}
+
+// Minutes of hands-on work. Blank means "not stated" (null), NOT zero — a recipe
+// nobody has filled this in for must not claim to need no attention.
+function normalizeActiveTime(value) {
+  if (value == null || String(value).trim() === '') return null;
+  var n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function normalizeMealBalance(value) {
+  var v = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return { protein: !!v.protein, vegetables: !!v.vegetables, carb: !!v.carb };
+}
+
+function normalizeRecipeMeta(recipe) {
+  if (!recipe) return recipe;
+  recipe.equipment = normalizeSlugList(recipe.equipment, EQUIPMENT_BY_ID);
+  recipe.effort = normalizeEffort(recipe.effort);
+  recipe.activeTime = normalizeActiveTime(recipe.activeTime);
+  recipe.mealBalance = normalizeMealBalance(recipe.mealBalance);
+  recipe.tags = normalizeSlugList(recipe.tags, TAG_BY_ID);
+  return recipe;
+}
+
+// ── Recipe times ─────────────────────────────────────────────────────────────
+// `recipe.baseCookTime || recipe.cookTime` silently turns a legitimate 0 into
+// undefined, and every arithmetic downstream then produced NaN — a no-cook recipe
+// rendered "NaN min". Read minutes through these instead: fall back to the legacy
+// field only when the base field is genuinely ABSENT, and never return non-numbers.
+
+function recipeMinutes(primary, legacy) {
+  var n = Number(primary);
+  if (Number.isFinite(n)) return n;
+  var l = Number(legacy);
+  return Number.isFinite(l) ? l : 0;
+}
+
+function recipePrepMinutes(recipe) {
+  return recipe ? recipeMinutes(recipe.basePrepTime, recipe.prepTime) : 0;
+}
+
+function recipeCookMinutes(recipe) {
+  return recipe ? recipeMinutes(recipe.baseCookTime, recipe.cookTime) : 0;
+}
+
+function recipeTotalMinutes(recipe) {
+  return recipePrepMinutes(recipe) + recipeCookMinutes(recipe);
+}
+
+// Minutes the user actually has to be present for. Falls back to total time when
+// a recipe hasn't declared it — the conservative reading, so an unlabelled recipe
+// is never mistaken for an effortless one.
+function recipeActiveMinutes(recipe) {
+  if (!recipe) return 0;
+  var stated = normalizeActiveTime(recipe.activeTime);
+  return stated == null ? recipeTotalMinutes(recipe) : stated;
+}
+
+// ── Effort ───────────────────────────────────────────────────────────────────
+
+var EFFORT_RANK = { 'assembly': 0, 'very-low': 1, 'low': 2, 'normal': 3 };
+
+// Lower = easier. Uses the recipe's declared effort when it has one; otherwise
+// infers a rank from hands-on time so recipes saved before this wave still sort
+// sensibly instead of all landing in one bucket.
+function recipeEffortScore(recipe) {
+  var declared = normalizeEffort(recipe && recipe.effort);
+  if (declared) return EFFORT_RANK[declared];
+  var active = recipeActiveMinutes(recipe);
+  if (active <= 5) return 1;
+  if (active <= 15) return 2;
+  return 3;
+}
+
+function recipeHasEquipment(recipe, ids) {
+  var eq = (recipe && recipe.equipment) || [];
+  return ids.some(function(id) { return eq.indexOf(id) >= 0; });
+}
+
+function recipeHasTag(recipe, tag) {
+  return (((recipe && recipe.tags) || []).indexOf(tag) >= 0);
+}
+
+function equipmentLabel(id) {
+  var e = EQUIPMENT_BY_ID[id];
+  return e ? e.icon + ' ' + e.label : '';
+}
+
+function effortLabel(recipe) {
+  var declared = normalizeEffort(recipe && recipe.effort);
+  return declared ? EFFORT_BY_ID[declared].label : '';
+}
+
+// "Protein ✓ · Veg ✓ · Carb ✓" — informational only. Never blocks anything, and
+// never asks for a number.
+function mealBalanceParts(recipe) {
+  var mb = normalizeMealBalance(recipe && recipe.mealBalance);
+  var parts = [];
+  if (mb.protein) parts.push('Protein');
+  if (mb.vegetables) parts.push('Veg');
+  if (mb.carb) parts.push('Carb');
+  return parts;
+}
+
+// ── Variety, from the cook history we already keep ───────────────────────────
+
+// Days since this recipe was last cooked, or null if it never has been.
+// cookHistory is newest-first, so the first match is the most recent cook.
+function daysSinceCooked(recipeId) {
+  var id = String(recipeId);
+  var entry = (AppState.cookHistory || []).find(function(h) {
+    return h && String(h.recipeId) === id;
+  });
+  if (!entry || !entry.date) return null;
+  var when = new Date(entry.date);
+  if (isNaN(when.getTime())) return null;
+  return Math.floor((Date.now() - when.getTime()) / 864e5);
+}
+
+// A small, explainable nudge so suggestions stop repeating this week's meals.
+// Positive = penalty, negative = boost. It only ever re-orders suggestions — it
+// never hides a recipe or stops the user cooking the same thing again.
+function varietyPenalty(recipeId) {
+  var days = daysSinceCooked(recipeId);
+  if (days == null) return 0;   // never cooked — neutral, not "exciting"
+  if (days <= 2) return 2;      // cooked in the last couple of days
+  if (days <= 6) return 1;      // cooked this week
+  return -1;                    // not for over a week — nudge it up
 }
 
 function patchMissingNutrition(recipes) {
@@ -595,6 +793,62 @@ const defaultCookingHacks = [
     description: "Buy whatever vegetables are in season and abundant at the market.",
     timeSaved: "",
     costSavings: "₱200-300 per week"
+  },
+  {
+    id: 7,
+    category: "Batch Cooking",
+    title: "Two Lechon Manok Hack",
+    description: "Buy 2 roast chickens instead of 1. Eat one now; shred the other and freeze it in meal-sized portions. Reuse with rice, wraps, eggs, or a different sauce each time.",
+    timeSaved: "1-2 hours per week",
+    costSavings: ""
+  },
+  {
+    id: 8,
+    category: "Equipment",
+    title: "Rice and Steamed Veg in One Pot",
+    description: "Put vegetables in the rice cooker's steamer tray while the rice cooks underneath. Fresh rice and hot vegetables, one appliance, one wash.",
+    timeSaved: "10-15 minutes per meal",
+    costSavings: ""
+  },
+  {
+    id: 9,
+    category: "Batch Cooking",
+    title: "Oven Chicken, Three Sauces",
+    description: "Roast 2 kg of chicken in one tray, then split it into 3 containers with different sauces. A week of the same protein without eating the same meal twice.",
+    timeSaved: "1 hour per week",
+    costSavings: ""
+  },
+  {
+    id: 10,
+    category: "Storage",
+    title: "Freeze the Protein, Cook Rice Fresh",
+    description: "Cooked meat freezes and reheats well; rice does not. Freeze protein portions and cook fresh rice the day you eat it.",
+    timeSaved: "20 minutes per meal",
+    costSavings: ""
+  },
+  {
+    id: 11,
+    category: "Time-Saving",
+    title: "Frozen Vegetables Skip the Chopping",
+    description: "Frozen mixed vegetables need no washing, peeling, or chopping, and they never spoil before you get to them.",
+    timeSaved: "10 minutes per meal",
+    costSavings: ""
+  },
+  {
+    id: 12,
+    category: "Equipment",
+    title: "Pressure-Cooker Batch Meat",
+    description: "An Instant Pot or pressure cooker turns cheap cuts into shredded meat in about 30 minutes, almost all of it unattended.",
+    timeSaved: "1-2 hours per batch",
+    costSavings: "₱100-200 per kilo"
+  },
+  {
+    id: 13,
+    category: "Batch Cooking",
+    title: "Make Sauces Separately",
+    description: "Cook plain protein and rice, and keep 2-3 sauces in jars. The same batch becomes a different meal each day without cooking again.",
+    timeSaved: "30 minutes per meal",
+    costSavings: ""
   }
 ];
 
@@ -1698,6 +1952,7 @@ function initApp() {
         loadFromLocalStorage();
         ensureStarterRecipes(); // R2: first-run starter content (respects an existing empty local record)
         seedPantryIfEmpty();
+        seedNewDefaultHacks();
         renderRecipes();
         renderWeeklyPlanner();
         renderStorageGuide();
@@ -1726,6 +1981,7 @@ function initApp() {
     }
     
     seedPantryIfEmpty();
+    seedNewDefaultHacks();
 
     // Initialize nutrition goals display
     updateNutritionGoalsDisplay();
@@ -1998,6 +2254,7 @@ function openAddRecipeModal() {
   AppState.currentEditingRecipe = null;
   document.getElementById('modal-title').textContent = 'Add New Recipe';
   clearRecipeForm();
+  renderRecipeMetaFields(null); // blank chips/selects for a brand-new recipe
   addIngredientField(); // Add one ingredient field by default
   document.getElementById('recipe-modal').classList.remove('hidden');
 }
@@ -2061,8 +2318,8 @@ function openEditRecipeModal(recipeId) {
   // Populate form with recipe data
   document.getElementById('recipe-name').value = recipe.name;
   document.getElementById('recipe-category').value = recipe.category;
-  document.getElementById('prep-time').value = recipe.basePrepTime || recipe.prepTime;
-  document.getElementById('cook-time').value = recipe.baseCookTime || recipe.cookTime;
+  document.getElementById('prep-time').value = recipePrepMinutes(recipe);
+  document.getElementById('cook-time').value = recipeCookMinutes(recipe);
   document.getElementById('servings').value = recipe.baseServings || recipe.servings;
   document.getElementById('fridge-life').value = recipe.fridgeLife == null ? '' : recipe.fridgeLife;
   document.getElementById('freezer-life').value = recipe.freezerLife == null ? '' : recipe.freezerLife;
@@ -2074,6 +2331,7 @@ function openEditRecipeModal(recipeId) {
   document.getElementById('nutrition-fat').value      = np.fat      || '';
   document.getElementById('storage-notes').value = recipe.storageNotes;
   document.getElementById('instructions').value = recipe.instructions;
+  renderRecipeMetaFields(recipe);
   
   // Handle existing photo
   if (recipe.photo) {
@@ -2185,7 +2443,12 @@ function saveRecipe(e) {
     return element ? parseFloat(element.value) || defaultValue : defaultValue;
   };
 
-  const recipe = {
+  const existingRecipe = AppState.currentEditingRecipe
+    ? AppState.recipes.find(r => String(r.id) === String(AppState.currentEditingRecipe))
+    : null;
+
+  // Exactly the fields this form owns and is authoritative for.
+  const formFields = {
     id: AppState.currentEditingRecipe || Date.now(),
     name: getElementValue('recipe-name'),
     category: getElementValue('recipe-category'),
@@ -2207,23 +2470,37 @@ function saveRecipe(e) {
       category: ing.category
     }))
   };
-  if (AppState.currentEditingRecipe) {
-    const existingRecipe = AppState.recipes.find(r => String(r.id) === String(AppState.currentEditingRecipe));
-    if (existingRecipe) {
-      if (existingRecipe.sourceUrl) recipe.sourceUrl = existingRecipe.sourceUrl;
-      if (existingRecipe.sourceSite) recipe.sourceSite = existingRecipe.sourceSite;
-      if (existingRecipe.importedAt) recipe.importedAt = existingRecipe.importedAt;
-    }
-  }
+
+  // An edit REBUILDS only what the form owns and carries everything else across.
+  // Before this, saving from the edit form replaced the whole recipe object, so
+  // any property without a form input was silently dropped: favorite, highlights,
+  // import provenance, updatedAt (which tombstone LWW depends on), and any field
+  // a later feature adds. Starting from the existing recipe makes preservation the
+  // default, so a new field can never be forgotten here again.
+  const recipe = existingRecipe ? Object.assign({}, existingRecipe, formFields) : formFields;
 
   const nutCal  = getElementValueAsNumber('nutrition-calories', 0);
   const nutPro  = getElementValueAsNumber('nutrition-protein', 0);
   const nutCarb = getElementValueAsNumber('nutrition-carbs', 0);
   const nutFat  = getElementValueAsNumber('nutrition-fat', 0);
   if (nutCal || nutPro || nutCarb || nutFat) {
-    recipe.nutritionPerServing = { calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat, fiber: 0, sodium: 0 };
+    // Fiber and sodium have no inputs on this form, so they are NOT the form's to
+    // set — keep whatever the recipe already had instead of zeroing them on
+    // every edit (which is what "fiber: 0, sodium: 0" used to do).
+    const prevNutrition = (existingRecipe && existingRecipe.nutritionPerServing) || {};
+    recipe.nutritionPerServing = {
+      calories: nutCal, protein: nutPro, carbs: nutCarb, fat: nutFat,
+      fiber: Number(prevNutrition.fiber) || 0,
+      sodium: Number(prevNutrition.sodium) || 0
+    };
+  } else if (existingRecipe) {
+    // All four inputs cleared — unchanged behaviour: treat that as clearing the
+    // recipe's nutrition rather than silently keeping the old numbers.
+    delete recipe.nutritionPerServing;
   }
-  
+
+  readRecipeMetaFromForm(recipe); // optional low-effort metadata
+
   persistRecipe(recipe);
   closeRecipeModal();
 }
@@ -2266,6 +2543,7 @@ function toggleFavorite(recipeId) {
   renderRecipes();
 }
 window.toggleFavorite = toggleFavorite;
+window.setRecipeQuickFilter = setRecipeQuickFilter;
 
 // Click anywhere on a recipe card to edit it — except on interactive controls
 // (serving steppers, quick-serve buttons, Cooked/Edit/Delete).
@@ -2451,6 +2729,313 @@ function renderCookSuggestions() {
     sections + '</div>';
 }
 
+// ── Recipe form: low-effort metadata controls ────────────────────────────────
+// Rendered from the vocabularies above rather than hand-written in index.html,
+// so there is one source of truth for the slugs. Called on every modal open, so
+// the form's own reset() can never leave a stale checkbox behind.
+
+function metaCheckboxes(containerId, options, selected, iconed) {
+  var chosen = selected || [];
+  return options.map(function(opt) {
+    var isOn = chosen.indexOf(opt.id) >= 0;
+    return '<label class="lowfx-check' + (isOn ? ' is-on' : '') + '">' +
+      '<input type="checkbox" value="' + escapeHtml(opt.id) + '" ' + (isOn ? 'checked' : '') +
+      ' onchange="this.parentNode.classList.toggle(\'is-on\', this.checked)">' +
+      (iconed && opt.icon ? opt.icon + ' ' : '') + escapeHtml(opt.label) +
+      '</label>';
+  }).join('');
+}
+
+function renderRecipeMetaFields(recipe) {
+  var r = recipe || {};
+  var equipEl = document.getElementById('recipe-equipment-chips');
+  if (equipEl) equipEl.innerHTML = metaCheckboxes('recipe-equipment-chips', RECIPE_EQUIPMENT, r.equipment, true);
+
+  var tagEl = document.getElementById('recipe-tag-chips');
+  if (tagEl) tagEl.innerHTML = metaCheckboxes('recipe-tag-chips', RECIPE_TAGS, r.tags, false);
+
+  var effortEl = document.getElementById('recipe-effort');
+  if (effortEl) {
+    effortEl.innerHTML = '<option value="">Not set</option>' + RECIPE_EFFORTS.map(function(e) {
+      return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.label) + '</option>';
+    }).join('');
+    effortEl.value = normalizeEffort(r.effort) || '';
+  }
+
+  var activeEl = document.getElementById('recipe-active-time');
+  if (activeEl) {
+    var active = normalizeActiveTime(r.activeTime);
+    activeEl.value = active == null ? '' : active;
+  }
+
+  var mb = normalizeMealBalance(r.mealBalance);
+  [['balance-protein', mb.protein], ['balance-vegetables', mb.vegetables], ['balance-carb', mb.carb]]
+    .forEach(function(pair) {
+      var el = document.getElementById(pair[0]);
+      if (!el) return;
+      el.checked = pair[1];
+      if (el.parentNode) el.parentNode.classList.toggle('is-on', pair[1]);
+    });
+}
+
+function readCheckedValues(containerId) {
+  var el = document.getElementById(containerId);
+  if (!el) return [];
+  return Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(function(input) { return input.value; });
+}
+
+function isChecked(id) {
+  var el = document.getElementById(id);
+  return !!(el && el.checked);
+}
+
+// Pull the optional metadata off the form and onto a recipe about to be saved.
+function readRecipeMetaFromForm(recipe) {
+  recipe.equipment = normalizeSlugList(readCheckedValues('recipe-equipment-chips'), EQUIPMENT_BY_ID);
+  recipe.tags = normalizeSlugList(readCheckedValues('recipe-tag-chips'), TAG_BY_ID);
+  var effortEl = document.getElementById('recipe-effort');
+  recipe.effort = normalizeEffort(effortEl ? effortEl.value : null);
+  var activeEl = document.getElementById('recipe-active-time');
+  recipe.activeTime = normalizeActiveTime(activeEl ? activeEl.value : null);
+  recipe.mealBalance = {
+    protein: isChecked('balance-protein'),
+    vegetables: isChecked('balance-vegetables'),
+    carb: isChecked('balance-carb')
+  };
+  return recipe;
+}
+
+// ── Recipe card: a compact metadata strip ────────────────────────────────────
+// Renders nothing at all for a recipe that has no metadata, so old recipes look
+// exactly as they did before this wave.
+
+function renderRecipeMetaStrip(recipe) {
+  var chips = [];
+
+  var active = normalizeActiveTime(recipe.activeTime);
+  if (active != null) {
+    chips.push('<span class="lowfx-chip lowfx-chip--time">⚡ ' + active + 'm hands-on</span>');
+  }
+  var effort = effortLabel(recipe);
+  if (effort) chips.push('<span class="lowfx-chip">' + escapeHtml(effort) + '</span>');
+
+  (recipe.equipment || []).forEach(function(id) {
+    var label = equipmentLabel(id);
+    if (label) chips.push('<span class="lowfx-chip lowfx-chip--equip">' + escapeHtml(label) + '</span>');
+  });
+
+  (recipe.tags || []).forEach(function(id) {
+    var tag = TAG_BY_ID[id];
+    if (tag) chips.push('<span class="lowfx-chip lowfx-chip--tag">' + escapeHtml(tag.label) + '</span>');
+  });
+
+  var balance = mealBalanceParts(recipe);
+  var balanceHtml = balance.length
+    ? '<div class="lowfx-balance">' + balance.map(function(p) { return escapeHtml(p) + ' ✓'; }).join(' · ') + '</div>'
+    : '';
+
+  if (!chips.length && !balanceHtml) return '';
+  return '<div class="recipe-lowfx">' +
+    (chips.length ? '<div class="lowfx-chips-row">' + chips.join('') + '</div>' : '') +
+    balanceHtml +
+    '</div>';
+}
+
+// ── Quick filters: find the low-effort options fast ──────────────────────────
+// One chip at a time, on top of (not instead of) the existing search, category,
+// time and favourites filters. Transient view state — deliberately not on
+// AppState, so no new synced top-level key is introduced.
+
+var recipeQuickFilter = '';
+
+var RECIPE_QUICK_FILTERS = [
+  { id: 'lowest-effort', icon: '⚡', label: 'Lowest effort',
+    match: function(r) { return recipeEffortScore(r) <= 1; } },
+  { id: 'rice-cooker', icon: '🍚', label: 'Rice cooker',
+    match: function(r) { return recipeHasEquipment(r, ['rice-cooker', 'rice-cooker-steamer']); } },
+  { id: 'rice-steamer', icon: '♨️', label: 'Rice + steamer',
+    match: function(r) { return recipeHasEquipment(r, ['rice-cooker-steamer']); } },
+  { id: 'pressure', icon: '⏲️', label: 'Instant Pot',
+    match: function(r) { return recipeHasEquipment(r, ['instant-pot', 'pressure-cooker']); } },
+  { id: 'oven', icon: '🔥', label: 'Oven',
+    match: function(r) { return recipeHasEquipment(r, ['oven']); } },
+  { id: 'pan', icon: '🍳', label: 'Pan',
+    match: function(r) { return recipeHasEquipment(r, ['pan']); } },
+  { id: 'no-cook', icon: '🥗', label: 'No-cook',
+    match: function(r) { return recipeHasEquipment(r, ['no-cook']); } },
+  { id: 'batch', icon: '🍱', label: 'Batch-friendly',
+    match: function(r) { return recipeHasTag(r, 'batch-friendly'); } }
+];
+
+function quickFilterById(id) {
+  return RECIPE_QUICK_FILTERS.find(function(f) { return f.id === id; }) || null;
+}
+
+function setRecipeQuickFilter(id) {
+  // Tapping the active chip clears it — no separate "all" button to hunt for.
+  recipeQuickFilter = recipeQuickFilter === id ? '' : id;
+  renderRecipes();
+}
+
+function renderRecipeQuickFilters() {
+  var el = document.getElementById('recipe-quick-filters');
+  if (!el) return;
+  var recipes = AppState.recipes || [];
+
+  var chips = RECIPE_QUICK_FILTERS.map(function(f) {
+    var count = recipes.filter(f.match).length;
+    var active = recipeQuickFilter === f.id;
+    // A chip that matches nothing is hidden rather than shown as a dead end —
+    // that is what keeps this a short row instead of a filter panel.
+    if (!count && !active) return '';
+    return '<button type="button" class="rq-chip' + (active ? ' is-active' : '') + '"' +
+      ' aria-pressed="' + (active ? 'true' : 'false') + '"' +
+      ' onclick="setRecipeQuickFilter(\'' + escapeHtml(f.id) + '\')">' +
+      f.icon + ' ' + escapeHtml(f.label) +
+      '<span class="rq-count">' + count + '</span></button>';
+  }).filter(Boolean).join('');
+
+  el.innerHTML = chips;
+  el.classList.toggle('hidden', !chips);
+}
+
+// ── Home: up to three deterministic "what should I cook?" options ────────────
+
+// Recipes that use a pantry item expiring within 3 days. Lifted verbatim out of
+// renderDashboard() so the dashboard's own "Use before they expire" block and the
+// suggestion ranker below share one implementation instead of drifting apart.
+function getExpirySuggestions(limit) {
+  var nearExpiryNames = [];
+  (AppState.pantry || []).forEach(function(p) {
+    var dl = pantryDaysLeft(p);
+    if (dl != null && dl <= 3) nearExpiryNames.push(p.name.toLowerCase());
+  });
+  if (!nearExpiryNames.length) return [];
+
+  var out = [];
+  (AppState.recipes || []).forEach(function(r) {
+    if (!r.baseIngredients) return;
+    var match = r.baseIngredients.find(function(ing) {
+      var n = ing.name.toLowerCase();
+      return nearExpiryNames.some(function(en) { return n.includes(en) || en.includes(n); });
+    });
+    if (match) out.push({ recipe: r, ingredient: match.name });
+  });
+  return limit ? out.slice(0, limit) : out;
+}
+
+// A one-line reason, built from what the recipe actually declares.
+function describeEffort(recipe) {
+  var bits = [];
+  var active = normalizeActiveTime(recipe.activeTime);
+  if (active != null) bits.push(active + ' min hands-on');
+  else if (recipeTotalMinutes(recipe) > 0) bits.push(recipeTotalMinutes(recipe) + ' min total');
+  var equip = (recipe.equipment || [])[0];
+  if (equip) bits.push(equipmentLabel(equip));
+  if (recipeHasTag(recipe, 'minimal-cleanup')) bits.push('minimal cleanup');
+  return bits.join(' · ') || effortLabel(recipe) || 'Low effort';
+}
+
+// Up to three suggestions, all derived from data the app already holds — pantry,
+// freshness, cook history, and the recipe's own metadata. No model calls, no new
+// state, no server. A category is OMITTED rather than filled with a weak guess
+// when there isn't enough information to support it.
+function getCookSuggestions() {
+  var recipes = AppState.recipes || [];
+  if (!recipes.length) return [];
+
+  var cookable = getCookableRecipes(); // pantry-aware; empty when the pantry has nothing to say
+  var missingById = {};
+  cookable.forEach(function(c) { missingById[String(c.recipe.id)] = c.missing; });
+
+  // Prefer recipes we can nearly cook; fall back to the whole book when the
+  // pantry can't narrow it down.
+  var pool = cookable.length ? cookable.map(function(c) { return c.recipe; }) : recipes;
+
+  var used = {};
+  var out = [];
+  function take(key, icon, label, recipe, why) {
+    if (!recipe || used[String(recipe.id)]) return;
+    used[String(recipe.id)] = true;
+    out.push({ key: key, icon: icon, label: label, recipe: recipe, why: why });
+  }
+
+  // Claim order is NOT display order. "Use soon" picks first because food about
+  // to spoil is the most time-sensitive reason — if the same recipe is also the
+  // easiest, saying "uses the broccoli that expires tomorrow" is more useful than
+  // saying "3 min hands-on", and Easiest simply moves to the next-easiest recipe.
+
+  // 🥬 Use soon — something expiring; easiest and least-repetitive one first.
+  var expiring = getExpirySuggestions();
+  expiring.sort(function(a, b) {
+    return (recipeEffortScore(a.recipe) + varietyPenalty(a.recipe.id)) -
+      (recipeEffortScore(b.recipe) + varietyPenalty(b.recipe.id));
+  });
+  if (expiring.length) {
+    take('use-soon', '🥬', 'Use soon', expiring[0].recipe, 'Uses ' + expiring[0].ingredient);
+  }
+
+  // ⚡ Easiest — least effort, then least hands-on time, then fewest missing
+  // ingredients, then variety.
+  var easiest = pool.filter(function(r) { return !used[String(r.id)]; }).sort(function(a, b) {
+    return recipeEffortScore(a) - recipeEffortScore(b) ||
+      recipeActiveMinutes(a) - recipeActiveMinutes(b) ||
+      (missingById[String(a.id)] || 0) - (missingById[String(b.id)] || 0) ||
+      varietyPenalty(a.id) - varietyPenalty(b.id);
+  })[0];
+  // Only offer it if it is genuinely easy. If the easiest thing available is
+  // still a normal-effort cook, there is no "easiest" worth suggesting.
+  if (easiest && recipeEffortScore(easiest) <= 2) {
+    take('easiest', '⚡', 'Easiest', easiest, describeEffort(easiest));
+  }
+
+  // 🍽️ Something different — only meaningful once there IS a cook history to
+  // be different from. With no history, everything is equally new; suggesting
+  // one would be fabricating a reason.
+  if ((AppState.cookHistory || []).length) {
+    var different = pool
+      .filter(function(r) { return !used[String(r.id)]; })
+      .sort(function(a, b) {
+        return varietyPenalty(a.id) - varietyPenalty(b.id) ||
+          recipeEffortScore(a) - recipeEffortScore(b);
+      })[0];
+    // varietyPenalty <= 0 means "not cooked in the last few days".
+    if (different && varietyPenalty(different.id) <= 0) {
+      var days = daysSinceCooked(different.id);
+      take('different', '🍽️', 'Something different', different,
+        days == null ? "Haven't cooked this yet" : 'Last cooked ' + days + ' days ago');
+    }
+  }
+
+  // Always presented in the same order, so the card doesn't reshuffle itself
+  // between visits just because a different category claimed a recipe first.
+  var displayOrder = { easiest: 0, 'use-soon': 1, different: 2 };
+  return out.sort(function(a, b) { return displayOrder[a.key] - displayOrder[b.key]; });
+}
+
+function renderCookSuggestionCard() {
+  var suggestions = getCookSuggestions();
+  if (!suggestions.length) return '';
+
+  var rows = suggestions.map(function(s) {
+    var sid = String(s.recipe.id);
+    return '<div class="dash-sugg-row">' +
+      '<button class="dash-sugg-item" onclick="openRecipeFromHome(\'' + escJ(sid) + '\')">' +
+        '<span class="dash-sugg-label">' + s.icon + ' ' + escapeHtml(s.label) + '</span>' +
+        '<span class="dash-sugg-name">' + escapeHtml(s.recipe.name) + '</span>' +
+        '<span class="dash-sugg-why">' + escapeHtml(s.why) + '</span>' +
+      '</button>' +
+      '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + escJ(sid) + '\')">Plan it</button>' +
+      '</div>';
+  }).join('');
+
+  return '<div class="dash-card dash-card--suggest">' +
+    '<div class="dash-level-header">' + icon('chef-hat') + ' What should I cook?</div>' +
+    rows +
+    '</div>';
+}
+
 // A recipe is a "sample" if it's one of the seeded example recipes (ids 1–26).
 // Badged on the card so a first-time user knows they didn't add these themselves.
 function isSampleRecipe(r) {
@@ -2460,21 +3045,25 @@ function isSampleRecipe(r) {
 function renderRecipes() {
   renderGettingStarted();
   renderCookSuggestions();
+  renderRecipeQuickFilters();
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
   const categoryFilter = document.getElementById('category-filter').value;
   const preptimeFilter = document.getElementById('preptime-filter').value;
   const favoritesOnly = document.getElementById('favorites-filter') && document.getElementById('favorites-filter').checked;
+  // The quick chip narrows on TOP of the existing filters, never instead of them.
+  const quick = quickFilterById(recipeQuickFilter);
 
   let filteredRecipes = AppState.recipes.filter(recipe => {
     const matchesSearch = recipe.name.toLowerCase().includes(searchTerm) ||
                          (recipe.instructions || '').toLowerCase().includes(searchTerm);
     const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
-    const totalTime = (recipe.basePrepTime || 0) + (recipe.baseCookTime || 0);
+    const totalTime = recipeTotalMinutes(recipe);
     const matchesTime = !preptimeFilter ||
       (preptimeFilter === '999' ? totalTime >= 60 : totalTime < parseInt(preptimeFilter));
     const matchesFavorites = !favoritesOnly || !!recipe.favorite;
-    return matchesSearch && matchesCategory && matchesTime && matchesFavorites;
+    const matchesQuick = !quick || quick.match(recipe);
+    return matchesSearch && matchesCategory && matchesTime && matchesFavorites && matchesQuick;
   });
 
   const countEl = document.getElementById('recipe-count');
@@ -2488,8 +3077,8 @@ function renderRecipes() {
   }
 
   recipesGrid.innerHTML = filteredRecipes.map(recipe => {
-    const totalPrepTime = (recipe.basePrepTime || recipe.prepTime) * recipe.currentServings / recipe.baseServings;
-    const totalCookTime = (recipe.baseCookTime || recipe.cookTime) * recipe.currentServings / recipe.baseServings;
+    const totalPrepTime = recipePrepMinutes(recipe) * recipe.currentServings / recipe.baseServings;
+    const totalCookTime = recipeCookMinutes(recipe) * recipe.currentServings / recipe.baseServings;
     const isScaled = recipe.currentServings !== recipe.baseServings;
     const totalCost = calculateRecipeCost(recipe);
     const costPerServing = totalCost / recipe.currentServings;
@@ -2543,14 +3132,16 @@ function renderRecipes() {
         <div class="time-item">
           ${icon('clock')}
           <span>Prep: ${Math.round(totalPrepTime)}m</span>
-          ${isScaled ? `<span class="time-per-serving">(${recipe.basePrepTime || recipe.prepTime}m base)</span>` : ''}
+          ${isScaled ? `<span class="time-per-serving">(${recipePrepMinutes(recipe)}m base)</span>` : ''}
         </div>
         <div class="time-item">
           ${icon('flame')}
           <span>Cook: ${Math.round(totalCookTime)}m</span>
-          ${isScaled ? `<span class="time-per-serving">(${recipe.baseCookTime || recipe.cookTime}m base)</span>` : ''}
+          ${isScaled ? `<span class="time-per-serving">(${recipeCookMinutes(recipe)}m base)</span>` : ''}
         </div>
       </div>
+
+      ${renderRecipeMetaStrip(recipe)}
 
       <div class="recipe-storage">
         <div class="storage-info">${icon('refrigerator')} Fridge: ${formatStorageLife(recipe.fridgeLife)}</div>
@@ -2715,7 +3306,7 @@ function renderWeeklyPlanner() {
           const recipeId = meal === 'snacks' ? mealData[0] : mealData;
           const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
           if (recipe) {
-            const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+            const totalTime = Math.round(recipeTotalMinutes(recipe) * recipe.currentServings / recipe.baseServings);
             const expired = willExpire(recipe, day);
             return `
               <div class="meal-slot has-recipe${expired ? ' expiry-warning' : ''}"
@@ -2938,7 +3529,7 @@ function toggleAllPlannerDays() {
 }
 
 function recipeSelectionCard(recipe) {
-  const totalTime = Math.round(((recipe.basePrepTime || recipe.prepTime) + (recipe.baseCookTime || recipe.cookTime)) * recipe.currentServings / recipe.baseServings);
+  const totalTime = Math.round(recipeTotalMinutes(recipe) * recipe.currentServings / recipe.baseServings);
   const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
   return `
     <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${recipe.id}')">
@@ -3077,8 +3668,8 @@ function updateWeeklyStats() {
           const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
           if (recipe) {
             const scale = recipe.currentServings / recipe.baseServings;
-            totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
-            totalCookTime += (recipe.baseCookTime || recipe.cookTime) * scale;
+            totalPrepTime += recipePrepMinutes(recipe) * scale;
+            totalCookTime += recipeCookMinutes(recipe) * scale;
             plannedMeals++;
           }
         });
@@ -3086,8 +3677,8 @@ function updateWeeklyStats() {
         const recipe = AppState.recipes.find(r => String(r.id) === String(mealData));
         if (recipe) {
           const scale = recipe.currentServings / recipe.baseServings;
-          totalPrepTime += (recipe.basePrepTime || recipe.prepTime) * scale;
-          totalCookTime += (recipe.baseCookTime || recipe.cookTime) * scale;
+          totalPrepTime += recipePrepMinutes(recipe) * scale;
+          totalCookTime += recipeCookMinutes(recipe) * scale;
           plannedMeals++;
         }
       }
@@ -3162,23 +3753,8 @@ function renderDashboard() {
   expiringItems.sort(function(a, b) { return a.daysLeft - b.daysLeft; });
 
   // ── Expiry-based recipe suggestions (≤3 days) ─────────────────
-  var nearExpiryNames = [];
-  AppState.pantry.forEach(function(p) {
-    var dl = pantryDaysLeft(p);
-    if (dl != null && dl <= 3) nearExpiryNames.push(p.name.toLowerCase());
-  });
-  var expirySuggestions = [];
-  if (nearExpiryNames.length > 0) {
-    AppState.recipes.forEach(function(r) {
-      if (!r.baseIngredients) return;
-      var match = r.baseIngredients.find(function(ing) {
-        var n = ing.name.toLowerCase();
-        return nearExpiryNames.some(function(en) { return n.includes(en) || en.includes(n); });
-      });
-      if (match) expirySuggestions.push({ recipe: r, ingredient: match.name });
-    });
-    expirySuggestions = expirySuggestions.slice(0, 3);
-  }
+  // Same scan as before, now shared with getCookSuggestions() (see getExpirySuggestions).
+  var expirySuggestions = getExpirySuggestions(3);
 
   // ── Week analysis ──────────────────────────────────────────────
   var dayMealCounts = {};
@@ -3388,6 +3964,7 @@ function renderDashboard() {
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
     leftoverPromptCard +
     level1Card +
+    renderCookSuggestionCard() +
     level2Card +
     level3Card +
     historyCard +
@@ -5699,6 +6276,7 @@ async function loadUserData() {
 
   ensureStarterRecipes(); // R2: seed samples only on a genuine first run — never over a deliberate empty
   seedPantryIfEmpty();    // first-time: pre-fill common staples to set stock on
+  seedNewDefaultHacks();  // add default hacks introduced after this device first ran
   applyTombstones();      // honour tombstones on every path (loaded / empty / error)
   purgeOldTombstones();
   snapshotIdBaseline(); // baseline AFTER seeding — so any future delete (incl. of a staple) is detected
@@ -8092,6 +8670,21 @@ function renderPantryKeepOpen() {
 function togglePantryGuide(safeId) {
   var el = document.getElementById('ptdetail-' + safeId);
   if (el) el.classList.toggle('hidden');
+}
+
+// Adds any default hack the user doesn't already have, matched by id. Additive
+// only: an edited copy is never overwritten, and a hack the user DELETED stays
+// deleted because this runs before applyTombstones() (its tombstone still wins)
+// and before snapshotIdBaseline(), so no phantom tombstone is recorded either.
+// A device that deleted every hack is left alone entirely.
+function seedNewDefaultHacks() {
+  if (!Array.isArray(AppState.customHacks)) AppState.customHacks = [];
+  if (!AppState.customHacks.length) return; // untouched or deliberately emptied — leave it
+  var have = {};
+  AppState.customHacks.forEach(function(h) { if (h && h.id != null) have[String(h.id)] = true; });
+  defaultCookingHacks.forEach(function(h) {
+    if (!have[String(h.id)]) AppState.customHacks.push(Object.assign({}, h));
+  });
 }
 
 function seedPantryIfEmpty() {
