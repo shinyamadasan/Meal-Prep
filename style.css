@@ -6293,7 +6293,19 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .dash-keep-btn { color: var(--color-text-secondary); }
 .dash-remove-btn { color: #b91c1c; border-color: rgba(220, 38, 38, 0.35); }
-.dash-remove-all-btn { color: #b91c1c; }
+/* The bulk destructive action inherits .dash-l1-cta, which is a padding-0 text
+   link — far too small to tap safely for something that deletes records. Give it
+   the same pill treatment as the per-row controls. */
+.dash-remove-all-btn {
+  color: #b91c1c;
+  text-decoration: none;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: var(--color-surface);
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.75rem;
+  min-height: 34px;
+  width: fit-content;
+}
 .confirm-note { font-size: 0.8rem; }
 
 @media (max-width: 480px) {

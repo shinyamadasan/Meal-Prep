@@ -120,6 +120,10 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 - **`#storage` tab** — full UI + `renderStorageGuide()` but no nav button (superseded by Inventory).
 - ~~**Orphaned pantry reads**~~ — fixed in D-057; `addToPantry()` no longer reads the removed
   `#pantry-qty-input` / `#pantry-add-where`.
+- **Grocery row is a 33px tap target on phones** — `style.css` .grocery-item under the narrow
+  breakpoint sets `padding: 5px 6px`, giving a ~33px row against the 44px guideline. Pre-existing,
+  but D-057 made that row the primary inventory-write interaction, so it now carries more weight
+  than it used to. Found by the D-057 mobile smoke; left unfixed to keep that wave scoped.
 - **Cook-path deletes lack explicit tombstones** — `deductIngredientsForRecipe()` removes depleted
   pantry items by filtering the array and relying on the `recordLocalDeletions()` vanish-diff.
   Depleting more than `MASS_DELETE_GUARD` (5) tracked items in one cook records NO tombstones, so

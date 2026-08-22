@@ -551,6 +551,134 @@ test('Keep quiets an expired item for the day without touching its dates', async
   expect(result.keptOn).toBe(result.today);
 });
 
+test('Keep is a one-day acknowledgement — the item is actionable again tomorrow', async ({ page }) => {
+  await loadLocalApp(page);
+
+  // ── Day N: two expired records, one pantry and one cooked, both kept today ──
+  const dayN = await page.evaluate((dayFnSrc) => {
+    const day = eval(dayFnSrc);
+    AppState.deletions = {};
+    AppState.pantry = [
+      { id: 'p_keep', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+    ];
+    AppState.cookedMeals = normalizeCookedMeals([
+      { id: 'cm_keep', name: 'Old Adobo', cookedDate: day(9), storage: 'fridge', fridgeLife: 4, freezerLife: 60 }
+    ]);
+    const beforeKeep = collectAttentionItems().expired.map((e) => e.id).sort();
+
+    keepAttentionItem('pantry', 'p_keep');
+    keepAttentionItem('cooked', 'cm_keep');
+
+    return {
+      beforeKeep: beforeKeep,
+      today: todayISO(),
+      keptOnPantry: AppState.pantry[0].keptOn,
+      keptOnCooked: AppState.cookedMeals[0].keptOn,
+      // All three suppression surfaces, on the day of the tap.
+      attention: collectAttentionItems().expired.length,
+      bulkCandidates: getExpiredPantryItems().length,
+      bannerExpired: getFreshnessAlerts().expired,
+      // The underlying truth is untouched.
+      purchaseDate: AppState.pantry[0].purchaseDate,
+      shelfLifeDays: AppState.pantry[0].shelfLifeDays,
+      daysLeft: pantryDaysLeft(AppState.pantry[0])
+    };
+  }, LOCAL_DAY_FN);
+
+  expect(dayN.beforeKeep).toEqual(['cm_keep', 'p_keep']);  // both were actionable
+  expect(dayN.keptOnPantry).toBe(dayN.today);
+  expect(dayN.keptOnCooked).toBe(dayN.today);
+  expect(dayN.attention).toBe(0);        // suppressed from Home
+  expect(dayN.bulkCandidates).toBe(0);   // and from bulk-expired removal
+  expect(dayN.bannerExpired).toBe(0);    // and from the freshness alert
+  expect(dayN.daysLeft).toBeLessThan(0); // Inventory still knows it is expired
+
+  // Home shows nothing to act on right now.
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await expect(page.locator('.dash-remove-all-btn')).toHaveCount(0);
+
+  // ── Advance the wall clock to tomorrow ────────────────────────────────────
+  // Nothing else changes: the records are not touched, not removed, and their
+  // dates are not edited. Only the calendar moves.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(10, 30, 0, 0);
+  await page.clock.setFixedTime(tomorrow);
+
+  const dayN1 = await page.evaluate(() => ({
+    today: todayISO(),
+    keptOnPantry: AppState.pantry[0].keptOn,
+    keptOnCooked: AppState.cookedMeals[0].keptOn,
+    attention: collectAttentionItems().expired.map((e) => e.id).sort(),
+    bulkCandidates: getExpiredPantryItems().map((x) => String(x.id)),
+    bannerExpired: getFreshnessAlerts().expired,
+    stillExpired: pantryDaysLeft(AppState.pantry[0]) < 0,
+    pantryCount: AppState.pantry.length,
+    cookedCount: AppState.cookedMeals.length
+  }));
+
+  expect(dayN1.today).not.toBe(dayN.today);          // the clock really moved
+  expect(dayN1.keptOnPantry).toBe(dayN.today);       // the record was NOT rewritten
+  expect(dayN1.keptOnCooked).toBe(dayN.today);
+  expect(dayN1.pantryCount).toBe(1);                 // nothing was auto-removed
+  expect(dayN1.cookedCount).toBe(1);
+  expect(dayN1.stillExpired).toBe(true);
+
+  // Suppression has lapsed on all three surfaces.
+  expect(dayN1.attention).toEqual(['cm_keep', 'p_keep']);
+  expect(dayN1.bulkCandidates).toEqual(['p_keep']);
+  expect(dayN1.bannerExpired).toBe(2);
+
+  // And Home offers the actions again.
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  const card = page.locator('.dash-card--warn');
+  await expect(card).toContainText('Old Broccoli');
+  await expect(card).toContainText('Old Adobo');
+  await expect(card.locator('.dash-remove-btn')).toHaveCount(2);
+  await expect(card.locator('.dash-remove-all-btn')).toContainText('Remove expired (2)');
+});
+
+test('Keep can be tapped again the next day, and re-suppresses for that day only', async ({ page }) => {
+  await loadLocalApp(page);
+
+  const setup = await page.evaluate((dayFnSrc) => {
+    const day = eval(dayFnSrc);
+    AppState.deletions = {};
+    AppState.cookedMeals = [];
+    AppState.pantry = [
+      // keptOn already carries YESTERDAY's date — the state a kept item is in
+      // when the user opens the app the following morning.
+      { id: 'p_again', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9),
+        shelfLifeDays: 5, storage: 'fridge', keptOn: day(1) }
+    ];
+    return {
+      yesterday: day(1),
+      today: todayISO(),
+      actionableOnOpen: collectAttentionItems().expired.map((e) => e.id)
+    };
+  }, LOCAL_DAY_FN);
+
+  expect(setup.yesterday).not.toBe(setup.today);
+  expect(setup.actionableOnOpen).toEqual(['p_again']);   // yesterday's Keep does not carry over
+
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await page.locator('.dash-card--warn .dash-keep-btn').first().click();
+  await page.waitForTimeout(300);
+
+  const after = await page.evaluate(() => ({
+    keptOn: AppState.pantry[0].keptOn,
+    today: todayISO(),
+    attention: collectAttentionItems().expired.length,
+    bulkCandidates: getExpiredPantryItems().length,
+    persistedKeptOn: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry[0].keptOn
+  }));
+
+  expect(after.keptOn).toBe(after.today);         // refreshed to today, not left at yesterday
+  expect(after.attention).toBe(0);
+  expect(after.bulkCandidates).toBe(0);
+  expect(after.persistedKeptOn).toBe(after.today); // and it survives a reload
+});
+
 test('the Inventory tab Clear-expired button now matches what the badges say', async ({ page }) => {
   await loadLocalApp(page);
 
@@ -741,11 +869,23 @@ test('mobile: expired cleanup is reachable and tappable on a phone viewport', as
     renderDashboard();
   }, LOCAL_DAY_FN);
 
+  // Every control that DELETES must be a real tap target, not a text link. The
+  // bulk button is included deliberately: it inherits .dash-l1-cta, which is
+  // padding-0, and shipped at 12px tall until this assertion caught it.
+  const destructive = page.locator('.dash-card--warn .dash-remove-btn, .dash-card--warn .dash-remove-all-btn, .dash-card--warn .dash-keep-btn');
+  const count = await destructive.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const b = destructive.nth(i);
+    await expect(b).toBeVisible();
+    const bb = await b.boundingBox();
+    expect(bb.height, 'control ' + i + ' height').toBeGreaterThanOrEqual(30);
+    expect(bb.width, 'control ' + i + ' width').toBeGreaterThanOrEqual(44);
+    expect(bb.x, 'control ' + i + ' left edge').toBeGreaterThanOrEqual(0);
+    expect(bb.x + bb.width, 'control ' + i + ' right edge').toBeLessThanOrEqual(390);
+  }
+
   const removeBtn = page.locator('.dash-card--warn .dash-remove-btn').first();
-  await expect(removeBtn).toBeVisible();
-  const box = await removeBtn.boundingBox();
-  expect(box.height).toBeGreaterThanOrEqual(30);   // real tap target, not a text link
-  expect(box.width).toBeGreaterThanOrEqual(48);
 
   // The page itself must not scroll sideways on a phone.
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
