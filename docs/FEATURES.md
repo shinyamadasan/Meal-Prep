@@ -6,7 +6,7 @@
 
 ## Dashboard (Home)
 - **3-level prioritized home** — Status: Working · `renderDashboard()`
-  - L1 Attention: expiring items (≤2d), low-staple alerts, **"Use soon"** recipe suggestions.
+  - L1 Attention: **Expired** (pantry + cooked food, each with one-tap `Keep` / `Remove`, plus a bulk **Remove expired (N)**), **Use soon** (≤2d, informational only — never bulk-removable), low-staple alerts, and **"Use soon"** recipe suggestions. Sourced from `collectAttentionItems()`. See DECISIONS D-057.
   - L2 Action split: cook suggestions (3 tiers) with **"Buy [ingredient]"** (`buyMissingIngredient()`); buy suggestions.
   - L3 Planning strip: 7-day dot row + links to Planner/Nutrition.
 - **Cook History card** — Working · last 10 of `AppState.cookHistory`, hidden when empty.
@@ -32,17 +32,19 @@
 - **Cooked meals** — Working · `renderCookedMeals()` · location, days-remaining, expired highlight.
 - **Pantry grid** — Working · `renderPantry()` · grouped by storage; staple cycling; inline date/qty/storage edit; storage tips from `PANTRY_KNOWLEDGE`.
 - **Pantry search** — Working · `#pantry-search` filters the pantry by name in real time (`renderPantry()`); preserves storage grouping; encouraging "No matches" empty state; hidden when the pantry is empty. *(Job: "did I already buy X?")*
-- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. Toast feedback on add ("Added …"). Duplicate name: `showConfirmDialog()` asks "add another?" instead of silent skip — supports same-name items with different expiry dates. (Qty input + storage selector were removed; `addToPantry()` still reads removed `#pantry-qty-input`/`#pantry-storage` — see ROADMAP Known Issues.)
+- **Add to pantry row** — Working · `#pantry-input` + Add + Browse + Bulk add. Toast feedback on add ("Added …"). Duplicate name: `showConfirmDialog()` asks "add another?" instead of silent skip — supports same-name items with different expiry dates. (The removed `#pantry-qty-input` / `#pantry-add-where` reads were deleted in D-057; `addToPantry()` now infers storage and leaves quantity unknown.)
 - **Ingredient Browser modal** — Working · `openIngredientBrowser()`, `#ingredient-browser-modal`.
 - **Bulk add + voice** — Working · `openBulkAddModal()`, `confirmBulkAdd()`, `startVoiceInput()` (Web Speech API; Chrome/Edge only, text fallback elsewhere).
-- **Freshness alert banner** — Working · top-of-app on load; dismissable per session.
+- **Freshness alert banner** — Working · top-of-app on load; dismissable per session. Items marked `Keep` today are excluded from the expired count (`getFreshnessAlerts()`).
+- **Clear expired** — Working · `#pantry-clear-expired` / `clearExpiredPantryItems()` · pantry-scoped bulk removal. `getExpiredPantryItems()` classifies through `pantryDaysLeft()`, so it agrees with the badges for bought-date items too (D-057 fixed an expiryDate-only scan that matched almost nothing). Explicit tombstones per id.
+- **Expired cleanup from Home** — Working · `removeAttentionItem()` (one tap, one item) and `removeAllExpired()` (bulk, confirmed, pantry + cooked meals). Only `daysLeft < 0` records qualify; "use soon" and `Keep`-marked records are structurally excluded. See DECISIONS D-057.
 - **Mark recipe cooked** — Working · `markRecipeCooked()` → deducts pantry + logs cook history. The same dialog optionally captures how many meal portions the batch made (pre-filled from the recipe's servings, follows the batch multiplier until the user overrides it).
 - **Portion tracking on stored food** — Working · `cookedMeal.initialPortions` / `portionsRemaining` · optional. A tracked batch shows a portion badge and a one-tap **Used 1**; the last portion finishes the batch through the existing removal path. Untracked batches render exactly as before. See DECISIONS D-056.
 
 ## Shop (Grocery)
 - **Auto grocery list** — Working · `renderGroceryList()` · aggregated from plan, scaled, grouped by category (A→Z, "Other" last), per-item cost, in-stock badges, check-off, recipe source labels.
 - Add custom item, Clear All, Copy to clipboard, Prices→Price Book, weekly cost summary.
-- Grocery → Pantry auto-transfer on check (with undo).
+- **Grocery → Inventory on check** — Working · `toggleGroceryItem()` → `stockPurchasedGroceryItem()` · checking a row transfers it to inventory with **no further input**: category, storage, shelf life and purchase date are all inferred. Buying more of something you already have updates the existing record (`findPantryByExactName()` + `canMergePurchase()`) rather than creating a duplicate; a printed-expiry or already-expired record stays separate. Buying a low staple sets `stockLevel: 'full'` and clears its auto shopping row. Unchecking undoes the transfer exactly, via the `stocked` receipt. Check-off now persists (it previously never called `saveData()`). See DECISIONS D-057.
 
 ### Low-effort discovery
 - **Quick filter chips** — Working · `renderRecipeQuickFilters()` / `setRecipeQuickFilter()` → `#recipe-quick-filters` · lowest effort, rice cooker, rice + steamer, Instant Pot, oven, pan, no-cook, batch-friendly. One chip at a time, ANDed on top of the existing search/category/time/favourites filters. A chip matching nothing is hidden; tapping the active chip clears it. Transient view state — not persisted, not synced.
