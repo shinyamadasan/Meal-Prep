@@ -4,6 +4,137 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-046 — APPROVED (food attention notifications, D-058) — owner-approved D-032 red-zone merge
+branch: wave-food-attention-notifications @ 31bf98d → main
+verdict: approved — **red zone**, merged only on the operator's explicit written instruction
+date: 2026-08-22
+
+### The gate, stated plainly
+This wave writes nothing to `AppState`, `AppState.deletions`, Firestore or `mealPrepAppData`, and a
+regression test asserts that. It is still **red zone** under D-032, for one reason: it modifies
+`sw.js`. The service worker is the offline-cache surface every user loads the app through, and a
+broken worker is not a one-minute revert — it can wedge a cached app on a device that then never
+fetches the fix. I recommended `approved` (held for a human) rather than `done` (auto-merge),
+returned the branch unmerged and unpushed, and did not merge on my own judgement. The operator then
+explicitly instructed: *"Approved pending one final device verification… Merge
+wave-food-attention-notifications @ 31bf98d into current main with --no-ff."* That instruction is
+the gate being satisfied — priority 1 in the CLAUDE.md Decision Priority list. Recorded here so the
+audit trail shows a human, not Claude, released the red-zone work. **This was not an automatic
+merge.**
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude at the operator's explicit instruction rather than delegated to Codex
+(CLAUDE.md Delegation Policy). This is a review of Claude's own work, stated plainly — the same
+disclosed caveat as TASK-044/045. Mitigated here by the fact that the central architectural claim
+(the notification layer invents no freshness of its own) is proven *structurally* by a test that
+stubs `collectAttentionItems()` and asserts the notification follows the stub, rather than by a
+second read of the same code.
+
+### The finding that shaped the whole wave
+Phase 1 characterised the platform before any code was written, and the answer was negative:
+**this app cannot deliver a notification while it is closed, and nothing short of new backend
+infrastructure would change that.** Hosting is static GitHub Pages with no server-side compute; the
+only backend is a stateless recipe-import Worker with no scheduler; `sw.js` was cache-only; the
+Firebase project is Auth + Firestore with no FCM registration, no VAPID key and no messaging SDK.
+Web Push would mean a VAPID keypair, a per-device subscription store, and a scheduled service that
+reads every user's inventory — a materially larger security and privacy surface than this app has
+today. Periodic Background Sync is Chromium-only, installed-PWA-only, engagement-gated and free to
+never fire. The Notification Triggers API never shipped past origin trial.
+
+The operator's decision gate ("if reliable background notifications require significant backend push
+infrastructure, stop and report") was therefore hit, reported, and honoured. No push stack was
+built. See DECISIONS D-058.
+
+### What I checked
+**1. No second freshness model.** `maybeNotifyAttention()` calls `collectAttentionItems()` and reads
+its Expired / Use soon buckets. `pantryDaysLeft()`, `daysLeftFrom()`, `cookedShelfLife()`,
+`freshnessStatus()` and `FRESHNESS_WARN_DAYS` are byte-identical to `main`. Verified structurally,
+not by inspection: one test replaces `collectAttentionItems()` with a stub returning a fabricated
+item and asserts the notification follows the stub. If a parallel expiry rule is ever introduced,
+that test fails.
+
+**2. Keep suppression is inherited, not re-implemented.** There is no `keptOn` or `isKeptToday()`
+reference anywhere in the new code. Keep works because it removes the record from the Expired bucket
+before the notification layer sees it. Two tests cover it: kept-before-first-alert (never announced,
+ledger stays empty) and kept-after-an-alert (silent on the next pass). The Inventory tab still shows
+the item's own "Expired Nd ago" badge — D-057's rule that Keep hides the *offer*, never the *truth*,
+is preserved.
+
+**3. Expired food is never offered for eating.** Three copy shapes, and every expired body says
+"Open Meal Prep to review". A test lowercases title+body and asserts absence of `eat`, `cook`,
+`consume`, `use soon`, `used soon`, `use it`, `use them`. A second test on a mixed kitchen asserts
+the expired item's name never appears in the "should be used soon" clause.
+
+**4. Deduplication is the smallest state that works.** A ledger of `"<kind>:<id>" → state`, rewritten
+from the current world each pass. Unchanged food is silent across four consecutive passes and across
+a page reload; use-soon → expired announces once more (genuinely new information) then goes quiet;
+removed food drops out of the ledger so a re-add can announce again. Keys namespaced by kind, so a
+pantry id can never mask a cooked-meal id — asserted directly.
+
+**5. No new top-level state.** The ledger lives in the device-local `localStorage` key
+`mealPrepFoodAlerts`, alongside the existing `mealPrepHelpSeen` / `pantryOnboardingDone` /
+`mealPrepWeekTemplate` precedent. A test asserts that neither `Object.keys(AppState)` nor the
+persisted `mealPrepAppData` payload contains any alert/notification/announce field. This matters
+beyond tidiness: every key added to `AppState` flows through `buildFirestorePayload()`, the union
+merges and the tombstone machinery — the exact code this wave was scoped to stay out of. It is also
+correct on the merits, since syncing "already told you" would let a phone silence a laptop.
+
+**6. Permission hygiene.** `Notification.requestPermission()` appears exactly once in the codebase,
+inside `toggleFoodAlerts()`, reachable only from the Settings row. A test asserts zero permission
+requests after a cold load. Denial disables the row, relabels it "Blocked in browser settings" and
+changes nothing else; a browser with no `Notification` object at all (iOS Safari in a tab) reads
+"Not supported on this browser" and is inert. Both paths verified with the rest of the app still
+rendering, the banner still showing and the Keep/Remove buttons still present.
+
+**7. The `sw.js` change — the actual red-zone surface.** Additive only: one `notificationclick`
+listener plus `CACHE` v4 → v5. The `install` / `activate` / `fetch` handlers are unchanged, so the
+network-first app-shell strategy that makes deploys go live immediately is intact. The worker
+registers no `push` handler and no `periodicsync` handler — it schedules and sends nothing, it only
+routes a tap. The listener is guarded (`c.url.startsWith(self.registration.scope)`) and falls back
+to `openWindow(scope)`. The cache bump is conventional here and clears stale v4 entries.
+
+**8. Android Chrome constraint handled correctly.** Android Chrome throws on the page-side
+`new Notification()` constructor and requires `registration.showNotification()`. The code prefers the
+SW path via `getRegistration()` — deliberately not `serviceWorker.ready`, which never resolves when
+no worker is registered and would have hung the promise on `file://` and in tests — and falls back
+to the constructor only where there is no registration.
+
+**9. Verification.** 27 new cases, all passing. Full suite 178 passed on the branch against a
+151-passed baseline on `main@4de1512` — zero regressions. Two initial failures were my own test
+fixtures, not app bugs (`instructions: []` where the app's schema wants a string, reproduced on
+unmodified code; and an init-script ordering bug that wiped the ledger before a reload). Both fixed
+in the fixtures; neither was masked.
+
+### What I could NOT verify — the honest residual
+**No real Android device was reachable from this environment.** `adb` is installed
+(platform-tools 37.0.0) but reports zero devices attached and zero configured AVDs, and the session
+is non-interactive so no device could be attached. Recorded as an owner/manual item rather than
+silently skipped or claimed.
+
+Post-deployment I ran the largest practical substitute — production smoke against the deployed
+HTTPS site in Chromium with a real registered service worker and a genuinely granted notification
+permission — which covers the same Blink service-worker code path Android Chrome uses. What that
+substitute still cannot reach, and what the owner should check on a phone:
+
+- **PWA install** from the Chrome menu on `shinyamadasan.github.io/Meal-Prep/`
+- **The real OS permission prompt** — Chromium's `grantPermissions()` bypasses the UI
+- **Tapping the notification in the Android tray** and confirming it focuses Meal Prep and lands on
+  the Needs Attention card (the `notificationclick` → `postMessage` → `openAttentionView()` chain is
+  smoke-verified as *wired*, but not tapped by a human thumb)
+- **`navigator.setAppBadge()` on the launcher icon** — requires an installed PWA
+- **Close/reopen with no notification arriving in between**, confirming the app never implies
+  background push exists
+
+### Risk-gate
+**D-032 red zone → `approved`, not `done`.** `sw.js` is the offline-cache surface. Held; `main` was
+not touched on Claude's judgement. Merged `--no-ff` only after the operator's explicit written
+authorisation, with the real-device check recorded above as an outstanding manual item the operator
+chose to accept rather than block on.
+
+→ TASK-046 status set to `approved` in TASKS.md before the merge, then `done` after deployment and
+production smoke.
+
+---
 ## Review TASK-045 — APPROVED (cook-path depletion tombstones, D-057 addendum) — owner-approved D-032 red-zone merge
 branch: fix/cook-depletion-tombstones → main
 verdict: approved — **red zone**, merged only on the operator's explicit written instruction

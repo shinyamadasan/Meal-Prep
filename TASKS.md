@@ -2665,6 +2665,88 @@ merge gate:
 
 ---
 
+### TASK-046 · Food attention notifications: foreground-only alerts, dedup ledger, and the PWA app badge
+status: approved
+owner: claude
+source: direct operator brief ("Build a small Food Attention Notifications wave") — not BQ
+depends-on: TASK-044 (consumes D-057 `collectAttentionItems()` and its `keptOn` suppression)
+files: app.js, index.html, style.css, sw.js,
+        tests/food-attention-notifications.spec.js (new),
+        tests/production-smoke-attention-notifications.spec.js (new),
+        docs/DECISIONS.md, docs/FEATURES.md, docs/DATA_MODEL.md
+
+objective:
+  Notify the user only when food genuinely needs attention, reusing the existing Kitchen Truth
+  freshness model — and be honest about what a static GitHub Pages PWA can actually deliver.
+  Explicitly NOT a generic reminder platform.
+
+notes:
+  Phase 1 characterised the platform before any code was written. There is no push server and
+  none can exist here without new backend infrastructure: hosting is static GitHub Pages, the
+  only backend is a stateless recipe-import Worker, `sw.js` was cache-only, and the Firebase
+  project is Auth + Firestore with no FCM registration, no VAPID key and no messaging SDK. Adding
+  Web Push would mean a VAPID keypair, a per-device subscription store and a scheduled service
+  reading every user's inventory. Periodic Background Sync is Chromium-only, installed-PWA-only,
+  engagement-gated and free to never fire; the Notification Triggers API never shipped past
+  origin trial. The operator's decision gate was therefore hit and reported rather than built
+  through — see DECISIONS D-058.
+
+  What was built instead: `maybeNotifyAttention()` at app open (all three load paths) and on
+  `visibilitychange` → visible. It CONSUMES `collectAttentionItems()` and defines no expiry
+  boundary of its own.
+
+acceptance:
+  - [x] Permission is requested from exactly one place, reached only by a deliberate Settings tap;
+        zero `requestPermission()` calls after a cold page load
+  - [x] A denied permission, and a browser with no `Notification` object at all, both leave the
+        app fully working
+  - [x] Expired / use-soon classification comes from `pantryDaysLeft()`, `cookedShelfLife()` and
+        `FRESHNESS_WARN_DAYS` — no second freshness system
+  - [x] Expired food is never suggested for consumption; the copy says "review", never eat/use/cook
+  - [x] Several attention items produce ONE grouped notification, `tag: 'meal-prep-attention'`
+  - [x] Unchanged food never notifies twice, across repeated passes and across a reload
+  - [x] A newly expired or newly use-soon item notifies once; use-soon → expired notifies once more
+  - [x] Keep suppression (D-057 `isKeptToday()`) is respected — inherited, not re-implemented
+  - [x] Cooked Ready Food freshness is included; freezer batches and null-shelf-life meals excluded
+  - [x] Old saved data loads unchanged; a corrupt prefs value falls back to off instead of throwing
+  - [x] No new top-level `AppState` key — bookkeeping lives in device-local `mealPrepFoodAlerts`
+  - [x] Mobile settings row is reachable, tappable and introduces no horizontal overflow
+  - [x] Full existing suite remains green
+
+constraints:
+  - Do NOT add a push server, FCM, Cloud Functions, Cloud Scheduler or any notification backend
+  - Do NOT build a reminder scheduler, user-created reminders, meal/calorie/water/shopping
+    reminders, recipe recommendations, SMS/email/Telegram delivery, AI, or a household model
+  - Do NOT touch sync, tombstones, `saveData()`, the `cloudReady` write-guard or auth
+  - Do NOT touch `wave1-portion-truth`
+
+sync/deletion safety (why this is D-032 red zone despite touching no sync code):
+  This wave writes NOTHING to `AppState`, `AppState.deletions`, Firestore or localStorage's
+  `mealPrepAppData`. Its only persistent state is the separate device-local key
+  `mealPrepFoodAlerts`, and a regression test asserts that neither `AppState` nor the persisted
+  payload grows an alert field. The red-zone trigger is `sw.js`: the service worker is the
+  offline-cache surface every user loads through, and a broken worker is not a one-minute revert.
+  The change there is additive — one `notificationclick` listener plus a `CACHE` bump v4 → v5 —
+  and the worker schedules and sends nothing of its own.
+
+verification:
+  - [x] `npx playwright test tests/food-attention-notifications.spec.js` — 27 passed
+  - [x] `npm test` on the branch — 178 passed, 0 failed (baseline on `main@4de1512` was 151)
+  - [x] `npm test` on final `main` after the merge — see REVIEW.md TASK-046
+  - [x] Production smoke against the deployed GitHub Pages build over real HTTPS with a live
+        service worker and a genuinely granted notification permission
+  - [ ] **Real Android device / installed PWA — NOT PERFORMED. Owner/manual item.** See the
+        merge gate below and REVIEW.md TASK-046 for the exact residual list.
+
+merge gate:
+  D-032 **red zone** — `sw.js`, the service-worker/offline-cache surface. Claude recommended
+  `approved` (held) and did not merge on its own judgement. Merged `--no-ff` only after the
+  operator's explicit written authorisation ("Approved pending one final device verification…
+  Merge wave-food-attention-notifications @ 31bf98d into current main with --no-ff"). See
+  REVIEW.md TASK-046.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
