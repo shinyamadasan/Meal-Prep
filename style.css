@@ -5886,6 +5886,16 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .recipe-details.hidden,
 .recipe-instructions.hidden { display: none; }
 
+.recipe-instruction-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.recipe-instruction-list li {
+  margin-bottom: 0.35rem;
+  line-height: 1.45;
+}
+
 /* ── Micro-animations: subtle motion for a more premium feel ─────────────── */
 @keyframes mp-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes mp-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

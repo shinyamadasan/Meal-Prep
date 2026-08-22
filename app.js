@@ -2495,12 +2495,12 @@ function renderRecipes() {
     const costPerServing = totalCost / recipe.currentServings;
     const nutrition = calculateRecipeNutrition(recipe);
     const nutritionPerServing = {
-      calories: Math.round(nutrition.calories / recipe.currentServings),
-      protein: Math.round(nutrition.protein / recipe.currentServings),
-      carbs: Math.round(nutrition.carbs / recipe.currentServings),
-      fat: Math.round(nutrition.fat / recipe.currentServings),
-      fiber: Math.round(nutrition.fiber / recipe.currentServings),
-      sodium: Math.round(nutrition.sodium / recipe.currentServings)
+      calories: nutritionDisplayValue(nutrition.calories, recipe.currentServings),
+      protein: nutritionDisplayValue(nutrition.protein, recipe.currentServings),
+      carbs: nutritionDisplayValue(nutrition.carbs, recipe.currentServings),
+      fat: nutritionDisplayValue(nutrition.fat, recipe.currentServings),
+      fiber: nutritionDisplayValue(nutrition.fiber, recipe.currentServings),
+      sodium: nutritionDisplayValue(nutrition.sodium, recipe.currentServings)
     };
     
     return `
@@ -2562,27 +2562,27 @@ function renderRecipes() {
         <div class="recipe-nutrition-title">Nutrition per serving:</div>
         <div class="nutrition-grid">
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.calories}</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.calories, '')}</span>
             <span class="nutrition-value-label">cal</span>
           </div>
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.protein}g</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.protein, 'g')}</span>
             <span class="nutrition-value-label">protein</span>
           </div>
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.carbs}g</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.carbs, 'g')}</span>
             <span class="nutrition-value-label">carbs</span>
           </div>
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.fat}g</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.fat, 'g')}</span>
             <span class="nutrition-value-label">fat</span>
           </div>
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.fiber}g</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.fiber, 'g')}</span>
             <span class="nutrition-value-label">fiber</span>
           </div>
           <div class="nutrition-value">
-            <span class="nutrition-value-number">${nutritionPerServing.sodium}mg</span>
+            <span class="nutrition-value-number">${formatNutritionMetric(nutritionPerServing.sodium, 'mg')}</span>
             <span class="nutrition-value-label">sodium</span>
           </div>
         </div>
@@ -2620,7 +2620,7 @@ function renderRecipes() {
       </div>
       <button type="button" class="recipe-details-toggle" onclick="toggleRecipeDetails(event)" aria-expanded="false" data-show-label="Instructions ▾" data-hide-label="Hide instructions ▴">Instructions ▾</button>
       <div class="recipe-instructions hidden">
-        <p><strong>Instructions:</strong> ${escapeHtml(recipe.instructions || '')}</p>
+        ${renderInstructionSteps(recipe.instructions || '')}
       </div>
 
       <div class="recipe-actions">
@@ -2634,6 +2634,28 @@ function renderRecipes() {
 
 function filterRecipes() {
   renderRecipes();
+}
+
+function nutritionDisplayValue(totalValue, servings) {
+  if (totalValue == null) return null;
+  const total = Number(totalValue);
+  const servingCount = Number(servings);
+  if (!Number.isFinite(total) || !Number.isFinite(servingCount) || servingCount <= 0) return null;
+  return Math.round(total / servingCount);
+}
+
+function formatNutritionMetric(value, suffix) {
+  return Number.isFinite(value) ? value + suffix : '—';
+}
+
+function renderInstructionSteps(instructions) {
+  const steps = parseInstructionSteps(instructions || '');
+  if (steps.length === 0) return '<p><strong>Instructions:</strong> —</p>';
+  return `
+        <h4>Instructions:</h4>
+        <ol class="recipe-instruction-list">
+          ${steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+        </ol>`;
 }
 
 // Weekly planner functions
@@ -4148,14 +4170,13 @@ document.addEventListener('DOMContentLoaded', initApp);
 function calculateRecipeNutrition(recipe) {
   if (recipe.nutritionPerServing && recipe.nutritionPerServing.calories > 0) {
     // If recipe already has nutrition data, scale it
-    const scale = recipe.currentServings / recipe.baseServings;
     return {
-      calories: recipe.nutritionPerServing.calories * recipe.currentServings,
-      protein: recipe.nutritionPerServing.protein * recipe.currentServings,
-      carbs: recipe.nutritionPerServing.carbs * recipe.currentServings,
-      fat: recipe.nutritionPerServing.fat * recipe.currentServings,
-      fiber: recipe.nutritionPerServing.fiber * recipe.currentServings,
-      sodium: recipe.nutritionPerServing.sodium * recipe.currentServings
+      calories: scaleKnownNutrition(recipe.nutritionPerServing.calories, recipe.currentServings),
+      protein: scaleKnownNutrition(recipe.nutritionPerServing.protein, recipe.currentServings),
+      carbs: scaleKnownNutrition(recipe.nutritionPerServing.carbs, recipe.currentServings),
+      fat: scaleKnownNutrition(recipe.nutritionPerServing.fat, recipe.currentServings),
+      fiber: scaleKnownNutrition(recipe.nutritionPerServing.fiber, recipe.currentServings),
+      sodium: scaleKnownNutrition(recipe.nutritionPerServing.sodium, recipe.currentServings)
     };
   }
   
@@ -4178,6 +4199,14 @@ function calculateRecipeNutrition(recipe) {
     
     return total;
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 });
+}
+
+function scaleKnownNutrition(value, servings) {
+  if (value == null) return null;
+  const number = Number(value);
+  const servingCount = Number(servings);
+  if (!Number.isFinite(number) || !Number.isFinite(servingCount)) return null;
+  return number * servingCount;
 }
 
 function toGrams(quantity, unit) {
@@ -6331,7 +6360,9 @@ function parseInstructionSteps(text) {
   if (lines.length === 1 && /\d+\./.test(lines[0])) {
     lines = lines[0].split(/(?=\d+\.)/).map(l => l.trim()).filter(Boolean);
   }
-  return lines;
+  return lines
+    .map(line => line.replace(/^\s*(?:step\s*)?\d+[\.)]\s*/i, '').trim())
+    .filter(Boolean);
 }
 
 function togglePrepCheck(key) {
