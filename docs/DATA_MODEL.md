@@ -53,8 +53,39 @@ AppState.prepModeSession    // null, or { active, recipeUsage, checked } for an 
   instructions,
   favorite,            // boolean (♥ toggle)
   highlights,          // string[] tag chips — rendered but NO edit-form UI to set
+
+  // ── Low-effort cooking metadata — ALL OPTIONAL, all additive ──
+  // Every field below is filled in by normalizeRecipes() -> normalizeRecipeMeta()
+  // on load. A recipe saved before these existed gets empty defaults and renders
+  // exactly as it did; a valid value is never overwritten, an unknown one is dropped.
+  equipment,           // string[] of slugs from RECIPE_EQUIPMENT:
+                       //   'rice-cooker' | 'rice-cooker-steamer' | 'instant-pot' |
+                       //   'pressure-cooker' | 'oven' | 'pan' | 'egg-boiler' |
+                       //   'microwave' | 'no-cook'. Multiple values allowed.
+  effort,              // 'assembly' | 'very-low' | 'low' | 'normal', or null
+  activeTime,          // minutes you actually have to DO something, or null.
+                       // null means NOT STATED — never 0. Different from cook time.
+  mealBalance,         // { protein: bool, vegetables: bool, carb: bool }
+                       // Informational only: renders "Protein ✓ · Veg ✓ · Carb ✓".
+                       // No grams, no goals, no warnings.
+  tags,                // string[] of slugs from RECIPE_TAGS: 'batch-friendly' |
+                       //   'minimal-cleanup' | 'cook-fresh' | 'freezer-friendly' | 'shortcut'
 }
 ```
+
+Read the time and effort fields through the helpers, never directly — `baseCookTime ||
+cookTime` turns a legitimate `0` into `undefined` and then `NaN`:
+
+| Helper | Returns |
+|---|---|
+| `recipePrepMinutes(recipe)` / `recipeCookMinutes(recipe)` | minutes; a real `0` stays `0` |
+| `recipeTotalMinutes(recipe)` | prep + cook |
+| `recipeActiveMinutes(recipe)` | `activeTime` if stated, else total time (conservative) |
+| `recipeEffortScore(recipe)` | 0–3, lower = easier; inferred from active time when `effort` is unset |
+| `recipeHasEquipment(recipe, ids)` / `recipeHasTag(recipe, tag)` | membership tests |
+| `daysSinceCooked(id)` / `varietyPenalty(id)` | from `AppState.cookHistory`; penalty only re-orders suggestions |
+
+See DECISIONS D-054.
 Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` hold one id or
 `null`; `snacks` is an array of ids.
 
