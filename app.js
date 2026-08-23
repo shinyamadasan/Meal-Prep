@@ -257,10 +257,21 @@ const STORAGE_KEY = 'mealPrepAppData';
 var FIRST_RUN_KEY = 'mealPrepInitialized';
 function isFirstRun() { try { return !localStorage.getItem(FIRST_RUN_KEY); } catch (e) { return false; } }
 function markInitialized() { try { localStorage.setItem(FIRST_RUN_KEY, '1'); } catch (e) {} }
+// sampleRecipes is a module constant, and `[...sampleRecipes]` copies only the
+// ARRAY — every recipe object stays shared with the seed. Since the app edits
+// recipes in place (toggleFavorite, updateServingSize, normalizeRecipes, the
+// photo cache), a seeded session rewrites the constant as the user works, and
+// anything that later reads sampleRecipes gets that contamination instead of
+// the pristine seed — the starter pack most of all. Every seed entry point
+// must therefore hand AppState its own objects. See DECISIONS D-064.
+function cloneSeedRecipes() {
+  return JSON.parse(JSON.stringify(sampleRecipes));
+}
+
 function ensureStarterRecipes() {
   if (!isFirstRun()) return;                 // existing install → respect whatever's there (incl. empty)
   if (!AppState.recipes || AppState.recipes.length === 0) {
-    AppState.recipes = [...sampleRecipes];
+    AppState.recipes = cloneSeedRecipes();
     patchMissingNutrition(AppState.recipes);
   }
   markInitialized();
@@ -583,7 +594,9 @@ function patchMissingNutrition(recipes) {
       // Use loose string comparison — Firestore may store numeric IDs as strings
       var source = sampleRecipes.find(function(s) { return String(s.id) === String(recipe.id); });
       if (source && source.nutritionPerServing) {
-        recipe.nutritionPerServing = source.nutritionPerServing;
+        // Copy, don't alias: assigning the seed's own object would let a later
+        // nutrition edit rewrite the constant (D-064).
+        recipe.nutritionPerServing = Object.assign({}, source.nutritionPerServing);
         patched = true;
       }
     }
@@ -2509,7 +2522,7 @@ function initApp() {
     
     // If no saved data, use defaults
     if (!hasLoadedData) {
-      AppState.recipes = [...sampleRecipes];
+      AppState.recipes = cloneSeedRecipes(); // own objects, not the seed's (D-064)
       AppState.customIngredients = [...defaultStorageData];
       AppState.customHacks = [...defaultCookingHacks];
       // Save the default data

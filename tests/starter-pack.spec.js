@@ -22,9 +22,13 @@ const PACK_IDS = Array.from({ length: 14 }, (_, i) => i + 27);
 
 async function boot(page) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  // addInitScript runs again on reload; guard the clear so a reload exercises
+  // the real restore path rather than starting from a blank slate.
   await page.addInitScript(() => {
     try {
+      if (localStorage.getItem('__harnessBooted')) return;
       localStorage.clear();
+      localStorage.setItem('__harnessBooted', '1');
       localStorage.setItem('mealPrepHelpSeen', '1');
       localStorage.setItem('mealPrepStartDone', '1');
       localStorage.setItem('pantryOnboardingDone', '1');

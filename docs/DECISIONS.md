@@ -866,3 +866,35 @@ The honest limit: `purgeOldTombstones()` forgets markers older than 180 days, so
 Deliberately not built, per the brief: no pack registry, no remote content, no downloadable packs, no versioning, no update/overwrite path, no automatic reseed. Adding a *second* pack later would need a real design; this is one list of ids and a presence check.
 
 Risk gate: **outside D-032 red zone** — but closer to it than the previous two commits, so worth stating precisely why. The feature reads `AppState.deletions` and writes only to `AppState.recipes` via the normal `saveData()` path. It does not modify `ensureStarterRecipes()`, `isFirstRun()`, the tombstone functions, the `cloudReady` write-guard, or any merge code. The one genuinely dangerous version of this feature — re-seeding automatically — is the version that was not built.
+
+## D-064 — Seeding hands AppState its own recipe objects, not the constant's
+
+Task: `wave-cook-method-discovery`, fourth commit. Pre-merge data-isolation check.
+
+Both seed entry points did `AppState.recipes = [...sampleRecipes]`. Spread copies the **array**; every recipe object inside stayed shared with the module constant. This was flagged as suspicious in the D-063 report and was checked before being changed, because "shallow copy looks wrong" is not by itself a reason to touch production code.
+
+It was reachable, and proven so rather than argued:
+
+- **All 40 objects shared.** `AppState.recipes[n] === sampleRecipes[n]` for every entry after a seeded boot.
+- **Ordinary interactions rewrite the constant.** `toggleFavorite()` (`recipe.favorite = !recipe.favorite`), `updateServingSize()` (`recipe.currentServings = n`), and `normalizeRecipes()` (which reassigns `equipment`, `tags`, `mealBalance` to fresh objects) all mutate in place. A probe confirmed `sampleRecipes` entry 27 came out with `currentServings: 8` and `favorite: true` after nothing more than scaling and favouriting in the UI.
+- **And it leaked into user data.** The exploit path: seeded session → user scales and favourites a starter recipe → something replaces `AppState.recipes` with a set lacking 27–40 (a sign-in merge from an older device does exactly this) → the D-063 starter pack sources those ids from `sampleRecipes` → the recipes are added **pre-scaled to 8 servings and already favourited**, then persisted and synced. Reproduced end to end before the fix.
+
+The blast radius was one session, since the constant is re-evaluated on every page load — which is why this never showed up as a permanent corruption and why it survived this long.
+
+Fix, using the deep-copy pattern `addStarterPackRecipes()` already established:
+
+```js
+function cloneSeedRecipes() { return JSON.parse(JSON.stringify(sampleRecipes)); }
+```
+
+Applied at both seed entry points (`ensureStarterRecipes()` and the Firebase-unavailable fallback). A third aliasing site was fixed in the same class: `patchMissingNutrition()` assigned `source.nutritionPerServing` — a reference **into** the constant — onto the recovered recipe, so a later nutrition edit would rewrite the seed. It now copies.
+
+Explicitly NOT changed: `isFirstRun()`, the first-run gate itself, when seeding happens, tombstone logic, or ranking. Only *what objects* seeding hands over.
+
+A correction to the D-063 report, which called the Firebase-unavailable fallback a latent bug for checking `hasLoadedData` instead of `isFirstRun()`: it is not a bug. `loadFromLocalStorage()` returns true whenever a saved record exists — including one whose `recipes` array is deliberately empty — so a saved empty list is never re-seeded over. A test now pins that behaviour.
+
+Also fixed: two Playwright harnesses cleared `localStorage` from `addInitScript`, which re-runs on **every** navigation including `page.reload()`. Their reload assertions were therefore starting from a blank slate and proving nothing — the starter-pack "survives a reload" test passed only because a fresh re-seed also yields 40 recipes. Both now guard the clear behind a one-time flag, so reload exercises the real restore path. This is why the seed-isolation reload test failed on first run: it was the first test to actually reload into saved state.
+
+Out of scope and left alone: `[...defaultStorageData]` and `[...defaultCookingHacks]` in the same fallback share objects the same way. No mutation path was audited for them and the brief scoped this to recipe objects; they are recorded here as known, unaudited, same-class candidates.
+
+Risk gate: **outside D-032 red zone.** No sync, tombstone, save-path, auth or service-worker change. The three touched lines make copies where references were being handed out.
