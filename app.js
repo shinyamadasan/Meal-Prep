@@ -257,10 +257,21 @@ const STORAGE_KEY = 'mealPrepAppData';
 var FIRST_RUN_KEY = 'mealPrepInitialized';
 function isFirstRun() { try { return !localStorage.getItem(FIRST_RUN_KEY); } catch (e) { return false; } }
 function markInitialized() { try { localStorage.setItem(FIRST_RUN_KEY, '1'); } catch (e) {} }
+// sampleRecipes is a module constant, and `[...sampleRecipes]` copies only the
+// ARRAY — every recipe object stays shared with the seed. Since the app edits
+// recipes in place (toggleFavorite, updateServingSize, normalizeRecipes, the
+// photo cache), a seeded session rewrites the constant as the user works, and
+// anything that later reads sampleRecipes gets that contamination instead of
+// the pristine seed — the starter pack most of all. Every seed entry point
+// must therefore hand AppState its own objects. See DECISIONS D-064.
+function cloneSeedRecipes() {
+  return JSON.parse(JSON.stringify(sampleRecipes));
+}
+
 function ensureStarterRecipes() {
   if (!isFirstRun()) return;                 // existing install → respect whatever's there (incl. empty)
   if (!AppState.recipes || AppState.recipes.length === 0) {
-    AppState.recipes = [...sampleRecipes];
+    AppState.recipes = cloneSeedRecipes();
     patchMissingNutrition(AppState.recipes);
   }
   markInitialized();
@@ -583,7 +594,9 @@ function patchMissingNutrition(recipes) {
       // Use loose string comparison — Firestore may store numeric IDs as strings
       var source = sampleRecipes.find(function(s) { return String(s.id) === String(recipe.id); });
       if (source && source.nutritionPerServing) {
-        recipe.nutritionPerServing = source.nutritionPerServing;
+        // Copy, don't alias: assigning the seed's own object would let a later
+        // nutrition edit rewrite the constant (D-064).
+        recipe.nutritionPerServing = Object.assign({}, source.nutritionPerServing);
         patched = true;
       }
     }
@@ -1288,7 +1301,12 @@ const sampleRecipes = [
       { name: "Green Onion (Sibuyas Dahon)", baseQuantity: 2, unit: "stalks", category: "Vegetable" }
     ],
     instructions: "Crush and fry garlic in oil until golden. Add day-old rice, break clumps, season with salt. Stir-fry until heated through. Top with green onion.",
-    nutritionPerServing: { calories: 290, protein: 5, carbs: 52, fat: 7, fiber: 1, sodium: 290 }
+    nutritionPerServing: { calories: 290, protein: 5, carbs: 52, fat: 7, fiber: 1, sodium: 290 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: false, vegetables: false, carb: true },
+    tags: ['minimal-cleanup']
   },
   {
     id: 2,
@@ -1311,7 +1329,12 @@ const sampleRecipes = [
       { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, and ginger. Add chicken and fish sauce. Pour in 1.5L water and rice. Simmer 30–35 min, stirring occasionally, until porridge consistency. Season to taste.",
-    nutritionPerServing: { calories: 285, protein: 22, carbs: 30, fat: 8, fiber: 1, sodium: 480 }
+    nutritionPerServing: { calories: 285, protein: 22, carbs: 30, fat: 8, fiber: 1, sodium: 480 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: false, carb: true },
+    tags: ['minimal-cleanup', 'batch-friendly']
   },
   {
     id: 3,
@@ -1332,7 +1355,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Grill or roast eggplant until soft. Peel skin and flatten with a fork. Dip in beaten egg seasoned with minced garlic and salt. Pan-fry until golden on both sides.",
-    nutritionPerServing: { calories: 185, protein: 10, carbs: 9, fat: 13, fiber: 3, sodium: 320 }
+    nutritionPerServing: { calories: 185, protein: 10, carbs: 9, fat: 13, fiber: 3, sodium: 320 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['cook-fresh']
   },
   {
     id: 4,
@@ -1354,7 +1382,12 @@ const sampleRecipes = [
       { name: "Black Pepper", baseQuantity: 0.5, unit: "tsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, and tomato. Add diced potato and cook 5 min. Add corned beef, break apart and mix well. Cook until potato is tender.",
-    nutritionPerServing: { calories: 310, protein: 17, carbs: 14, fat: 22, fiber: 1, sodium: 980 }
+    nutritionPerServing: { calories: 310, protein: 17, carbs: 14, fat: 22, fiber: 1, sodium: 980 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['shortcut', 'minimal-cleanup']
   },
 
   // ─── Main Dish ────────────────────────────────────────────────────────────
@@ -1379,7 +1412,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Marinate chicken in soy sauce, vinegar, garlic, and pepper for 30 min. Brown chicken in oil. Add marinade and bay leaves. Simmer covered 20 min, then uncovered 10 min to reduce sauce.",
-    nutritionPerServing: { calories: 290, protein: 28, carbs: 3, fat: 18, fiber: 0, sodium: 820 }
+    nutritionPerServing: { calories: 290, protein: 28, carbs: 3, fat: 18, fiber: 0, sodium: 820 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 18,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
   },
   {
     id: 6,
@@ -1402,7 +1440,12 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Boil pork with onion and tomato 30 min until tender. Add tamarind broth (or sinigang mix) and sitaw, simmer 5 min. Add kangkong in the last minute. Season with fish sauce.",
-    nutritionPerServing: { calories: 340, protein: 24, carbs: 8, fat: 22, fiber: 2, sodium: 560 }
+    nutritionPerServing: { calories: 340, protein: 24, carbs: 8, fat: 22, fiber: 2, sodium: 560 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 22,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['batch-friendly']
   },
   {
     id: 7,
@@ -1425,7 +1468,12 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté ginger, garlic, onion. Add chicken and sear briefly. Pour in 1L water and fish sauce. Simmer 20 min. Add sayote, cook 5 min. Stir in malunggay and turn off heat.",
-    nutritionPerServing: { calories: 195, protein: 22, carbs: 5, fat: 9, fiber: 2, sodium: 400 }
+    nutritionPerServing: { calories: 195, protein: 22, carbs: 5, fat: 9, fiber: 2, sodium: 400 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 18,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['minimal-cleanup']
   },
   {
     id: 8,
@@ -1448,7 +1496,12 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Boil mung beans 30–40 min until soft. In a separate pan, sauté garlic, onion, tomato, and pork. Add to beans and simmer 10 min. Add ampalaya last 5 min. Season with fish sauce.",
-    nutritionPerServing: { calories: 225, protein: 13, carbs: 26, fat: 7, fiber: 7, sodium: 340 }
+    nutritionPerServing: { calories: 225, protein: 13, carbs: 26, fat: 7, fiber: 7, sodium: 340 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 22,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['batch-friendly']
   },
   {
     id: 9,
@@ -1472,7 +1525,12 @@ const sampleRecipes = [
       { name: "Oyster Sauce", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, tomato. Add ground pork and cook until brown. Add soy sauce, oyster sauce, diced potato, and carrot. Cover and simmer 15 min until vegetables are tender.",
-    nutritionPerServing: { calories: 275, protein: 18, carbs: 13, fat: 17, fiber: 2, sodium: 520 }
+    nutritionPerServing: { calories: 275, protein: 18, carbs: 13, fat: 17, fiber: 2, sodium: 520 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
   },
   {
     id: 10,
@@ -1495,7 +1553,12 @@ const sampleRecipes = [
       { name: "Salt", baseQuantity: 1, unit: "tsp", category: "Pantry" }
     ],
     instructions: "Place bangus pieces in a pan. Add vinegar, garlic, ginger, onion, pepper, salt, and ¼ cup water. Bring to a boil without stirring. Cover and simmer 15 min on low heat.",
-    nutritionPerServing: { calories: 205, protein: 24, carbs: 2, fat: 10, fiber: 0, sodium: 480 }
+    nutritionPerServing: { calories: 205, protein: 24, carbs: 2, fat: 10, fiber: 0, sodium: 480 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 12,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup']
   },
   {
     id: 11,
@@ -1518,7 +1581,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Marinate beef in soy sauce, calamansi juice, and pepper for 30 min. Sear beef in hot oil, set aside. Sauté garlic and onion rings in same pan. Return beef and pour remaining marinade, simmer 10 min.",
-    nutritionPerServing: { calories: 285, protein: 27, carbs: 5, fat: 17, fiber: 1, sodium: 880 }
+    nutritionPerServing: { calories: 285, protein: 27, carbs: 5, fat: 17, fiber: 1, sodium: 880 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 20,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: []
   },
   {
     id: 12,
@@ -1540,7 +1608,12 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Boil pork and onion with peppercorn in 1.5L water. Simmer 40 min until tender. Add potato, cook 8 min. Add cabbage, cook 2 min. Season with fish sauce.",
-    nutritionPerServing: { calories: 310, protein: 22, carbs: 12, fat: 19, fiber: 2, sodium: 480 }
+    nutritionPerServing: { calories: 310, protein: 22, carbs: 12, fat: 19, fiber: 2, sodium: 480 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly']
   },
   {
     id: 13,
@@ -1562,7 +1635,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, tomato, and chili. Add sardines including the sauce from the can. Stir gently and simmer 5 min. Serve over rice.",
-    nutritionPerServing: { calories: 230, protein: 18, carbs: 5, fat: 15, fiber: 1, sodium: 680 }
+    nutritionPerServing: { calories: 230, protein: 18, carbs: 5, fat: 15, fiber: 1, sodium: 680 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 12,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['shortcut', 'minimal-cleanup']
   },
   {
     id: 14,
@@ -1588,7 +1666,12 @@ const sampleRecipes = [
       { name: "Bagoong", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Render pork fat in pan. Sauté garlic, onion, and tomato. Add bagoong and ¼ cup water. Add kalabasa and sitaw first, then eggplant, ampalaya, and okra. Cover and simmer 15 min.",
-    nutritionPerServing: { calories: 185, protein: 10, carbs: 11, fat: 11, fiber: 4, sodium: 560 }
+    nutritionPerServing: { calories: 185, protein: 10, carbs: 11, fat: 11, fiber: 4, sodium: 560 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: []
   },
   {
     id: 15,
@@ -1611,7 +1694,12 @@ const sampleRecipes = [
       { name: "Bagoong", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic and onion. Add pork and cook until browned. Add bagoong and all chilies. Pour in coconut milk. Simmer 20–25 min until pork is tender and sauce has thickened.",
-    nutritionPerServing: { calories: 430, protein: 19, carbs: 5, fat: 37, fiber: 1, sodium: 520 }
+    nutritionPerServing: { calories: 430, protein: 19, carbs: 5, fat: 37, fiber: 1, sodium: 520 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 20,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly']
   },
 
   // ─── Additional Breakfast ────────────────────────────────────────────────────
@@ -1637,7 +1725,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Marinate sliced beef in soy sauce, calamansi juice, minced garlic, and sugar for at least 1 hour. Pan-fry tapa over high heat until caramelized and slightly crisp. Fry garlic rice in remaining oil. Fry eggs sunny-side up. Serve tapa, sinangag, and itlog together.",
-    nutritionPerServing: { calories: 580, protein: 34, carbs: 52, fat: 22, fiber: 1, sodium: 780 }
+    nutritionPerServing: { calories: 580, protein: 34, carbs: 52, fat: 22, fiber: 1, sodium: 780 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: false, carb: true },
+    tags: []
   },
   {
     id: 17,
@@ -1659,7 +1752,12 @@ const sampleRecipes = [
       { name: "Vinegar (Suka)", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Prick longganisa with a fork. Pan-fry with a splash of water until water evaporates and longganisa caramelizes in its own fat. Fry garlic rice in a separate pan and eggs to preference. Serve with vinegar dipping sauce.",
-    nutritionPerServing: { calories: 570, protein: 22, carbs: 50, fat: 30, fiber: 1, sodium: 820 }
+    nutritionPerServing: { calories: 570, protein: 22, carbs: 50, fat: 30, fiber: 1, sodium: 820 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 20,
+    mealBalance: { protein: true, vegetables: false, carb: true },
+    tags: []
   },
   {
     id: 18,
@@ -1680,7 +1778,12 @@ const sampleRecipes = [
       { name: "Salt", baseQuantity: 1, unit: "pinch", category: "Pantry" }
     ],
     instructions: "Rinse glutinous rice and boil in 1L water. Simmer 15 min, stirring often, until porridge consistency. Dissolve tablea in a little hot water and stir into the pot. Add sugar and a pinch of salt. Simmer 5 more min. Serve in bowls topped with a drizzle of evaporated milk.",
-    nutritionPerServing: { calories: 310, protein: 7, carbs: 58, fat: 7, fiber: 2, sodium: 115 }
+    nutritionPerServing: { calories: 310, protein: 7, carbs: 58, fat: 7, fiber: 2, sodium: 115 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: false, vegetables: false, carb: true },
+    tags: ['minimal-cleanup']
   },
 
   // ─── Additional Soups ────────────────────────────────────────────────────────
@@ -1706,7 +1809,12 @@ const sampleRecipes = [
       { name: "Salt", baseQuantity: 1, unit: "tsp", category: "Pantry" }
     ],
     instructions: "Place beef shank and onion in a pot with 2L water. Bring to a boil and skim scum. Lower heat and simmer 2–2.5 hours until meat is very tender. Add corn and potatoes; cook 15 min. Season with fish sauce, salt, and pepper. Add cabbage last and cook 2 min. Serve hot.",
-    nutritionPerServing: { calories: 450, protein: 38, carbs: 20, fat: 24, fiber: 3, sodium: 650 }
+    nutritionPerServing: { calories: 450, protein: 38, carbs: 20, fat: 24, fiber: 3, sodium: 650 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['batch-friendly', 'freezer-friendly']
   },
   {
     id: 20,
@@ -1732,7 +1840,12 @@ const sampleRecipes = [
       { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
     ],
     instructions: "Boil chicken breast until cooked. Shred meat and reserve broth. Sauté garlic, onion, celery, and carrot in butter until soft. Add shredded chicken and broth (about 1L). Bring to a boil and add macaroni; cook 8–10 min until tender. Stir in evaporated milk, season, and simmer 2 min.",
-    nutritionPerServing: { calories: 370, protein: 26, carbs: 34, fat: 13, fiber: 2, sodium: 580 }
+    nutritionPerServing: { calories: 370, protein: 26, carbs: 34, fat: 13, fiber: 2, sodium: 580 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['batch-friendly']
   },
   {
     id: 21,
@@ -1756,7 +1869,12 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Boil tamarind in 1.5L water until soft. Strain and discard pulp, keeping sour broth. Add onion, tomato, and siling haba; simmer 5 min. Add bangus pieces and okra; cook 8 min. Season with fish sauce. Add kangkong in the last minute. Serve with rice.",
-    nutritionPerServing: { calories: 230, protein: 28, carbs: 14, fat: 6, fiber: 3, sodium: 740 }
+    nutritionPerServing: { calories: 230, protein: 28, carbs: 14, fat: 6, fiber: 3, sodium: 740 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 20,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['cook-fresh']
   },
   {
     id: 22,
@@ -1781,7 +1899,12 @@ const sampleRecipes = [
       { name: "Cornstarch", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic and onion. Add sliced pork belly and cook until browned. Pour in 750ml water and bring to a boil. Add noodles, carrot, and cabbage; simmer 5 min. Season with soy sauce. Mix cornstarch in cold water and stir in to thicken broth. Swirl in beaten eggs at the end. Serve hot.",
-    nutritionPerServing: { calories: 430, protein: 22, carbs: 46, fat: 17, fiber: 2, sodium: 760 }
+    nutritionPerServing: { calories: 430, protein: 22, carbs: 46, fat: 17, fiber: 2, sodium: 760 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 22,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['cook-fresh', 'minimal-cleanup']
   },
 
   // ─── Additional Mains ────────────────────────────────────────────────────────
@@ -1809,7 +1932,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 2, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Brown beef chunks in oil; set aside. Sauté garlic and onion in same pot. Return beef and add soy sauce, tomato paste, tomato sauce, and 500ml water. Simmer 60–75 min until beef is tender. Add potatoes and carrots; cook 15 min. Add bell pepper in the last 5 min. Adjust seasoning.",
-    nutritionPerServing: { calories: 410, protein: 34, carbs: 24, fat: 19, fiber: 4, sodium: 690 }
+    nutritionPerServing: { calories: 410, protein: 34, carbs: 24, fat: 19, fiber: 4, sodium: 690 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['batch-friendly', 'freezer-friendly']
   },
   {
     id: 24,
@@ -1835,7 +1963,12 @@ const sampleRecipes = [
       { name: "Cooking Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, and pork cubes until pork is lightly browned. Add soy sauce and tomato sauce. Simmer 20 min. Add potatoes and carrots; cook 10 min. Add sliced hotdog and bell pepper; cook 5 more min until vegetables are tender. Season to taste.",
-    nutritionPerServing: { calories: 380, protein: 26, carbs: 28, fat: 18, fiber: 3, sodium: 720 }
+    nutritionPerServing: { calories: 380, protein: 26, carbs: 28, fat: 18, fiber: 3, sodium: 720 },
+    equipment: ['pan'],
+    effort: 'normal',
+    activeTime: 25,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['batch-friendly', 'freezer-friendly']
   },
   {
     id: 25,
@@ -1860,7 +1993,12 @@ const sampleRecipes = [
       { name: "Ginger (Luya)", baseQuantity: 1, unit: "thumb", category: "Vegetable" }
     ],
     instructions: "Layer dried taro leaves in a wide pot without stirring. Arrange pork slices on top. Pour in coconut milk. Add garlic, onion, ginger, shrimp paste, and siling haba on top. Bring to a boil, then simmer uncovered 20 min without stirring. Add coconut cream and cook 15–20 min more until oil rises. Serve with rice.",
-    nutritionPerServing: { calories: 390, protein: 14, carbs: 14, fat: 34, fiber: 5, sodium: 560 }
+    nutritionPerServing: { calories: 390, protein: 14, carbs: 14, fat: 34, fiber: 5, sodium: 560 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
   },
   {
     id: 26,
@@ -1884,7 +2022,408 @@ const sampleRecipes = [
       { name: "Fish Sauce (Patis)", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
     ],
     instructions: "Sauté garlic, onion, ginger, and lemongrass until fragrant. Add chicken pieces and brown lightly. Pour in coconut milk and bring to a gentle simmer. Add siling haba and fish sauce. Cook uncovered 25–30 min, turning chicken occasionally, until sauce thickens and chicken is cooked through.",
-    nutritionPerServing: { calories: 420, protein: 32, carbs: 7, fat: 29, fiber: 1, sodium: 470 }
+    nutritionPerServing: { calories: 420, protein: 32, carbs: 7, fat: 29, fiber: 1, sodium: 470 },
+    equipment: ['pan'],
+    effort: 'low',
+    activeTime: 18,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
+  },
+  // ─── Low-effort starter set (D-061) ───────────────────────────────────────
+  // Added so the cooking-method filters have honest content. Every recipe here
+  // is written FOR the appliance it declares — the instructions say how it is
+  // cooked in that appliance, not "you could also use a rice cooker". One
+  // appliance each, few ingredients, most of the clock unattended.
+  {
+    id: 27,
+    name: "Rice Cooker Chicken & Rice",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 10,
+    baseCookTime: 35,
+    fridgeLife: 3,
+    freezerLife: 60,
+    storageNotes: "Portion with the rice. Reheat with a splash of water so the rice loosens.",
+    baseIngredients: [
+      { name: "Chicken Thigh", baseQuantity: 500, unit: "g", category: "Protein" },
+      { name: "White Rice (Bigas)", baseQuantity: 300, unit: "g", category: "Grain" },
+      { name: "Water", baseQuantity: 450, unit: "ml", category: "Pantry" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 60, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 6, unit: "cloves", category: "Vegetable" },
+      { name: "Ginger (Luya)", baseQuantity: 20, unit: "g", category: "Vegetable" },
+      { name: "Sesame Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" },
+      { name: "Pechay", baseQuantity: 200, unit: "g", category: "Vegetable" },
+      { name: "Green Onion (Sibuyas Dahon)", baseQuantity: 2, unit: "stalks", category: "Vegetable" }
+    ],
+    instructions: "Rinse the rice and put it straight into the rice cooker pot with the water, soy sauce, crushed garlic, sliced ginger and sesame oil. Stir once. Lay the chicken thigh pieces on top of the rice — do not stir them in. Close the rice cooker and press Cook. Leave it alone. When it switches to Keep Warm, open it, lay the pechay over the top, close it again and leave 5 min on Keep Warm to wilt. Stir everything together, breaking the chicken up, and top with green onion.",
+    nutritionPerServing: { calories: 520, protein: 30, carbs: 60, fat: 17, fiber: 2, sodium: 780 },
+    equipment: ['rice-cooker'],
+    effort: 'low',
+    activeTime: 10,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['minimal-cleanup', 'batch-friendly']
+  },
+  {
+    id: 28,
+    name: "Rice Cooker Chicken Mushroom Rice",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 8,
+    baseCookTime: 35,
+    fridgeLife: 3,
+    freezerLife: 60,
+    storageNotes: "Keeps well. The mushrooms season the rice more strongly by day two.",
+    baseIngredients: [
+      { name: "Chicken Thigh", baseQuantity: 450, unit: "g", category: "Protein" },
+      { name: "Mushroom", baseQuantity: 200, unit: "g", category: "Vegetable" },
+      { name: "White Rice (Bigas)", baseQuantity: 300, unit: "g", category: "Grain" },
+      { name: "Water", baseQuantity: 450, unit: "ml", category: "Pantry" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 50, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 5, unit: "cloves", category: "Vegetable" },
+      { name: "Sesame Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" },
+      { name: "Green Onion (Sibuyas Dahon)", baseQuantity: 2, unit: "stalks", category: "Vegetable" }
+    ],
+    instructions: "Rinse the rice into the rice cooker pot. Add the water, soy sauce, minced garlic and sesame oil. Scatter the sliced mushrooms over the rice, then lay the chicken thigh pieces on top. Close the rice cooker and press Cook — no stirring, no watching. When it switches to Keep Warm, leave it 10 min before opening so the chicken finishes in the residual heat. Stir through and top with green onion.",
+    nutritionPerServing: { calories: 500, protein: 28, carbs: 58, fat: 16, fiber: 2, sodium: 700 },
+    equipment: ['rice-cooker'],
+    effort: 'very-low',
+    activeTime: 8,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['minimal-cleanup', 'batch-friendly']
+  },
+  {
+    id: 29,
+    name: "Rice Cooker Chicken with Steamed Vegetables",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 12,
+    baseCookTime: 35,
+    fridgeLife: 3,
+    freezerLife: 0,
+    storageNotes: "Best within two days — steamed vegetables soften in the fridge.",
+    baseIngredients: [
+      { name: "Chicken Breast", baseQuantity: 500, unit: "g", category: "Protein" },
+      { name: "White Rice (Bigas)", baseQuantity: 300, unit: "g", category: "Grain" },
+      { name: "Water", baseQuantity: 450, unit: "ml", category: "Pantry" },
+      { name: "Broccoli", baseQuantity: 250, unit: "g", category: "Vegetable" },
+      { name: "Carrot (Karot)", baseQuantity: 150, unit: "g", category: "Vegetable" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 40, unit: "ml", category: "Pantry" },
+      { name: "Ginger (Luya)", baseQuantity: 15, unit: "g", category: "Vegetable" },
+      { name: "Sesame Oil", baseQuantity: 1, unit: "tbsp", category: "Pantry" }
+    ],
+    instructions: "Rinse the rice and add it with the water to the rice cooker pot. Slice the chicken breast into strips and toss with the soy sauce, grated ginger and sesame oil. Lay the chicken in the rice cooker's steamer basket with the broccoli florets and sliced carrot around it. Set the basket over the rice, close the lid and press Cook. Rice below and chicken and vegetables above finish together — when the cooker switches to Keep Warm, everything is done. Lift the basket out, fluff the rice, and serve the chicken and vegetables over it.",
+    nutritionPerServing: { calories: 470, protein: 36, carbs: 60, fat: 8, fiber: 4, sodium: 560 },
+    equipment: ['rice-cooker-steamer'],
+    effort: 'low',
+    activeTime: 12,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['minimal-cleanup', 'cook-fresh']
+  },
+  {
+    id: 30,
+    name: "Rice Cooker Longganisa & Pechay Rice",
+    category: "Breakfast",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 5,
+    baseCookTime: 35,
+    fridgeLife: 3,
+    freezerLife: 30,
+    storageNotes: "Portion with the rice. The sausage fat keeps the rice from drying out.",
+    baseIngredients: [
+      { name: "Longganisa", baseQuantity: 8, unit: "pcs", category: "Protein" },
+      { name: "White Rice (Bigas)", baseQuantity: 300, unit: "g", category: "Grain" },
+      { name: "Water", baseQuantity: 450, unit: "ml", category: "Pantry" },
+      { name: "Pechay", baseQuantity: 250, unit: "g", category: "Vegetable" },
+      { name: "Garlic (Bawang)", baseQuantity: 4, unit: "cloves", category: "Vegetable" }
+    ],
+    instructions: "Rinse the rice into the rice cooker pot, add the water and the crushed garlic. Prick the longganisa a few times and lay them straight on top of the rice. Close the rice cooker and press Cook — the sausages steam through and their fat drips down into the rice. When the cooker switches to Keep Warm, put the pechay in the steamer basket, set it over the rice, close the lid and leave 5 min: the residual steam wilts the greens without turning them grey. Serve the longganisa and pechay over the rice.",
+    nutritionPerServing: { calories: 610, protein: 22, carbs: 60, fat: 30, fiber: 3, sodium: 900 },
+    equipment: ['rice-cooker-steamer'],
+    effort: 'very-low',
+    activeTime: 6,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['minimal-cleanup', 'shortcut']
+  },
+  {
+    id: 31,
+    name: "Oven Garlic-Soy Chicken Breast",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 10,
+    baseCookTime: 25,
+    fridgeLife: 4,
+    freezerLife: 60,
+    storageNotes: "Slice only what you are eating — whole pieces stay juicier in the fridge.",
+    baseIngredients: [
+      { name: "Chicken Breast", baseQuantity: 700, unit: "g", category: "Protein" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 60, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 8, unit: "cloves", category: "Vegetable" },
+      { name: "Cooking Oil", baseQuantity: 2, unit: "tbsp", category: "Pantry" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Calamansi", baseQuantity: 3, unit: "pcs", category: "Fruit" }
+    ],
+    instructions: "Heat the oven to 200°C. Line one baking tray with parchment. Mix the soy sauce, crushed garlic, oil, pepper and calamansi juice directly on the tray, then turn the chicken breasts in it until coated — no bowl to wash. Spread them out in a single layer. Bake 22–25 min until cooked through, turning once at the halfway point. Rest 5 min before slicing.",
+    nutritionPerServing: { calories: 260, protein: 40, carbs: 3, fat: 9, fiber: 0, sodium: 820 },
+    equipment: ['oven'],
+    effort: 'low',
+    activeTime: 10,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
+  },
+  {
+    id: 32,
+    name: "Honey-Garlic Oven Chicken",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 10,
+    baseCookTime: 40,
+    fridgeLife: 4,
+    freezerLife: 60,
+    storageNotes: "Spoon the tray juices over the portions before storing.",
+    baseIngredients: [
+      { name: "Chicken Leg", baseQuantity: 900, unit: "g", category: "Protein" },
+      { name: "Honey", baseQuantity: 60, unit: "g", category: "Pantry" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 50, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 8, unit: "cloves", category: "Vegetable" },
+      { name: "Calamansi", baseQuantity: 4, unit: "pcs", category: "Fruit" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "Heat the oven to 190°C. Stir the honey, soy sauce, crushed garlic, calamansi juice and pepper together on a parchment-lined baking tray. Turn the chicken legs in the mixture, then arrange them skin-side up in one layer. Bake 40 min, spooning the tray juices back over the chicken once at around 25 min, until the skin is glazed and dark and the juices run clear.",
+    nutritionPerServing: { calories: 380, protein: 32, carbs: 14, fat: 21, fiber: 0, sodium: 720 },
+    equipment: ['oven'],
+    effort: 'low',
+    activeTime: 10,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly']
+  },
+  {
+    id: 33,
+    name: "Sheet-Pan Chicken & Vegetables",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 15,
+    baseCookTime: 40,
+    fridgeLife: 4,
+    freezerLife: 30,
+    storageNotes: "A complete meal in one container. Reheats well in the oven or microwave.",
+    baseIngredients: [
+      { name: "Chicken Thigh", baseQuantity: 700, unit: "g", category: "Protein" },
+      { name: "Potato (Patatas)", baseQuantity: 400, unit: "g", category: "Vegetable" },
+      { name: "Carrot (Karot)", baseQuantity: 250, unit: "g", category: "Vegetable" },
+      { name: "Red Bell Pepper", baseQuantity: 2, unit: "pcs", category: "Vegetable" },
+      { name: "Onion (Sibuyas)", baseQuantity: 1, unit: "pcs", category: "Vegetable" },
+      { name: "Cooking Oil", baseQuantity: 3, unit: "tbsp", category: "Pantry" },
+      { name: "Garlic Powder", baseQuantity: 2, unit: "tsp", category: "Pantry" },
+      { name: "Paprika", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Salt", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "Heat the oven to 200°C. Cut the potato and carrot into 2cm chunks and the bell pepper and onion into wedges. Pile everything — chicken and vegetables — onto one parchment-lined baking tray, pour over the oil and scatter the garlic powder, paprika, salt and pepper, then toss with your hands on the tray. Spread into a single layer with the chicken skin-side up. Bake 40 min without touching it. The potatoes are the carb, so nothing else needs cooking.",
+    nutritionPerServing: { calories: 520, protein: 33, carbs: 32, fat: 27, fiber: 5, sodium: 560 },
+    equipment: ['oven'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['minimal-cleanup', 'batch-friendly']
+  },
+  {
+    id: 34,
+    name: "Oven-Roast Liempo",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 10,
+    baseCookTime: 75,
+    fridgeLife: 4,
+    freezerLife: 60,
+    storageNotes: "Slice cold, then reheat slices in the oven to bring the crackling back.",
+    baseIngredients: [
+      { name: "Pork Belly (Liempo)", baseQuantity: 800, unit: "g", category: "Protein" },
+      { name: "Salt", baseQuantity: 2, unit: "tsp", category: "Pantry" },
+      { name: "Garlic Powder", baseQuantity: 2, unit: "tsp", category: "Pantry" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Calamansi", baseQuantity: 3, unit: "pcs", category: "Fruit" }
+    ],
+    instructions: "Pat the pork belly completely dry — dry skin is the whole trick. Rub the meat side with garlic powder, pepper and calamansi juice, and rub salt into the skin. Lay it skin-side up on a parchment-lined baking tray. Roast at 180°C for 60 min, then turn the oven up to 220°C for a final 15 min until the skin blisters and crackles. Rest 10 min before slicing. Almost all of the 75 minutes is the oven working on its own.",
+    nutritionPerServing: { calories: 640, protein: 26, carbs: 1, fat: 59, fiber: 0, sodium: 720 },
+    equipment: ['oven'],
+    effort: 'low',
+    activeTime: 12,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['batch-friendly', 'freezer-friendly']
+  },
+  {
+    id: 35,
+    name: "Instant Pot Chicken Adobo",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 8,
+    baseCookTime: 30,
+    fridgeLife: 5,
+    freezerLife: 90,
+    storageNotes: "Better on day two. Store submerged in its sauce.",
+    baseIngredients: [
+      { name: "Chicken Thigh", baseQuantity: 800, unit: "g", category: "Protein" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 80, unit: "ml", category: "Pantry" },
+      { name: "Vinegar (Suka)", baseQuantity: 60, unit: "ml", category: "Pantry" },
+      { name: "Water", baseQuantity: 100, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 8, unit: "cloves", category: "Vegetable" },
+      { name: "Bay Leaves", baseQuantity: 3, unit: "pcs", category: "Pantry" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "Put the chicken, soy sauce, vinegar, water, crushed garlic, bay leaves and pepper into the Instant Pot. No browning, no marinating. Lock the lid, set the valve to Sealing, and Pressure Cook on High for 12 min. Let it release naturally for 10 min, then vent the rest. That is the whole recipe. If you want a thicker sauce, switch to Sauté and let it bubble 5 min with the lid off.",
+    nutritionPerServing: { calories: 300, protein: 29, carbs: 4, fat: 18, fiber: 0, sodium: 850 },
+    equipment: ['instant-pot'],
+    effort: 'very-low',
+    activeTime: 8,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly']
+  },
+  {
+    id: 36,
+    name: "Instant Pot Shredded Chicken",
+    category: "Main Dish",
+    baseServings: 6,
+    currentServings: 6,
+    basePrepTime: 5,
+    baseCookTime: 20,
+    fridgeLife: 4,
+    freezerLife: 90,
+    storageNotes: "The meal-prep base. Freeze in meal-sized bags with a little of the broth.",
+    baseIngredients: [
+      { name: "Chicken Breast", baseQuantity: 1000, unit: "g", category: "Protein" },
+      { name: "Chicken Broth / Stock", baseQuantity: 250, unit: "ml", category: "Pantry" },
+      { name: "Garlic (Bawang)", baseQuantity: 4, unit: "cloves", category: "Vegetable" },
+      { name: "Salt", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "Put the chicken breasts, broth, crushed garlic, salt and pepper into the Instant Pot. Lock the lid, valve to Sealing, Pressure Cook on High for 10 min, then quick release. Shred the chicken with two forks straight in the pot so it soaks the broth back up. One pot, one wash, and enough cooked protein for several meals — use it in rice bowls, wraps, or with any sauce you like.",
+    nutritionPerServing: { calories: 180, protein: 34, carbs: 1, fat: 4, fiber: 0, sodium: 420 },
+    equipment: ['instant-pot'],
+    effort: 'very-low',
+    activeTime: 8,
+    mealBalance: { protein: true, vegetables: false, carb: false },
+    tags: ['minimal-cleanup', 'batch-friendly', 'freezer-friendly', 'shortcut']
+  },
+  {
+    id: 37,
+    name: "Pressure Cooker Nilagang Baka",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 12,
+    baseCookTime: 50,
+    fridgeLife: 4,
+    freezerLife: 90,
+    storageNotes: "Freeze the beef and broth together; add fresh cabbage when reheating.",
+    baseIngredients: [
+      { name: "Beef Brisket", baseQuantity: 700, unit: "g", category: "Protein" },
+      { name: "Potato (Patatas)", baseQuantity: 400, unit: "g", category: "Vegetable" },
+      { name: "Carrot (Karot)", baseQuantity: 200, unit: "g", category: "Vegetable" },
+      { name: "Cabbage (Repolyo)", baseQuantity: 300, unit: "g", category: "Vegetable" },
+      { name: "Onion (Sibuyas)", baseQuantity: 1, unit: "pcs", category: "Vegetable" },
+      { name: "Peppercorn", baseQuantity: 1, unit: "tsp", category: "Pantry" },
+      { name: "Fish Sauce (Patis)", baseQuantity: 30, unit: "ml", category: "Pantry" },
+      { name: "Water", baseQuantity: 1200, unit: "ml", category: "Pantry" }
+    ],
+    instructions: "Put the beef, quartered onion, peppercorns and water into the pressure cooker. Lock the lid, bring it to full pressure over high heat, then turn the heat down to keep it just hissing and cook 35 min — what would be two and a half hours in an open pot. Release the pressure and open the lid. Add the potato and carrot and simmer uncovered 8 min, then the cabbage for a final 2 min. Season with fish sauce. The potatoes make it a complete meal on their own.",
+    nutritionPerServing: { calories: 480, protein: 34, carbs: 28, fat: 25, fiber: 5, sodium: 700 },
+    equipment: ['pressure-cooker'],
+    effort: 'low',
+    activeTime: 15,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['batch-friendly', 'freezer-friendly']
+  },
+  {
+    id: 38,
+    name: "Lechon Manok Rice Bowl",
+    category: "Main Dish",
+    baseServings: 4,
+    currentServings: 4,
+    basePrepTime: 12,
+    baseCookTime: 0,
+    fridgeLife: 3,
+    freezerLife: 30,
+    storageNotes: "Store the chicken and the fresh vegetables separately so nothing goes soggy.",
+    baseIngredients: [
+      { name: "Lechon Manok (Ready-Roasted)", baseQuantity: 800, unit: "g", category: "Protein" },
+      { name: "White Rice (Bigas)", baseQuantity: 4, unit: "cups cooked", category: "Grain" },
+      { name: "Cucumber", baseQuantity: 2, unit: "pcs", category: "Vegetable" },
+      { name: "Tomato (Kamatis)", baseQuantity: 2, unit: "pcs", category: "Vegetable" },
+      { name: "Calamansi", baseQuantity: 4, unit: "pcs", category: "Fruit" },
+      { name: "Soy Sauce (Toyo)", baseQuantity: 30, unit: "ml", category: "Pantry" }
+    ],
+    instructions: "Nothing is cooked here — this is assembly from a ready-roasted chicken and rice you already have. Pull the meat off the lechon manok in strips and discard the bones. Slice the cucumber and tomato. Build each bowl with rice at the bottom, chicken on one side, cucumber and tomato on the other. Mix the calamansi juice with the soy sauce and spoon it over. Two chickens is the real trick: eat one tonight, shred the other into portions for the freezer.",
+    nutritionPerServing: { calories: 550, protein: 38, carbs: 52, fat: 20, fiber: 3, sodium: 780 },
+    equipment: ['no-cook'],
+    effort: 'assembly',
+    activeTime: 12,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['shortcut', 'minimal-cleanup', 'freezer-friendly']
+  },
+  {
+    id: 39,
+    name: "Tuna Vegetable Rice Bowl",
+    category: "Main Dish",
+    baseServings: 2,
+    currentServings: 2,
+    basePrepTime: 8,
+    baseCookTime: 0,
+    fridgeLife: 2,
+    freezerLife: 0,
+    storageNotes: "Dress it only when you are about to eat, or the vegetables weep.",
+    baseIngredients: [
+      { name: "Tuna (Canned)", baseQuantity: 2, unit: "cans", category: "Protein" },
+      { name: "White Rice (Bigas)", baseQuantity: 2, unit: "cups cooked", category: "Grain" },
+      { name: "Cucumber", baseQuantity: 1, unit: "pcs", category: "Vegetable" },
+      { name: "Tomato (Kamatis)", baseQuantity: 2, unit: "pcs", category: "Vegetable" },
+      { name: "Lettuce", baseQuantity: 100, unit: "g", category: "Vegetable" },
+      { name: "Mayonnaise", baseQuantity: 30, unit: "g", category: "Pantry" },
+      { name: "Calamansi", baseQuantity: 2, unit: "pcs", category: "Fruit" },
+      { name: "Black Pepper", baseQuantity: 1, unit: "tsp", category: "Pantry" }
+    ],
+    instructions: "No heat needed. Drain the canned tuna and stir it with the mayonnaise, calamansi juice and pepper. Dice the cucumber and tomato and tear the lettuce. Put rice in each bowl, spoon the tuna over one half and pile the vegetables on the other. Done in the time it takes the kettle to go — the only washing up is a fork and a can opener.",
+    nutritionPerServing: { calories: 480, protein: 28, carbs: 50, fat: 17, fiber: 3, sodium: 620 },
+    equipment: ['no-cook'],
+    effort: 'assembly',
+    activeTime: 8,
+    mealBalance: { protein: true, vegetables: true, carb: true },
+    tags: ['shortcut', 'minimal-cleanup', 'cook-fresh']
+  },
+  {
+    id: 40,
+    name: "Overnight Oats with Banana & Peanut Butter",
+    category: "Breakfast",
+    baseServings: 2,
+    currentServings: 2,
+    basePrepTime: 5,
+    baseCookTime: 0,
+    fridgeLife: 3,
+    freezerLife: 0,
+    storageNotes: "Make both jars at once. They are ready from the next morning onwards.",
+    baseIngredients: [
+      { name: "Rolled Oats", baseQuantity: 100, unit: "g", category: "Grain" },
+      { name: "Milk (Gatas)", baseQuantity: 300, unit: "ml", category: "Dairy" },
+      { name: "Peanut Butter", baseQuantity: 40, unit: "g", category: "Pantry" },
+      { name: "Banana (Saging)", baseQuantity: 2, unit: "pcs", category: "Fruit" },
+      { name: "Honey", baseQuantity: 20, unit: "g", category: "Pantry" },
+      { name: "Chia Seeds", baseQuantity: 10, unit: "g", category: "Pantry" }
+    ],
+    instructions: "No cooking at all. Split the oats, milk, peanut butter, honey and chia seeds between two jars or containers and stir each one until the peanut butter is mixed through. Close them and leave in the fridge overnight — the oats soften on their own. In the morning, slice a banana over the top. Breakfast is already made before you are awake.",
+    nutritionPerServing: { calories: 430, protein: 14, carbs: 58, fat: 16, fiber: 8, sodium: 120 },
+    equipment: ['no-cook'],
+    effort: 'assembly',
+    activeTime: 5,
+    mealBalance: { protein: false, vegetables: false, carb: true },
+    tags: ['shortcut', 'minimal-cleanup', 'batch-friendly']
   }
 ];
 
@@ -1983,7 +2522,7 @@ function initApp() {
     
     // If no saved data, use defaults
     if (!hasLoadedData) {
-      AppState.recipes = [...sampleRecipes];
+      AppState.recipes = cloneSeedRecipes(); // own objects, not the seed's (D-064)
       AppState.customIngredients = [...defaultStorageData];
       AppState.customHacks = [...defaultCookingHacks];
       // Save the default data
@@ -2856,28 +3395,197 @@ function renderRecipeMetaStrip(recipe) {
     '</div>';
 }
 
-// ── Quick filters: find the low-effort options fast ──────────────────────────
+// ── Low-effort starter pack: opt-in, additive, never automatic ───────────────
+// ensureStarterRecipes() seeds sampleRecipes on a BRAND-NEW install only, and
+// must stay that way — re-seeding a live install is how you overwrite someone's
+// data (D-010, and the R2 first-run gate). So an install that predates the
+// D-061 low-effort recipes has no way to get them. This is that way: a compact
+// prompt on Cook and one tap, adding only what is genuinely absent.
+//
+// Deliberately NOT built: a pack registry, remote content, versioning, an
+// update/overwrite path, or any automatic reseed. It adds missing recipes once
+// and then stops offering.
+
+// The ids of the D-061 starter set. Listed explicitly rather than derived from
+// "id > 26" so a future seeded recipe does not silently join the pack.
+var STARTER_PACK_IDS = [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40];
+
+// Which starter recipes this install is genuinely missing.
+//
+// Two things disqualify an id, and both matter:
+//   ALREADY PRESENT — the user may have edited it. Their copy wins, always. We
+//     never compare, merge, or overwrite on an id match; presence alone is a
+//     permanent skip.
+//   TOMBSTONED — AppState.deletions holds `id -> deletedAtISO` for everything
+//     the user has deleted, and `recipes` is one of the TOMBSTONE_KEYS. Deleting
+//     a starter recipe is a decision; re-offering it would undo that decision.
+//     Worse, adding it back with a fresh updatedAt would beat its tombstone
+//     under applyTombstones()' LWW rule and resurrect it across every device.
+//
+// Note the one honest limit: purgeOldTombstones() drops markers older than 180
+// days, so a recipe deleted longer ago than that becomes offerable again. That
+// bound is deliberate in the sync design and is not worth a new field to defeat.
+function starterPackCandidates() {
+  var present = {};
+  (AppState.recipes || []).forEach(function(r) {
+    if (r && r.id != null) present[String(r.id)] = true;
+  });
+  var deleted = AppState.deletions || {};
+
+  return STARTER_PACK_IDS.filter(function(id) {
+    var key = String(id);
+    return !present[key] && !deleted[key];
+  }).map(function(id) {
+    var key = String(id);
+    return sampleRecipes.find(function(s) { return String(s.id) === key; });
+  }).filter(Boolean);
+}
+
+// One tap. Adds the missing starter recipes and nothing else.
+function addStarterPackRecipes() {
+  var missing = starterPackCandidates();
+  if (!missing.length) {          // nothing eligible — re-render so the prompt goes
+    renderStarterPackPrompt();
+    return;
+  }
+
+  var stampedAt = new Date().toISOString();
+  var added = missing.map(function(source) {
+    // Deep copy: AppState must never hold a reference into the sampleRecipes
+    // constant, or editing the added recipe would mutate the seed data.
+    var copy = JSON.parse(JSON.stringify(source));
+    // updatedAt is what applyTombstones() compares against, and what the
+    // local-vs-cloud merge uses. An added recipe is a local change now.
+    copy.updatedAt = stampedAt;
+    return copy;
+  });
+
+  // Hard Rule 4, scoped to the NEW copies only. Running it over the whole list
+  // would also stamp empty metadata defaults onto the user's own recipes, and
+  // adding a starter pack has no business rewriting anything the user made.
+  patchMissingNutrition(added);
+  added.forEach(function(r) { AppState.recipes.push(r); });
+
+  saveData(); // Hard Rule 5 — localStorage AND Firestore, via the one save path
+
+  renderRecipes();                         // redraws the prompt and the quick filters
+  renderRecipeSelectionGrid();
+  showStarterPackAdded(missing.length);
+}
+
+function showStarterPackAdded(count) {
+  var el = document.getElementById('starter-pack-prompt');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="sp-card sp-card--done" role="status">' +
+      '<div class="sp-text">' +
+        '<div class="sp-title">' + count + ' recipe' + (count === 1 ? '' : 's') + ' added</div>' +
+        '<div class="sp-sub">Try the <b>Rice cooker</b>, <b>Oven</b>, <b>Instant Pot</b> and ' +
+          '<b>No-cook</b> filters below.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderStarterPackPrompt() {
+  var el = document.getElementById('starter-pack-prompt');
+  if (!el) return;
+
+  var missing = starterPackCandidates();
+  // Nothing left to add — the prompt retires itself. No dismiss button and no
+  // "seen" flag: there is nothing to remember once the offer is empty.
+  if (!missing.length) {
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  var all = missing.length === STARTER_PACK_IDS.length;
+  var sub = all
+    ? 'Rice cooker, oven, Instant Pot and no-cook ideas are available.'
+    : missing.length + ' low-effort starter recipe' + (missing.length === 1 ? '' : 's') + ' available.';
+
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="sp-card">' +
+      '<div class="sp-text">' +
+        '<div class="sp-title">Low-effort starter recipes</div>' +
+        '<div class="sp-sub">' + sub + '</div>' +
+      '</div>' +
+      '<button type="button" class="btn btn--primary btn--sm sp-add" onclick="addStarterPackRecipes()">' +
+        'Add recipes</button>' +
+    '</div>';
+}
+// ── Quick filters: "easiest thing" and "this appliance", one tap from Cook ────
 // One chip at a time, on top of (not instead of) the existing search, category,
 // time and favourites filters. Transient view state — deliberately not on
 // AppState, so no new synced top-level key is introduced.
+//
+// The chips are grouped the way a person thinks about dinner, not the way the
+// data is stored:
+//   EFFORT         "how much work do I want to do?"   → Lowest effort
+//   COOKING METHOD "how do I want to cook it?"        → Rice cooker, Oven, ...
+// Cooking method is a PRESENTATION grouping over the existing recipe.equipment
+// slugs. There is no cookingMethod field and no migration: `Rice cooker` simply
+// matches both rice-cooker and rice-cooker-steamer, and `Instant Pot / pressure
+// cooker` matches both instant-pot and pressure-cooker, because the distinction
+// is a detail of the appliance, not a question the user is asking. The finer
+// slugs stay in the data and stay filterable via the refinement chips below.
 
 var recipeQuickFilter = '';
 
+// primary: always rendered, even at zero. The whole failure this wave fixes was
+//   a capability nobody could see; a method chip that hides when empty is a
+//   capability nobody can see. An empty primary chip is muted and, when tapped,
+//   explains how to fill it.
+// empty:   what to say when this chip is the only reason the grid is blank.
+// sort:    optional ordering applied when the chip is active.
 var RECIPE_QUICK_FILTERS = [
-  { id: 'lowest-effort', icon: '⚡', label: 'Lowest effort',
-    match: function(r) { return recipeEffortScore(r) <= 1; } },
-  { id: 'rice-cooker', icon: '🍚', label: 'Rice cooker',
-    match: function(r) { return recipeHasEquipment(r, ['rice-cooker', 'rice-cooker-steamer']); } },
+  { id: 'lowest-effort', icon: '⚡', label: 'Lowest effort', primary: true,
+    // Same honesty gate the Home "Easiest" pick uses (recipeEffortScore <= 2):
+    // assembly, very-low and low all count as "not a real cook", normal does
+    // not. One definition of easy in the app, not two.
+    match: function(r) { return recipeEffortScore(r) <= 2; },
+    // Ordered by how much WORK it is, never by total clock time — 5 min active
+    // plus 35 unattended must beat 20 min stood over a pan. Reuses the ranking
+    // helpers the Home recommendation already scores with.
+    sort: function(a, b) {
+      return (recipeEffortScore(a) - recipeEffortScore(b)) ||
+             (activeTimeFriction(a) - activeTimeFriction(b)) ||
+             // Inside one friction bucket, the actual hands-on minutes still
+             // separate 15 from 20 — otherwise the list falls to alphabetical
+             // and stops looking sorted to the person reading it.
+             (recipeActiveMinutes(a) - recipeActiveMinutes(b)) ||
+             (cleanupFriction(a) - cleanupFriction(b)) ||
+             (applianceFriction(a) - applianceFriction(b)) ||
+             String(a.name).localeCompare(String(b.name));
+    },
+    empty: 'Set <b>Effort</b> or <b>Active time</b> on a recipe and the easy ones collect here.' },
+
+  { id: 'rice-cooker', icon: '🍚', label: 'Rice cooker', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['rice-cooker', 'rice-cooker-steamer']); },
+    empty: 'Open a recipe, tick <b>Rice cooker</b> under Cooking method, and it will show up here.' },
+
+  { id: 'oven', icon: '🔥', label: 'Oven', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['oven']); },
+    empty: 'Open a recipe, tick <b>Oven</b> under Cooking method, and it will show up here.' },
+
+  { id: 'pressure', icon: '⏲️', label: 'Instant Pot', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['instant-pot', 'pressure-cooker']); },
+    empty: 'Open a recipe, tick <b>Instant Pot</b> or <b>Pressure cooker</b> under Cooking method, and it will show up here.' },
+
+  { id: 'no-cook', icon: '🥗', label: 'No-cook', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['no-cook']); },
+    empty: 'Open a recipe, tick <b>No cook</b> under Cooking method, and it will show up here.' },
+
+  { id: 'pan', icon: '🍳', label: 'Pan', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['pan']); },
+    empty: 'Open a recipe, tick <b>Pan</b> under Cooking method, and it will show up here.' },
+
+  // Refinements. Narrower than a cooking method and not something to hunt for,
+  // so unlike the primaries these still hide when they match nothing.
   { id: 'rice-steamer', icon: '♨️', label: 'Rice + steamer',
     match: function(r) { return recipeHasEquipment(r, ['rice-cooker-steamer']); } },
-  { id: 'pressure', icon: '⏲️', label: 'Instant Pot',
-    match: function(r) { return recipeHasEquipment(r, ['instant-pot', 'pressure-cooker']); } },
-  { id: 'oven', icon: '🔥', label: 'Oven',
-    match: function(r) { return recipeHasEquipment(r, ['oven']); } },
-  { id: 'pan', icon: '🍳', label: 'Pan',
-    match: function(r) { return recipeHasEquipment(r, ['pan']); } },
-  { id: 'no-cook', icon: '🥗', label: 'No-cook',
-    match: function(r) { return recipeHasEquipment(r, ['no-cook']); } },
   { id: 'batch', icon: '🍱', label: 'Batch-friendly',
     match: function(r) { return recipeHasTag(r, 'batch-friendly'); } }
 ];
@@ -2887,7 +3595,7 @@ function quickFilterById(id) {
 }
 
 function setRecipeQuickFilter(id) {
-  // Tapping the active chip clears it — no separate "all" button to hunt for.
+  // Tapping the active chip clears it, and so does All.
   recipeQuickFilter = recipeQuickFilter === id ? '' : id;
   renderRecipes();
 }
@@ -2897,21 +3605,34 @@ function renderRecipeQuickFilters() {
   if (!el) return;
   var recipes = AppState.recipes || [];
 
-  var chips = RECIPE_QUICK_FILTERS.map(function(f) {
+  // Nothing to filter: a row of zeroes above an empty grid helps no one.
+  if (!recipes.length) {
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  function chip(id, cls, pressed, label, count) {
+    return '<button type="button" class="rq-chip' + cls + '"' +
+      ' aria-pressed="' + (pressed ? 'true' : 'false') + '"' +
+      ' onclick="setRecipeQuickFilter(\'' + id + '\')">' + label +
+      '<span class="rq-count">' + count + '</span></button>';
+  }
+
+  var parts = [chip('', recipeQuickFilter ? '' : ' is-active', !recipeQuickFilter,
+    'All', recipes.length)];
+
+  RECIPE_QUICK_FILTERS.forEach(function(f) {
     var count = recipes.filter(f.match).length;
     var active = recipeQuickFilter === f.id;
-    // A chip that matches nothing is hidden rather than shown as a dead end —
-    // that is what keeps this a short row instead of a filter panel.
-    if (!count && !active) return '';
-    return '<button type="button" class="rq-chip' + (active ? ' is-active' : '') + '"' +
-      ' aria-pressed="' + (active ? 'true' : 'false') + '"' +
-      ' onclick="setRecipeQuickFilter(\'' + escapeHtml(f.id) + '\')">' +
-      f.icon + ' ' + escapeHtml(f.label) +
-      '<span class="rq-count">' + count + '</span></button>';
-  }).filter(Boolean).join('');
+    if (!count && !active && !f.primary) return;
+    parts.push(chip(escapeHtml(f.id),
+      (active ? ' is-active' : '') + (count ? '' : ' is-empty'),
+      active, f.icon + ' ' + escapeHtml(f.label), count));
+  });
 
-  el.innerHTML = chips;
-  el.classList.toggle('hidden', !chips);
+  el.innerHTML = parts.join('');
+  el.classList.remove('hidden');
 }
 
 // ── Home: up to three deterministic "what should I cook?" options ────────────
@@ -3071,16 +3792,32 @@ function lowestFrictionEquipment(recipe) {
   return best;
 }
 
+// Some slugs are two names for one physical appliance. Counting them as two
+// devices charges a juggling penalty for a chore nobody actually does:
+//   rice-cooker-steamer  is one rice cooker doing two jobs
+//   pressure-cooker      is the same pot as instant-pot, under another name
+// Collapsing to a family is the honest count. It deliberately does NOT change
+// friction COST (a steamer combo still costs 2) — only how many appliances a
+// recipe is judged to use. See DECISIONS D-062.
+var APPLIANCE_FAMILY = {
+  'rice-cooker-steamer': 'rice-cooker',
+  'pressure-cooker': 'instant-pot'
+};
+
+function applianceFamilyCount(eq) {
+  var seen = {};
+  (eq || []).forEach(function(id) { seen[APPLIANCE_FAMILY[id] || id] = true; });
+  return Object.keys(seen).length;
+}
+
 function applianceFriction(recipe) {
   var eq = (recipe && recipe.equipment) || [];
   if (!eq.length) return APPLIANCE_FRICTION_UNKNOWN;
   var best = lowestFrictionEquipment(recipe);
   var cost = best ? APPLIANCE_FRICTION[best] : APPLIANCE_FRICTION_UNKNOWN;
-  // Juggling two separate appliances is its own chore and its own washing up.
-  // A rice-cooker-steamer is ONE device doing two jobs, so it never counts as a
-  // second appliance.
-  var distinct = eq.filter(function(id) { return id !== 'rice-cooker-steamer'; });
-  if (distinct.length >= 2) cost += 1;
+  // Juggling two genuinely different appliances is its own chore and its own
+  // washing up. Two labels for one appliance are not two appliances.
+  if (applianceFamilyCount(eq) >= 2) cost += 1;
   return cost;
 }
 
@@ -3403,6 +4140,7 @@ function isSampleRecipe(r) {
 function renderRecipes() {
   renderGettingStarted();
   renderCookSuggestions();
+  renderStarterPackPrompt();
   renderRecipeQuickFilters();
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
@@ -3424,13 +4162,24 @@ function renderRecipes() {
     return matchesSearch && matchesCategory && matchesTime && matchesFavorites && matchesQuick;
   });
 
+  // An active chip may also reorder, not just narrow — "Lowest effort" is only
+  // useful if the easiest thing is at the top. Copy first: AppState.recipes must
+  // keep its own order.
+  if (quick && quick.sort) filteredRecipes = filteredRecipes.slice().sort(quick.sort);
+
   const countEl = document.getElementById('recipe-count');
   if (countEl) countEl.textContent = filteredRecipes.length + (filteredRecipes.length === 1 ? ' recipe' : ' recipes');
 
   if (filteredRecipes.length === 0) {
-    recipesGrid.innerHTML = AppState.recipes.length > 0
-      ? emptyState('search', 'No recipes match', 'Try a different search term or filter.')
-      : emptyState('square-pen', 'No recipes yet', 'Tap <b>Add New Recipe</b> to create your first — or <b>Import Recipe</b> to add one from a URL or text.');
+    // When a quick chip is the ONLY thing narrowing the list, say what would put
+    // recipes here instead of the generic "try a different search" dead end.
+    const onlyQuick = quick && quick.empty && !searchTerm && !categoryFilter &&
+      !preptimeFilter && !favoritesOnly;
+    recipesGrid.innerHTML = AppState.recipes.length === 0
+      ? emptyState('square-pen', 'No recipes yet', 'Tap <b>Add New Recipe</b> to create your first — or <b>Import Recipe</b> to add one from a URL or text.')
+      : onlyQuick
+        ? emptyState('chef-hat', 'No ' + quick.label.toLowerCase() + ' recipes yet', quick.empty)
+        : emptyState('search', 'No recipes match', 'Try a different search term or filter.');
     return;
   }
 

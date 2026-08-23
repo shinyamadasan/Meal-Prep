@@ -106,29 +106,44 @@ const shownRecipes = async (page) =>
 
 // ── Discovery ───────────────────────────────────────────────────────────────
 
-test('quick filters surface low-effort recipes and hide chips that match nothing', async ({ page }) => {
+test('quick filters surface low-effort recipes and every cooking method', async ({ page }) => {
   await loadLocalApp(page);
   await seed(page);
 
   const chips = await chipNames(page);
-  // Every chip carries its own count, and "Pan" is absent because nothing uses one.
-  expect(chips.join(' | ')).toContain('⚡ Lowest effort');
-  expect(chips.join(' | ')).toContain('🍚 Rice cooker');
-  expect(chips.join(' | ')).toContain('♨️ Rice + steamer');
-  expect(chips.join(' | ')).toContain('⏲️ Instant Pot');
-  expect(chips.join(' | ')).toContain('🔥 Oven');
-  expect(chips.join(' | ')).toContain('🥗 No-cook');
-  expect(chips.join(' | ')).toContain('🍱 Batch-friendly');
-  expect(chips.join(' | ')).not.toContain('🍳 Pan');
+  const row = chips.join(' | ');
+  expect(row).toContain('All');
+  expect(row).toContain('⚡ Lowest effort');
+  expect(row).toContain('🍚 Rice cooker');
+  expect(row).toContain('♨️ Rice + steamer');
+  expect(row).toContain('⏲️ Instant Pot');
+  expect(row).toContain('🔥 Oven');
+  expect(row).toContain('🥗 No-cook');
+  expect(row).toContain('🍱 Batch-friendly');
+  // Pan is a PRIMARY cooking method, so it stays on the row even though nothing
+  // in this fixture uses one — a method you cannot see is a method you cannot
+  // discover. It is rendered muted and reports a count of zero.
+  expect(row).toContain('🍳 Pan');
+  const panEmpty = await page.locator('.rq-chip', { hasText: 'Pan' }).first()
+    .evaluate((el) => el.classList.contains('is-empty') &&
+      el.querySelector('.rq-count').textContent === '0');
+  expect(panEmpty).toBe(true);
 
   await expect(page.locator('#recipes-grid .recipe-card')).toHaveCount(5);
 
-  // Lowest effort = assembly + very-low only.
+  // Lowest effort = assembly + very-low + low, matching the Home "Easiest" gate,
+  // and ordered easiest-first.
   await page.locator('.rq-chip', { hasText: 'Lowest effort' }).click();
-  expect((await shownRecipes(page)).sort()).toEqual(['Lechon Manok Hack', 'Rice + Steamed Veg']);
+  expect(await shownRecipes(page)).toEqual([
+    'Lechon Manok Hack',           // assembly
+    'Rice + Steamed Veg',          // very-low
+    'Pressure Cooker Pork Adobo'   // low
+  ]);
+  // The 60-minute legacy recipe with no metadata is not smuggled in.
+  expect(await shownRecipes(page)).not.toContain('Legacy Sinigang');
 
   // Rice cooker covers both the plain cooker and the steamer variant.
-  await page.locator('.rq-chip', { hasText: 'Rice cooker' }).click();
+  await page.locator('.rq-chip', { hasText: 'Rice cooker' }).first().click();
   expect(await shownRecipes(page)).toEqual(['Rice + Steamed Veg']);
 
   await page.locator('.rq-chip', { hasText: 'Instant Pot' }).click();
@@ -140,8 +155,14 @@ test('quick filters surface low-effort recipes and hide chips that match nothing
   await page.locator('.rq-chip', { hasText: 'Batch-friendly' }).click();
   expect((await shownRecipes(page)).sort()).toEqual(['Oven Batch Chicken', 'Pressure Cooker Pork Adobo']);
 
-  // Tapping the active chip again clears it — no separate "all" button.
+  // Tapping the active chip again clears it...
   await page.locator('.rq-chip', { hasText: 'Batch-friendly' }).click();
+  await expect(page.locator('#recipes-grid .recipe-card')).toHaveCount(5);
+
+  // ...and so does the explicit All chip.
+  await page.locator('.rq-chip', { hasText: 'Oven' }).click();
+  await expect(page.locator('#recipes-grid .recipe-card')).toHaveCount(1);
+  await page.locator('.rq-chip', { hasText: 'All' }).click();
   await expect(page.locator('#recipes-grid .recipe-card')).toHaveCount(5);
 });
 

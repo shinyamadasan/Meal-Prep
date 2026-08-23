@@ -791,7 +791,11 @@ test('the recipe equipment filters still work', async ({ page }) => {
   expect(result.counts['oven']).toBe(1);
   expect(result.counts['pan']).toBe(1);
   expect(result.counts['no-cook']).toBe(1);
-  expect(result.counts['lowest-effort']).toBe(3); // assembly + 2 very-low
+  // assembly + 2 very-low + 2 low. "Lowest effort" uses the same
+  // recipeEffortScore() <= 2 gate the Home "Easiest" pick uses, so the chip and
+  // the recommendation can never disagree about what counts as easy. Only the
+  // normal-effort pan recipe is excluded.
+  expect(result.counts['lowest-effort']).toBe(5);
   expect(result.chipsRendered).toBeGreaterThan(0);
   expect(result.riceCooker.cards).toBe(2);
   expect(result.steamer.cards).toBe(1);
@@ -799,7 +803,7 @@ test('the recipe equipment filters still work', async ({ page }) => {
   expect(result.oven.cards).toBe(1);
   expect(result.pan.cards).toBe(1);
   expect(result.noCook.cards).toBe(1);
-  expect(result.lowest.cards).toBe(3);
+  expect(result.lowest.cards).toBe(5);
 });
 
 test('old saved data with no recipe metadata still ranks and renders', async ({ page }) => {

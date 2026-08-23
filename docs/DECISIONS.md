@@ -753,3 +753,148 @@ Also deferred, not built: any use of `missing === 1` recipes as a shopping nudge
 Risk gate: **outside D-032 red zone.** This wave reads existing state and adds derived ranking plus one card. No change to sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service worker, or the notification machinery from D-058 — the ranking reads the same freshness state but writes none of it.
 
 Supersedes: nothing. Composes D-055's recipe metadata and variety helpers, D-056's ready-food ranking, and D-057's `collectAttentionItems()` freshness model without modifying any of them.
+
+## D-060 — Cooking-method discovery: the filters were never broken, the recipe book was empty
+
+Task: `wave-cook-method-discovery`. Supersedes the discovery half of D-055 and the "quick filters are untouched and covered" claim in D-059.
+
+The owner opened production Home and Cook and could not find low-effort cooking, rice-cooker recipes, or oven recipes. The instinct is to assume the filters were never built. They were — D-055 shipped `RECIPE_QUICK_FILTERS` with working `rice-cooker` / `oven` / `no-cook` / `lowest-effort` matchers, and D-059 added a test exercising every chip. Both were green the whole time.
+
+What was actually true on `main @ 52f33ce`: **`#recipe-quick-filters` rendered as `display: none` with `innerHTML: ""` and zero chips.** `renderRecipeQuickFilters()` hid any chip matching no recipes, and every one of the eight chips matched zero, because **all 26 seeded sample recipes carried no `equipment`, `effort`, `activeTime`, `mealBalance` or `tags` at all**. D-059 recorded this fact in writing and designed neutral fallbacks *around* it instead of fixing it. The tests passed because every discovery test injected its own fully-tagged fixture recipes; nothing asserted anything about the data the app actually ships. That is the lesson worth keeping: **a feature test that supplies its own data proves the code works, not that the product does.**
+
+Three changes, in the order they matter:
+
+**1. Backfill the seeded recipes (the actual fix).** All 26 now declare `equipment`, `effort`, `activeTime`, `mealBalance` and `tags`, read off their own instructions. `activeTime` is hands-on minutes with unattended simmering excluded, so Laing (50 min total, 15 hands-on) is `low` while Pinakbet (35 total, 25 hands-on) is `normal`. Every value is verifiable against the recipe text, and a test asserts `activeTime <= prep + cook` for all 26.
+
+**Nothing was invented, and this has a cost worth stating plainly: all 26 seeded recipes are stovetop Filipino dishes, so all 26 are `pan`. The book contains zero rice-cooker, oven, Instant Pot, or no-cook recipes.** Tortang Talong says "grill or roast" the eggplant and then pan-fries it; tagging it `oven` to populate a chip would be inventing a claim the recipe does not make, so it is `pan`. A guard test greps the instructions and fails if any recipe ever claims an oven without saying "oven/bake/roast", a rice cooker without saying "rice cooker", or `no-cook` while telling you to fry something. **The remaining gap is content, not code**: the Rice cooker and Oven chips work and are proven by tests against tagged fixtures, but they stay empty until rice-cooker and oven recipes exist.
+
+**2. A primary cooking-method chip never hides.** Hiding zero-count chips is what made the capability invisible, and hiding it hardest exactly when the user most needs to know it exists. The row now always renders `All | Lowest effort | Rice cooker | Oven | Instant Pot | No-cook | Pan`, with empty primaries muted and dashed rather than absent. Tapping an empty one is not a dead end: it says "No rice cooker recipes yet — open a recipe, tick Rice cooker under Cooking method, and it will show up here", which is the on-ramp that populates it. Refinement chips (`Rice + steamer`, `Batch-friendly`) still hide when empty — they are narrower than a method and nobody goes hunting for them. The editor's `Equipment` label is renamed `Cooking method` so the chip and the field that fills it use one word; the `equipment[]` slugs are unchanged.
+
+**Cooking method is presentation, not schema.** `Rice cooker` matches `rice-cooker` **and** `rice-cooker-steamer`; `Instant Pot` matches `instant-pot` **and** `pressure-cooker`. No `cookingMethod` field, no migration, no data touched — the user should never have to know the app distinguishes a rice cooker from a rice cooker with a steamer tray to find dinner. The finer slugs survive in the data and stay reachable through the refinement chip.
+
+**3. One definition of "easy".** `Lowest effort` used `recipeEffortScore(r) <= 1` (assembly + very-low) while the Home "Easiest" pick used `<= 2`. Two thresholds for one word, which meant a recipe could be "Easiest" on Home and excluded from "Lowest effort" on Cook. The chip now uses `<= 2`, matching Home, and a test asserts the two agree rather than merely both existing.
+
+The chip also **sorts**, not just filters — a "lowest effort" list is useless if the easiest thing is fifth. Ordering reuses the D-059 ranking helpers (`recipeEffortScore`, `activeTimeFriction`, `cleanupFriction`, `applianceFriction`) with raw `recipeActiveMinutes()` as a finer tie-break inside a friction bucket, because bucketing alone let the list fall to alphabetical and stop looking sorted. No second scoring system was introduced. The result is ordered by work, not clock: Nilaga (60 min total, 15 hands-on) outranks Chicken Adobo (45 min total, 18 hands-on), and a test asserts hands-on minutes never decrease down the list *while* total minutes do.
+
+Mobile: the chip row scrolls on its own axis and is pinned with `min-width: 0` / `max-width: 100%` so a flex item cannot refuse to shrink and push the **page** into horizontal scroll. Chips were 23px tall on a phone — technically tappable, practically fiddly — and now have `min-height: 36px`. Tests assert no page-level overflow at 390px and a ≥32px tap target on every chip.
+
+Home was **not** redesigned and no card was added, per the brief. The existing D-059 "What should we eat?" card simply got useful: before the backfill it rendered `Easiest → Corned Beef Guisado` with an **empty reasons array** — a recommendation that could not say why. It now renders `Easiest → Arroz Caldo · Pan · 15 min active · Minimal cleanup · Batch-friendly`. Same engine, same weights, same code path; only the data underneath changed. A test asserts the pick now carries at least one reason, names a cooking method, and states hands-on minutes.
+
+Zero new persisted state. No new `AppState` key, no new localStorage key. `recipeQuickFilter` stays a module-scoped view variable that a reload forgets, and a test asserts the persisted payload's key set is byte-identical before and after filtering.
+
+Two existing tests were updated rather than deleted, and both now assert the *new* contract at equal strictness: `low-effort-discovery.spec.js` asserted `Pan` was absent when nothing used one (now asserts it is present, muted, and reports 0) and `what-should-we-eat.spec.js` asserted `lowest-effort` counted 3 (now 5, under the aligned `<= 2` gate).
+
+Risk gate: **outside D-032 red zone.** Recipe metadata, filtering, and presentation only. No change to sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service worker, or notifications.
+
+## D-061 — A curated low-effort starter set, because D-060 proved the gap was content
+
+Task: `wave-cook-method-discovery`, second commit. Closes the gap D-060 identified and could not honestly close on its own.
+
+D-060 made the cooking-method filters visible and correct, then had to report that Rice cooker, Oven, Instant Pot and No-cook were all still empty: every one of the 26 seeded recipes is an explicitly stovetop Filipino dish, and tagging any of them `oven` to populate a chip would have been inventing a claim the recipe does not make. The filters worked; there was nothing to find.
+
+Decision: add **14 new seeded recipes** (ids 27–40) written *for* the appliances the filters expose, rather than retag anything. Method counts went 0/0/0/0 → **Rice cooker 4** (2 `rice-cooker`, 2 `rice-cooker-steamer`), **Oven 4**, **Instant Pot 3** (2 `instant-pot`, 1 `pressure-cooker`), **No-cook 3**. Pan stays at 26. **All 26 original recipes are byte-identical** — the commit is a pure addition (+396 lines, zero deletions), and a test asserts ids 1–26 still carry exactly `['pan']` so no future edit can quietly relabel them to make a chip look busier.
+
+**Written for the appliance, not merely compatible with it.** Every recipe's instructions describe how it is cooked in the appliance it declares: the rice-cooker recipes say what goes in the pot, when to press Cook, and what happens at Keep Warm; the two `rice-cooker-steamer` ones say what sits in the steamer basket and when. A test greps each recipe's own instructions and fails if an `oven` recipe never says oven/bake/roast, a rice-cooker recipe never says "rice cooker", an `instant-pot` one never says "Instant Pot", a `pressure-cooker` one never says "pressure cooker", or a `no-cook` one tells you to fry, boil, simmer or sauté. That guard is the thing standing between this set and padding.
+
+**One appliance per recipe, deliberately.** `applianceFriction()` adds +1 for juggling two distinct appliances, so declaring `['instant-pot', 'pressure-cooker']` on a recipe that needs only one device would score it as *harder* than it is. Each recipe therefore names the single device it was written for; the chip's grouping (D-060) is what makes both slugs findable under one label. A test asserts no seeded recipe declares more than one appliance. Note the latent consequence, unfixed here because it affects nothing shipped: a **user** who ticks both Instant Pot and Pressure cooker on their own recipe in the editor still takes that spurious +1. The same class of bug is already exempted for `rice-cooker-steamer`; extending the exemption to the instant-pot/pressure-cooker pair is a one-line ranking change and was left out of this commit because the brief scoped it to content.
+
+Low-friction is enforced, not just intended: no recipe in the set is `normal` effort (3 `assembly`, 4 `very-low`, 7 `low`), maximum hands-on time is 15 minutes, maximum ingredient count is 10, and 8 of the 14 are protein + vegetables + carb in one dish. A test asserts all of those bounds, plus that any `mealBalance` claim is backed by an ingredient of that category — a recipe cannot claim vegetables without listing one.
+
+Effort ranking behaves correctly across tiers now that more than one tier exists in the shipped data: declared effort is the primary key, so an `assembly` bowl at 12 minutes hands-on outranks a `very-low` rice-cooker meal at 6. Two tests were tightened to assert the real contract — effort rank never decreases down the list, and hands-on minutes never decrease *within* a tier — rather than the global monotonicity that happened to hold when every low-effort recipe was `low`.
+
+Home was not touched. Its existing "Easiest" pick now lands on **Tuna Vegetable Rice Bowl · No cook · 8 min active · Balanced · Minimal cleanup** on a fresh install, and on **Rice Cooker Chicken Mushroom Rice** once the pantry is stocked for it — the pantry-informed path reaching a new recipe through the normal cook-now tier, which a test asserts.
+
+**Known limitation, stated because it decides how the owner actually gets these.** `ensureStarterRecipes()` is gated on `isFirstRun()` — sample recipes are injected into a brand-new install only, and never re-injected over an existing one (the R2 gate that exists so an empty recipe list stays the user's deliberate choice). **The owner's existing production install will not receive these 14 recipes automatically.** That gate is correct and was not weakened: re-injecting seeds into a live install is exactly the "write over the user's data" failure D-010 and the D-032 red zone exist to prevent. Getting the set onto an existing install needs a separate, additive, opt-in mechanism — an "add the starter low-effort recipes" action that merges by id and skips anything already present — which is its own decision and its own wave.
+
+Judgement calls worth naming: potatoes are counted as the carb in Sheet-Pan Chicken & Vegetables and Pressure Cooker Nilagang Baka, so both claim `carb: true` without a grain; Overnight Oats is the one recipe in the set that is not protein-forward and honestly declares `protein: false`; and "Lechon Manok (Ready-Roasted)" is a free-typed ingredient with no INGREDIENT_DB entry, which is supported but means it contributes no price or pantry alias until one is added.
+
+Risk gate: **outside D-032 red zone.** Seed content and tests only. No change to sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service worker, or notifications — and no change to any code path, only to the data `sampleRecipes` holds.
+
+## D-062 — Appliance FAMILIES, not appliance labels, decide the juggling penalty
+
+Task: `wave-cook-method-discovery`, third commit. Amends the `applianceFriction()` rule from D-059.
+
+`applianceFriction()` adds +1 when a recipe uses two appliances, because two devices means two things to run and two things to wash. D-059 already knew one slug pair was not really two devices and special-cased it inline: `eq.filter(id => id !== 'rice-cooker-steamer')`, on the grounds that a rice cooker with a steamer tray is one machine doing two jobs.
+
+The same is true of `instant-pot` and `pressure-cooker` — they are the same pot under two names — and that pair was never exempted. A user who ticks both in the editor (entirely reasonable: "either works") had their recipe scored as *harder* than one that ticked only one. No shipped recipe hits this, because the D-061 starter set deliberately declares a single appliance each, but every user recipe could.
+
+Decision: replace the one-off label filter with an explicit family map.
+
+```js
+var APPLIANCE_FAMILY = {
+  'rice-cooker-steamer': 'rice-cooker',
+  'pressure-cooker': 'instant-pot'
+};
+```
+
+The penalty now counts distinct *families*, not distinct slugs. Friction COST is untouched — a steamer combo still costs 2, an oven still costs 3 — only the "how many appliances is this really" question changed.
+
+Why a map rather than extending the filter, which would have been the smaller diff: the filter approach drops a label out of the count entirely, and that is wrong in the other direction. Filtering out `pressure-cooker` would mean `['pressure-cooker', 'oven']` — a genuine two-appliance recipe — counts as one appliance and loses a penalty it should pay. The family map keeps that case at +1 while fixing the equivalent-label case, so it is the only version of this change that does not trade one wrong answer for another.
+
+One case beyond the brief's ask changed as a consequence, and it is worth naming rather than burying: `['rice-cooker-steamer', 'oven']` previously escaped the penalty (the old filter removed the steamer slug, leaving a count of one) and now pays +1. That is a recipe using a rice cooker *and* an oven — genuinely two appliances — so the new answer is the correct one, but it is a ranking change nobody requested. No test asserted the old value; a test asserts the new one. Revert by dropping `'rice-cooker-steamer'` from the map if the old leniency was intentional.
+
+A focused regression test pins all of it: both Instant Pot labels tie with one, both rice-cooker labels tie with one, and `pan`+`oven`, `pressure-cooker`+`oven`, `rice-cooker-steamer`+`oven` all still pay the juggling +1. A second test asserts the ranking-level consequence — two recipes identical except that one declares both Instant Pot labels now score the same `parts.appliance`.
+
+Risk gate: **outside D-032 red zone.** Pure ranking arithmetic, no persisted state, no sync surface.
+
+
+## D-063 — The starter pack is opt-in and additive, because the first-run gate is right
+
+Task: `wave-cook-method-discovery`, third commit. Closes the delivery gap D-061 reported.
+
+D-061 added 14 low-effort recipes to `sampleRecipes` and had to end with a limitation: `ensureStarterRecipes()` is gated on `isFirstRun()`, so only a brand-new install ever receives seed content. Every existing install — including the owner's — would keep four visible, correct, empty cooking-method filters forever.
+
+The tempting fix is to loosen the gate: "only re-seed if the recipe is missing". That gate exists because an empty recipe list is a legitimate user choice, and re-injecting seeds over live data is the exact failure mode D-010 and the R2 rule were written to prevent. **The gate was not touched.** Instead, delivery became an explicit user action.
+
+**The surface.** One compact card on Cook, rendered from `renderRecipes()` into `#starter-pack-prompt`, sitting directly above the quick-filter row — so the offer is adjacent to the four chips reading `0` that it fills. Title "Low-effort starter recipes", one line of subtext, one `Add recipes` button. Not a modal, not fixed-position, nothing auto-added, and a test asserts both of those. The subtext states the count when the install is only partly missing the set ("10 low-effort starter recipes available") and names the methods when it is missing all of it.
+
+**What counts as missing.** `starterPackCandidates()` disqualifies an id for exactly two reasons, and the second is the one that matters:
+
+- **Already present.** Presence is a permanent skip. No comparison, no merge, no "the seed is newer" — the user may have renamed, rescaled or rewritten that recipe, and their copy wins unconditionally. A test edits recipe 31 beyond recognition, adds the pack, and asserts every edited field survives and no duplicate appears.
+- **Tombstoned.** `AppState.deletions` is the existing synced `id -> deletedAtISO` map and `recipes` is already one of the `TOMBSTONE_KEYS`, so deletion intent was fully detectable with **no change to sync or tombstone architecture** — which is what the brief asked to be verified before implementing. Re-offering a deleted recipe would undo a decision the user made; worse, adding it back with a fresh `updatedAt` would beat its tombstone under `applyTombstones()`' LWW comparison and resurrect it on *every* device. The pack reads that map and never writes it, and a test asserts the map is byte-identical after an add.
+
+The honest limit: `purgeOldTombstones()` forgets markers older than 180 days, so a starter recipe deleted longer ago than that becomes offerable again. That bound is deliberate in the sync design — defeating it would need a new persisted field, which this feature does not justify.
+
+**Duplicate protection is in the function, not the button.** `addStarterPackRecipes()` re-derives candidates on every call, so calling it three times in a row after a successful add is a no-op; a test drives the handler directly rather than clicking, because a guard that only exists in the UI is not a guard. Reload safety falls out of persistence: the added recipes are in storage, so they are present, so they are not candidates.
+
+**Persistence uses the existing path and nothing else.** Added recipes are deep copies (`JSON.parse(JSON.stringify(...))`) so `AppState` never holds a reference into the `sampleRecipes` constant — a test mutates an added recipe and asserts the seed is unchanged. Each copy is stamped with `updatedAt`, which is what tombstone LWW and the local-vs-cloud merge both read. Then `saveData()` — Hard Rule 5, localStorage and Firestore through the one save path.
+
+`patchMissingNutrition()` (Hard Rule 4) is called on **the new copies only**, not the whole list. Running it over `AppState.recipes` also stamps empty metadata defaults onto the user's own recipes, and a caught test failure is what surfaced that: adding a starter pack has no business rewriting anything the user made, even harmlessly.
+
+**Zero new state.** No new `AppState` key, no new localStorage key, no "pack seen" or "dismissed" flag — there is nothing to remember, because the prompt's visibility is derived entirely from whether anything is eligible. It retires itself. A test snapshots `Object.keys(AppState)`, the persisted payload's key set, and every localStorage key before and after, and asserts all three are unchanged.
+
+Deliberately not built, per the brief: no pack registry, no remote content, no downloadable packs, no versioning, no update/overwrite path, no automatic reseed. Adding a *second* pack later would need a real design; this is one list of ids and a presence check.
+
+Risk gate: **outside D-032 red zone** — but closer to it than the previous two commits, so worth stating precisely why. The feature reads `AppState.deletions` and writes only to `AppState.recipes` via the normal `saveData()` path. It does not modify `ensureStarterRecipes()`, `isFirstRun()`, the tombstone functions, the `cloudReady` write-guard, or any merge code. The one genuinely dangerous version of this feature — re-seeding automatically — is the version that was not built.
+
+## D-064 — Seeding hands AppState its own recipe objects, not the constant's
+
+Task: `wave-cook-method-discovery`, fourth commit. Pre-merge data-isolation check.
+
+Both seed entry points did `AppState.recipes = [...sampleRecipes]`. Spread copies the **array**; every recipe object inside stayed shared with the module constant. This was flagged as suspicious in the D-063 report and was checked before being changed, because "shallow copy looks wrong" is not by itself a reason to touch production code.
+
+It was reachable, and proven so rather than argued:
+
+- **All 40 objects shared.** `AppState.recipes[n] === sampleRecipes[n]` for every entry after a seeded boot.
+- **Ordinary interactions rewrite the constant.** `toggleFavorite()` (`recipe.favorite = !recipe.favorite`), `updateServingSize()` (`recipe.currentServings = n`), and `normalizeRecipes()` (which reassigns `equipment`, `tags`, `mealBalance` to fresh objects) all mutate in place. A probe confirmed `sampleRecipes` entry 27 came out with `currentServings: 8` and `favorite: true` after nothing more than scaling and favouriting in the UI.
+- **And it leaked into user data.** The exploit path: seeded session → user scales and favourites a starter recipe → something replaces `AppState.recipes` with a set lacking 27–40 (a sign-in merge from an older device does exactly this) → the D-063 starter pack sources those ids from `sampleRecipes` → the recipes are added **pre-scaled to 8 servings and already favourited**, then persisted and synced. Reproduced end to end before the fix.
+
+The blast radius was one session, since the constant is re-evaluated on every page load — which is why this never showed up as a permanent corruption and why it survived this long.
+
+Fix, using the deep-copy pattern `addStarterPackRecipes()` already established:
+
+```js
+function cloneSeedRecipes() { return JSON.parse(JSON.stringify(sampleRecipes)); }
+```
+
+Applied at both seed entry points (`ensureStarterRecipes()` and the Firebase-unavailable fallback). A third aliasing site was fixed in the same class: `patchMissingNutrition()` assigned `source.nutritionPerServing` — a reference **into** the constant — onto the recovered recipe, so a later nutrition edit would rewrite the seed. It now copies.
+
+Explicitly NOT changed: `isFirstRun()`, the first-run gate itself, when seeding happens, tombstone logic, or ranking. Only *what objects* seeding hands over.
+
+A correction to the D-063 report, which called the Firebase-unavailable fallback a latent bug for checking `hasLoadedData` instead of `isFirstRun()`: it is not a bug. `loadFromLocalStorage()` returns true whenever a saved record exists — including one whose `recipes` array is deliberately empty — so a saved empty list is never re-seeded over. A test now pins that behaviour.
+
+Also fixed: two Playwright harnesses cleared `localStorage` from `addInitScript`, which re-runs on **every** navigation including `page.reload()`. Their reload assertions were therefore starting from a blank slate and proving nothing — the starter-pack "survives a reload" test passed only because a fresh re-seed also yields 40 recipes. Both now guard the clear behind a one-time flag, so reload exercises the real restore path. This is why the seed-isolation reload test failed on first run: it was the first test to actually reload into saved state.
+
+Out of scope and left alone: `[...defaultStorageData]` and `[...defaultCookingHacks]` in the same fallback share objects the same way. No mutation path was audited for them and the brief scoped this to recipe objects; they are recorded here as known, unaudited, same-class candidates.
+
+Risk gate: **outside D-032 red zone.** No sync, tombstone, save-path, auth or service-worker change. The three touched lines make copies where references were being handed out.

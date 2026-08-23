@@ -6617,6 +6617,46 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
    "What should I cook?" card. Reuses the existing tokens — no :root block
    here (Hard Rule 7). */
 
+/* Starter pack prompt ------------------------------------------------------
+   Compact, inline, non-blocking. Sits directly above the quick filters it
+   populates. Reuses existing tokens — no :root block (Hard Rule 7). */
+
+.sp-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  margin: 0 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base, 8px);
+  background: var(--color-secondary, transparent);
+}
+
+.sp-text { flex: 1 1 240px; min-width: 0; }
+
+.sp-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sp-sub {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.sp-add { flex: 0 0 auto; white-space: nowrap; }
+
+/* Post-add confirmation: same shape, no button, tinted to read as success. */
+.sp-card--done { border-color: var(--color-primary); }
+
+@media (max-width: 768px) {
+  .sp-card { padding: 0.55rem 0.7rem; gap: 0.5rem; }
+  .sp-add { width: 100%; min-height: 36px; }
+}
+
 /* Quick filters ---------------------------------------------------------- */
 
 .recipe-quick-filters {
@@ -6658,6 +6698,17 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   opacity: 0.7;
 }
 .rq-chip.is-active .rq-count { opacity: 0.9; }
+
+/* A cooking method nobody has tagged a recipe with yet. Still shown and still
+   tappable — tapping explains how to fill it — but visibly quieter than a chip
+   with recipes behind it, so the row reads as "these five, two of which have
+   something" rather than five equal choices. */
+.rq-chip.is-empty {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.rq-chip.is-empty:hover { opacity: 1; }
+.rq-chip.is-empty.is-active { opacity: 1; border-style: solid; }
 
 /* Recipe card metadata strip --------------------------------------------- */
 
@@ -6888,14 +6939,28 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 
 @media (max-width: 768px) {
-  .rq-chip { font-size: 0.78rem; padding: 0.3rem 0.6rem; }
+  /* 23px chips were technically tappable and practically fiddly. A comfortable
+     target matters more here than shaving a few pixels off the row. */
+  .rq-chip {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.75rem;
+    min-height: 36px;
+  }
   .lowfx-check { font-size: 0.8rem; }
   .recipe-quick-filters {
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 4px;
     -webkit-overflow-scrolling: touch;
+    /* Without these a flex item can refuse to shrink below its content width
+       and push the whole PAGE into horizontal scroll instead of scrolling
+       itself — the row is allowed to scroll, the page is not. */
+    min-width: 0;
+    max-width: 100%;
+    scrollbar-width: none;
   }
+  .recipe-quick-filters::-webkit-scrollbar { display: none; }
+  .rq-chip { flex: 0 0 auto; }
 }
 
 /* ── Ready-to-eat portions ──────────────────────────────────────────────────
