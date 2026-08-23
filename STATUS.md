@@ -4,6 +4,109 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-23 — Cooking-method discovery merged and deployed (TASK-048, D-060..D-064) — the wave where the tests were green and the product was broken
+
+`wave-cook-method-discovery` → `main` (`8e847c6`, `--no-ff`, unrebased). Deployed and smoke-tested.
+`wave1-portion-truth` remains parked and untouched at `88b5598`.
+
+### The finding worth remembering
+
+The owner opened production Cook and could not find low-effort cooking, rice cooker recipes, or oven
+recipes. The obvious conclusion — the filters were never built — was wrong. `RECIPE_QUICK_FILTERS`
+had working matchers since D-055, and D-059 shipped a test exercising every chip. Both green.
+
+What was actually true on `main @ 52f33ce`, verified in a throwaway worktree rather than reasoned
+about: **`#recipe-quick-filters` rendered as `display: none`, `innerHTML: ""`, zero chips.**
+`renderRecipeQuickFilters()` hides any chip that matches no recipes, and **all 26 seeded recipes
+carried no `equipment` / `effort` / `activeTime` / `mealBalance` / `tags` whatsoever**. D-059 even
+recorded that gap in writing and designed neutral ranking fallbacks *around* it instead of closing
+it.
+
+Every discovery test passed the whole time because **each one injected its own fully-tagged fixture
+recipes**. That is the lesson to carry: a feature test that supplies its own data proves the code
+works, not that the product does. The four new specs assert against the shipped `sampleRecipes`, and
+a new production smoke asserts against the deployed bundle.
+
+### What shipped, in four commits
+
+**`9956a3e` — discovery UX.** A primary cooking-method chip never hides now, even at zero: it renders
+muted and its empty state names the editor field that fills it. The row is
+`All | Lowest effort | Rice cooker | Oven | Instant Pot | No-cook | Pan`, plus `Rice + steamer` and
+`Batch-friendly` as refinements that still hide when empty. `Rice cooker` matches both
+`rice-cooker` and `rice-cooker-steamer`; `Instant Pot` matches both `instant-pot` and
+`pressure-cooker` — a presentation grouping over the existing `equipment[]` slugs, no new field and
+no migration. `Lowest effort` was `<= 1` while Home's "Easiest" gate was `<= 2`, so a recipe could
+be Easiest on Home and excluded from Lowest effort on Cook; aligned to `<= 2`, with a test asserting
+the two agree. The chip also sorts by hands-on work rather than clock time. All 26 originals were
+backfilled with truthful `pan` metadata.
+
+**`cf736ba` — 14 low-effort starter recipes (ids 27–40).** 4 rice cooker, 4 oven, 3 Instant Pot,
+3 no-cook. Each is written *for* its appliance, and a test greps each recipe's own instructions to
+prove it: an `oven` recipe must say oven/bake/roast, a rice-cooker one must say "rice cooker", a
+`no-cook` one must not tell you to fry or simmer. The 26 originals are byte-identical — pure
+addition, zero deletions — and a test asserts ids 1–26 still carry exactly `['pan']` so nothing can
+be quietly relabelled later to make a chip look busier.
+
+**`555efef` — opt-in delivery.** `ensureStarterRecipes()` seeds first-run installs only, and that
+gate is correct: re-seeding a live install is how you overwrite someone's data. It was not touched.
+Instead a compact, non-blocking Cook prompt adds only what is genuinely absent. Presence on an id is
+a permanent skip (the user may have edited it), and `AppState.deletions` is honoured. The tombstone
+check is not cosmetic — `applyTombstones()` is last-write-wins, so re-adding with a fresh
+`updatedAt` would *beat* the tombstone and resurrect a deleted recipe on every device. Also fixed:
+`instant-pot` and `pressure-cooker` are one appliance family and no longer pay the two-appliance
+juggling penalty.
+
+**`5f3c342` — seed object isolation.** `[...sampleRecipes]` copied the array only, leaving every
+recipe object shared with the module constant — and `toggleFavorite()`, `updateServingSize()` and
+`normalizeRecipes()` all mutate in place. This was flagged as *suspicious* in the previous report and
+checked before being changed, because "shallow copy looks wrong" is not a reason to touch production
+code. It was reachable, and the exploit was reproduced end to end: scale recipe 27 to 8 servings and
+favourite it, let a sign-in merge replace `AppState.recipes` with a set lacking 27–40, then use the
+starter pack — it added recipe 27 **pre-scaled to 8 servings and already favourited**, then
+persisted it. Both seed entry points now deep-copy.
+
+### Two defects the tests caught, not inspection
+
+`patchMissingNutrition()` run over the whole recipe list stamped empty metadata defaults onto the
+user's *own* recipes during a starter-pack add. Scoped to the new copies only — adding a starter
+pack has no business rewriting anything the user made.
+
+Two Playwright harnesses cleared `localStorage` inside `addInitScript`, which re-runs on every
+navigation **including `page.reload()`**. Their reload assertions were starting from a blank slate;
+the starter-pack "survives a reload" test had been passing only because a fresh re-seed also yields
+40 recipes. Both now guard the clear.
+
+### Test-suite geography, recorded because it caused repeated confusion
+
+**Nine spec files hit the live GitHub Pages site**, not local files. They validate whatever is
+deployed, cannot validate a branch, and are network-dependent — every intermittent failure seen
+during this wave came from that set (one ready-food smoke run took 5.0 min and failed, then passed
+8/8 in 41s). The deterministic branch gate is the 224-test local suite. Worth splitting into
+`npm run test:local` / `npm run test:prod` in a future OS pass.
+
+### Numbers
+
+Recipes 26 → 40. Live production chip counts: `All 40 · Lowest effort 26 · Rice cooker 4 · Oven 4 ·
+Instant Pot 3 · No-cook 3 · Pan 26 · Rice + steamer 2 · Batch-friendly 23`. Home "Easiest" went from
+rendering `Corned Beef Guisado` with an **empty reasons array** to `Tuna Vegetable Rice Bowl ·
+No cook · 8 min active · Balanced · Minimal cleanup` — same engine, same weights, only the data
+underneath changed.
+
+Local suite 224 passed / 0 failed on the branch and on merged `main`. Full suite 286 passed /
+4 skipped / 0 failed. Production smoke against `8e847c6`: 15/15.
+
+### Next
+
+Dogfood the filters and the `Easiest` pick before touching either. `Lowest effort` is deliberately
+broad at `<= 2` (26 of 40) — ordering puts assembly and very-low first, so judge the breadth after
+real use rather than narrowing it now.
+
+Carried forward, not fixed: the 180-day tombstone horizon means a starter recipe deleted longer ago
+than that becomes offerable again; the Firebase multi-device path is untested in the local harness
+(Firebase is stubbed in every local spec); `defaultStorageData` and `defaultCookingHacks` may share
+the same shallow-copy pattern and need their own audit.
+
+---
 ## 2026-08-22 — "What should we eat?" merged and deployed (TASK-047, D-059) — a reversible D-032 `done`, not a red-zone hold
 
 The first wave in a while that changed no data path at all. `wave1-portion-truth` remains parked and

@@ -2838,6 +2838,93 @@ merge gate:
 
 ---
 
+### TASK-048 · Cooking-method discovery — make "easy meal with this appliance" findable, and give it something to find
+status: done
+owner: claude
+source: direct operator brief ("Low-effort cooking and appliance-based discovery exist in the
+        architecture but are not obvious/useful enough in the actual UI") — not BQ
+depends-on: TASK-042 (D-055 recipe metadata), TASK-047 (D-059 what-should-we-eat ranking)
+files: app.js, index.html, style.css,
+        tests/cook-method-discovery.spec.js (new), tests/starter-pack.spec.js (new),
+        tests/seed-isolation.spec.js (new),
+        tests/production-smoke-cook-method.spec.js (new),
+        tests/low-effort-discovery.spec.js, tests/what-should-we-eat.spec.js,
+        docs/DECISIONS.md
+
+objective:
+  Make "I want an easy meal using this cooking method" usable in one obvious interaction after
+  opening Cook — then make the filters actually return something, and deliver that content to
+  installs that predate it. Presentation, seed content and delivery: no schema change, no new
+  recommendation engine.
+
+notes:
+  Phase 1 characterised the shipped build before any code was written, and the finding inverted the
+  brief's assumption. The filters were NOT missing: `RECIPE_QUICK_FILTERS` had working
+  rice-cooker / oven / no-cook / lowest-effort matchers since D-055, and D-059 added a test
+  exercising every chip. Both were green the whole time. On `main @ 52f33ce`,
+  `#recipe-quick-filters` rendered as `display: none` with `innerHTML: ""` and ZERO chips, because
+  `renderRecipeQuickFilters()` hides any chip matching no recipes — and all 26 seeded recipes
+  carried no `equipment` / `effort` / `activeTime` / `mealBalance` / `tags` at all. D-059 recorded
+  that gap in writing and designed neutral fallbacks around it rather than fixing it. Every
+  discovery test passed because each injected its own fully-tagged fixtures.
+
+  The lesson, recorded because it will recur: **a feature test that supplies its own data proves
+  the code works, not that the product does.** The new specs assert against the shipped
+  `sampleRecipes`, not fixtures, for exactly this reason.
+
+acceptance:
+  - [x] Cook exposes a visible quick-filter row: All | Lowest effort | Rice cooker | Oven |
+        Instant Pot | No-cook | Pan, plus Rice + steamer and Batch-friendly refinements
+  - [x] Primary cooking-method chips never hide, even at zero — an empty one is muted and its
+        empty state says how to fill it
+  - [x] Rice cooker matches `rice-cooker` AND `rice-cooker-steamer`; Instant Pot matches
+        `instant-pot` AND `pressure-cooker` — presentation grouping over existing `equipment[]`
+  - [x] No recipe appears under a cooking method its own metadata does not support
+  - [x] Lowest effort uses `recipeEffortScore() <= 2`, the same gate the Home "Easiest" pick uses,
+        and orders by hands-on work rather than total clock time
+  - [x] All 26 original recipes backfilled with truthful metadata; none retagged to populate a chip
+  - [x] 14 new starter recipes (ids 27–40): 4 rice cooker, 4 oven, 3 Instant Pot, 3 no-cook, each
+        written FOR its appliance and proven by a grep of its own instructions
+  - [x] Existing installs get an opt-in prompt that adds only genuinely absent starter recipes
+  - [x] A deleted starter recipe is never resurrected (`AppState.deletions` honoured)
+  - [x] Repeated Add and reload never duplicate
+  - [x] `AppState.recipes` never shares objects with the `sampleRecipes` constant
+  - [x] Zero new persisted state; no `AppState` key, no localStorage key
+  - [x] Mobile: no horizontal PAGE overflow, chips ≥32px tap target
+
+constraints:
+  - No new persisted schema, no new top-level `AppState` collection
+  - Do NOT weaken `isFirstRun()` or the deliberate empty-recipe-list behaviour
+  - Do NOT change sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service
+    worker, or notifications
+  - Do NOT fabricate recipe metadata; a method claim must be described by the recipe's own
+    instructions
+  - Do NOT touch `wave1-portion-truth`
+
+sync/deletion safety:
+  The wave READS `AppState.deletions` (starter-pack eligibility) and never writes it — a test
+  asserts the map is byte-identical after an add. Recipes are added through `saveData()` like any
+  edit, each deep-copied and `stampUpdated()`-stamped so tombstone LWW and the local-vs-cloud merge
+  behave normally. `git diff` against `52f33ce` adds no `AppState.<key> =` assignment and touches
+  no tombstone, sync, auth or service-worker function.
+
+verification:
+  - [x] `tests/cook-method-discovery.spec.js` — 41 passed
+  - [x] `tests/starter-pack.spec.js` — 17 passed
+  - [x] `tests/seed-isolation.spec.js` — 9 passed
+  - [x] `tests/what-should-we-eat.spec.js` — 26 passed (unchanged behaviour)
+  - [x] Local suite on the branch — 224 passed, 0 failed (deterministic across repeat runs)
+  - [x] Full suite on the branch — 286 passed, 4 skipped, 0 failed
+  - [x] Local suite on merged `main` — 224 passed, 0 failed
+  - [x] Production smoke against the deployed build — 15/15
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Recipe metadata, filtering, presentation and an
+  additive opt-in action; no red-zone surface is touched. Landed `--no-ff` at `8e847c6` on the
+  operator's explicit approval of `5f3c342`.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

@@ -106,3 +106,24 @@
   knowing before the next such test is written: the honest way to classify one of these is to probe
   a bare `page.goto` with zero app interaction and see whether the error still appears, rather than
   widening the filter until the test goes green.
+- 2026-08-23: a whole wave's premise was "the filters don't exist"; they did, and had passing tests
+  the entire time. The row was `display:none` because every chip matched zero recipes, because the
+  SHIPPED seed data had no metadata — while every discovery test injected its own fully-tagged
+  fixtures. The tests proved the code worked, not that the product did. Cheap rule worth adopting:
+  any spec for a discovery/onboarding surface should have at least one case asserting against the
+  data the app actually ships (`sampleRecipes`, defaults) rather than a fixture, because that is
+  the only case that can catch "correct code, empty product".
+- 2026-08-23: nine spec files in `tests/` hit the live GitHub Pages URL rather than the local
+  `index.html`, and `npm test` runs them together with the local ones. Consequences seen repeatedly
+  this wave: a branch's "full suite" result partly measures whatever is currently DEPLOYED (so it
+  cannot validate the branch), and network latency produced intermittent failures that looked like
+  regressions — one run took 5.0 min and failed, the same spec then passed 8/8 in 41s. Worth
+  splitting into `npm run test:local` (the deterministic branch gate) and `npm run test:prod`
+  (post-deploy verification) so the two questions stop being answered by one number.
+- 2026-08-23: Playwright `addInitScript` re-runs on EVERY navigation including `page.reload()`, so a
+  harness that calls `localStorage.clear()` there silently defeats any reload assertion — the page
+  comes back to a blank slate instead of restoring saved state. Two specs in this repo had that bug,
+  and one "survives a reload" test had been passing only because a fresh re-seed happened to produce
+  the same recipe count it expected. Guard the clear behind a one-time sentinel key; and if the
+  spec also asserts "no unexpected localStorage keys", pick a sentinel name the assertion's own
+  filter will not match.
