@@ -2750,7 +2750,7 @@ merge gate:
 ---
 
 ### TASK-047 · "What should we eat?" — one deterministic recommendation composed from the existing helpers
-status: approved
+status: done
 owner: claude
 source: direct operator brief ("Help us decide what to eat with the least possible friction") — not BQ
 depends-on: TASK-042 (D-055 recipe metadata), TASK-043 (D-056 ready-food ranking),
@@ -2829,8 +2829,8 @@ sync/deletion safety:
 verification:
   - [x] `npx playwright test tests/what-should-we-eat.spec.js` — 26 passed
   - [x] Full suite on the branch — 209 passed, 4 skipped, 0 failed
-  - [x] Full suite on final `main` after the merge — see REVIEW.md TASK-047
-  - [x] Production smoke against the deployed GitHub Pages build — see REVIEW.md TASK-047
+  - [x] Full suite on final `main` after the merge — 219 passed, 4 skipped, 0 failed
+  - [x] Production smoke against the deployed GitHub Pages build — 10/10
 
 merge gate:
   D-032 **`done`** — approved and reversible. Derived ranking plus one additive Home card; no

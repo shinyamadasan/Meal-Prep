@@ -81,3 +81,28 @@
   it); candidate fixes are raising the timeout for the `production-smoke-*` specs specifically,
   pinning them to a single worker, or splitting live-site smoke into its own workflow from the
   local-file suite.
+- 2026-08-23: writing repo docs through `node -e "..."` from bash keeps losing content to the
+  SHELL, not to node: backticks inside the double-quoted program are command-substituted before
+  node ever sees them (a `` `done` `` in a DONE.md entry silently became an empty string, and the
+  only symptom was a stray "syntax error near unexpected token" printed *alongside* a successful
+  "ok"). A `"` inside a single-quoted JS string in the same position produces "Unterminated string
+  constant" instead. Both hit this session, on top of the mixed-line-endings trap already logged
+  2026-08-22. Working rule that holds: put any doc block in a scratchpad file and have node read it
+  with `fs.readFileSync`, never inline it in the `-e` program; when a short inline edit is
+  unavoidable, use `node -e '...'` with single quotes and build backticks via
+  `String.fromCharCode(96)`. Candidate fix: a tiny `tools/doc-insert.js` taking (file, anchor,
+  block-file) that also does the per-file `\r\n` vs `\n` detection, so every wave stops
+  re-implementing both traps.
+- 2026-08-23: a "nothing was persisted" regression test matched the TEST HARNESS's own
+  `__wseProdBootstrapped` sentinel and reported it as an app state leak — a false positive that
+  looks exactly like a real finding, in the one class of test where a false negative would be
+  dangerous. Cost a live-smoke debug cycle. Fixed by excluding `__`-prefixed keys, which is already
+  the de-facto convention for sentinels across these specs. Candidate improvement: standardise that
+  prefix explicitly in the test docs, or have the shared bootstrap helper own the sentinel so
+  individual specs never invent their own key.
+- 2026-08-23: `requestStorageAccess: Permission denied.` fires on a PLAIN live page load of the
+  deployed app in headless Chromium — the reCAPTCHA/App Check iframe asking for third-party storage
+  — so any production smoke asserting "no console errors" fails on it unless it filters. Worth
+  knowing before the next such test is written: the honest way to classify one of these is to probe
+  a bare `page.goto` with zero app interaction and see whether the error still appears, rather than
+  widening the filter until the test goes green.

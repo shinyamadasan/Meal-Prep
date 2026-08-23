@@ -4,6 +4,130 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-22 — "What should we eat?" merged and deployed (TASK-047, D-059) — a reversible D-032 `done`, not a red-zone hold
+
+The first wave in a while that changed no data path at all. `wave1-portion-truth` remains parked and
+untouched at `88b5598`.
+
+### What shipped — `wave-what-should-we-eat` → `main` (`ff35f1e`, `--no-ff`)
+
+Home already knew everything needed to answer "what should we eat?" — it just never combined it.
+`getReadyFoodSuggestions()` ranked cooked food (D-056), `getCookableRecipes()` knew what the pantry
+could support, `getExpirySuggestions()` knew what was about to spoil, `recipeEffortScore()` /
+`recipeActiveMinutes()` / `varietyPenalty()` knew effort and repetition (D-055), and
+`normalizeMealBalance()` knew protein/veg/carb. The user still had two overlapping cards and forty
+recipes, and still had to do the deciding.
+
+One helper now composes all of it — `getWhatShouldWeEatSuggestions()` — into at most three picks:
+**Eat this first** / **Easiest** / **Something different**, with reasons as chips and never a number.
+No parallel recommendation system, no AI, no learned ranking, and **no freshness boundary recomputed
+anywhere**. A test proves that structurally by stubbing `collectAttentionItems()`-adjacent inputs and
+asserting the expiry signal comes from the shared `getExpirySuggestions()` scan.
+
+### The finding that shaped the ranking
+
+Two weights were wrong on the first cut, and **tests caught both — not eyeballing the card**. That is
+the argument for keeping ranking in a pure function with no DOM access.
+
+**Shopping was priced as a weight, and it recommended a shopping trip over dinner.** At 2 points per
+missing ingredient, a no-cook, assembly-effort, minimal-cleanup recipe missing two items scored 5
+against 12 for an ordinary pan recipe you could actually cook. The framing was wrong: needing to shop
+is not a slightly-worse kind of effort, it happens *before* you can start and often means not eating
+tonight. Availability became a **tier** — anything cookable now beats anything that isn't, and the
+score only breaks ties inside a tier. It is also the more explainable shape, because "you have
+everything for this one" is the first reason a person actually wants to hear.
+
+**The expiry bonus at −3 lost to an easier rival's effort-plus-appliance edge**, contradicting the
+briefed priority order that puts expiry second only to availability. Raised to −8 and locked by a
+competing-reasons test.
+
+### Ranking, stated plainly
+Tier on availability, then an additive cost (lower better): expiry −8 · balance 0/2/4 · effort
+0/2/4/6 · hands-on time 0–4 · minimal-cleanup −2 · appliance 0–4 (+1 for juggling two devices) ·
+variety −1/0/+1/+2 as the tie-breaker. Effort reads **hands-on** minutes, not total: a 40-minute
+pressure-cooker recipe you walk away from beats a 20-minute pan recipe you stand over, with a test
+asserting that exact inversion.
+
+### Honesty by omission
+Each rule has its own test. No ready food → no "Eat this first". Nothing with `recipeEffortScore()
+<= 2` → no "Easiest", because mislabelling a normal cook is a lie the user notices once. Empty
+`cookHistory` → no "Something different", because with no history everything is equally new and the
+reason would be fabricated. One or two picks is a valid answer; zero hides the card entirely.
+
+A material Phase-1 finding shaped every default: **none of the 26 seeded recipes carry any D-055
+metadata**. Undeclared appliance scores the neutral middle, undeclared balance is neither rewarded
+nor condemned, and a test loads a pre-D-055 save to prove a legacy recipe ranks sensibly instead of
+being buried — and gets no completion hint invented from balance data it doesn't have.
+
+### Why this was NOT red zone
+The wave writes nothing. The diff against `main` greps clean for `saveData(`, `saveToFirestore`,
+`cloudReady`, `AppState.deletions`, `snapshotIdBaseline`, `tombstone`, `onAuthStateChanged`,
+`serviceWorker`, `showNotification` and `FOOD_ALERTS_KEY`, and adds no `AppState.<key> =` assignment.
+Zero new persisted state — no `AppState` key, no localStorage key, nothing in `mealPrepAppData`.
+Under D-032 that is the reversible `done` gate: a broken ranking is a bad suggestion the user ignores
+and a one-commit revert, not lost data. Landed on the operator's explicit approval.
+
+A test hammers the read path — rank, build candidates, render the card, render the dashboard twice —
+and asserts pantry, cooked meals, grocery list, deletions, cook history and the D-058
+`mealPrepFoodAlerts` ledger are byte-identical afterwards. **Displaying a recommendation consumes
+nothing.**
+
+### Merge-time finding, checked rather than assumed
+`origin/main` had advanced one commit since the branch was cut: `b488750 replies: cleared after send`
+— the n8n reply-relay clearing `captures/replies/OUTBOX.md` after sending the notifications-wave
+Telegram summary, exactly as `captures/replies/README.md` documents. Verified docs-only with **zero
+file overlap** against the wave's diff before proceeding. Local `main` was fast-forwarded; the branch
+was merged `--no-ff` **unrebased**, and `git diff wave-what-should-we-eat main` over the wave's files
+is empty — the approved commits landed byte-for-byte as reviewed.
+
+### Deployment verified, not assumed
+Pages deployment succeeded for `ff35f1ed923af55b9915d81c40ad0597b57d9546` = final `main` at merge
+time. All five served assets were fetched and compared against the committed blobs (LF-normalised,
+since the local checkout is CRLF): `app.js`, `style.css`, `index.html`, `sw.js`, `manifest.json` all
+**MATCH**, and the deployed `app.js` carries every new symbol.
+
+### Test evidence
+- `tests/what-should-we-eat.spec.js` — 26 passed
+- `tests/production-smoke-what-should-we-eat.spec.js` — **10/10 against the live deployment**
+- Full suite on final `main` — **219 passed, 4 skipped, 0 failed**
+
+Two production-smoke failures on the first live run were **test artifacts, diagnosed rather than
+waved away**: the "no persisted state" check was matching the spec's own `__wseProdBootstrapped`
+sentinel, and `requestStorageAccess: Permission denied.` was proven environmental by probing a plain
+live page load with zero wave interaction (it is the reCAPTCHA/App Check iframe asking for
+third-party storage in headless). Both filters were narrowed precisely rather than broadened to hide
+real errors.
+
+### Pre-existing live-smoke flake — flagged again, still not absorbed
+A single live-site production smoke fails per full-suite run, a **different test each time**, and
+passes in isolation. This session: `production-smoke-ready-food.spec.js:212` on one run,
+`production-smoke-kitchen-truth.spec.js:386` on another — the latter then passing **11/11** on its
+own — and neither recurring on the final run. These specs hit the *deployed* site, so they can never
+be evidence about a branch under review. Already logged in `docs/AI_OS_NOTES.md` with candidate
+fixes. Deliberately left alone rather than folded into an unrelated wave.
+
+### Known follow-up — recorded, deliberately NOT fixed
+**Home now carries three suggestion surfaces**: the new decision card plus the two older cards it
+summarises. That is real redundancy and the one place this wave arguably works against its own UX
+goal. It was kept on purpose — the existing cards' tests assert their presence *and* relative order,
+and the brief said not to redesign Home. **Dogfood the new card first.** If it proves sufficient, a
+later UX wave should consolidate or remove the redundant surfaces; that is a UI decision with its own
+test churn and belongs in its own wave.
+
+### Inherited / deferred, carried forward unchanged
+- Pantry ingredient matching remains substring-based (`"Rice"` matches `"Rice Vinegar"`) — pre-existing.
+- No shopping/grocery-planning expansion.
+- No portion-aware serving maths.
+- `wave1-portion-truth` remains parked at `88b5598`.
+- No persisted recommendation state; results are derived fresh every render.
+
+### Where we are
+The decision card is live. The next honest step is **using it for a week** — the redundancy question
+and any weight tuning should both be answered by dogfooding, not by another round of reasoning. The
+Android real-device check owed from TASK-046 (install the PWA, enable alerts, tap the notification,
+check the launcher badge) is still outstanding.
+
+---
 ## 2026-08-22 — Food attention notifications merged and deployed (TASK-046, D-058) — third owner-authorised D-032 red-zone merge
 
 A small feature wave that started by proving what the platform **cannot** do, and then built only
