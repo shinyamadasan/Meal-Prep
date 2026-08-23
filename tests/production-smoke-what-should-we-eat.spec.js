@@ -412,7 +412,12 @@ test('mobile Home has no horizontal overflow and no console errors', async ({ pa
     if (m.type() !== 'error') return;
     const t = m.text();
     // Firebase/App Check chatter on a signed-out first visit is expected here.
-    if (/Failed to load resource|net::ERR_|firebase|recaptcha|appcheck|permission-denied|requestStorageAccess/i.test(t)) return;
+    // `Framing 'https://www.google.com/' violates ... frame-ancestors` is the App Check
+    // reCAPTCHA challenge iframe, identified by URL rather than by the word recaptcha, so
+    // the older filter missed it. Intermittent: it fires only when App Check escalates to
+    // the visible challenge. A bare page.goto with zero app interaction reproduces the same
+    // family of App Check errors, so it is environmental, not app code. See AI_OS_NOTES.
+    if (/Failed to load resource|net::ERR_|firebase|recaptcha|appcheck|permission-denied|requestStorageAccess|frame-ancestors|google\.com/i.test(t)) return;
     errors.push('console: ' + t);
   });
 

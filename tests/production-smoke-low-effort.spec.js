@@ -144,8 +144,15 @@ test('low-effort quick filters work on the deployed site', async ({ page }) => {
   await expect(page.locator('#recipe-quick-filters .rq-chip').first()).toBeVisible();
   await expect(page.locator('#recipes-grid .recipe-card')).toHaveCount(4);
 
+  // Lowest effort is recipeEffortScore() <= 2 (assembly + very-low + low), the same
+  // gate Home's "Easiest" pick uses, ordered easiest-first. The legacy recipe with no
+  // metadata (60 min total) still does not qualify. See DECISIONS D-060.
   await page.locator('.rq-chip', { hasText: 'Lowest effort' }).click();
-  expect((await shown()).sort()).toEqual(['PS Lechon Manok Hack', 'PS Rice + Steamed Veg']);
+  expect(await shown()).toEqual([
+    'PS Lechon Manok Hack',        // assembly
+    'PS Rice + Steamed Veg',       // very-low
+    'PS Pressure Cooker Adobo'     // low
+  ]);
 
   await page.locator('.rq-chip', { hasText: 'Instant Pot' }).click();
   expect(await shown()).toEqual(['PS Pressure Cooker Adobo']);
