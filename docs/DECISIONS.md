@@ -809,3 +809,60 @@ Home was not touched. Its existing "Easiest" pick now lands on **Tuna Vegetable 
 Judgement calls worth naming: potatoes are counted as the carb in Sheet-Pan Chicken & Vegetables and Pressure Cooker Nilagang Baka, so both claim `carb: true` without a grain; Overnight Oats is the one recipe in the set that is not protein-forward and honestly declares `protein: false`; and "Lechon Manok (Ready-Roasted)" is a free-typed ingredient with no INGREDIENT_DB entry, which is supported but means it contributes no price or pantry alias until one is added.
 
 Risk gate: **outside D-032 red zone.** Seed content and tests only. No change to sync, tombstones, `saveData()`, the `cloudReady` write-guard, auth, the service worker, or notifications — and no change to any code path, only to the data `sampleRecipes` holds.
+
+## D-062 — Appliance FAMILIES, not appliance labels, decide the juggling penalty
+
+Task: `wave-cook-method-discovery`, third commit. Amends the `applianceFriction()` rule from D-059.
+
+`applianceFriction()` adds +1 when a recipe uses two appliances, because two devices means two things to run and two things to wash. D-059 already knew one slug pair was not really two devices and special-cased it inline: `eq.filter(id => id !== 'rice-cooker-steamer')`, on the grounds that a rice cooker with a steamer tray is one machine doing two jobs.
+
+The same is true of `instant-pot` and `pressure-cooker` — they are the same pot under two names — and that pair was never exempted. A user who ticks both in the editor (entirely reasonable: "either works") had their recipe scored as *harder* than one that ticked only one. No shipped recipe hits this, because the D-061 starter set deliberately declares a single appliance each, but every user recipe could.
+
+Decision: replace the one-off label filter with an explicit family map.
+
+```js
+var APPLIANCE_FAMILY = {
+  'rice-cooker-steamer': 'rice-cooker',
+  'pressure-cooker': 'instant-pot'
+};
+```
+
+The penalty now counts distinct *families*, not distinct slugs. Friction COST is untouched — a steamer combo still costs 2, an oven still costs 3 — only the "how many appliances is this really" question changed.
+
+Why a map rather than extending the filter, which would have been the smaller diff: the filter approach drops a label out of the count entirely, and that is wrong in the other direction. Filtering out `pressure-cooker` would mean `['pressure-cooker', 'oven']` — a genuine two-appliance recipe — counts as one appliance and loses a penalty it should pay. The family map keeps that case at +1 while fixing the equivalent-label case, so it is the only version of this change that does not trade one wrong answer for another.
+
+One case beyond the brief's ask changed as a consequence, and it is worth naming rather than burying: `['rice-cooker-steamer', 'oven']` previously escaped the penalty (the old filter removed the steamer slug, leaving a count of one) and now pays +1. That is a recipe using a rice cooker *and* an oven — genuinely two appliances — so the new answer is the correct one, but it is a ranking change nobody requested. No test asserted the old value; a test asserts the new one. Revert by dropping `'rice-cooker-steamer'` from the map if the old leniency was intentional.
+
+A focused regression test pins all of it: both Instant Pot labels tie with one, both rice-cooker labels tie with one, and `pan`+`oven`, `pressure-cooker`+`oven`, `rice-cooker-steamer`+`oven` all still pay the juggling +1. A second test asserts the ranking-level consequence — two recipes identical except that one declares both Instant Pot labels now score the same `parts.appliance`.
+
+Risk gate: **outside D-032 red zone.** Pure ranking arithmetic, no persisted state, no sync surface.
+
+
+## D-063 — The starter pack is opt-in and additive, because the first-run gate is right
+
+Task: `wave-cook-method-discovery`, third commit. Closes the delivery gap D-061 reported.
+
+D-061 added 14 low-effort recipes to `sampleRecipes` and had to end with a limitation: `ensureStarterRecipes()` is gated on `isFirstRun()`, so only a brand-new install ever receives seed content. Every existing install — including the owner's — would keep four visible, correct, empty cooking-method filters forever.
+
+The tempting fix is to loosen the gate: "only re-seed if the recipe is missing". That gate exists because an empty recipe list is a legitimate user choice, and re-injecting seeds over live data is the exact failure mode D-010 and the R2 rule were written to prevent. **The gate was not touched.** Instead, delivery became an explicit user action.
+
+**The surface.** One compact card on Cook, rendered from `renderRecipes()` into `#starter-pack-prompt`, sitting directly above the quick-filter row — so the offer is adjacent to the four chips reading `0` that it fills. Title "Low-effort starter recipes", one line of subtext, one `Add recipes` button. Not a modal, not fixed-position, nothing auto-added, and a test asserts both of those. The subtext states the count when the install is only partly missing the set ("10 low-effort starter recipes available") and names the methods when it is missing all of it.
+
+**What counts as missing.** `starterPackCandidates()` disqualifies an id for exactly two reasons, and the second is the one that matters:
+
+- **Already present.** Presence is a permanent skip. No comparison, no merge, no "the seed is newer" — the user may have renamed, rescaled or rewritten that recipe, and their copy wins unconditionally. A test edits recipe 31 beyond recognition, adds the pack, and asserts every edited field survives and no duplicate appears.
+- **Tombstoned.** `AppState.deletions` is the existing synced `id -> deletedAtISO` map and `recipes` is already one of the `TOMBSTONE_KEYS`, so deletion intent was fully detectable with **no change to sync or tombstone architecture** — which is what the brief asked to be verified before implementing. Re-offering a deleted recipe would undo a decision the user made; worse, adding it back with a fresh `updatedAt` would beat its tombstone under `applyTombstones()`' LWW comparison and resurrect it on *every* device. The pack reads that map and never writes it, and a test asserts the map is byte-identical after an add.
+
+The honest limit: `purgeOldTombstones()` forgets markers older than 180 days, so a starter recipe deleted longer ago than that becomes offerable again. That bound is deliberate in the sync design — defeating it would need a new persisted field, which this feature does not justify.
+
+**Duplicate protection is in the function, not the button.** `addStarterPackRecipes()` re-derives candidates on every call, so calling it three times in a row after a successful add is a no-op; a test drives the handler directly rather than clicking, because a guard that only exists in the UI is not a guard. Reload safety falls out of persistence: the added recipes are in storage, so they are present, so they are not candidates.
+
+**Persistence uses the existing path and nothing else.** Added recipes are deep copies (`JSON.parse(JSON.stringify(...))`) so `AppState` never holds a reference into the `sampleRecipes` constant — a test mutates an added recipe and asserts the seed is unchanged. Each copy is stamped with `updatedAt`, which is what tombstone LWW and the local-vs-cloud merge both read. Then `saveData()` — Hard Rule 5, localStorage and Firestore through the one save path.
+
+`patchMissingNutrition()` (Hard Rule 4) is called on **the new copies only**, not the whole list. Running it over `AppState.recipes` also stamps empty metadata defaults onto the user's own recipes, and a caught test failure is what surfaced that: adding a starter pack has no business rewriting anything the user made, even harmlessly.
+
+**Zero new state.** No new `AppState` key, no new localStorage key, no "pack seen" or "dismissed" flag — there is nothing to remember, because the prompt's visibility is derived entirely from whether anything is eligible. It retires itself. A test snapshots `Object.keys(AppState)`, the persisted payload's key set, and every localStorage key before and after, and asserts all three are unchanged.
+
+Deliberately not built, per the brief: no pack registry, no remote content, no downloadable packs, no versioning, no update/overwrite path, no automatic reseed. Adding a *second* pack later would need a real design; this is one list of ids and a presence check.
+
+Risk gate: **outside D-032 red zone** — but closer to it than the previous two commits, so worth stating precisely why. The feature reads `AppState.deletions` and writes only to `AppState.recipes` via the normal `saveData()` path. It does not modify `ensureStarterRecipes()`, `isFirstRun()`, the tombstone functions, the `cloudReady` write-guard, or any merge code. The one genuinely dangerous version of this feature — re-seeding automatically — is the version that was not built.

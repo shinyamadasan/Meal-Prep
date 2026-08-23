@@ -3382,6 +3382,127 @@ function renderRecipeMetaStrip(recipe) {
     '</div>';
 }
 
+// ── Low-effort starter pack: opt-in, additive, never automatic ───────────────
+// ensureStarterRecipes() seeds sampleRecipes on a BRAND-NEW install only, and
+// must stay that way — re-seeding a live install is how you overwrite someone's
+// data (D-010, and the R2 first-run gate). So an install that predates the
+// D-061 low-effort recipes has no way to get them. This is that way: a compact
+// prompt on Cook and one tap, adding only what is genuinely absent.
+//
+// Deliberately NOT built: a pack registry, remote content, versioning, an
+// update/overwrite path, or any automatic reseed. It adds missing recipes once
+// and then stops offering.
+
+// The ids of the D-061 starter set. Listed explicitly rather than derived from
+// "id > 26" so a future seeded recipe does not silently join the pack.
+var STARTER_PACK_IDS = [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40];
+
+// Which starter recipes this install is genuinely missing.
+//
+// Two things disqualify an id, and both matter:
+//   ALREADY PRESENT — the user may have edited it. Their copy wins, always. We
+//     never compare, merge, or overwrite on an id match; presence alone is a
+//     permanent skip.
+//   TOMBSTONED — AppState.deletions holds `id -> deletedAtISO` for everything
+//     the user has deleted, and `recipes` is one of the TOMBSTONE_KEYS. Deleting
+//     a starter recipe is a decision; re-offering it would undo that decision.
+//     Worse, adding it back with a fresh updatedAt would beat its tombstone
+//     under applyTombstones()' LWW rule and resurrect it across every device.
+//
+// Note the one honest limit: purgeOldTombstones() drops markers older than 180
+// days, so a recipe deleted longer ago than that becomes offerable again. That
+// bound is deliberate in the sync design and is not worth a new field to defeat.
+function starterPackCandidates() {
+  var present = {};
+  (AppState.recipes || []).forEach(function(r) {
+    if (r && r.id != null) present[String(r.id)] = true;
+  });
+  var deleted = AppState.deletions || {};
+
+  return STARTER_PACK_IDS.filter(function(id) {
+    var key = String(id);
+    return !present[key] && !deleted[key];
+  }).map(function(id) {
+    var key = String(id);
+    return sampleRecipes.find(function(s) { return String(s.id) === key; });
+  }).filter(Boolean);
+}
+
+// One tap. Adds the missing starter recipes and nothing else.
+function addStarterPackRecipes() {
+  var missing = starterPackCandidates();
+  if (!missing.length) {          // nothing eligible — re-render so the prompt goes
+    renderStarterPackPrompt();
+    return;
+  }
+
+  var stampedAt = new Date().toISOString();
+  var added = missing.map(function(source) {
+    // Deep copy: AppState must never hold a reference into the sampleRecipes
+    // constant, or editing the added recipe would mutate the seed data.
+    var copy = JSON.parse(JSON.stringify(source));
+    // updatedAt is what applyTombstones() compares against, and what the
+    // local-vs-cloud merge uses. An added recipe is a local change now.
+    copy.updatedAt = stampedAt;
+    return copy;
+  });
+
+  // Hard Rule 4, scoped to the NEW copies only. Running it over the whole list
+  // would also stamp empty metadata defaults onto the user's own recipes, and
+  // adding a starter pack has no business rewriting anything the user made.
+  patchMissingNutrition(added);
+  added.forEach(function(r) { AppState.recipes.push(r); });
+
+  saveData(); // Hard Rule 5 — localStorage AND Firestore, via the one save path
+
+  renderRecipes();                         // redraws the prompt and the quick filters
+  renderRecipeSelectionGrid();
+  showStarterPackAdded(missing.length);
+}
+
+function showStarterPackAdded(count) {
+  var el = document.getElementById('starter-pack-prompt');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="sp-card sp-card--done" role="status">' +
+      '<div class="sp-text">' +
+        '<div class="sp-title">' + count + ' recipe' + (count === 1 ? '' : 's') + ' added</div>' +
+        '<div class="sp-sub">Try the <b>Rice cooker</b>, <b>Oven</b>, <b>Instant Pot</b> and ' +
+          '<b>No-cook</b> filters below.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderStarterPackPrompt() {
+  var el = document.getElementById('starter-pack-prompt');
+  if (!el) return;
+
+  var missing = starterPackCandidates();
+  // Nothing left to add — the prompt retires itself. No dismiss button and no
+  // "seen" flag: there is nothing to remember once the offer is empty.
+  if (!missing.length) {
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  var all = missing.length === STARTER_PACK_IDS.length;
+  var sub = all
+    ? 'Rice cooker, oven, Instant Pot and no-cook ideas are available.'
+    : missing.length + ' low-effort starter recipe' + (missing.length === 1 ? '' : 's') + ' available.';
+
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="sp-card">' +
+      '<div class="sp-text">' +
+        '<div class="sp-title">Low-effort starter recipes</div>' +
+        '<div class="sp-sub">' + sub + '</div>' +
+      '</div>' +
+      '<button type="button" class="btn btn--primary btn--sm sp-add" onclick="addStarterPackRecipes()">' +
+        'Add recipes</button>' +
+    '</div>';
+}
 // ── Quick filters: "easiest thing" and "this appliance", one tap from Cook ────
 // One chip at a time, on top of (not instead of) the existing search, category,
 // time and favourites filters. Transient view state — deliberately not on
@@ -3658,16 +3779,32 @@ function lowestFrictionEquipment(recipe) {
   return best;
 }
 
+// Some slugs are two names for one physical appliance. Counting them as two
+// devices charges a juggling penalty for a chore nobody actually does:
+//   rice-cooker-steamer  is one rice cooker doing two jobs
+//   pressure-cooker      is the same pot as instant-pot, under another name
+// Collapsing to a family is the honest count. It deliberately does NOT change
+// friction COST (a steamer combo still costs 2) — only how many appliances a
+// recipe is judged to use. See DECISIONS D-062.
+var APPLIANCE_FAMILY = {
+  'rice-cooker-steamer': 'rice-cooker',
+  'pressure-cooker': 'instant-pot'
+};
+
+function applianceFamilyCount(eq) {
+  var seen = {};
+  (eq || []).forEach(function(id) { seen[APPLIANCE_FAMILY[id] || id] = true; });
+  return Object.keys(seen).length;
+}
+
 function applianceFriction(recipe) {
   var eq = (recipe && recipe.equipment) || [];
   if (!eq.length) return APPLIANCE_FRICTION_UNKNOWN;
   var best = lowestFrictionEquipment(recipe);
   var cost = best ? APPLIANCE_FRICTION[best] : APPLIANCE_FRICTION_UNKNOWN;
-  // Juggling two separate appliances is its own chore and its own washing up.
-  // A rice-cooker-steamer is ONE device doing two jobs, so it never counts as a
-  // second appliance.
-  var distinct = eq.filter(function(id) { return id !== 'rice-cooker-steamer'; });
-  if (distinct.length >= 2) cost += 1;
+  // Juggling two genuinely different appliances is its own chore and its own
+  // washing up. Two labels for one appliance are not two appliances.
+  if (applianceFamilyCount(eq) >= 2) cost += 1;
   return cost;
 }
 
@@ -3990,6 +4127,7 @@ function isSampleRecipe(r) {
 function renderRecipes() {
   renderGettingStarted();
   renderCookSuggestions();
+  renderStarterPackPrompt();
   renderRecipeQuickFilters();
   const recipesGrid = document.getElementById('recipes-grid');
   const searchTerm = document.getElementById('recipe-search').value.toLowerCase();
