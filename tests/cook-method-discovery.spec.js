@@ -382,14 +382,30 @@ test.describe('built-in recipe metadata', () => {
       withEquipment: sampleRecipes.filter((r) => (r.equipment || []).length).length,
       withEffort: sampleRecipes.filter((r) => r.effort).length,
       withActive: sampleRecipes.filter((r) => r.activeTime != null).length,
+      withNutrition: sampleRecipes.filter((r) => r.nutritionPerServing.calories > 0).length,
+      uniqueIds: new Set(sampleRecipes.map((r) => String(r.id))).size,
       activeNeverExceedsTotal: sampleRecipes.every(
         (r) => r.activeTime <= r.basePrepTime + r.baseCookTime)
     }));
-    expect(audit.total).toBe(26);
-    expect(audit.withEquipment).toBe(26);
-    expect(audit.withEffort).toBe(26);
-    expect(audit.withActive).toBe(26);
+    expect(audit.total).toBe(40);       // 26 original + 14 low-effort starters
+    expect(audit.withEquipment).toBe(40);
+    expect(audit.withEffort).toBe(40);
+    expect(audit.withActive).toBe(40);
+    expect(audit.withNutrition).toBe(40);
+    expect(audit.uniqueIds).toBe(40);
     expect(audit.activeNeverExceedsTotal).toBe(true);
+  });
+
+  test('the original 26 Filipino recipes were not retagged to populate filters', async ({ page }) => {
+    await loadLocalApp(page);
+    // Ids 1-26 are the pre-existing stovetop book. They were backfilled with
+    // truthful `pan` metadata in the previous commit and must not have been
+    // quietly re-labelled oven/rice-cooker to make a chip look populated.
+    const retagged = await page.evaluate(() => sampleRecipes
+      .filter((r) => Number(r.id) <= 26)
+      .filter((r) => r.equipment.length !== 1 || r.equipment[0] !== 'pan')
+      .map((r) => r.name + ' -> ' + r.equipment.join(',')));
+    expect(retagged).toEqual([]);
   });
 
   test('14: the backfilled recipes appear under Pan and Lowest effort', async ({ page }) => {
@@ -422,12 +438,20 @@ test.describe('built-in recipe metadata', () => {
     const rows = await page.evaluate(() =>
       Array.from(document.querySelectorAll('#recipes-grid .recipe-title')).map((e) => {
         const r = AppState.recipes.find((x) => x.name === e.textContent.trim());
-        return { name: r.name, active: r.activeTime, total: recipeTotalMinutes(r) };
+        return { name: r.name, active: r.activeTime, total: recipeTotalMinutes(r),
+                 rank: recipeEffortScore(r) };
       }));
     expect(rows.length).toBeGreaterThan(3);
 
-    // Hands-on minutes never decrease down the list.
+    // Declared effort is the primary key and never goes backwards: an assembly
+    // meal outranks a very-low cook outranks a low one.
     for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].rank, `${rows[i].name} after ${rows[i - 1].name}`)
+        .toBeGreaterThanOrEqual(rows[i - 1].rank);
+    }
+    // Inside one effort tier, hands-on minutes never decrease.
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].rank !== rows[i - 1].rank) continue;
       expect(rows[i].active, `${rows[i].name} after ${rows[i - 1].name}`)
         .toBeGreaterThanOrEqual(rows[i - 1].active);
     }
@@ -437,19 +461,159 @@ test.describe('built-in recipe metadata', () => {
     expect(beatsOnTotal).toBe(true);
   });
 
-  test('the backfill invents no appliance the recipes do not describe', async ({ page }) => {
+  test('no recipe claims an appliance its own instructions do not describe', async ({ page }) => {
     await loadLocalApp(page);
-    // Every seeded recipe is an explicitly stovetop Filipino dish. If a future
-    // edit claims an oven or rice cooker, its instructions must say so.
+    // A method claim is only honest if the recipe TELLS you how it is cooked in
+    // that appliance. This is the guard against padding a filter with recipes
+    // that merely "could" be made that way.
     const suspicious = await page.evaluate(() => sampleRecipes.filter((r) => {
       const i = (r.instructions || '').toLowerCase();
       const eq = r.equipment || [];
       if (eq.includes('oven') && !/oven|bake|roast/.test(i)) return true;
       if (eq.some((e) => e.indexOf('rice-cooker') === 0) && !/rice cooker/.test(i)) return true;
+      if (eq.includes('instant-pot') && !/instant pot/.test(i)) return true;
+      if (eq.includes('pressure-cooker') && !/pressure cooker/.test(i)) return true;
       if (eq.includes('no-cook') && /fry|boil|simmer|saut/.test(i)) return true;
       return false;
-    }).map((r) => r.name));
+    }).map((r) => r.name + ' -> ' + r.equipment.join(',')));
     expect(suspicious).toEqual([]);
+  });
+
+  test('a rice-cooker-steamer recipe actually uses the steamer basket', async ({ page }) => {
+    await loadLocalApp(page);
+    const missing = await page.evaluate(() => sampleRecipes
+      .filter((r) => r.equipment.includes('rice-cooker-steamer'))
+      .filter((r) => !/steamer/.test((r.instructions || '').toLowerCase()))
+      .map((r) => r.name));
+    expect(missing).toEqual([]);
+  });
+});
+
+// ── The starter set: every method chip returns real recipes out of the box ───
+
+test.describe('shipped recipe book populates every cooking method', () => {
+  test.use({ viewport: { width: 1280, height: 1600 } });
+
+  // The wave this set exists to close: on the previous commit these four chips
+  // were visible, correct, and empty. Each must now return usable recipes with
+  // no setup, no import, and no editing.
+  const EXPECTED = [
+    { label: 'Rice cooker', min: 4, slugs: ['rice-cooker', 'rice-cooker-steamer'] },
+    { label: 'Oven', min: 4, slugs: ['oven'] },
+    { label: 'Instant Pot', min: 3, slugs: ['instant-pot', 'pressure-cooker'] },
+    { label: 'No-cook', min: 3, slugs: ['no-cook'] }
+  ];
+
+  for (const { label, min, slugs } of EXPECTED) {
+    test(`${label} returns real recipes on a fresh install`, async ({ page }) => {
+      await loadLocalApp(page);
+      await gotoCook(page);
+
+      const c = page.locator(chip(label)).first();
+      // No longer muted — it has content behind it.
+      await expect(c).not.toHaveClass(/is-empty/);
+      const count = Number(await c.locator('.rq-count').innerText());
+      expect(count).toBeGreaterThanOrEqual(min);
+
+      await c.click();
+      await page.waitForTimeout(300);
+      const names = await visibleNames(page);
+      expect(names).toHaveLength(count);
+
+      // Every recipe shown genuinely declares one of this chip's slugs.
+      const bad = await page.evaluate(({ names, slugs }) => names.filter((n) => {
+        const r = AppState.recipes.find((x) => x.name === n);
+        return !r || !r.equipment.some((e) => slugs.includes(e));
+      }), { names, slugs });
+      expect(bad).toEqual([]);
+    });
+  }
+
+  test('the Rice + steamer refinement is now populated too', async ({ page }) => {
+    await loadLocalApp(page);
+    await gotoCook(page);
+    const c = page.locator(chip('Rice + steamer'));
+    await expect(c).toBeVisible();
+    await c.click();
+    await page.waitForTimeout(300);
+    const names = await visibleNames(page);
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    const allSteamer = await page.evaluate((n) => n.every((x) =>
+      AppState.recipes.find((y) => y.name === x).equipment.includes('rice-cooker-steamer')), names);
+    expect(allSteamer).toBe(true);
+  });
+
+  test('Lowest effort is a mix of methods, not just the old stovetop book', async ({ page }) => {
+    await loadLocalApp(page);
+    await gotoCook(page);
+    await page.locator(chip('Lowest effort')).click();
+    await page.waitForTimeout(300);
+
+    const rows = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#recipes-grid .recipe-title')).map((e) => {
+        const r = AppState.recipes.find((x) => x.name === e.textContent.trim());
+        return { name: r.name, eq: r.equipment, effort: r.effort, active: r.activeTime,
+                 rank: recipeEffortScore(r) };
+      }));
+
+    // More than one cooking method is represented.
+    const methods = new Set(rows.flatMap((r) => r.eq));
+    expect(methods.size).toBeGreaterThan(1);
+    expect(methods.has('pan')).toBe(true);
+
+    // The genuinely effortless new recipes sort ABOVE the old stovetop ones —
+    // that is the whole point of the ordering.
+    const top5 = rows.slice(0, 5);
+    expect(top5.some((r) => !r.eq.includes('pan'))).toBe(true);
+    expect(top5.every((r) => r.effort === 'assembly' || r.effort === 'very-low')).toBe(true);
+
+    // Declared effort never goes backwards, and inside a tier the hands-on
+    // minutes never decrease.
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].rank, `${rows[i].name} after ${rows[i - 1].name}`)
+        .toBeGreaterThanOrEqual(rows[i - 1].rank);
+      if (rows[i].rank === rows[i - 1].rank) {
+        expect(rows[i].active, `${rows[i].name} after ${rows[i - 1].name}`)
+          .toBeGreaterThanOrEqual(rows[i - 1].active);
+      }
+    }
+  });
+
+  test('the starter set is protein + vegetables + carb where it claims to be', async ({ page }) => {
+    await loadLocalApp(page);
+    // A mealBalance claim must be supported by an ingredient of that kind.
+    const unsupported = await page.evaluate(() => sampleRecipes
+      .filter((r) => Number(r.id) > 26)
+      .filter((r) => {
+        const cats = r.baseIngredients.map((i) => i.category);
+        if (r.mealBalance.protein && cats.indexOf('Protein') < 0) return true;
+        if (r.mealBalance.vegetables && cats.indexOf('Vegetable') < 0) return true;
+        if (r.mealBalance.carb && cats.indexOf('Grain') < 0 &&
+            !r.baseIngredients.some((i) => /potato/i.test(i.name))) return true;
+        return false;
+      }).map((r) => r.name));
+    expect(unsupported).toEqual([]);
+  });
+
+  test('the starter set is genuinely low-friction: no normal-effort recipe in it', async ({ page }) => {
+    await loadLocalApp(page);
+    const audit = await page.evaluate(() => {
+      const nu = sampleRecipes.filter((r) => Number(r.id) > 26);
+      return {
+        count: nu.length,
+        normalEffort: nu.filter((r) => r.effort === 'normal').map((r) => r.name),
+        // One appliance each. rice-cooker-steamer is one device doing two jobs.
+        multiAppliance: nu.filter((r) => r.equipment.length > 1).map((r) => r.name),
+        maxActive: Math.max(...nu.map((r) => r.activeTime)),
+        maxIngredients: Math.max(...nu.map((r) => r.baseIngredients.length))
+      };
+    });
+    expect(audit.count).toBe(14);
+    expect(audit.normalEffort).toEqual([]);
+    expect(audit.multiAppliance).toEqual([]);
+    expect(audit.maxActive).toBeLessThanOrEqual(15);
+    // "Avoid complicated foodie recipes with 20 ingredients."
+    expect(audit.maxIngredients).toBeLessThanOrEqual(10);
   });
 });
 
@@ -491,6 +655,35 @@ test.describe('Home "Easiest" after the backfill', () => {
     const chips = await row.locator('.wse-chip').allInnerTexts();
     expect(chips.length).toBeGreaterThan(0);
     expect(chips.join(' · ')).toMatch(/min active/);
+  });
+
+  test('pantry state can surface a starter-set recipe as Easiest', async ({ page }) => {
+    await loadLocalApp(page);
+    // Stock exactly what the rice-cooker mushroom rice needs. getCookableRecipes()
+    // then tiers it as cook-now, and the ranking should land on it — proving the
+    // new recipes reach the existing recommendation through the normal path, not
+    // just by being alphabetically lucky on an empty pantry.
+    const pick = await page.evaluate(() => {
+      AppState.pantry = ['Chicken Thigh', 'Mushroom', 'White Rice (Bigas)', 'Water',
+        'Soy Sauce (Toyo)', 'Garlic (Bawang)', 'Sesame Oil', 'Green Onion (Sibuyas Dahon)']
+        .map((n, i) => ({ id: 'p' + i, name: n, quantity: 1, unit: 'pc', category: 'Pantry' }));
+      const picks = getWhatShouldWeEatSuggestions();
+      const e = picks.find((p) => p.label === 'Easiest');
+      const cand = eatCookCandidates()[0];
+      return e ? {
+        name: e.name, reasons: e.reasons,
+        pantryInformed: cand.pantryInformed, missing: cand.missing
+      } : null;
+    });
+
+    expect(pick).toBeTruthy();
+    expect(pick.name).toBe('Rice Cooker Chicken Mushroom Rice');
+    expect(pick.reasons.join(' · ')).toContain('Rice cooker');
+    expect(pick.reasons.join(' · ')).toContain('8 min active');
+    // It won on the cook-now tier, not despite needing a shop. ("Have everything"
+    // is a real reason but falls outside the card's existing 4-chip cap here.)
+    expect(pick.pantryInformed).toBe(true);
+    expect(pick.missing).toBe(0);
   });
 
   test('no new Home card was added', async ({ page }) => {
