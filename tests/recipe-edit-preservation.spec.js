@@ -28,7 +28,12 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  // Condition, not clock. See AI_OS_NOTES 2026-08-23.
+  await page.waitForFunction(
+    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
+          typeof saveToLocalStorage === 'function' && typeof renderRecipes === 'function',
+    null, { timeout: 30000 });
+  await page.waitForTimeout(300);
 }
 
 // A recipe carrying every category of property the form does NOT own.
@@ -155,7 +160,13 @@ test('preserved properties survive a save and reload', async ({ page }) => {
   await renameViaForm(page, 'rich-1', 'Reloaded Adobo');
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  // Wait for the RESTORED recipe specifically. A fixed wait could read mid-init, when the
+  // list is empty or freshly re-seeded, and report the edit as lost.
+  await page.waitForFunction(
+    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
+          AppState.recipes.some((x) => String(x.id) === 'rich-1'),
+    null, { timeout: 30000 });
+  await page.waitForTimeout(300);
 
   const after = await page.evaluate(() => {
     const r = AppState.recipes.find((x) => String(x.id) === 'rich-1');

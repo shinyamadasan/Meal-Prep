@@ -25,7 +25,13 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  // Condition, not clock: a fixed wait fires mid-init on a slow runner and the test then
+  // mutates state that init overwrites. See AI_OS_NOTES 2026-08-23.
+  await page.waitForFunction(
+    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
+          typeof saveData === 'function' && typeof renderCookedMeals === 'function',
+    null, { timeout: 30000 });
+  await page.waitForTimeout(300);
 }
 
 // Local calendar date N days ago — daysLeftFrom()/todayISO() work in local time.
@@ -269,7 +275,9 @@ test('the Landers lechon manok workflow works with no special-case code', async 
   await page.locator('#manual-cooked-fridge-life').fill('3');
   await page.locator('#manual-cooked-freezer-life').fill('60');
   await page.locator('#manual-cooked-modal .btn--primary').click();
-  await page.waitForTimeout(500);
+  // Wait for the meal to actually exist rather than for 500ms to elapse.
+  await page.waitForFunction(() => (AppState.cookedMeals || []).length === 1,
+    null, { timeout: 30000 });
 
   let state = await page.evaluate(() => {
     const m = AppState.cookedMeals[0];
