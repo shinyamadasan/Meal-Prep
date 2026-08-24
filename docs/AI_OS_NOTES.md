@@ -162,3 +162,11 @@
   list of prod specs would rot silently, so `tests/suite-classification.spec.js` fails the LOCAL
   suite if any spec containing the deployed URL is not classified as prod. A classification that
   isn't enforced is a comment.
+- 2026-08-24: a verification harness that cannot fail is not evidence. Proving the docs-check fix,
+  the first harness extracted the PowerShell block to a file written as UTF-8 *without a BOM*;
+  Windows PowerShell 5.1 then misdecoded the em-dash and emoji, the block failed to parse — and the
+  harness still reported "downstream reached", because a parse error in a dot-sourced file is
+  non-fatal. Three consecutive green runs proved nothing. The tell was that no WARN had reached the
+  log even though the branch had supposedly executed. Two rules worth keeping: write .ps1 files for
+  PS 5.1 with a BOM when they contain non-ASCII, and when a proof passes on the first attempt,
+  deliberately break it once to confirm it can go red.

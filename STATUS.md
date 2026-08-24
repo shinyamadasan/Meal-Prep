@@ -4,6 +4,86 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-24 — Test-infrastructure trust merged (TASK-049, D-065) — the wave where the brief's root cause was wrong
+
+`wave-test-infra-trust` → `main` (`a067b8c`, `--no-ff`, unrebased). Infrastructure only: the diff
+against `a292206` for `app.js`, `index.html`, `style.css`, `sw.js` and `manifest.json` is **empty**.
+`wave1-portion-truth` remains parked at `88b5598`.
+
+### Check the premise first
+
+The brief stated the overnight automation halted because it invoked `Check-DocsConsistency.ps1`
+instead of `.\tools\Check-DocsConsistency.ps1`. It did not, and never had. `run-claude.ps1` uses a
+full path, the line is byte-identical to the halting commit, and it runs correctly under both
+Windows PowerShell 5.1 — which is what the scheduled task actually invokes — and pwsh 7.
+
+The error message was then *attributed* rather than assumed: only a bare-name call produces
+`'Check-DocsConsistency.ps1'`; an empty variable produces `'\tools\…'`; a missing file produces the
+full path. No bare-name call exists anywhere in the repo. **The halt is not reproducible from HEAD
+and its trigger is still unknown** — logged as an open item, not quietly "fixed".
+
+Ten minutes of checking prevented editing correct code, and pointed at the real defect one line
+below: the block's own comment promised *"Non-fatal … it never halts automation"* and then ended in
+`catch { Halt-Automation … }`. **A docs-drift report took down the entire overnight run.** A check
+that cannot fail safely is worse than no check.
+
+Phase 3b now resolves the path once, tests existence explicitly, and warns-and-continues on both
+failure paths. Proven under the scheduler's own PS 5.1 invocation across four cases — checker
+present, checker absent, checker throws, and a **reproduction of the exact 2026-08-23 bare-name
+error**. All four reach downstream work, none halts, and the failures surface a WARN in both
+`claude-session.log` and `DIGEST.md`.
+
+### One number was answering two questions
+
+`npm test` ran 31 spec files together: 21 load `index.html` from the checkout, 10 fetch the deployed
+site. A branch's "full suite" therefore partly measured whatever was already **deployed**, and
+network latency read as regressions — three CI investigations during the previous wave were spent on
+that noise.
+
+Now two Playwright projects: `npm test` == `test:local` is the deterministic offline branch gate
+(230 tests, ~58s); `test:prod` is the post-deploy gate (81). CI runs local **first**, so a real
+regression surfaces in about a minute instead of after a 90s Pages sleep, then keeps the sleep and
+runs prod. Nothing stopped being verified.
+
+The prod set is an explicit list, because three live-site specs predate the `production-smoke-*`
+convention. An explicit list rots, so `tests/suite-classification.spec.js` fails the local suite if
+any spec is filed in the wrong gate. A classification that isn't enforced is a comment.
+
+### The wait audit was an audit
+
+All 16 remaining `waitForTimeout(2500)` calls were classified before anything was edited. Every one
+sat after a `goto` or `reload` — initialisation. None waited on network (local specs abort
+`**/firebasejs/**`), none was intentional UX timing. There was no category to preserve, so nothing
+was preserved; that is a finding, not a shortcut. Replaced by one shared readiness condition —
+`AppState.recipes` present, `saveData` defined, `#dashboard` rendered — deliberately **not**
+`recipes.length > 0`, because several specs boot a zero-recipe document on purpose.
+
+Diff across those 9 specs: exactly 16 wait replacements plus 9 requires. No assertion touched. Local
+suite ~2.4 min → ~59s.
+
+### The near-miss worth remembering
+
+The first attempt to prove the automation fix wrote the extracted block to a file **without a UTF-8
+BOM**. PowerShell 5.1 then misdecoded the em-dash and emoji, the block failed to parse — and the
+harness still printed "downstream reached", because a parse error in a dot-sourced file is
+non-fatal. Three runs of green nonsense. Caught only by noticing no WARN had reached the log despite
+the branch supposedly executing. **A test that cannot fail is not evidence**; when a proof passes
+first try, check that its failure mode actually fails.
+
+### Numbers
+
+`test:local` 230 passed · `test:prod` 77 passed / 4 skipped · `npm test` 230 passed ·
+suite-classification 6/6 · `Verify-Decisions.ps1` 7/7 · spec files 31 → 32, none deleted.
+
+### Next
+
+Nothing queued. Open items are recorded in TASKS.md and REVIEW.md rather than scheduled: the
+historical bare-name trigger is still unexplained; `Check-DocsConsistency` emits 16 mostly-noise
+findings and wants a precision pass; production tests inherently cannot validate an unmerged branch;
+shorter mid-test waits (500/600ms) were out of the audited class; and the three D-064-hardened specs
+keep their own condition helper.
+
+---
 ## 2026-08-23 (later) — Autonomous triage + plan run: 0 new captures, 0 unconverted BUILD_QUEUE items; PLAN.md un-staled
 
 Planning-only run. No app code touched, nothing built, nothing committed by this session.

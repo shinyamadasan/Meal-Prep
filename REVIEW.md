@@ -4,6 +4,99 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-049 — APPROVED (test-infrastructure trust, D-065) — D-032 `done`, operator-approved
+branch: wave-test-infra-trust @ 55f83c2 → main @ a067b8c (`--no-ff`, unrebased)
+verdict: approved — infrastructure only, outside the red zone
+date: 2026-08-24
+
+### The gate
+D-032 **`done`**. The wave changes the test harness, npm scripts, CI wiring, and one error-handling
+path in `run-claude.ps1`. `git diff a292206 HEAD -- app.js index.html style.css sw.js manifest.json`
+is **empty** — no product source at all, so there is no user-visible behaviour to revert. The one
+automation change strictly *reduces* blast radius: a path that used to halt the overnight run now
+warns and continues.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude from an operator brief. Review of Claude's own work, disclosed as in
+TASK-044 through TASK-048. The mitigating factor specific to this wave is that its central finding
+was that the **brief itself was wrong**, which is the opposite of the failure mode self-review
+usually risks.
+
+### The finding that defines this wave
+The brief asserted a root cause: the automation invoked `Check-DocsConsistency.ps1` instead of
+`.\tools\Check-DocsConsistency.ps1`. Verified false before any edit. `run-claude.ps1` has always
+used a full path; the line is byte-identical to the halting commit (`git diff 38c86cb HEAD --
+run-claude.ps1` is empty); and it runs correctly under both PowerShell 5.1 — which is what the
+scheduled task actually invokes — and pwsh 7.
+
+The message was then attributed experimentally rather than assumed. Only a bare-name call yields
+`'Check-DocsConsistency.ps1'`; an empty variable yields `'\tools\…'`; a missing file yields the full
+path. No bare-name call exists anywhere in the repo. **The halt is not reproducible from HEAD and
+its trigger remains unknown** — recorded as an open item rather than papered over.
+
+What *was* certain: the block's own comment read "Non-fatal … it never halts automation" and the
+next line was `catch { Halt-Automation … }`. A docs-drift report killed the whole overnight run.
+That contradiction is the defect, and fixing it is what actually makes the loop trustworthy.
+
+### What I checked
+
+**1. The automation fix is proven, not asserted.** Four cases run through the scheduler's own
+`powershell.exe -NonInteractive -ExecutionPolicy Bypass -File` path: checker present (16 findings,
+exit 1), checker absent, checker throws, and a **reproduction of the exact 2026-08-23 bare-name
+error**. All four reach downstream work; none halts; the three failure cases surface a WARN in both
+`claude-session.log` and `DIGEST.md`. The historical failure now degrades to a warning.
+
+Worth recording how that proof nearly went wrong: the first harness extracted the block to a file
+without a UTF-8 BOM, so PowerShell 5.1 misdecoded the em-dash and emoji and the block failed to
+parse — yet the harness still printed "downstream reached", because a parse error in a dot-sourced
+file is non-fatal. The first three runs were therefore **meaningless passes**. Caught by noticing
+that no WARN reached the log despite the branch supposedly executing. A test that cannot fail is
+not evidence.
+
+**2. The split is enforced, not documented.** An explicit `PROD_SPECS` list would rot silently, so
+`tests/suite-classification.spec.js` runs in the local project and fails if a spec containing the
+deployed URL is not classified prod, if a listed spec no longer touches the network, or if a listed
+file is missing. It also asserts every `tools/*.ps1` path `run-claude.ps1` references exists —
+catching the whole bad-invocation class rather than the one script — and that Phase 3b still
+contains its `Test-Path` and no `Halt-Automation`. Six tests, all reading files off disk, so the
+guard cannot itself be flaky.
+
+**3. Nothing stops being verified.** `npm test` narrowing to the local gate would be a regression if
+CI still ran only `npm test`. CI now runs `test:local` first, keeps the 90s Pages sleep, then runs
+`test:prod`. `playwright.config.js` was added to the workflow's `paths:` filter, since it decides
+what each gate runs.
+
+**4. The wait audit is an audit, not a sweep.** All 16 occurrences were classified before editing;
+all 16 were post-`goto`/`reload` initialisation. None waited on network (every local spec aborts
+`**/firebasejs/**`) and none was intentional UX timing, so nothing was retained — and the review
+checked that this was a finding rather than a convenience, by confirming no category-C wait existed
+to preserve. The readiness condition deliberately avoids `recipes.length > 0`, because several specs
+boot a zero-recipe document on purpose; it was verified against both a first-run boot and a
+saved-doc-with-no-recipes boot.
+
+**5. The diff is exactly what it claims.** Across the 9 specs: 16 removed `waitForTimeout(2500)`
+lines, 16 added `waitForAppReady(page)` lines, 9 added `require` lines. Nothing else. No assertion
+touched, no test deleted (31 spec files → 32).
+
+### One self-correction worth noting
+The first draft of D-065 backticked two test-only identifiers, which pushed `Check-DocsConsistency`
+from 16 findings to 18 — adding noise to the exact signal this wave exists to make trustworthy.
+Rephrased before commit; drift is back to the pre-existing 16.
+
+### Verification
+`test:local` 230 passed (repeated runs, ~58s) · `test:prod` 77 passed / 4 skipped · `npm test` 230
+passed, confirming it is the local gate · suite-classification 6/6 · `Verify-Decisions.ps1` 7/7
+(3 new pointers) · docs-consistency runs correctly under PS 5.1 and pwsh 7 · product source diff
+empty.
+
+### Carried forward, not fixed
+The root trigger of the historical bare-name error is still unknown. `Check-DocsConsistency` still
+emits 16 mostly-noise findings and needs its own precision pass. Production tests inherently cannot
+validate an unmerged branch. Shorter mid-test fixed waits (500/600ms) outside the audited 2500ms
+initialisation class were not examined. The three specs hardened in D-064 keep their own local
+condition helper rather than the new shared one. `wave1-portion-truth` remains parked at `88b5598`.
+
+---
 ## Review TASK-048 — APPROVED (cooking-method discovery, D-060..D-064) — D-032 `done`, operator-approved
 branch: wave-cook-method-discovery @ 5f3c342 → main @ 8e847c6 (`--no-ff`, unrebased)
 verdict: approved — reversible, outside the red zone

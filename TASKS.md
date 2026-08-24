@@ -3008,6 +3008,24 @@ merge gate:
   D-032 **`done`** — approved and reversible. Test harness, npm scripts, CI wiring and one
   automation error-handling path; no product source and no red-zone surface.
 
+landed:
+  Merged `--no-ff` at `a067b8c` on the operator's approval of `55f83c2`. Post-merge: CI runs the
+  local gate then the prod gate in the intended order; `npm test` is the local gate; the
+  docs-consistency phase was re-proven through the scheduler's own PowerShell 5.1 invocation.
+
+open items (recorded, deliberately NOT fixed):
+  - The root trigger of the historical bare-name `Check-DocsConsistency.ps1` error is still
+    unknown. The fix makes it non-fatal, which is a mitigation, not a diagnosis.
+  - `Check-DocsConsistency.ps1` still emits 16 findings that are almost entirely prose
+    false-positives (PowerShell/service-worker identifiers named in docs). It needs its own
+    precision pass; until then the drift warning is noise.
+  - Production tests inherently cannot validate an unmerged branch — they measure whatever is
+    deployed. The split stops that from being confusing; it cannot remove the limitation.
+  - Shorter mid-test fixed waits (500/600ms) outside the audited 2500ms initialisation class
+    were not examined.
+  - The three specs hardened in D-064 keep their own local condition helper rather than the new
+    shared one; re-pointing them is churn with no behavioural gain.
+
 ---
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
