@@ -342,8 +342,11 @@ test('no NaN and no runtime errors anywhere on the deployed site', async ({ page
   // `requestStorageAccess: Permission denied` comes from the real Firebase SDK
   // hitting Chromium's storage partitioning in a headless third-party context.
   // It is environmental, not app code, and does not occur in a normal browser.
+  // Same family, added 2026-08-23: `Framing 'https://www.google.com/' violates ...
+  // frame-ancestors` is the App Check reCAPTCHA challenge iframe, named by URL rather
+  // than by "recaptcha", so the older list missed it. Intermittent in CI.
   const appErrors = consoleErrors.filter(
-    (e) => !/net::ERR|Failed to load resource|favicon|requestStorageAccess/i.test(e)
+    (e) => !/net::ERR|Failed to load resource|favicon|requestStorageAccess|frame-ancestors|google\.com/i.test(e)
   );
   expect(appErrors).toEqual([]);
 });
