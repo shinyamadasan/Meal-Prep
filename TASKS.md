@@ -2923,6 +2923,23 @@ merge gate:
   additive opt-in action; no red-zone surface is touched. Landed `--no-ff` at `8e847c6` on the
   operator's explicit approval of `5f3c342`.
 
+post-merge (CI caught what the pre-merge suite structurally could not):
+  - `production-smoke-low-effort.spec.js` still asserted the OLD `Lowest effort` contract
+    (`recipeEffortScore() <= 1`). I updated its local twin during the wave and missed this
+    production-smoke copy. It runs against the DEPLOYED site, so it could not fail until the
+    merge actually shipped the new gate — which is exactly why the pre-merge suite was green.
+    Fixed at `b31e035`, and made stricter: it now asserts the full easiest-first ORDER rather
+    than a sorted set.
+  - All four production smokes shared a console-error filter that missed the App Check reCAPTCHA
+    iframe (`Framing 'https://www.google.com/' violates ... frame-ancestors`), named by URL
+    rather than by "recaptcha". Verified environmental via three bare `page.goto` loads with
+    zero app interaction. Widened in all four at `b31e035` and `34cd3a8`.
+  - One CI run (`b31e035`) failed two LOCAL specs — `ready-food-home.spec.js:253` and
+    `ready-food-portions.spec.js:307` — that pass locally on every run (3× 224/224 after the
+    fact) and did not fail in the two CI runs before it on the same code. Unreproduced; assessed
+    as CI-environment timing flakiness, not a regression, but NOT proven. `Button tests` has
+    failed intermittently on `main` before this wave (8fbf89d, 352a799, 9007d4e).
+
 ---
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->

@@ -127,3 +127,15 @@
   the same recipe count it expected. Guard the clear behind a one-time sentinel key; and if the
   spec also asserts "no unexpected localStorage keys", pick a sentinel name the assertion's own
   filter will not match.
+- 2026-08-23: a production-smoke spec asserting a behaviour the current wave CHANGES cannot fail
+  before the merge — it runs against the deployed build, which is still the old code. TASK-048
+  updated `Lowest effort` and updated its local spec, and the pre-merge suite went green with the
+  production-smoke twin still asserting the old contract; CI went red the moment main deployed.
+  Rule worth adopting: when a wave changes behaviour, grep `tests/production-smoke-*` for the same
+  assertion BEFORE merging and update it in the same commit, accepting that it will fail until the
+  deploy lands. Otherwise every behaviour change ships a guaranteed red CI run.
+- 2026-08-23: the repo's own overnight automation commits and pushes to `main` while a session is
+  working. A push during this wave was rejected because `plan:`/`notify:`/`replies:` commits had
+  landed in between. Harmless here (they touch PLAN.md/STATUS.md/OUTBOX.md only) and resolved with
+  a plain merge, but worth knowing before assuming a rejected push means someone else is editing
+  code — and worth checking `git log origin/main` rather than reflexively rebasing.
