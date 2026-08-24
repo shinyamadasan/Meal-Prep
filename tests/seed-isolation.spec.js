@@ -37,7 +37,21 @@ async function bootNoFirebase(page, pre) {
     } catch (e) {}
   }, pre || null);
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await settled(page);
+}
+
+/**
+ * Wait for init to ACTUALLY finish rather than for a fixed number of milliseconds.
+ * A slower runner made a 2500ms wait fire mid-initialisation: the test then mutated a
+ * recipe list that init subsequently overwrote, and the follow-up reload restored a
+ * state the mutation had never reached. Condition, not clock.
+ */
+async function settled(page) {
+  await page.waitForFunction(
+    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
+          AppState.recipes.length > 0 && typeof saveData === 'function',
+    null, { timeout: 30000 });
+  await page.waitForTimeout(300);
 }
 
 // ── The starter set still arrives ────────────────────────────────────────────
@@ -175,10 +189,21 @@ test('patchMissingNutrition hands out a copy, not the seed object', async ({ pag
 test('reload still restores the saved recipes and re-isolates them', async ({ page }) => {
   await bootNoFirebase(page);
   await page.evaluate(() => { toggleFavorite('27'); updateServingSize('5', 6); });
-  await page.waitForTimeout(300);
+
+  // Confirm the edits actually reached storage before reloading. Without this the test
+  // cannot tell "reload lost my data" from "the edit never happened", which is exactly
+  // how it failed on a slow CI runner.
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem('mealPrepAppData');
+    if (!raw) return false;
+    const rs = JSON.parse(raw).recipes || [];
+    const a = rs.find((x) => Number(x.id) === 27);
+    const b = rs.find((x) => Number(x.id) === 5);
+    return rs.length === 40 && a && a.favorite === true && b && b.currentServings === 6;
+  }, null, { timeout: 30000 });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await settled(page);
 
   const after = await page.evaluate(() => {
     const r27 = AppState.recipes.find((x) => Number(x.id) === 27);
@@ -205,10 +230,21 @@ test('an existing install with a deliberately empty recipe list stays empty', as
     AppState.recipes = [];
     saveData();
   });
-  await page.waitForTimeout(300);
+  // The empty list must be IN storage before reloading, or this proves nothing.
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem('mealPrepAppData');
+    return !!raw && (JSON.parse(raw).recipes || []).length === 0;
+  }, null, { timeout: 30000 });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  // settled() cannot be used here: it waits for recipes to APPEAR, and the whole point is
+  // that they must not. Wait for init to finish rendering instead, then assert.
+  await page.waitForFunction(
+    () => typeof starterPackCandidates === 'function' &&
+          document.getElementById('dashboard') &&
+          document.getElementById('dashboard').children.length > 0,
+    null, { timeout: 30000 });
+  await page.waitForTimeout(1500);
 
   // The first-run gate must not re-seed over the user's deliberate choice.
   expect(await page.evaluate(() => AppState.recipes.length)).toBe(0);

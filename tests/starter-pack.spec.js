@@ -35,7 +35,20 @@ async function boot(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await settled(page);
+}
+
+/**
+ * Wait for init to ACTUALLY finish rather than for a fixed number of milliseconds.
+ * A fixed wait fires mid-initialisation on a slow runner, and the test then reads or
+ * mutates state that init subsequently overwrites. Condition, not clock.
+ */
+async function settled(page) {
+  await page.waitForFunction(
+    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
+          AppState.recipes.length > 0 && typeof saveData === 'function',
+    null, { timeout: 30000 });
+  await page.waitForTimeout(300);
 }
 
 /**
@@ -190,7 +203,7 @@ test('the added recipes persist through the normal save path', async ({ page }) 
 
   // Survives a reload with no duplication.
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await settled(page);
   expect(await ids(page)).toEqual(ORIGINAL_IDS.concat(PACK_IDS).map(String));
   expect(await promptText(page)).toBeNull();
 });
