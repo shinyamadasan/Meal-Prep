@@ -160,6 +160,39 @@ function pantryDaysLeft(p) {
   return daysLeftFrom(p.purchaseDate, shelf);
 }
 
+// The calendar date pantryDaysLeft() is actually counting down to, and whether
+// that date is the user's own (a printed expiry off the pack) or an estimate the
+// app derived from the bought date plus a shelf life.
+//
+// Deliberately reads the SAME two branches as pantryDaysLeft(), so the date shown
+// on a card and the "3d left" sitting beside it can never disagree — they are two
+// renderings of one number. Returns null when the item tracks no date at all.
+function pantryExpiryInfo(p) {
+  if (!p) return null;
+  if (p.dateMode === 'expiry') {
+    return p.expiryDate ? { date: p.expiryDate, printed: true } : null;
+  }
+  var shelf = (p.shelfLifeDays != null) ? p.shelfLifeDays : categoryShelfLife(p.category);
+  if (!p.purchaseDate || shelf == null || isNaN(shelf)) return null;
+  var d = new Date(p.purchaseDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + Number(shelf));
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return { date: d.getFullYear() + '-' + m + '-' + day, printed: false, shelfLifeDays: Number(shelf) };
+}
+
+// "Aug 10" within the current year, "Aug 10, 2026" outside it. Parsed at LOCAL
+// midnight (same as daysLeftFrom) so the rendered day is never off by one.
+function formatShortDate(isoStr) {
+  if (!isoStr) return '';
+  var d = new Date(isoStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  var opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(undefined, opts);
+}
+
 // Visual status from days remaining. Threshold is FRESHNESS_WARN_DAYS.
 function freshnessStatus(daysLeft) {
   if (daysLeft == null) return { cls: '', icon: '', label: '' };
@@ -9580,6 +9613,21 @@ function renderPantry() {
 
     var freshBadge = fs.label ? '<span class="pantry-fresh-badge ' + fs.cls + '">' + fs.icon + ' ' + fs.label + '</span>' : '';
 
+    // Absolute date, shown as its own concept next to the relative "3d left".
+    // A printed expiry is the user's own truth and says "Expires"; a date the app
+    // worked out from bought-date + shelf life says "Best by", because calling an
+    // estimate an expiry date would claim a certainty this app does not have.
+    var exp = pantryExpiryInfo(p);
+    var dateChip = '';
+    if (exp) {
+      var dateLabel = (exp.printed ? 'Expires ' : 'Best by ') + formatShortDate(exp.date);
+      var dateTitle = exp.printed
+        ? 'Printed expiry date you entered'
+        : 'Estimated: bought ' + formatShortDate(p.purchaseDate) + ' + ' + exp.shelfLifeDays + '-day shelf life';
+      dateChip = '<span class="pi-date' + (exp.printed ? ' pi-date--printed' : '') +
+                 '" title="' + escapeHtml(dateTitle) + '">' + escapeHtml(dateLabel) + '</span>';
+    }
+
     var whereOpts = PANTRY_STORAGE_OPTIONS.map(function(w) {
       return '<option value="' + w[0] + '"' + (storage === w[0] ? ' selected' : '') + '>' + w[1] + '</option>';
     }).join('');
@@ -9609,7 +9657,10 @@ function renderPantry() {
     return '<div class="pi-item' + (selected ? ' pi-item--selected' : '') + '">' +
       '<div class="pi-row' + (pantrySelectMode ? ' pi-row--selecting' : '') + '" onclick="' + rowClick + '">' +
         selectBox +
-        '<span class="pi-name">' + escapeHtml(p.name) + '</span>' +
+        '<div class="pi-main">' +
+          '<span class="pi-name">' + escapeHtml(p.name) + '</span>' +
+          dateChip +
+        '</div>' +
         '<div class="pi-badges">' + stockBadge + freshBadge + '</div>' +
         (pantrySelectMode ? '' : '<span class="pi-chevron">' + icon('chevron-right') + '</span>') +
       '</div>' +
@@ -11298,19 +11349,38 @@ function addToPantry(forceAdd) {
   var storage = inferStorage(name, category);
   var dbEntry = INGREDIENT_DB.find(function(i) { return i.name.toLowerCase() === name.toLowerCase(); });
 
+  // Quantity, unit and expiry come from their own inputs and are stored in their
+  // own fields — never folded into name. Same record shape the bulk-add path
+  // produces, so both entry points yield identical inventory.
+  var qtyEl = document.getElementById('pantry-qty');
+  var unitEl = document.getElementById('pantry-unit');
+  var expiryEl = document.getElementById('pantry-expiry');
+  var qtyRaw = qtyEl ? qtyEl.value.trim() : '';
+  var qty = parseFloat(qtyRaw);
+  if (qtyRaw === '' || isNaN(qty) || qty <= 0) qty = null;
+  var unit = unitEl ? unitEl.value.trim() : '';
+  var expiry = (expiryEl && expiryEl.value) ? expiryEl.value : '';
+
   AppState.pantry.push({
     id: Date.now() + Math.random(),
     name: name,
     category: category,
+    // purchaseDate + shelfLifeDays are kept even in expiry mode so that flipping
+    // the card's date toggle back to "bought" still has something to count from.
     purchaseDate: todayISO(),
     shelfLifeDays: ingredientShelfLife(name, category),
     storage: storage,
-    quantity: null,
-    unit: dbEntry ? dbEntry.unit : '',
-    staple: dbEntry ? !!dbEntry.isStaple : undefined
+    quantity: qty,
+    unit: unit || (dbEntry ? dbEntry.unit : ''),
+    staple: dbEntry ? !!dbEntry.isStaple : undefined,
+    expiryDate: expiry || null,
+    dateMode: expiry ? 'expiry' : undefined
   });
 
   input.value = '';
+  if (qtyEl) qtyEl.value = '';
+  if (unitEl) unitEl.value = '';
+  if (expiryEl) expiryEl.value = '';
   input.focus();
 
   saveData();

@@ -376,7 +376,7 @@
                         <div id="pantry-body">
                             <div class="pantry-add-row">
                                 <div class="ing-name-wrap" style="flex:1">
-                                    <input type="text" id="pantry-input" class="form-control" placeholder="Add an item… (e.g. chicken, rice, soy sauce)" autocomplete="off">
+                                    <input type="text" id="pantry-input" class="form-control" placeholder="Item name… (e.g. chicken, rice, soy sauce)" autocomplete="off">
                                     <div class="ing-suggestions hidden"></div>
                                 </div>
                                 <button class="btn btn--secondary btn--sm" onclick="addToPantry()">+ Add</button>
@@ -384,6 +384,23 @@
                                 <button class="btn btn--ghost btn--sm" onclick="openBulkAddModal()" title="Add multiple items at once">Bulk add</button>
                                 <button class="btn btn--ghost btn--sm hidden" id="pantry-clear-expired" onclick="clearExpiredPantryItems()" title="Remove expired pantry items">Clear expired</button>
                                 <button class="btn btn--ghost btn--sm" id="pantry-select-toggle" onclick="togglePantrySelectMode()" title="Select pantry items">Select</button>
+                            </div>
+                            <!-- Quantity, unit and expiry are entered as their own fields.
+                                 Before this existed, everything a user knew about an item had to
+                                 be typed into the name box, which stored it all as the name. -->
+                            <div class="pantry-add-detail">
+                                <label class="pad-field">
+                                    <span class="pad-label">Qty</span>
+                                    <input type="number" id="pantry-qty" class="form-control" min="0" step="0.01" placeholder="—" autocomplete="off" aria-label="Quantity">
+                                </label>
+                                <label class="pad-field">
+                                    <span class="pad-label">Unit</span>
+                                    <input type="text" id="pantry-unit" class="form-control" placeholder="pcs, g, kg" autocomplete="off" aria-label="Unit">
+                                </label>
+                                <label class="pad-field pad-field--date">
+                                    <span class="pad-label">Expires</span>
+                                    <input type="date" id="pantry-expiry" class="form-control" autocomplete="off" aria-label="Expiry date">
+                                </label>
                             </div>
                             <div id="pantry-search-wrap" class="pantry-search-wrap hidden">
                                 <input type="text" id="pantry-search" class="form-control" placeholder="Search your kitchen…" autocomplete="off" aria-label="Search pantry items">
