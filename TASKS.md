@@ -2935,10 +2935,18 @@ post-merge (CI caught what the pre-merge suite structurally could not):
     rather than by "recaptcha". Verified environmental via three bare `page.goto` loads with
     zero app interaction. Widened in all four at `b31e035` and `34cd3a8`.
   - One CI run (`b31e035`) failed two LOCAL specs — `ready-food-home.spec.js:253` and
-    `ready-food-portions.spec.js:307` — that pass locally on every run (3× 224/224 after the
-    fact) and did not fail in the two CI runs before it on the same code. Unreproduced; assessed
-    as CI-environment timing flakiness, not a regression, but NOT proven. `Button tests` has
-    failed intermittently on `main` before this wave (8fbf89d, 352a799, 9007d4e).
+    `ready-food-portions.spec.js:307` — that pass locally on every run and did not fail in the
+    two CI runs before or the two after, on the same code. Unreproduced; assessed as the same
+    fixed-`waitForTimeout` fragility diagnosed below, which those pre-existing specs also use.
+    Not changed: they are outside this wave and were not demonstrably broken.
+  - CI on `2226651` then failed `seed-isolation.spec.js:175`, and that one WAS a real defect
+    in a spec this wave added. The failure shape gave it away: `count` was 40 but `favorite`
+    was false, so the reload had RE-SEEDED rather than restored — the fixed
+    `waitForTimeout(2500)` fired mid-initialisation on the slower runner, `toggleFavorite()`
+    mutated a list init then overwrote, nothing persisted, and the reload correctly found
+    empty storage. The assertion was right; the harness was wrong. Fixed at `f00fdfc`: all
+    three specs this wave added now wait on real conditions (`settled()`, and a
+    storage-contents check before any reload) instead of a clock. Also ~4x faster.
 
 ---
 

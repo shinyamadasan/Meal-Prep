@@ -139,3 +139,12 @@
   landed in between. Harmless here (they touch PLAN.md/STATUS.md/OUTBOX.md only) and resolved with
   a plain merge, but worth knowing before assuming a rejected push means someone else is editing
   code — and worth checking `git log origin/main` rather than reflexively rebasing.
+- 2026-08-23: `await page.waitForTimeout(2500)` after `page.goto`/`page.reload` is the single
+  most common flake source in this repo's specs, and it fails in a way that looks like a
+  product bug rather than a harness bug. A CI runner slower than the laptop fires the wait
+  mid-init; the test mutates state that init then overwrites; nothing persists; and the
+  following reload assertion reports "your data was lost". Diagnostic tell: the count is
+  right but the edit is missing — that is a re-seed, not a failed restore. Wait on a
+  condition (`AppState.recipes.length > 0 && typeof saveData === 'function'`), and before any
+  reload assertion, first wait for the expected bytes to be IN localStorage. Doing this made
+  three specs deterministic AND cut them from ~4 min to 55s.
