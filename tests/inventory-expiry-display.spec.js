@@ -27,9 +27,14 @@ test.use({ viewport: { width: 1280, height: 1600 } });
 
 async function loadLocalApp(page) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  // The bootstrap flag makes the clear run ONCE per browser context rather than on
+  // every navigation, so a reload can prove that what was added actually persisted.
+  // Playwright gives each test a fresh context, so tests stay isolated either way.
   await page.addInitScript(() => {
     try {
+      if (localStorage.getItem('__expiryDisplayBootstrapped')) return;
       localStorage.clear();
+      localStorage.setItem('__expiryDisplayBootstrapped', '1');
       localStorage.setItem('mealPrepHelpSeen', '1');
       localStorage.setItem('mealPrepStartDone', '1');
       localStorage.setItem('pantryOnboardingDone', '1');
@@ -191,4 +196,131 @@ test('an item that tracks no date at all renders no date chip and no badge', asy
   await expect(row.locator('.pi-name')).toHaveText('Salt');
   await expect(row.locator('.pi-date')).toHaveCount(0);
   await expect(row.locator('.pantry-fresh-badge')).toHaveCount(0);
+});
+
+// ── 3. The add form survives a phone ────────────────────────────────────────
+//
+// The structured fields above are only worth having if they can actually be used on
+// the device this app is dogfooded on. `.pantry-add-row` was `display: flex` with no
+// `flex-wrap` and five buttons; `.ing-name-wrap` carries a global `min-width: 0` and
+// its input is `width: 100%`, so the name field's min-content contribution was zero
+// and it collapsed to 26px at both 320px and 390px — narrower than a single character
+// cell. These lock the floor and the wrap, at the two narrowest phone widths that
+// matter, without pinning the exact layout the browser chooses.
+
+const PHONE = { width: 390, height: 1400 };
+
+// Wide enough to type an ingredient name into and to hit with a thumb. The bug
+// produced 26px, so any honest floor catches it; this one also refuses a merely
+// "technically visible" 60px sliver.
+const MIN_USABLE_INPUT_PX = 140;
+
+async function boxOf(locator) {
+  const b = await locator.boundingBox();
+  expect(b, 'element has no layout box').not.toBeNull();
+  return b;
+}
+
+test.describe('mobile add form', () => {
+  test.use({ viewport: PHONE });
+
+  test('390px: the page does not scroll horizontally', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+    const o = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth
+    }));
+    expect(o.scrollW).toBeLessThanOrEqual(o.clientW);
+  });
+
+  test('390px: the item-name input keeps a usable typing width', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+    const box = await boxOf(page.locator('#pantry-input'));
+    expect(box.width).toBeGreaterThanOrEqual(MIN_USABLE_INPUT_PX);
+    // And it must still fit on screen rather than buying width by overflowing.
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+  });
+
+  test('390px: quantity, unit, expiry and Add are all reachable', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+
+    const addBtn = page.locator('#pantry-body button:has-text("+ Add")');
+    for (const loc of [page.locator('#pantry-qty'), page.locator('#pantry-unit'),
+                       page.locator('#pantry-expiry'), addBtn]) {
+      await expect(loc).toBeVisible();
+      const b = await boxOf(loc);
+      expect(b.width).toBeGreaterThan(0);
+      expect(b.height).toBeGreaterThan(0);
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(PHONE.width);   // never clipped off-screen
+    }
+
+    // Reachable means operable, not merely painted: these calls assert actionability.
+    await page.fill('#pantry-qty', '6');
+    await page.fill('#pantry-unit', 'pcs');
+    await page.fill('#pantry-expiry', localDayOffset(3));
+    await expect(page.locator('#pantry-qty')).toHaveValue('6');
+    await expect(page.locator('#pantry-unit')).toHaveValue('pcs');
+  });
+
+  test('390px: the fields have not been stacked into an unreadable single column', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+    // Wrapping to a second line is explicitly fine; every control landing on its own
+    // line would mean the row was redesigned rather than wrapped.
+    const tops = await page.evaluate(() => ['#pantry-input', '#pantry-qty', '#pantry-unit', '#pantry-expiry']
+      .map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBeLessThan(4);
+  });
+
+  test('390px: an expiry entered on a phone persists and renders as date + freshness', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+
+    const expiry = localDayOffset(2);
+    await addViaForm(page, { name: 'Eggs', qty: 12, unit: 'pcs', expiry });
+
+    // Survives a reload through the normal saveData() path, not just in memory.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForAppReady(page);
+    await page.evaluate(() => showTab('fridge'));
+
+    const rec = await page.evaluate(() =>
+      AppState.pantry.find((p) => p.name === 'Eggs'));
+    expect(rec).toBeTruthy();
+    expect(rec.quantity).toBe(12);
+    expect(rec.unit).toBe('pcs');
+    expect(rec.expiryDate).toBe(expiry);
+    expect(rec.dateMode).toBe('expiry');
+
+    const row = page.locator('.pi-item', { has: page.locator('.pi-name', { hasText: 'Eggs' }) })
+                    .locator('.pi-row');
+    await expect(row.locator('.pi-name')).toHaveText('Eggs');
+    await expect(row.locator('.pi-date')).toContainText('Expires');       // absolute
+    await expect(row.locator('.pi-date')).toHaveClass(/pi-date--printed/);
+    await expect(row.locator('.pantry-fresh-badge')).toContainText('2d left');  // relative
+    await expect(row.locator('.pi-qty')).toHaveText('12 pcs');
+  });
+});
+
+// The fix is width-sensitive, so the narrowest phone still in circulation gets the
+// same two guarantees. 320px is where an unwrapped row breaks first.
+test.describe('narrow phone', () => {
+  test.use({ viewport: { width: 320, height: 1400 } });
+
+  test('320px: no horizontal overflow and the name input stays usable', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { AppState.pantry = []; showTab('fridge'); });
+    const o = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth
+    }));
+    expect(o.scrollW).toBeLessThanOrEqual(o.clientW);
+    const box = await boxOf(page.locator('#pantry-input'));
+    expect(box.width).toBeGreaterThanOrEqual(MIN_USABLE_INPUT_PX);
+  });
 });

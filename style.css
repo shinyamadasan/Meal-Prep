@@ -3929,8 +3929,18 @@ select.form-control {
 
 .pantry-add-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+/* The name field is a flex item with the global .ing-name-wrap min-width:0, and its
+   input is width:100%, so its min-content contribution is zero — five buttons on one
+   unwrapped line crushed it to 26px at 390px. A floor plus wrapping keeps it typable
+   and pushes the surplus buttons onto a second line instead of squeezing it. Scoped to
+   this row: the same wrapper is reused by the custom-item modal, which must not change. */
+.pantry-add-row .ing-name-wrap {
+  min-width: 12rem;
 }
 
 /* Second line of the add form: the fields that used to have nowhere to go and

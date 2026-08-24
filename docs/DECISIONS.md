@@ -1085,18 +1085,40 @@ The stale half of the FEATURES line was corrected rather than left to disagree w
 - **No warning when a name still looks like it contains a quantity or a date.** Speculative, and the
   fields now make the right place obvious.
 
-### Pre-existing defect found and NOT fixed here
+### The pre-existing squeeze that made the new fields unusable on a phone
 
-`.pantry-add-row` is `display: flex` with no `flex-wrap`, and at a 390px viewport its five buttons
-squeeze `#pantry-input` to **26px**. Verified against unmodified `main`, so it predates this change
-and is not caused by it. It is left alone under the surgical-changes rule, but it does make this
-row hard to use on exactly the phone this app is dogfooded on, and it should get its own task.
+`.pantry-add-row` was `display: flex` with no `flex-wrap`. `.ing-name-wrap` carries a global
+`min-width: 0` and its input is `width: 100%`, so the name field's min-content contribution was
+**zero** and five buttons on one unwrapped line crushed `#pantry-input` to **26px** at both 320px
+and 390px. Measured against unmodified `main`, so it predates this change.
+
+It was found while shipping the fields above and was initially left alone under the surgical-changes
+rule. That was the wrong call once the consequence was clear: the structured fields this entry adds
+are worth nothing if the row carrying them cannot be typed into on the phone the app is dogfooded
+on, so the defect is in scope after all and is fixed here.
+
+Two properties, no redesign: `flex-wrap: wrap` on the row, and `min-width: 12rem` on
+`.pantry-add-row .ing-name-wrap`. The floor stops the name field collapsing and the wrap sends the
+surplus buttons to a second line instead of squeezing it. The override is **scoped to this row**
+because the same `.ing-name-wrap` is reused by the custom-item modal, which must not change.
+
+Measured `#pantry-input` width, before → after: 320px **26 → 188**, 390px **26 → 179**,
+414px **45 → 203**. 768px (399) and 1280px (943) are byte-identical and the desktop row still
+renders on one line, so compact desktop behaviour is preserved rather than traded away. No
+horizontal page overflow at any of the five widths, before or after.
+
+A free-text parser was again rejected as the alternative, for the reasons under "Deliberately not
+done" — the problem was that the fields had no room, not that they were the wrong shape.
 
 Supersedes: nothing. Corrects a stale behaviour description in `docs/FEATURES.md` left by D-057.
-Regression-locked by `tests/inventory-expiry-display.spec.js` (8 cases); mutation-checked by running
-that spec against unmodified `main`, where 7 of the 8 fail.
+Regression-locked by `tests/inventory-expiry-display.spec.js` (14 cases, 6 of them mobile);
+mutation-checked twice — the 8 data/display cases fail 7-of-8 against unmodified `main`, and the two
+width cases fail against the pre-wrap CSS. The other four mobile cases (overflow, reachability,
+persistence, not-one-column) pass both before and after by design: they guard adjacent failure modes
+this particular bug did not exhibit.
 
 Verify: app.js contains "function pantryExpiryInfo(p)"
 Verify: app.js contains "Best by "
 Verify: index.html contains "pantry-expiry"
 Verify: style.css contains ".pi-date"
+Verify: style.css contains "flex-wrap: wrap"
