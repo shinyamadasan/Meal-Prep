@@ -4,6 +4,42 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-23 (later) — Autonomous triage + plan run: 0 new captures, 0 unconverted BUILD_QUEUE items; PLAN.md un-staled
+
+Planning-only run. No app code touched, nothing built, nothing committed by this session.
+
+**STEP A (Triage):** nothing to do. All **35** files in `captures/inbox/` are already
+`status: triaged` — zero at `status: new`. No proposal written, no capture archived.
+
+**STEP B (Plan conversion):** nothing to add. Every BUILD_QUEUE item already has a matching
+`source: BQ-<id>` task: BQ-016→TASK-001/002/003, BQ-017→TASK-005, BQ-018→TASK-006, BQ-019→TASK-008,
+BQ-020→TASK-009/010, BQ-021→TASK-007, BQ-022→TASK-011, BQ-023→TASK-025, BQ-024/025/026→
+TASK-026/027/028. BQ-013/014/015 stay deferred by their own build notes (human decision, not mine).
+No task-block reordering was needed — **there are no `status: codex` tasks at all** (the one
+`status: todo → codex` line near the end of `TASKS.md` is inside the commented-out template).
+
+**One doc fixed:** `PLAN.md` still described TASK-025..028 as `status: codex` awaiting execution
+when all four are `done`, and still listed TASK-017/021/022/024 as held at the `/merge` gate when
+they have since landed. Status section corrected and the milestone marked complete; Goal/Approach/
+Scope left intact as the historical record of that milestone. Per CLAUDE.md, `Next` reports such a
+milestone complete but only a real `Plan` run edits `PLAN.md` — this was that run.
+
+**Where we actually are** (detail in the entry below): cooking-method discovery is merged, deployed
+and smoke-tested at `8e847c6`; local suite 224/224 on `main`. The honest next step is still
+**dogfooding** the Cook filters and the Home `Easiest` pick before tuning either — `Lowest effort`
+is deliberately broad at `<= 2` (26 of 40 recipes) and should be judged from real use.
+
+**Not outstanding implementation work, but still open:** TASK-035 and TASK-038 sit at
+`status: approved` awaiting `/merge`; TASK-037 is `blocked` on `task-037` (`7c4785d`) with a stale
+blocker (fixed by TASK-040) and needs a rebase + re-run. `wave1-portion-truth` (`88b5598`) remains
+parked, still claiming D-054. The Android real-device notification check owed since TASK-046 is
+still not done.
+
+**Nothing was queued for Codex by this run.** With an empty build queue and no untriaged captures,
+the next move needs a human: approve a new BUILD_QUEUE batch, hand over an operator brief, or
+dogfood first and let that decide.
+
+---
 ## 2026-08-23 — Cooking-method discovery merged and deployed (TASK-048, D-060..D-064) — the wave where the tests were green and the product was broken
 
 `wave-cook-method-discovery` → `main` (`8e847c6`, `--no-ff`, unrebased). Deployed and smoke-tested.
