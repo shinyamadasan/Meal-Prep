@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 /**
  * Kitchen Truth wave — inventory truth with minimum maintenance.
@@ -26,7 +27,7 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 // Local calendar date N days ago — daysLeftFrom()/todayISO() work in local time.
@@ -719,7 +720,7 @@ test('a grocery transfer survives a localStorage round-trip and reload', async (
   });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 
   const after = await page.evaluate(() => {
     const p = AppState.pantry.find((x) => x.name === 'Chicken Breast');

@@ -4,7 +4,10 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "playwright test",
+    "test": "npm run test:local",
+    "test:local": "playwright test --project=local",
+    "test:prod": "playwright test --project=prod",
+    "test:all": "playwright test",
     "test:worker": "node --test workers/recipe-import/test/*.node.js",
     "test:smoke": "playwright test tests/button-smoke.spec.js",
     "test:functional": "playwright test tests/buttons-functional.spec.js",

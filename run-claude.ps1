@@ -428,14 +428,32 @@ try { & "$projectPath\tools\Generate-Codex-Notice.ps1" | Out-Null } catch { Halt
 #     silently. Non-fatal: drift is a hygiene finding, not a safety issue, so it never halts automation.
 #     Findings are appended to DIGEST.md (already sent to Telegram every morning, unconditionally) so
 #     they actually get seen instead of sitting unread in claude-session.log. ---
-try {
-    $docsDriftOutput = & "$projectPath\tools\Check-DocsConsistency.ps1" 2>&1
-    $docsDriftExit = $LASTEXITCODE
-    $docsDriftOutput | Tee-Object -FilePath $logFile -Append | Out-Null
-    if ($docsDriftExit -ne 0) {
-        Add-Content -Path "$projectPath\planning\DIGEST.md" -Value "`n—`n⚠️ Docs drift detected (Check-DocsConsistency.ps1) — see claude-session.log for details."
+#     The catch below deliberately does NOT call Halt-Automation. It used to, which contradicted
+#     this block's own contract two lines up and is exactly how a hygiene check took down a whole
+#     overnight run on 2026-08-23: the checker threw, the catch halted, and every downstream phase
+#     was skipped over a docs-drift report nobody was blocked on. A check that cannot fail safely
+#     is worse than no check. Failures are logged, surfaced in the digest, and the run continues.
+$docsCheckScript = Join-Path $projectPath 'tools/Check-DocsConsistency.ps1'
+if (-not (Test-Path -LiteralPath $docsCheckScript)) {
+    # Named explicitly rather than left to a CommandNotFoundException, whose message reports only
+    # whatever string was handed to "&" and so cannot distinguish a wrong path from a missing file.
+    $msg = "Docs-consistency check SKIPPED: script not found at $docsCheckScript"
+    Add-Content -Path $logFile -Value "WARN: $msg"
+    Add-Content -Path "$projectPath\planning\DIGEST.md" -Value "`n—`n⚠️ $msg"
+} else {
+    try {
+        $docsDriftOutput = & $docsCheckScript 2>&1
+        $docsDriftExit = $LASTEXITCODE
+        $docsDriftOutput | Tee-Object -FilePath $logFile -Append | Out-Null
+        if ($docsDriftExit -ne 0) {
+            Add-Content -Path "$projectPath\planning\DIGEST.md" -Value "`n—`n⚠️ Docs drift detected (Check-DocsConsistency.ps1) — see claude-session.log for details."
+        }
+    } catch {
+        $msg = "Docs-consistency check FAILED (run continued): $_"
+        Add-Content -Path $logFile -Value "WARN: $msg"
+        Add-Content -Path "$projectPath\planning\DIGEST.md" -Value "`n—`n⚠️ $msg"
     }
-} catch { Halt-Automation "Check-DocsConsistency.ps1 threw an error: $_" }
+}
 
 git add planning/DIGEST.md planning/CODEX_READY.md
 git diff --cached --quiet
