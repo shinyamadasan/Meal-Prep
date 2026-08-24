@@ -148,3 +148,17 @@
   condition (`AppState.recipes.length > 0 && typeof saveData === 'function'`), and before any
   reload assertion, first wait for the expected bytes to be IN localStorage. Doing this made
   three specs deterministic AND cut them from ~4 min to 55s.
+- 2026-08-24: the brief for a maintenance wave asserted a specific root cause ("automation invoked
+  the bare script name") that turned out to be false — the code had always used a full path, and the
+  observed error message is only producible by a bare-name call, which exists nowhere in the repo.
+  Checking the premise cost about ten minutes and prevented a pointless "fix" to correct code. It
+  also surfaced the real defect, which was one line away: a block whose own comment said it "never
+  halts automation" ended in `catch { Halt-Automation ... }`. Worth generalising: when a doc or a
+  brief and the code disagree about what the code DOES, reproduce before editing — and when a block
+  documents a safety property, check that the error path actually honours it.
+- 2026-08-24: `npm test` answered two different questions at once (does this branch work / is the
+  deployed site healthy) and therefore answered neither reliably. Split into Playwright projects,
+  `test:local` and `test:prod`. The lesson that generalises is the guard, not the split: an explicit
+  list of prod specs would rot silently, so `tests/suite-classification.spec.js` fails the LOCAL
+  suite if any spec containing the deployed URL is not classified as prod. A classification that
+  isn't enforced is a comment.

@@ -12,6 +12,7 @@ on:
       - 'style.css'
       - 'tests/**'
       - 'package.json'
+      - 'playwright.config.js'  # decides which specs each gate runs
       - 'package-lock.json'
       - '.github/workflows/test.yml'
   workflow_dispatch: {} # also lets you run it by hand from the Actions tab
@@ -32,13 +33,20 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      # The tests hit the live GitHub Pages site, which redeploys ~1 min after a
-      # push. Wait so we test THIS push's version, not the previous one.
+      # Two gates, deliberately separate (D-065). The local suite loads index.html
+      # from THIS checkout, so it validates the pushed code and needs no network; run
+      # it FIRST so a real regression is reported in ~1 min instead of after a 90s
+      # sleep and a network round-trip.
+      - name: Run local suite (branch gate)
+        run: npm run test:local
+
+      # The production smokes hit the live GitHub Pages site, which redeploys ~1 min
+      # after a push. Wait so we verify THIS push's deploy, not the previous one.
       - name: Wait for GitHub Pages to deploy
         run: sleep 90
 
-      - name: Run button tests
-        run: npm test
+      - name: Run production smokes (post-deploy gate)
+        run: npm run test:prod
 
       # If anything fails, keep the HTML report so you can see what broke.
       - name: Upload report on failure

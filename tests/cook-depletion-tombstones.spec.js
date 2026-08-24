@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 /**
  * Cook-path depletion tombstones.
@@ -31,7 +32,7 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 // A pantry record the cook path will actually deduct from: tracked quantity in
@@ -337,7 +338,7 @@ test('a full cook still creates the batch, and every depleted id reaches storage
 
   // 9 (cont.) — reload and the removals hold; nothing is resurrected.
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 
   const reloaded = await page.evaluate(() => ({
     pantryIds: AppState.pantry.map((p) => p.id),

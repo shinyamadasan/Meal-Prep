@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 /**
  * "What should we eat?" wave — deterministic, explainable ranking.
@@ -28,7 +29,7 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 // Local calendar date N days ago — daysLeftFrom()/todayISO() work in local time.
@@ -835,7 +836,7 @@ test('old saved data with no recipe metadata still ranks and renders', async ({ 
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 
   const result = await page.evaluate(() => {
     const cands = eatCookCandidates();

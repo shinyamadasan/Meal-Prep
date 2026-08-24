@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 /**
  * Food Attention Notifications wave.
@@ -64,7 +65,7 @@ async function loadLocalApp(page, opts) {
   }, opts);
   await page.addInitScript(NOTIFICATION_STUB);
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 // Local calendar date N days ago — daysLeftFrom()/todayISO() work in local time.
@@ -179,7 +180,7 @@ test('a browser with no Notification API at all does not break the app', async (
     delete window.Notification;
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 
   const result = await page.evaluate(async () => {
     openSettingsModal();
@@ -378,7 +379,7 @@ test('the dedup ledger survives a reload', async ({ page }) => {
   expect(await page.evaluate(() => window.__notifications.length)).toBe(1);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
   // Second open: same unchanged food, silence.
   expect(await page.evaluate(() => window.__notifications.length)).toBe(0);
   expect(await page.evaluate(() => loadFoodAlertPrefs().announced['pantry:1'])).toBe('expired');
@@ -692,7 +693,7 @@ test('a corrupt alert-prefs value falls back to off instead of throwing', async 
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 
   expect(await page.evaluate(() => loadFoodAlertPrefs())).toEqual({ enabled: false, announced: {} });
   expect(await page.evaluate(() => !!document.getElementById('dashboard'))).toBe(true);

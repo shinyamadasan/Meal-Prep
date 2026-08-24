@@ -2950,6 +2950,66 @@ post-merge (CI caught what the pre-merge suite structurally could not):
 
 ---
 
+### TASK-049 · Test-infrastructure trust: non-fatal docs check, local/prod suite split, fixed-wait audit
+status: done
+owner: claude
+source: direct operator brief ("make the automated development/test loop trustworthy again without
+        changing product behavior") — not BQ
+depends-on: none
+files: run-claude.ps1, package.json, playwright.config.js (new), .github/workflows/test.yml,
+        tests/app-ready.js (new), tests/suite-classification.spec.js (new),
+        tests/{cook-depletion-tombstones,food-attention-notifications,kitchen-truth,
+        low-effort-discovery,low-effort-metadata,low-effort-zero-time,recipe-actions,
+        recipe-storage-persistence,what-should-we-eat}.spec.js, docs/DECISIONS.md
+
+objective:
+  Make the automated loop trustworthy: a hygiene check must not be able to halt the overnight run,
+  a branch gate must not depend on the deployed site, and an initialisation wait must not be a
+  guess. No product behaviour changes.
+
+notes:
+  Phase 1 disproved the brief's first premise before any edit. `run-claude.ps1` has ALWAYS invoked
+  the checker by full path, that line is byte-identical to the halting commit, and it runs correctly
+  under both PowerShell 5.1 (what the scheduled task uses) and pwsh 7. Experimentally, the observed
+  message is produced ONLY by a bare-name call — a path yields the whole path in the error — and no
+  bare-name call exists in the repo. The halt is not reproducible from HEAD and its trigger is still
+  unknown; nothing was changed to make an unreproducible error disappear.
+
+  The real defect found instead: Phase 3b's own comment promised it "never halts automation" while
+  the very next line called `Halt-Automation`. A docs-drift report took down the whole overnight run.
+
+acceptance:
+  - [x] Phase 3b resolves the script once, tests existence explicitly, and cannot halt the run
+  - [x] Both new branches (missing script, throwing script) verified under PowerShell 5.1 to warn
+        and continue
+  - [x] `npm test` == `npm run test:local` == the deterministic offline branch gate
+  - [x] `npm run test:prod` runs exactly the specs that hit the deployed site
+  - [x] CI runs the local gate FIRST, then the existing Pages wait, then the prod gate
+  - [x] Suite classification is guarded by a test — a misfiled spec fails the local suite
+  - [x] Every `tools/*.ps1` path referenced by run-claude.ps1 is asserted to exist
+  - [x] All 16 fixed 2500ms waits classified before editing; all were category A (init)
+  - [x] No assertion weakened, no test deleted, no product source touched
+
+constraints:
+  - No product behaviour change; no D-032 red-zone code
+  - Do not duplicate test files, weaken assertions, or reclassify prod tests as local
+  - Do not mechanically replace waits that have no deterministic condition
+  - Do not absorb the automation-generated STATUS.md / CODEX_READY.md / DIGEST.md edits
+
+verification:
+  - [x] `npm run test:local` — 230 passed, 0 failed (repeated runs, ~59s; was 224 in ~2.4min)
+  - [x] `npm run test:prod` — 77 passed, 4 skipped, 0 failed
+  - [x] `npm test` — 230 passed (confirms it is the local gate)
+  - [x] `tools/Verify-Decisions.ps1` — all 7 pointers hold (3 new, added by D-065)
+  - [x] `tools/Check-DocsConsistency.ps1` runs correctly under both PS 5.1 and pwsh 7
+  - [x] `git diff main -- app.js index.html style.css sw.js manifest.json` — empty
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Test harness, npm scripts, CI wiring and one
+  automation error-handling path; no product source and no red-zone surface.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

@@ -898,3 +898,108 @@ Also fixed: two Playwright harnesses cleared `localStorage` from `addInitScript`
 Out of scope and left alone: `[...defaultStorageData]` and `[...defaultCookingHacks]` in the same fallback share objects the same way. No mutation path was audited for them and the brief scoped this to recipe objects; they are recorded here as known, unaudited, same-class candidates.
 
 Risk gate: **outside D-032 red zone.** No sync, tombstone, save-path, auth or service-worker change. The three touched lines make copies where references were being handed out.
+
+## D-065 — A hygiene check may not halt the run, and one test number may not answer two questions
+
+Task: TASK-049. Test-infrastructure only; no product behaviour changed.
+
+### The automation halt was not a bad path
+
+The brief for this wave stated that the overnight run halted because it invoked
+`Check-DocsConsistency.ps1` instead of `.\tools\Check-DocsConsistency.ps1`. **That is not what the
+code does, and it is worth recording that the premise was checked rather than acted on.**
+`run-claude.ps1` has always used a full path (`& "$projectPath\tools\Check-DocsConsistency.ps1"`),
+the line is byte-identical to what was present at the halting commit, and it runs correctly under
+both Windows PowerShell 5.1 — which is what the scheduled task actually uses — and pwsh 7. No
+bare-name invocation exists anywhere in the repo.
+
+The observed message (`The term 'Check-DocsConsistency.ps1' is not recognized…`) is only ever
+produced by a bare-name call: with a path, PowerShell names the *whole path* in the error. That was
+established experimentally rather than assumed — an empty `$projectPath` yields
+`'\tools\Check-DocsConsistency.ps1'`, a missing file yields the full path, and only a bare name
+yields the bare name. **The halt is therefore not reproducible from HEAD and its trigger remains
+unexplained.** Nothing was "fixed" to make an unreproducible error go away.
+
+What *is* certain, and is the real defect: Phase 3b's own comment promised
+"Non-fatal: drift is a hygiene finding, not a safety issue, so it never halts automation" — and the
+next lines read `} catch { Halt-Automation ... }`. Whatever made the checker throw that night, a
+**docs-drift report killed the entire overnight run** and skipped every downstream phase. A check
+that cannot fail safely is worse than no check, because it converts a cosmetic finding into an
+outage.
+
+Decision: Phase 3b now matches its documented contract. The script path is resolved once into
+`$docsCheckScript` via `Join-Path`, its existence is tested explicitly (so a genuinely missing file
+reports *that*, instead of a `CommandNotFoundException` whose message can only echo the string it
+was handed — precisely why the original failure was hard to read), and both the missing-file and
+throwing branches log a warning, append it to `DIGEST.md`, and **let the run continue**.
+`Halt-Automation` is gone from the block. Verified under PowerShell 5.1: script-present, script-
+missing, and script-throws all reach the end of the block without halting.
+
+`tests/suite-classification.spec.js` pins it: one test asserts the Phase 3b window still contains
+the `Test-Path` preflight and contains no `Halt-Automation`, and another asserts every `tools/*.ps1`
+path referenced by `run-claude.ps1` resolves to a file that exists — which catches the whole class
+of bad-invocation regressions, not just this one script.
+
+### One number answering two questions
+
+`npm test` ran every spec together, but the 31 spec files answer two unrelated questions. Twenty-one
+load `index.html` from the checkout over `file://`; ten fetch
+`https://shinyamadasan.github.io/Meal-Prep/`. Mixing them meant a branch's "full suite" result partly
+measured whatever was already **deployed** — so it could not validate unmerged code — and network
+latency produced failures that read as regressions. During the previous wave one production smoke
+took 5.0 minutes and failed, then passed 8/8 in 41 seconds; three separate CI investigations were
+spent on that class of noise.
+
+Decision: two Playwright **projects** in a new `playwright.config.js`, and scripts to match:
+
+| command | project | what it is for |
+|---|---|---|
+| `npm test` → `npm run test:local` | `local` | the deterministic pre-merge branch gate |
+| `npm run test:prod` | `prod` | post-deploy verification of the live site |
+| `npm run test:all` | both | escape hatch; not a gate |
+
+`npm test` means the local gate because that is the question a developer and a pre-merge check are
+actually asking. Nothing stops being verified: CI now runs `test:local` **first** (fast, offline, and
+it reports a real regression in about a minute instead of after a 90-second Pages sleep), then keeps
+the existing sleep and runs `test:prod`.
+
+The prod set is an explicit list rather than a filename pattern, because three live-site specs
+predate the `production-smoke-*` convention (`button-smoke`, `buttons-functional`, `smoke`) and
+renaming them is not this wave's business. An explicit list can rot, so
+`tests/suite-classification.spec.js` runs in the local project and fails if any spec containing the
+deployed URL is missing from the list, if any listed spec no longer touches the network, or if a
+listed file does not exist. Misclassification cannot be silent.
+
+Everything else in the config is left at Playwright's defaults on purpose. Introducing a config file
+must not quietly re-tune timeouts, retries, workers or reporters.
+
+### Fixed waits: 16 replaced, 0 retained
+
+All 16 fixed 2500 ms Playwright waits across the 9 remaining local specs were classified before any
+edit. Every one sits immediately after a `page.goto` or `page.reload` — category **A**, waiting for
+application initialisation. None waits on network or Firebase (every local spec aborts
+`**/firebasejs/**`), and none is intentional user-visible timing. There was no category-C wait to
+preserve, so none was preserved; had there been one it would have been left with a comment.
+
+They are replaced by one shared readiness helper in `tests/app-ready.js` waiting on what
+"initialised" actually means here: `AppState.recipes` present, `saveData` defined, and `#dashboard`
+rendered — which `initApp()` does last via `showTab('dashboard')`. Deliberately **not**
+`recipes.length > 0`: several specs boot a saved document with zero recipes on purpose and that is a
+legitimate ready state. Verified against both a first-run boot (seeds 40) and a saved-doc-with-no-
+recipes boot; both satisfy the condition in under ~100 ms.
+
+The diff across those 9 files is exactly 16 wait replacements plus 9 `require` lines — no assertion
+was touched, no tolerance widened. The local suite went from ~2.4 minutes to ~59 seconds and passed
+230/230 on repeated runs.
+
+Not converted, deliberately: the three specs hardened during D-064 already wait on conditions and
+carry their own local helper; re-pointing them at the shared helper is churn with no behavioural
+gain. The production smokes keep their own longer waits — they are waiting on a real network and a
+CDN, which is category **B**, and no local readiness condition applies.
+
+Risk gate: **outside D-032 red zone.** No product source file (`app.js`, `index.html`, `style.css`,
+`sw.js`, `manifest.json`) is touched — verified by diff against `main`.
+
+Verify: run-claude.ps1 contains "Test-Path -LiteralPath $docsCheckScript"
+Verify: package.json contains "playwright test --project=local"
+Verify: package.json contains "playwright test --project=prod"

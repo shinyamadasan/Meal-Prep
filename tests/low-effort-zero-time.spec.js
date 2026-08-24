@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 /**
  * Regression: a legitimate 0-minute cook (or prep) time must never render NaN.
@@ -25,7 +26,7 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 // A genuinely no-cook recipe: assembled, never heated.

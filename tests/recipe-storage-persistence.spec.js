@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 test.use({ viewport: { width: 1000, height: 1400 } });
 
@@ -15,7 +16,7 @@ async function loadLocalApp(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 test('recipe storage life can remain unknown end-to-end', async ({ page }) => {

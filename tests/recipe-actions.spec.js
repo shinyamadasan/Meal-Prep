@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForAppReady } = require('./app-ready');
 
 // Exercises real recipe CARDS — the blind spot of the other suites. The live
 // site needs Firebase to load recipes (App Check blocks headless), so here we
@@ -23,7 +24,7 @@ async function loadWithSamples(page) {
     } catch (e) {}
   });
   await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2500);
+  await waitForAppReady(page);
 }
 
 test('clicking a sample recipe card opens the editor (numeric id)', async ({ page }) => {

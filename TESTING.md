@@ -7,10 +7,19 @@ Quick reference for the automated button tests. (Tool: [Playwright](https://play
 ## Run the tests
 
 ```bash
-npm test                 # run everything
+npm test                 # the branch gate -- same as test:local
+npm run test:local       # this checkout, offline, deterministic
+npm run test:prod        # the DEPLOYED site (only meaningful after a deploy)
+npm run test:all         # both, in one run
 npm run test:smoke       # just the crash check (fast, broad)
 npm run test:functional  # just the "did it actually work" checks
 ```
+
+**The split matters (D-065).** `test:local` loads `index.html` from your checkout over
+`file://`, so it tests the code you are about to push and never touches the network.
+`test:prod` fetches the live GitHub Pages site, so it can only tell you about what is
+already deployed -- it cannot validate a branch, and it goes red when the network hiccups.
+Mixing them into one number is why several "failures" turned out to be neither.
 
 **First time on a new computer only:**
 ```bash
@@ -97,7 +106,9 @@ Tests run **automatically** on GitHub whenever you push a change to `app.js`,
 - **Where to watch it:** repo → **Actions** tab → "Button tests".
 - ✅ green check = all buttons still work. ❌ red X = something broke (click in to
   see which test + why; a report is attached on failure).
-- It waits ~90s first so GitHub Pages can redeploy your push before testing.
+- It runs `test:local` FIRST (fast, offline -- a real regression shows up in about a
+  minute), then waits ~90s for GitHub Pages to redeploy your push, then runs
+  `test:prod` against the freshly deployed site.
 - **Cost:** free (public repo) — and **no AI tokens**, it's just GitHub running
   `npm test` on its own servers.
 - You can also trigger it by hand: Actions tab → "Button tests" → "Run workflow".
@@ -111,6 +122,9 @@ Tests run **automatically** on GitHub whenever you push a change to `app.js`,
 | `tests/button-smoke.spec.js` | Clicks every button, catches crashes |
 | `tests/buttons-functional.spec.js` | Asserts buttons do their job |
 | `package.json` → `scripts` | The `npm test` shortcuts |
+| `playwright.config.js` | Defines the `local` and `prod` projects (which specs each gate runs) |
+| `tests/suite-classification.spec.js` | Fails if a spec is filed in the wrong gate |
+| `tests/app-ready.js` | Shared "app finished initialising" wait for the local specs |
 | `.github/workflows/test.yml` | Auto-runs the tests on every push |
 | `.gitignore` | Keeps test junk (`test-results/`) out of git |
 | `TESTING.md` | This cheat sheet |
