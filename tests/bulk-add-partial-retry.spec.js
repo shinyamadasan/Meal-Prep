@@ -268,6 +268,53 @@ test('13. natural trailing-date parsing still works', async ({ page }) => {
   expect(r.pantry.find((p) => p.name === 'Carrot').expiryDate).toBe('2026-09-08');
 });
 
+// D-067's two-digit-year extension must not open a hole in the retry loop: a two-digit
+// date is a RESOLVED line (it leaves the textarea), and a slash date is still actionable
+// at either year width.
+test('13b. a two-digit trailing year resolves its line; a two-digit slash date does not',
+  async ({ page }) => {
+    await loadLocalApp(page);
+    await openBulk(page);
+    const shortAmbig = 'Milk 2 L 8/8/26';
+    const r = await submit(page, ['Eggs 12 pcs Aug 8 26', shortAmbig,
+                                  'Carrot 1 kg 8 Sep 27'].join('\n'));
+
+    expect(r.pantry.map((p) => p.name).sort()).toEqual(['Carrot', 'Eggs']);
+    expect(r.pantry.find((p) => p.name === 'Eggs'))
+      .toMatchObject({ quantity: 12, unit: 'pcs', expiryDate: '2026-08-08' });
+    expect(r.pantry.find((p) => p.name === 'Carrot').expiryDate).toBe('2027-09-08');
+    expect(r.modalOpen).toBe(true);
+    expect(r.textarea).toBe(shortAmbig);     // exact original text, nothing rewritten
+    expect(r.summary).toBe('2 items added \u00b7 1 line needs attention.');
+
+    // Correcting it in place to the two-digit natural form finishes the batch, and the
+    // already-resolved lines are not re-submitted.
+    const corrected = (await page.inputValue('#bulk-add-textarea')).replace('8/8/26', 'Aug 8 26');
+    const r2 = await submit(page, corrected);
+    expect(r2.pantry).toHaveLength(3);
+    expect(r2.pantry.find((p) => p.name === 'Milk').expiryDate).toBe('2026-08-08');
+    expect(r2.toast).toBe('1 item added.');
+    expect(r2.notes.join(' ')).not.toContain('already in pantry');
+    expect(r2.modalOpen).toBe(false);
+    const names = r2.pantry.map((p) => p.name);
+    expect(new Set(names).size).toBe(names.length);   // no duplicate records
+  });
+
+// A two-digit year naming a day the calendar does not have is NOT a recognised date, so
+// the line is added with the text intact - exactly what the four-digit spelling does.
+// It must not become an actionable line that traps the user in the retry loop.
+test('13c. an impossible two-digit date behaves exactly like its four-digit twin',
+  async ({ page }) => {
+    await loadLocalApp(page);
+    await openBulk(page);
+    const r = await submit(page, 'Butter 250 g Feb 31 26\nCheese 200 g Feb 31 2026');
+    expect(r.pantry.map((p) => p.name))
+      .toEqual(['Butter 250 g Feb 31 26', 'Cheese 200 g Feb 31 2026']);
+    expect(r.pantry.every((p) => p.expiryDate === null)).toBe(true);
+    expect(r.modalOpen).toBe(false);
+    expect(r.textarea).toBe('');
+  });
+
 test('14. slash dates remain refused', async ({ page }) => {
   await loadLocalApp(page);
   await openBulk(page);

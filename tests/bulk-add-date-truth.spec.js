@@ -23,9 +23,22 @@ const { waitForAppReady } = require('./app-ready');
  * "bulk" spec is about bulk *cleanup* (removeAllExpired), a different feature.
  *
  * The rule under test is deliberately narrow: a trailing month-word (or full ISO) date
- * with a four-digit year is recognised and stripped; anything else is left alone rather
- * than guessed. No second expiry model — everything lands in the D-066 fields and renders
- * through the D-066 renderer.
+ * is recognised and stripped; anything else is left alone rather than guessed. No second
+ * expiry model — everything lands in the D-066 fields and renders through the D-066
+ * renderer.
+ *
+ * EXTENDED (two-digit years): the month-word shapes now also accept a two-digit year,
+ * mapped 00-99 to 2000-2099. `Eggs 12 pcs Aug 8 26` was the reported follow-up defect —
+ * it stored the whole string as the name and then invented a category shelf life, the
+ * exact D-066 symptom by a third door, purely because the year was two digits. The comma
+ * spelling `Eggs, 12, pcs, Aug 8 26` failed differently and more quietly: name, quantity
+ * and unit parsed fine and the fourth field was dropped on the floor, so the item took
+ * the shared/derived date with no warning at all.
+ *
+ * What the extension must NOT do is start reading two-digit numbers as years. The
+ * safeguard is the COMPLETE grammar — month word AND day AND year — not the year's
+ * width, so `Formula 26`, `Protein 8 26`, `Sauce Aug 26` and `Vitamin May 26` still have
+ * to come through as plain names. Slash dates stay refused at every year width.
  */
 
 test.use({ viewport: { width: 1280, height: 1600 } });
@@ -124,6 +137,79 @@ test('3b. day-first and trailing-ISO forms also work', async ({ page }) => {
   }
 });
 
+// ── 3c-3g. Two-digit years in the same trailing grammar ─────────────────────
+
+test('3c. "Eggs 12 pcs Aug 8 26" parses like its four-digit twin', async ({ page }) => {
+  await loadLocalApp(page);
+  const short = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26'));
+  expect(short).toMatchObject({ name: 'Eggs', quantity: 12, unit: 'pcs',
+                                expiryDate: '2026-08-08', dateMode: 'expiry' });
+  // The reported symptom: the whole line used to become the name and then pick up a
+  // derived category shelf life.
+  expect(short.name).not.toMatch(/aug|26/i);
+  expect(short.chip).toBe('Expires Aug 8');
+
+  // Field for field the same record the four-digit spelling produces, so nothing
+  // downstream can tell the two apart.
+  const long = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 2026'));
+  expect(short.expiryDate).toBe(long.expiryDate);
+  expect(short.dateMode).toBe(long.dateMode);
+  expect(short.shelfLifeDays).toBe(long.shelfLifeDays);
+});
+
+test('3d. the other two-digit spellings work too', async ({ page }) => {
+  await loadLocalApp(page);
+  for (const line of ['Eggs 12 pcs August 8 26',       // full month word
+                      'Eggs 12 pcs 8 Aug 26',          // day-first
+                      'Eggs, 12, pcs, Aug 8 26',       // comma form (used to drop the date)
+                      'Eggs 12 pcs Aug 8th, 26',       // ordinal + comma
+                      'Eggs 12 pcs Sept. 8 26']) {     // abbreviation with a period
+    const it = only(await bulkAdd(page, line));
+    expect(it.name, line).toBe('Eggs');
+    expect(it.quantity, line).toBe(12);
+    expect(it.unit, line).toBe('pcs');
+    expect(it.dateMode, line).toBe('expiry');
+    expect(it.expiryDate, line).toBe(line.includes('Sept') ? '2026-09-08' : '2026-08-08');
+  }
+});
+
+test('3e. the two-digit year maps 00-99 to 2000-2099, with no sliding window', async ({ page }) => {
+  await loadLocalApp(page);
+  const cases = { 'Eggs Aug 8 26': '2026-08-08', 'Eggs Aug 8 30': '2030-08-08',
+                  'Eggs Aug 8 99': '2099-08-08', 'Eggs Aug 8 00': '2000-08-08',
+                  'Eggs Aug 8 05': '2005-08-08' };
+  for (const line of Object.keys(cases)) {
+    expect(only(await bulkAdd(page, line)).expiryDate, line).toBe(cases[line]);
+  }
+});
+
+test('3f. a two-digit year naming a day the calendar does not have is rejected',
+  async ({ page }) => {
+    await loadLocalApp(page);
+    // Same strict round-trip check as the four-digit path: no rollover into March.
+    for (const line of ['Eggs 12 pcs Feb 31 26', 'Eggs 12 pcs 31 Feb 26',
+                        'Eggs 12 pcs Feb 29 26',            // 2026 is not a leap year
+                        'Eggs 12 pcs Aug 32 26', 'Eggs 12 pcs Blah 8 26']) {
+      const it = only(await bulkAdd(page, line));
+      expect(it.expiryDate, line).toBeNull();
+      expect(it.name, line).toBe(line);      // left alone, not nudged to a nearby real day
+    }
+    // ...and the one real leap day at a two-digit year still parses.
+    expect(only(await bulkAdd(page, 'Eggs 12 pcs Feb 29 28')).expiryDate).toBe('2028-02-29');
+  });
+
+test('3g. a slash date is still refused as ambiguous at either year width', async ({ page }) => {
+  await loadLocalApp(page);
+  for (const line of ['Milk 1 L 8/8/26', 'Milk 1 L 08/08/26',
+                      'Milk 1 L 8/8/2026', 'Milk 1 L 08/08/2026']) {
+    const r = await bulkAdd(page, line);
+    expect(r.items, line).toHaveLength(0);
+    expect(r.warnings, line).toContain('ambiguous');
+    // D-068: the exact original line survives in the textarea for correction.
+    expect(await page.inputValue('#bulk-add-textarea'), line).toBe(line);
+  }
+});
+
 // ── 4-7. Precedence ────────────────────────────────────────────────────────
 
 test('4. the documented exp:YYYY-MM-DD syntax still works', async ({ page }) => {
@@ -147,6 +233,23 @@ test('5. exp: outranks both a trailing natural date and the shared field', async
 test('6. a trailing natural date outranks the shared expiry field', async ({ page }) => {
   await loadLocalApp(page);
   const it = only(await bulkAdd(page, 'eggs 12 pcs aug 8 2026', { shared: '2026-12-25' }));
+  expect(it.expiryDate).toBe('2026-08-08');
+  expect(it.dateMode).toBe('expiry');
+});
+
+test('5b. exp: still outranks a TWO-DIGIT trailing date, which is still stripped', async ({ page }) => {
+  await loadLocalApp(page);
+  const it = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26 exp:2026-09-01',
+                                { shared: '2026-12-25' }));
+  expect(it.expiryDate).toBe('2026-09-01');   // exp: wins, unchanged by D-067's extension
+  expect(it.name).toBe('Eggs');               // ...and the trailing date still left the name
+  expect(it.quantity).toBe(12);
+  expect(it.unit).toBe('pcs');
+});
+
+test('6b. a two-digit trailing date outranks the shared expiry field', async ({ page }) => {
+  await loadLocalApp(page);
+  const it = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26', { shared: '2026-12-25' }));
   expect(it.expiryDate).toBe('2026-08-08');
   expect(it.dateMode).toBe('expiry');
 });
@@ -243,6 +346,27 @@ test('10b. a year-like number alone is not treated as a date', async ({ page }) 
   }
 });
 
+test('10c. adversarial two-digit names are not read as dates', async ({ page }) => {
+  await loadLocalApp(page);
+  // A two-digit number is NEVER a year on its own. Recognition needs the whole grammar:
+  // a month word AND a day AND a year. Each line below is missing one of those.
+  const names = ['Formula 26',        // no month word at all
+                 'Protein 8 26',      // two numbers, still no month word
+                 'Sauce Aug 26',      // month word, but only one number where two are needed
+                 'Vitamin May 26',    // same, with the month word that is also a real word
+                 'Mix 26',
+                 'Blend 8 26',
+                 'Juice Dec 26',
+                 'Bar 99'];
+  const r = await bulkAdd(page, names.join('\n'));
+  expect(r.items.map((i) => i.name)).toEqual(names);
+  r.items.forEach((i, n) => {
+    expect(i.expiryDate, names[n]).toBeNull();
+    expect(i.dateMode, names[n]).toBeNull();
+  });
+  expect(r.warnings).toBe('');
+});
+
 // ── 11. Mixed sources across lines ─────────────────────────────────────────
 
 test('11. one submission can mix natural, exp:, shared and no date', async ({ page }) => {
@@ -282,6 +406,41 @@ test('12. structured fields survive a save and reload', async ({ page }) => {
   expect(rec.unit).toBe('pcs');
   expect(rec.expiryDate).toBe('2026-08-08');
   expect(rec.dateMode).toBe('expiry');
+});
+
+test('12b. a two-digit-year record survives save and reload as the canonical ISO date',
+  async ({ page }) => {
+    await loadLocalApp(page);
+    await bulkAdd(page, 'Eggs 12 pcs Aug 8 26');
+    await page.evaluate(() => saveData());
+
+    // What is persisted is the canonical date, not the user's shorthand.
+    const stored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForAppReady(page);
+
+    const rec = await page.evaluate(() => AppState.pantry.find((p) => p.name === 'Eggs'));
+    expect(rec).toBeTruthy();
+    expect(rec.quantity).toBe(12);
+    expect(rec.unit).toBe('pcs');
+    expect(rec.expiryDate).toBe('2026-08-08');
+    expect(rec.dateMode).toBe('expiry');
+    expect(JSON.stringify(stored)).not.toContain('Aug 8 26');
+  });
+
+test('the two-digit-year path raises no console or page errors', async ({ page }) => {
+  const errors = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(e.message));
+  await loadLocalApp(page);
+  await bulkAdd(page, ['Eggs 12 pcs Aug 8 26', 'Milk 1 L 8 Sep 27', 'Formula 26',
+                       'Butter 250 g Feb 31 26'].join('\n'));
+  await page.evaluate(() => { showTab('fridge'); renderPantry(); });
+  await page.waitForTimeout(200);
+  // file:// blocks the Firebase CDN in this harness; that network error is the harness.
+  expect(errors.filter((e) => !/ERR_FAILED|Failed to load resource|firebasejs/i.test(e)))
+    .toEqual([]);
 });
 
 // ── 13. It renders through the D-066 model, unchanged ──────────────────────
@@ -354,7 +513,7 @@ test('the pre-existing no-comma and comma formats are unchanged', async ({ page 
 
 // ── The date helper in isolation ───────────────────────────────────────────
 
-test('parseTrailingDate accepts only the three documented shapes', async ({ page }) => {
+test('parseTrailingDate accepts only the three documented shapes, at either year width', async ({ page }) => {
   await loadLocalApp(page);
   const out = await page.evaluate(() => {
     const accept = {
@@ -364,12 +523,27 @@ test('parseTrailingDate accepts only the three documented shapes', async ({ page
       'Eggs, aug 8 2026': '2026-08-08',
       'Eggs Dec 31 2026': '2026-12-31',
       'Eggs 2026-08-08': '2026-08-08',
-      'Eggs feb 29 2028': '2028-02-29'          // a real leap day
+      'Eggs feb 29 2028': '2028-02-29',         // a real leap day
+      // Two-digit years, same grammar, mapped 00-99 -> 2000-2099.
+      'Eggs aug 8 26': '2026-08-08',
+      'Eggs August 8 26': '2026-08-08',
+      'Eggs 8 August 26': '2026-08-08',
+      'Eggs, aug 8 26': '2026-08-08',
+      'Eggs Dec 31 26': '2026-12-31',
+      'Eggs feb 29 28': '2028-02-29',
+      'Eggs aug 8 00': '2000-08-08',
+      'Eggs aug 8 99': '2099-08-08'
     };
     const reject = ['7 Up', 'Heinz 57 Sauce', 'Vitamin B12', '12 Grain Bread',
-                    'Formula 1 Protein', 'Milk 8/8/2026', 'Eggs feb 30 2026',
-                    'Eggs feb 29 2026', 'Eggs aug 8', 'Eggs 8 2026', 'aug 8 2026',
-                    'Eggs aug 8 26', 'Eggs blah 8 2026'];
+                    'Formula 1 Protein', 'Milk 8/8/2026', 'Milk 8/8/26',
+                    'Eggs feb 30 2026', 'Eggs feb 29 2026', 'Eggs aug 8',
+                    'Eggs 8 2026', 'aug 8 2026', 'Eggs blah 8 2026',
+                    // Two-digit adversarial: a bare two-digit number is never a year,
+                    // and a partial date is not a date.
+                    'Eggs feb 30 26', 'Eggs feb 29 26', 'Eggs blah 8 26',
+                    'Formula 26', 'Protein 8 26', 'Sauce Aug 26', 'Vitamin May 26',
+                    'Eggs 8 26', 'Eggs aug 26', 'aug 8 26', 'Eggs aug 8 226',
+                    'Eggs aug 8 2', 'Eggs aug 8 026'];
     const bad = [];
     Object.keys(accept).forEach((k) => {
       const r = parseTrailingDate(k);
@@ -382,4 +556,42 @@ test('parseTrailingDate accepts only the three documented shapes', async ({ page
     return bad;
   });
   expect(out).toEqual([]);
+});
+
+// ── Mobile ─────────────────────────────────────────────────────────────────
+
+test.describe('mobile two-digit years', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('390px: a two-digit date parses and the modal still does not overflow', async ({ page }) => {
+    await loadLocalApp(page);
+    await page.evaluate(() => { showTab('fridge'); openBulkAddModal(); });
+    await page.fill('#bulk-add-textarea', 'Eggs 12 pcs Aug 8 26\nMilk 1 L 8 Sep 27');
+    await page.click('#bulk-add-modal button:has-text("Add Items")');
+    await page.waitForTimeout(200);
+
+    const items = await page.evaluate(() => AppState.pantry.map((p) => ({
+      name: p.name, quantity: p.quantity, expiryDate: p.expiryDate })));
+    expect(items).toHaveLength(2);
+    expect(items.find((i) => i.name === 'Eggs').expiryDate).toBe('2026-08-08');
+    expect(items.find((i) => i.name === 'Milk').expiryDate).toBe('2027-09-08');
+
+    const o = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth
+    }));
+    expect(o.scrollW).toBeLessThanOrEqual(o.clientW);
+
+    // The format-help line is the only thing this change touched in the markup; it must
+    // still wrap inside the modal rather than widening it.
+    await page.evaluate(() => openBulkAddModal());
+    const help = await page.locator('#bulk-add-modal .modal-content').boundingBox();
+    expect(help.x).toBeGreaterThanOrEqual(-1);
+    expect(help.x + help.width).toBeLessThanOrEqual(391);
+    const o2 = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth
+    }));
+    expect(o2.scrollW).toBeLessThanOrEqual(o2.clientW);
+  });
 });

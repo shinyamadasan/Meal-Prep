@@ -206,6 +206,15 @@ function toISODate(y, m, d) {
   return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 }
 
+// A trailing month-word date may write its year with two digits. 00-99 means 2000-2099,
+// with no sliding window: an expiry is a future date, so there is no 19xx reading worth
+// preserving. Applies ONLY inside parseTrailingDate's grammar — two-digit numbers
+// anywhere else in an item name stay numbers.
+function expandYear(raw) {
+  var n = Number(raw);
+  return String(raw).length === 2 ? 2000 + n : n;
+}
+
 var MONTH_WORDS = {
   jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
   may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
@@ -216,38 +225,46 @@ var MONTH_WORDS = {
 // Deliberately NOT a natural-language date parser. It recognises exactly three shapes,
 // and only as a TRAILING segment preceded by whitespace or a comma:
 //
-//   <month> <day> <year>   "aug 8 2026", "August 8th, 2026"
-//   <day> <month> <year>   "8 aug 2026"
-//   <year>-<mm>-<dd>       "2026-08-08"
+//   <month> <day> <year>   "aug 8 2026", "August 8th, 2026", "Aug 8 26"
+//   <day> <month> <year>   "8 aug 2026", "8 Aug 26"
+//   <year>-<mm>-<dd>       "2026-08-08"          (four-digit year only)
 //
 // Anything else is left ALONE rather than guessed. 8/8/2026 in particular is day-first in
 // half the world and month-first in the other half; guessing it wrong moves an expiry by
 // months, which is the exact class of invented freshness D-066 exists to prevent.
 //
-// Requiring a month WORD (or a full ISO date) plus a four-digit year is also what keeps
-// product names intact: "7 Up", "Heinz 57 Sauce", "Formula 1 Protein", "Vitamin B12" and
-// "12 Grain Bread" all fail every pattern, because none of them ends in a month and a year.
+// The month-word shapes take a four-digit year OR a two-digit one; a bare two-digit year
+// maps 00-99 to 2000-2099. Groceries are bought with "Aug 8 26" written on them, and
+// forcing "2026" every time is a tax the user pays for the parser's convenience. The
+// mapping is total and has no sliding window: 26 is 2026 and 99 is 2099, never 1926.
+//
+// What keeps product names intact is the COMPLETE grammar, not the year's width: a month
+// WORD (or a full ISO date) AND a day AND a year. "7 Up", "Heinz 57 Sauce", "Formula 1
+// Protein", "Vitamin B12", "12 Grain Bread", "Formula 26" and "Protein 8 26" all fail
+// every pattern for want of a month word; "Sauce Aug 26" and "Vitamin May 26" have a
+// month word but only one number where the grammar needs two, so they fail too. A
+// two-digit number is never a year on its own — only as the last token of a full date.
 //
 // Returns { iso, rest } with the date removed, or null to leave the text untouched.
 function parseTrailingDate(text) {
   var s = String(text || ''), m, mon;
 
   // <month> <day> <year>
-  m = s.match(/^(.*\S)[\s,]+([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\s*$/);
+  m = s.match(/^(.*\S)[\s,]+([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}|\d{2})\s*$/);
   if (m) {
     mon = MONTH_WORDS[m[2].toLowerCase()];
-    if (mon && isRealCalendarDate(+m[4], mon, +m[3])) {
-      return { iso: toISODate(+m[4], mon, +m[3]), rest: m[1] };
+    if (mon && isRealCalendarDate(expandYear(m[4]), mon, +m[3])) {
+      return { iso: toISODate(expandYear(m[4]), mon, +m[3]), rest: m[1] };
     }
     return null;   // looked like a date but is not one — do not fall through and guess
   }
 
   // <day> <month> <year>
-  m = s.match(/^(.*\S)[\s,]+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\s*$/);
+  m = s.match(/^(.*\S)[\s,]+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4}|\d{2})\s*$/);
   if (m) {
     mon = MONTH_WORDS[m[3].toLowerCase()];
-    if (mon && isRealCalendarDate(+m[4], mon, +m[2])) {
-      return { iso: toISODate(+m[4], mon, +m[2]), rest: m[1] };
+    if (mon && isRealCalendarDate(expandYear(m[4]), mon, +m[2])) {
+      return { iso: toISODate(expandYear(m[4]), mon, +m[2]), rest: m[1] };
     }
     return null;
   }
