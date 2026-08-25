@@ -1438,6 +1438,13 @@ moving either bound by one in either direction (`SHORT_YEAR_BACK` 1→0 or 1→2
 fails 4; extending the rescue to the shared expiry field fails 1; and stripping the implausible date
 out of a rescued line's name fails 4. Every pre-existing case passes under all nine.
 
+Landed as an operator-approved D-032 `done` merge: `--no-ff` at `7ce77cc` (parents `6692e2a` +
+`f2aaca8`), the four reviewed commits unchanged, with the production-smoke follow-up at `88d6357`
+written only after Pages had actually served `7ce77cc`. Final main `88d6357`; served `app.js`,
+`index.html` and `style.css` verified SHA-256-identical to it. Recorded as TASK-054 — an extension
+of this entry, not a new decision, because the expiry model, the precedence ladder, the refusal to
+guess slash dates and the calendar validation are all the ones written above.
+
 Verify: app.js contains "function expandYear(raw)"
 Verify: app.js contains "function shortYearPlausible(y)"
 Verify: app.js contains "return { shortYear: yearRaw }"

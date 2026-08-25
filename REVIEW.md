@@ -4,6 +4,102 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-054 — APPROVED (Bulk Add short years, D-067 extension) — D-032 `done`, operator-approved
+branch: fix/bulk-add-two-digit-year @ f2aaca8 → main @ 7ce77cc (`--no-ff`, unrebased)
+final main: 88d6357 (production smoke follow-up)
+verdict: approved — text parsing plus one branch of Bulk Add control flow; outside the red zone
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**. The `app.js` diff is three hunks, all inside the date-parsing region and
+`confirmBulkAdd()`'s trailing-date branch: two new helpers (`expandYear`, `shortYearPlausible`),
+one extracted shared verdict (`trailingDateVerdict`, which both month-word branches now route
+through so they cannot drift apart), a third return shape on `parseTrailingDate()`, and one
+`if (!perLineExpiry)` guard. `index.html` is one sentence of Bulk Add help copy. `style.css`,
+`sw.js` and `manifest.json` are byte-unchanged.
+
+A red-zone grep across the entire branch diff returns **zero** lines touching `saveData`,
+`saveToFirestore`, `saveToLocalStorage`, `cloudReady`, tombstones, `MASS_DELETE_GUARD`,
+`recordLocalDeletions`, `snapshotIdBaseline`, `buildFirestorePayload`, `applyPurchaseToStock`,
+`canMergePurchase*`, `findMergeableStock`, `pantryDaysLeft`, `pantryExpiryInfo`,
+`FRESHNESS_WARN_DAYS`, `renderPantry`, `:root`, `serviceWorker` or auth. No new persisted state
+and no persisted-shape change: the parser's only output is the same canonical `expiryDate` /
+`dateMode` pair D-066 already stores.
+
+### What was wrong, and what the four review rounds changed
+
+Characterised on unmodified `main @ 6692e2a` before any edit. `Eggs 12 pcs Aug 8 26` stored the
+whole line as `name`, `inferCategory()` matched "eggs" inside it, and `categoryShelfLife('Protein')`
+supplied 3 days — the exact D-066/D-067 symptom, through a third door, purely because the year was
+two digits. `Eggs, 12, pcs, Aug 8 26` failed differently and more quietly: name, quantity and unit
+parsed correctly and the fourth field was dropped with no warning at all.
+
+Round 1 accepted a two-digit year on a total 00-99 map. **Review caught that this was too
+permissive**, and the catch was correct: `Juice May 5 12` became an expiry in 2012. Round 2 added
+the plausibility window. **Review then caught that the window had put a new rung above the top of
+the D-067 ladder** — `Juice May 5 12 exp:2026-08-08` was being held back even though the user had
+already supplied an unambiguous expiry. Round 3 fixed that. Both catches were real defects that the
+implementation had shipped past; neither was a preference call.
+
+### Verdict per contract
+
+| contract | verdict |
+|---|---|
+| `Aug 8 26` / `August 8 26` / `8 Aug 26` / comma form → Eggs / 12 / pcs / `2026-08-08` | ✅ |
+| Deterministic expansion, no sliding century rule | ✅ 26→2026, never 1926 |
+| Window `[currentYear - 1, currentYear + 10]` inclusive, clock-relative | ✅ proven from one input across pinned 2026 and 2030 clocks |
+| Four-digit years never windowed; no general expiry-age rule | ✅ `May 5 2012`, `1999`, `2099`, ISO all store as typed |
+| Implausible short year → D-068 attention, not persisted, exact text, four-digit guidance | ✅ |
+| Date text never buried in the item name | ✅ third verdict `{ shortYear }` exists precisely for this |
+| Valid `exp:` outranks the rejection; short year stays in the name | ✅ |
+| Shared expiry / shelf-life inference do NOT rescue | ✅ |
+| Invalid `exp:` fails on its own terms | ✅ rejected before the year is reached; note names the expiry |
+| Plausible date + `exp:` → date stripped, `exp:` wins | ✅ unchanged from D-067 |
+| Calendar validity judged before the year | ✅ `Feb 31 26` stays "not a date at all"; no March rollover |
+| Slash dates refused at every width | ✅ unchanged, including with `exp:` present |
+| Numeric-name safeguards | ✅ original list plus six new adversarial two-digit cases |
+| D-068 retry | ✅ resolved lines leave, actionable stay byte-for-byte, no reprocessing |
+| D-069 merge | ✅ short and four-digit produce byte-identical records and identical toasts |
+
+### Evidence quality
+
+Two things raise this above the usual bar. First, **the tests control the clock.** Because the
+expansion is relative to the current year, any case asserting a literal expansion would have
+started failing in 2037; `page.clock.setFixedTime` pins 2026 where the literals live and 2030 to
+prove the window moves, and one case derives the bounds from the app's own clock so it states the
+rule rather than a date. The production smokes do the same — short-year inputs there are built from
+the *deployed* app's clock, so the post-deploy gate cannot rot either.
+
+Second, **nine mutants, all caught**: four-digit-only (12 fail), window removed (3), each bound
+moved one step in each direction (3 each), rejected year buried in the name (7), `exp:` rescue
+removed (4), rescue extended to the shared field (1), rescued line's name stripped (4). Every
+pre-existing case passes under all nine, which is the shape a safe extension should have.
+
+Worth recording honestly: **three of the implementer's own draft assertions were wrong about D-069
+and the app was right** — twice expecting a merge where a printed expiry correctly forces
+separation, once expecting a second record where a quantity-less duplicate is correctly skipped.
+Each was corrected to the real rule rather than the code being bent to the test. That the existing
+D-069 machinery pushed back three times is itself evidence it is well specified.
+
+### Not rubber-stamped
+
+Two things were checked specifically because they are where this kind of change goes wrong, and
+both held: the regex alternation `(\d{4}|\d{2})` does not mis-match a three-digit year (`aug 8 226`
+and `aug 8 026` both fail cleanly rather than truncating), and `expandYear()` runs *before*
+`isRealCalendarDate()` so a short year can never bypass calendar validation.
+
+### Carried forward, deliberately not fixed
+Slash date + `exp:` remains `attention` — the one place `exp:` is not the top of the ladder,
+carried forward by explicit operator instruction. `Trail Mix May 5 26` remains the accepted
+trailing-date tradeoff. Historical names are never re-parsed. Input-path consolidation,
+two-tap pantry-card collapse and unknown-quantity paired rows all remain separate work.
+
+### Gate chosen, and why
+**`done`**, not `approved`. Text parsing and one control-flow branch; nothing in the red zone; the
+change only ever widens or narrows what a *new* submission parses into fields that already exist,
+and stored records are never re-read. Operator directed the landing explicitly.
+
+---
 ## Review TASK-053 — APPROVED (inventory quantity truth, D-069) — D-032 `done`, operator-approved
 branch: fix/inventory-quantity-truth @ 4b0d761 → main @ 0fe2a63 (`--no-ff`, unrebased)
 final main: 006f779 (production smoke follow-up)

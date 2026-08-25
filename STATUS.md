@@ -5,6 +5,131 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-25 — Bulk Add short years landed (TASK-054, D-067 extension) — the fix that had to be narrowed twice
+
+`fix/bulk-add-two-digit-year` → `main` (`7ce77cc`, `--no-ff`, unrebased). Four commits — `b594e74`,
+`c649e81`, `3aceda5`, `f2aaca8` — landed unchanged. Production smoke follow-up `88d6357`.
+**Final main: `88d6357`.** `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### The complaint
+
+The same Kitchen Truth failure, one door further along. `Eggs 12 pcs Aug 8 26` — how a carton is
+printed and how a person actually types it — reproduced D-067's original symptom exactly:
+
+```
+input : Eggs 12 pcs Aug 8 26
+stored: name="Eggs 12 pcs Aug 8 26", quantity=null, unit="", no expiry
+shown : Best by Aug 28 · 3d left      (inferCategory → Protein → 3-day category shelf life)
+```
+
+The comma spelling failed more quietly still: `Eggs, 12, pcs, Aug 8 26` parsed name, quantity and
+unit correctly and dropped the date field on the floor with no warning at all. The only thing
+separating both from the already-working four-digit forms was the width of the year. Requiring
+`2026` every time is a tax the user pays for the parser's convenience, and it was being collected
+in the currency D-066 exists to protect.
+
+Root cause was one line, twice: both month-word branches of `parseTrailingDate()` hard-required
+`(\d{4})`.
+
+### It took two narrowings to be right
+
+The first version accepted the full `00`-`99` range. Review found `Juice May 5 12` becoming an
+expiry in **2012** — juice that went off fourteen years ago, which nobody types into a pantry.
+`May 5 12` describes a product name far better than it describes a date, and a confidently wrong
+expiry is worse than none.
+
+So expansion stayed deterministic (`26` → `2026`, never `1926`) and what became bounded is whether
+the result is *believed*: `shortYearPlausible()` accepts a short year only inside
+`[currentYear - 1, currentYear + 10]`. Relative to the clock, not a hard-coded range — in 2030 the
+identical string `Aug 8 26` stops parsing and `Aug 8 40` starts.
+
+Then review found the **second** problem: the window had quietly put a new rung *above* the top of
+the D-067 precedence ladder. `Juice May 5 12 exp:2026-08-08` was being held back for correction
+even though the user had already given an unambiguous expiry. `exp:` is the documented escape hatch
+from parser ambiguity, and an escape hatch that closes under the one condition you need it for is
+not an escape hatch. The rejection now fires only when the line carries no valid `exp:`.
+
+### The half that matters more than the bound
+
+A rejected short year is **never swallowed back into the item name** — that would be the original
+defect wearing a new hat. `parseTrailingDate()` gained a third verdict:
+
+| return | meaning |
+|---|---|
+| `{ iso, rest }` | a date, removed from the text |
+| `{ shortYear: 'nn' }` | a real date whose short year is not plausible — hold the line back |
+| `null` | not a date; leave the text completely alone |
+
+On `{ shortYear }` the line becomes D-068 `attention`: not added, exact original text kept, modal
+open, and the note names both problem and fix — *year "12" is outside the expected food-expiry
+range. Use a four-digit year if you mean 2012.*
+
+Final precedence:
+
+```
+Juice May 5 12                       -> attention, not persisted, exact text kept
+Juice May 5 12 exp:2026-08-08        -> added; name stays "Juice May 5 12", expiry 2026-08-08
+Eggs 12 pcs Aug 8 26 exp:2026-09-01  -> unchanged; plausible date IS stripped, exp: wins
+```
+
+The rescued line deliberately does **not** strip `May 5 12` from the name: it was never accepted as
+a date, so removing it would delete text on the strength of a reading the parser just refused. Only
+`exp:` has that authority — the shared field and shelf-life inference never rescue, because they
+would stamp a date unrelated to the one the user typed.
+
+### What protects product names
+
+Not the year's width — the **complete grammar**: month WORD *and* day *and* year, in trailing
+position. `7 Up`, `Heinz 57 Sauce`, `Vitamin B12`, `12 Grain Bread`, `Omega 3 6 9`, `Vitamin 2000`,
+`Sauce 12 2026` and the new adversarial cases `Formula 26`, `Protein 8 26`, `Sauce Aug 26`,
+`Vitamin May 26`, `Eggs 8 26` all still come through as plain names. A two-digit number is never a
+year on its own.
+
+Calendar validity is judged **before** the year, so `Feb 31 26` stays "not a date at all" and
+nothing rolls into March. Four-digit years are never windowed — `May 5 2012` still stores 2012;
+no general expiry-age restriction was added anywhere.
+
+### Evidence
+
+The expansion is clock-relative, so the tests control the clock. `page.clock.setFixedTime` pins
+2026 where the literal cases live and 2030 to prove the window moves from one input; one case
+derives the bounds from the app's own clock and states the rule rather than a date. The production
+smokes build their short-year inputs from the **deployed** app's clock for the same reason — a
+post-deploy gate that rots in 2037 is worse than none.
+
+Mutation-checked **nine ways, every one caught**: four-digit-only (12 fail), window removed (3),
+each bound moved one step in each direction (3 each), rejected year buried in the name (7), `exp:`
+rescue removed (4), rescue extended to the shared field (1), rescued line's name stripped (4).
+Every pre-existing case passes under all nine.
+
+Three of my own draft assertions were wrong about D-069 and the app was right — twice expecting a
+merge where a printed expiry correctly forces separation, once expecting a second record where a
+quantity-less duplicate is correctly skipped. Each was corrected to the real rule. The D-069
+machinery pushing back three times is itself a good sign about it.
+
+Local suite 306 → **335**. Production suite **137 passed / 4 skipped**. `Verify-Decisions.ps1`: all
+29 pointers hold. Served `app.js` / `index.html` / `style.css` verified SHA-256-identical to final
+main, with `expandYear`, `shortYearPlausible`, `trailingDateVerdict`, the `{ shortYear }` verdict
+and the updated help copy all confirmed present in the deployed bundle.
+
+### Red zone
+Untouched. Zero diff lines in `saveData`, `saveToFirestore`, `cloudReady`, tombstones,
+`MASS_DELETE_GUARD`, conflict resolution, freshness calculation, pantry rendering, the inventory
+merge architecture, the D-068 retry machinery, auth, the service worker or the `AppState` shape.
+`style.css`, `sw.js` and `manifest.json` byte-unchanged; `index.html` is one sentence of help copy.
+Recorded as a **D-067 extension**, not a new expiry model.
+
+### Carried forward, deliberately not fixed
+- **Slash date + `exp:` stays `attention`** — the one place `exp:` is not the top of the ladder.
+  `8/8/26` cannot be read at all; `May 5 12` reads fine and is merely implausible. Operator carried
+  it forward explicitly; revisit only if real usage shows a need.
+- `Trail Mix May 5 26` remains the accepted trailing-date tradeoff, now narrowed to plausible years.
+- Historical pantry names are never re-parsed. New submissions only.
+- Input-path consolidation (quick-add vs Bulk Add grammars) remains separate work.
+- Two-tap pantry-card collapse and unknown-quantity paired rows carried from TASK-053.
+- `wave1-portion-truth` parked at `88b5598`.
+
+---
 ## 2026-08-25 — Inventory Quantity Truth landed (TASK-053, D-069) — the bug was not where the report pointed
 
 `fix/inventory-quantity-truth` → `main` (`0fe2a63`, `--no-ff`, unrebased). Two commits, `bf4ad68`
