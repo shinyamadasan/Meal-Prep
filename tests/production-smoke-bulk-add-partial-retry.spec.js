@@ -11,10 +11,15 @@ const { test, expect } = require('@playwright/test');
  * Kept separate from production-smoke-bulk-add-dates.spec.js on purpose: that file proves
  * the D-067 parser, this one proves the D-068 control flow around it.
  *
- * The contract under test:
+ * The contract under test (statuses extended by D-069):
  *   added     -> committed once, removed from the retry textarea
- *   skipped   -> already in pantry; resolved, removed, still reported
+ *   merged    -> topped up existing stock; resolved, removed, reported as updated stock
+ *   skipped   -> already in pantry with nothing to add; resolved, removed, still reported
  *   attention -> NOT committed, stays for correction in original text and order
+ *
+ * D-069 changed WHAT a duplicate line does, not how the retry pass treats it. openLiveBulk()
+ * preloads records with an UNTRACKED quantity, so "unknown + 12" has no honest sum and the
+ * purchase becomes its own record rather than being thrown away.
  *
  * Everything drives the real modal inputs and the real Add Items button, so a regression
  * in the shipped control flow shows up here rather than in a reimplementation of it.
@@ -82,8 +87,11 @@ const OK2 = 'Chicken 1 kg Sep 1 2026';
 test('the deployed bundle contains the partial-retry flow', async ({ page }) => {
   await loadLiveApp(page);
   expect(await page.evaluate(() => typeof buildBulkAddSummary === 'function')).toBe(true);
-  expect(await page.evaluate(() => buildBulkAddSummary(2, 1, 1)))
-    .toBe('2 items added · 1 already in pantry · 1 line needs attention.');
+  // Four-argument signature since D-069: added, merged, skipped, attention.
+  expect(await page.evaluate(() => buildBulkAddSummary(2, 1, 1, 1)))
+    .toBe('2 items added · 1 stock item updated · 1 already in pantry · 1 line needs attention.');
+  expect(await page.evaluate(() => typeof canMergePurchaseInto === 'function')).toBe(true);
+  expect(await page.evaluate(() => typeof applyPurchaseToStock === 'function')).toBe(true);
 });
 
 // ── 1. Partial success ─────────────────────────────────────────────────────
@@ -133,11 +141,12 @@ test('live: duplicate + valid + actionable are each classified honestly', async 
   await openLiveBulk(page, { preload: ['Eggs'] });
   const r = await pressAdd(page, ['Eggs, 12, pcs', OK2, BAD].join('\n'));
 
-  expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs']);
-  expect(r.pantry.find((p) => p.name === 'Eggs').quantity).toBeNull();   // pre-existing, untouched
+  expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs', 'Eggs']);
+  // The pre-existing untracked record is untouched; the purchase is represented too.
+  expect(r.pantry.filter((p) => p.name === 'Eggs').map((p) => p.quantity).sort())
+    .toEqual([12, null]);
   expect(r.textarea).toBe(BAD);            // duplicate resolved and dropped from the retry
-  expect(r.summary).toBe('1 item added · 1 already in pantry · 1 line needs attention.');
-  expect(r.notes.join(' ')).toContain('already in pantry');              // surfaced, not hidden
+  expect(r.summary).toBe('2 items added · 1 line needs attention.');
 });
 
 // ── 4-5. Actionable rows are never persisted; all-invalid keeps everything ─
@@ -161,10 +170,13 @@ test('live: an all-duplicate batch closes with an honest summary', async ({ page
   await openLiveBulk(page, { preload: ['Eggs', 'Chicken', 'Milk'] });
   const r = await pressAdd(page, 'Eggs, 12, pcs\nChicken 1 kg\nMilk 2 L');
 
-  expect(r.pantry).toHaveLength(3);          // the three preloaded, nothing new
-  expect(r.pantry.every((p) => p.quantity === null)).toBe(true);
+  // Each preloaded record has an untracked quantity, so none of the three purchases has an
+  // honest sum to fold into. Each is kept as its own record — losing them was the complaint.
+  expect(r.pantry).toHaveLength(6);
+  expect(r.pantry.filter((p) => p.quantity !== null).map((p) => p.quantity).sort())
+    .toEqual([1, 12, 2]);
   expect(r.modalOpen).toBe(false);           // no pointless retry loop
-  expect(r.toast).toBe('3 already in pantry.');
+  expect(r.toast).toBe('3 items added.');
 });
 
 // ── 8. Shared controls survive ─────────────────────────────────────────────
