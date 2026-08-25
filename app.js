@@ -206,13 +206,25 @@ function toISODate(y, m, d) {
   return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 }
 
-// A trailing month-word date may write its year with two digits. 00-99 means 2000-2099,
-// with no sliding window: an expiry is a future date, so there is no 19xx reading worth
-// preserving. Applies ONLY inside parseTrailingDate's grammar — two-digit numbers
-// anywhere else in an item name stay numbers.
+// A two-digit year expands deterministically: 00-99 means 2000-2099, no sliding window.
+// The expansion says nothing about whether the result is BELIEVABLE; shortYearPlausible()
+// decides that separately, so the two questions never get tangled together.
 function expandYear(raw) {
   var n = Number(raw);
   return String(raw).length === 2 ? 2000 + n : n;
+}
+
+// How far a two-digit year is allowed to land from today before Bulk Add stops believing
+// it. Food does not keep for decades and is not bought long after it expired, so a short
+// year outside this window is far more likely to be part of a product name — or a typo —
+// than a date. Deliberately NOT a general expiry-age restriction: it gates the two-digit
+// SPELLING only. An explicitly typed "May 5 2012" is still stored as 2012.
+var SHORT_YEAR_BACK = 1;     // last year's stock can still be sitting in the freezer
+var SHORT_YEAR_AHEAD = 10;   // covers tinned goods and long-life staples with room to spare
+
+function shortYearPlausible(y) {
+  var now = new Date().getFullYear();
+  return y >= (now - SHORT_YEAR_BACK) && y <= (now + SHORT_YEAR_AHEAD);
 }
 
 var MONTH_WORDS = {
@@ -221,6 +233,18 @@ var MONTH_WORDS = {
   sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
   dec: 12, december: 12
 };
+
+// Shared verdict for both month-word shapes, so the two branches cannot drift apart.
+// Order matters and is deliberate: a day the calendar does not have is not a date at
+// ALL, whatever its year, and keeps D-067's original leave-the-text-alone behaviour.
+// Only an otherwise-valid date can be rejected for an implausible short year.
+function trailingDateVerdict(mon, yearRaw, day, rest) {
+  if (!mon) return null;
+  var y = expandYear(yearRaw);
+  if (!isRealCalendarDate(y, mon, day)) return null;
+  if (String(yearRaw).length === 2 && !shortYearPlausible(y)) return { shortYear: yearRaw };
+  return { iso: toISODate(y, mon, day), rest: rest };
+}
 
 // Deliberately NOT a natural-language date parser. It recognises exactly three shapes,
 // and only as a TRAILING segment preceded by whitespace or a comma:
@@ -233,10 +257,13 @@ var MONTH_WORDS = {
 // half the world and month-first in the other half; guessing it wrong moves an expiry by
 // months, which is the exact class of invented freshness D-066 exists to prevent.
 //
-// The month-word shapes take a four-digit year OR a two-digit one; a bare two-digit year
-// maps 00-99 to 2000-2099. Groceries are bought with "Aug 8 26" written on them, and
-// forcing "2026" every time is a tax the user pays for the parser's convenience. The
-// mapping is total and has no sliding window: 26 is 2026 and 99 is 2099, never 1926.
+// The month-word shapes take a four-digit year OR a two-digit one. Groceries are printed
+// with "Aug 8 26" and typed that way, and forcing "2026" every time is a tax the user pays
+// for the parser's convenience. But a two-digit year is only believed inside the
+// shortYearPlausible() window (last year through ten years out): "Juice May 5 12" is a far
+// better description of a product name than of milk that expired in 2012. Outside the
+// window the grammar still MATCHED, so the text is not quietly buried in the item name —
+// the caller is told, and holds the line back for correction.
 //
 // What keeps product names intact is the COMPLETE grammar, not the year's width: a month
 // WORD (or a full ISO date) AND a day AND a year. "7 Up", "Heinz 57 Sauce", "Formula 1
@@ -245,28 +272,25 @@ var MONTH_WORDS = {
 // month word but only one number where the grammar needs two, so they fail too. A
 // two-digit number is never a year on its own — only as the last token of a full date.
 //
-// Returns { iso, rest } with the date removed, or null to leave the text untouched.
+// Returns exactly one of three things:
+//   { iso, rest }        a date, with the date text removed from `rest`
+//   { shortYear: 'nn' }  the grammar matched and the calendar agrees, but the two-digit
+//                        year is not plausible for food — hold the line back, do not add
+//   null                 not a date; leave the text completely alone
 function parseTrailingDate(text) {
-  var s = String(text || ''), m, mon;
+  var s = String(text || ''), m;
 
   // <month> <day> <year>
   m = s.match(/^(.*\S)[\s,]+([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}|\d{2})\s*$/);
   if (m) {
-    mon = MONTH_WORDS[m[2].toLowerCase()];
-    if (mon && isRealCalendarDate(expandYear(m[4]), mon, +m[3])) {
-      return { iso: toISODate(expandYear(m[4]), mon, +m[3]), rest: m[1] };
-    }
-    return null;   // looked like a date but is not one — do not fall through and guess
+    // looked like a date but is not one -> null, and do not fall through and guess
+    return trailingDateVerdict(MONTH_WORDS[m[2].toLowerCase()], m[4], +m[3], m[1]);
   }
 
   // <day> <month> <year>
   m = s.match(/^(.*\S)[\s,]+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4}|\d{2})\s*$/);
   if (m) {
-    mon = MONTH_WORDS[m[3].toLowerCase()];
-    if (mon && isRealCalendarDate(expandYear(m[4]), mon, +m[2])) {
-      return { iso: toISODate(expandYear(m[4]), mon, +m[2]), rest: m[1] };
-    }
-    return null;
+    return trailingDateVerdict(MONTH_WORDS[m[3].toLowerCase()], m[4], +m[2], m[1]);
   }
 
   // <year>-<mm>-<dd> — the app's own format, already unambiguous
@@ -11598,9 +11622,19 @@ function confirmBulkAdd() {
     // which outranks it. Everything downstream stays the pre-existing qty/unit parser.
     let naturalExpiry = '';
     const trailing = parseTrailingDate(line);
-    if (trailing) {
+    if (trailing && trailing.iso) {
       naturalExpiry = trailing.iso;
       line = trailing.rest.replace(/[\s,]+$/, '').trim();
+    } else if (trailing && trailing.shortYear) {
+      // The grammar matched and the calendar agrees, but the two-digit year is not
+      // plausible for food. Burying "May 5 12" inside the item name is the exact silent
+      // failure D-067 exists to prevent, so the line is held back for correction instead
+      // — same treatment, and same reason, as an ambiguous slash date below.
+      results.push({ line: originalLine, status: 'attention',
+                     message: `"${originalLine}" — year "${trailing.shortYear}" is outside the ` +
+                              `expected food-expiry range. Use a four-digit year if you mean ` +
+                              `${expandYear(trailing.shortYear)}.` });
+      return;
     } else if (looksLikeAmbiguousDate(line)) {
       // Also previously warned and then added the item anyway — with the unparsed date
       // still sitting inside the name. Holding it back is what makes the correction pass

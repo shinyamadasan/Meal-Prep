@@ -1251,8 +1251,9 @@ Verify: app.js contains "looksLikeAmbiguousDate"
 Verify: app.js contains "perLineExpiry || naturalExpiry || bulkExpiry"
 
 Addendum (TASK-054, 2026-08-25): **the trailing month-word shapes now accept a two-digit year as
-well as a four-digit one**, mapped `00`-`99` to `2000`-`2099`. The "No two-digit years" bullet above
-is superseded by this paragraph; everything else in this decision stands unchanged.
+well as a four-digit one**, expanded `00`-`99` to `2000`-`2099` and then believed only inside a
+food-inventory plausibility window of `[currentYear - 1, currentYear + 10]`. The "No two-digit years"
+bullet above is superseded by this addendum; everything else in this decision stands unchanged.
 
 Dogfooding produced the same complaint one door further along. `Eggs 12 pcs Aug 8 26` — how a carton
 is actually printed and how a person actually types it — reproduced this entry's original symptom
@@ -1270,10 +1271,70 @@ these from the already-fixed four-digit forms was the width of the year. Requiri
 is a tax the user pays for the parser's convenience, and the tax was being collected in the currency
 this entry exists to protect: an invented freshness date on real food.
 
-**The century rule is total and has no sliding window.** `26` is `2026`, `30` is `2030`, `99` is
-`2099`, `00` is `2000`. A sliding window (nn < current+N ⇒ 20nn, else 19nn) would be the guess this
-entry refuses to make; a fixed map is a *convention*, stated once and never re-litigated per input.
-1900s are not a plausible reading of a grocery expiry, so nothing real is lost by not offering them.
+**Expansion is deterministic; belief is bounded.** The expansion has no sliding window: `26` is
+`2026`, `12` is `2012`, `99` is `2099`, never `1926`. A sliding century rule (nn < current+N ⇒ 20nn,
+else 19nn) would be exactly the guess this entry refuses to make. What *is* bounded is whether the
+result is believed at all: a two-digit year is accepted only inside a **food-inventory plausibility
+window** of `[currentYear - 1, currentYear + 10]`, inclusive (`SHORT_YEAR_BACK = 1`,
+`SHORT_YEAR_AHEAD = 10`, read through `shortYearPlausible()`).
+
+Review caught why the window is needed. Under the first version of this addendum, which believed the
+full `00`-`99` range:
+
+```
+input : Juice May 5 12
+stored: name="Juice", expiryDate=2012-05-05
+```
+
+Juice that expired fourteen years ago is not a thing anyone types into a pantry. `May 5 12` is far
+better explained as part of a product name, or as a typo, than as a date — and D-066's whole premise
+is that a confidently wrong expiry is worse than no expiry. Standing in 2026 the window therefore
+reads:
+
+| short year | verdict |
+|---|---|
+| `25` (currentYear - 1) | ✅ last year's stock can still be in the freezer |
+| `26` (currentYear) | ✅ |
+| `30` | ✅ |
+| `36` (currentYear + 10) | ✅ tinned goods and long-life staples, with room to spare |
+| `24`, `12`, `99`, `00` | ✗ rejected as a short year |
+
+The window is **relative to the clock, not a hard-coded range**: in 2030 the identical string
+`Aug 8 26` stops parsing and `Aug 8 40` starts. That is asserted from one input across two pinned
+clocks rather than assumed.
+
+**The window gates the two-digit SPELLING only. It is not an expiry-age restriction.** A typed
+four-digit year is a statement, not a shorthand, so `May 5 2012` is still stored honestly as
+`2012-05-05`, and `May 5 1999` and `May 5 2099` likewise. Four-digit years remain governed solely by
+`isRealCalendarDate()`, exactly as before this addendum. Nothing anywhere refuses to store an old
+expiry — the app has to be able to describe food that has already gone off.
+
+### A rejected short year is actionable, never silent
+
+This is the half that matters more than the bound itself. When the grammar matched and the calendar
+agreed but the year is outside the window, the date text is **not** swallowed back into the item
+name — that would be the original D-067 defect wearing a new hat. `parseTrailingDate()` gained a
+third verdict for exactly this:
+
+| return | meaning |
+|---|---|
+| `{ iso, rest }` | a date, removed from the text |
+| `{ shortYear: 'nn' }` | a real date whose short year is not plausible — hold the line back |
+| `null` | not a date; leave the text completely alone |
+
+On `{ shortYear }` the line becomes a D-068 **attention** row: not added to the pantry, exact
+original text preserved in the textarea, modal stays open, and the note names both the problem and
+the fix — *year "12" is outside the expected food-expiry range. Use a four-digit year if you mean
+2012.* Correcting it to `May 5 2012` then succeeds and stores 2012. This is the same treatment an
+ambiguous slash date already gets, for the same reason: an actionable line is never committed,
+because a line cannot both be kept for correction and already exist. That also means `exp:` does not
+rescue such a line — letting it through would leave `May 5 12` sitting inside the item name, which is
+the failure being prevented.
+
+**Order of judgement is deliberate.** Calendar validity is decided first: a day the calendar does not
+have is not a date *at all*, whatever its year, so `Feb 31 12` keeps this entry's original
+leave-the-text-alone behaviour rather than becoming an actionable short-year line. Only an
+otherwise-valid date can be rejected for its year.
 
 **What keeps product names intact was never the year's width — it is the complete grammar.**
 Recognition still requires a month WORD *and* a day *and* a year, all in trailing position. That is
@@ -1291,9 +1352,10 @@ survive for the same structural reason, not by luck:
 | `Eggs 8 26` | no month word |
 
 **A two-digit number is never a year on its own** — only as the last token of a complete trailing
-date. The expansion lives in one three-line helper, `expandYear()`, called only from inside
-`parseTrailingDate()`, so nothing else in the app's text handling can start reading years into
-numbers.
+date, and only then if the window believes it. The expansion lives in one three-line helper,
+`expandYear()`, and the bound in one more, `shortYearPlausible()`; both are called only from inside
+`parseTrailingDate()`'s own `trailingDateVerdict()`, so nothing else in the app's text handling can
+start reading years into numbers.
 
 Everything else about this decision is deliberately untouched:
 
@@ -1325,13 +1387,24 @@ same trade already accepted above for the four-digit case, and the same escape a
 quantity or unit after the name moves the date out of trailing position.
 
 Regression-locked by the extended `tests/bulk-add-date-truth.spec.js` (two-digit parsing, the
-century map, calendar rejection, slash refusal at both widths, precedence, adversarial two-digit
-names, persistence, mobile, console-clean), plus paired D-068 and D-069 parity cases in
-`tests/bulk-add-partial-retry.spec.js` and `tests/inventory-quantity-truth.spec.js`. Mutation-checked
-by restoring the four-digit-only year requirement (`(\d{4}|\d{2})` → `(\d{4})`): **12 tests fail and
-every pre-existing case still passes**, which is the shape the change was supposed to have.
+plausibility window at both bounds and one step past each, the window moving with the clock,
+rejection UX, correction-to-four-digit, calendar rejection, slash refusal at both widths, precedence,
+adversarial two-digit names, persistence, mobile, console-clean), plus paired D-068 and D-069 cases
+in `tests/bulk-add-partial-retry.spec.js` and `tests/inventory-quantity-truth.spec.js`. Because the
+expansion is now clock-relative, every case asserting a literal expanded year pins the clock with
+`page.clock.setFixedTime()` (2026 for the era the literals are written in, 2030 to prove the window
+moves) rather than inheriting whatever year the suite happens to run in; one case derives the bounds
+from the app's own clock so it states the rule and cannot rot.
+
+Mutation-checked six ways, each caught: restoring the four-digit-only year requirement
+(`(\d{4}|\d{2})` → `(\d{4})`) fails 12; removing the window (`shortYearPlausible` → `true`) fails 3;
+moving either bound by one in either direction (`SHORT_YEAR_BACK` 1→0 or 1→2, `SHORT_YEAR_AHEAD`
+10→9 or 10→11) fails 3 each; and burying a rejected short year back in the item name
+(`{ shortYear }` → `null`) fails 7. Every pre-existing case passes under all six.
 
 Verify: app.js contains "function expandYear(raw)"
+Verify: app.js contains "function shortYearPlausible(y)"
+Verify: app.js contains "return { shortYear: yearRaw }"
 
 ## D-068 — Bulk Add finishes what it can and keeps only what you can fix
 

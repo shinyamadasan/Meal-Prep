@@ -35,16 +35,42 @@ const { waitForAppReady } = require('./app-ready');
  * and unit parsed fine and the fourth field was dropped on the floor, so the item took
  * the shared/derived date with no warning at all.
  *
- * What the extension must NOT do is start reading two-digit numbers as years. The
- * safeguard is the COMPLETE grammar — month word AND day AND year — not the year's
- * width, so `Formula 26`, `Protein 8 26`, `Sauce Aug 26` and `Vitamin May 26` still have
- * to come through as plain names. Slash dates stay refused at every year width.
+ * What the extension must NOT do is start reading two-digit numbers as years. Two
+ * safeguards, and both are load-bearing:
+ *
+ *   1. The COMPLETE grammar — month word AND day AND year — not the year's width. So
+ *      `Formula 26`, `Protein 8 26`, `Sauce Aug 26` and `Vitamin May 26` still come
+ *      through as plain names.
+ *   2. A PLAUSIBILITY WINDOW on the expanded short year: [currentYear - 1, currentYear
+ *      + 10]. Review found `Juice May 5 12` becoming an expiry in 2012 under the earlier
+ *      total 00-99 map. Food does not keep for decades, so a short year that far out
+ *      describes a product name better than it describes a date.
+ *
+ * A short year outside the window is NOT silently swallowed into the item name — the
+ * grammar did match, so the line is held back as D-068 attention with its exact text and
+ * guidance to write a four-digit year. The window gates the two-digit SPELLING only:
+ * `May 5 2012` is still stored as 2012, because a typed four-digit year is a statement
+ * rather than a shorthand, and there is no general expiry-age restriction anywhere.
+ *
+ * Slash dates stay refused at every year width.
  */
 
 test.use({ viewport: { width: 1280, height: 1600 } });
 
-async function loadLocalApp(page) {
+// A two-digit year is expanded relative to the CURRENT year, so any test asserting a
+// literal expansion has to say which year it is standing in — otherwise it silently
+// starts failing once the real clock walks out of the plausibility window. page.clock
+// .setFixedTime pins Date.now()/new Date() while leaving timers running, so the app boots
+// and renders normally. Two anchors are used deliberately:
+//   FIXED_2026 — the era the literal `Aug 8 26` cases are written in
+//   FIXED_2030 — a different era, used to prove the window MOVES with the clock rather
+//                than being a hard-coded range that happens to match today
+const FIXED_2026 = '2026-06-15T12:00:00';
+const FIXED_2030 = '2030-06-15T12:00:00';
+
+async function loadLocalApp(page, { fixedTime = null } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__bulkDateBootstrapped')) return;
@@ -140,7 +166,7 @@ test('3b. day-first and trailing-ISO forms also work', async ({ page }) => {
 // ── 3c-3g. Two-digit years in the same trailing grammar ─────────────────────
 
 test('3c. "Eggs 12 pcs Aug 8 26" parses like its four-digit twin', async ({ page }) => {
-  await loadLocalApp(page);
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
   const short = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26'));
   expect(short).toMatchObject({ name: 'Eggs', quantity: 12, unit: 'pcs',
                                 expiryDate: '2026-08-08', dateMode: 'expiry' });
@@ -158,7 +184,7 @@ test('3c. "Eggs 12 pcs Aug 8 26" parses like its four-digit twin', async ({ page
 });
 
 test('3d. the other two-digit spellings work too', async ({ page }) => {
-  await loadLocalApp(page);
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
   for (const line of ['Eggs 12 pcs August 8 26',       // full month word
                       'Eggs 12 pcs 8 Aug 26',          // day-first
                       'Eggs, 12, pcs, Aug 8 26',       // comma form (used to drop the date)
@@ -173,19 +199,158 @@ test('3d. the other two-digit spellings work too', async ({ page }) => {
   }
 });
 
-test('3e. the two-digit year maps 00-99 to 2000-2099, with no sliding window', async ({ page }) => {
-  await loadLocalApp(page);
-  const cases = { 'Eggs Aug 8 26': '2026-08-08', 'Eggs Aug 8 30': '2030-08-08',
-                  'Eggs Aug 8 99': '2099-08-08', 'Eggs Aug 8 00': '2000-08-08',
-                  'Eggs Aug 8 05': '2005-08-08' };
+// ── 3e. The short-year plausibility window ─────────────────────────────────
+//
+// The expansion is still deterministic (26 -> 2026, never 1926), but a two-digit year is
+// only BELIEVED when it lands inside [currentYear - 1, currentYear + 10]. Food does not
+// keep for decades and is not bought long after it expired, so `Juice May 5 12` describes
+// a product name far better than it describes juice that went off in 2012. The window
+// gates the two-digit SPELLING only: an explicitly typed four-digit year is still stored
+// exactly as written, because that is a statement rather than a shorthand.
+
+test('3e. inside the window: previous year, current year and +10 all parse', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2030 });
+  const cases = { 'Eggs Aug 8 29': '2029-08-08',    // currentYear - 1, the lower bound
+                  'Eggs Aug 8 30': '2030-08-08',    // currentYear
+                  'Eggs Aug 8 31': '2031-08-08',
+                  'Eggs Aug 8 40': '2040-08-08',    // currentYear + 10, the upper bound
+                  'Eggs 8 Aug 40': '2040-08-08' };  // day-first shape shares the window
   for (const line of Object.keys(cases)) {
     expect(only(await bulkAdd(page, line)).expiryDate, line).toBe(cases[line]);
   }
 });
 
+test('3e2. outside the window: below the lower bound and above the upper bound',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2030 });
+    // 28 is one year below the bound, 41 one year above; 12, 99 and 00 are far outside.
+    for (const line of ['Juice May 5 28', 'Juice May 5 41', 'Juice May 5 12',
+                        'Juice May 5 99', 'Juice May 5 00', 'Juice 5 May 12']) {
+      const r = await bulkAdd(page, line);
+      expect(r.items, line).toHaveLength(0);                     // NOT persisted
+      expect(r.warnings, line).toContain('outside the expected food-expiry range');
+      expect(r.warnings, line).toContain('four-digit year');
+      // The exact original line survives for correction (D-068).
+      expect(await page.inputValue('#bulk-add-textarea'), line).toBe(line);
+    }
+  });
+
+test('3e3. the window MOVES with the clock - the same line parses in one era, not another',
+  async ({ page, browser }) => {
+    // In 2026, `Aug 8 26` is this year. In 2030 the same four characters are four years
+    // stale and the parser must stop believing them. Proving both from ONE input is what
+    // makes this a window rather than a hard-coded range that happens to fit today.
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+    expect(only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26')).expiryDate).toBe('2026-08-08');
+
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 1600 } });
+    const later = await ctx.newPage();
+    await loadLocalApp(later, { fixedTime: FIXED_2030 });
+    const r = await bulkAdd(later, 'Eggs 12 pcs Aug 8 26');
+    expect(r.items).toHaveLength(0);
+    expect(r.warnings).toContain('year "26" is outside the expected food-expiry range');
+    expect(r.warnings).toContain('2026');            // names the year it would have meant
+    await ctx.close();
+  });
+
+test('3e4. the boundary is inclusive on both ends and exclusive one step past each',
+  async ({ page }) => {
+    // Computed from the app's own clock rather than from a literal, so this case states
+    // the RULE and cannot rot as the real year advances.
+    await loadLocalApp(page);
+    const probe = await page.evaluate(() => {
+      const y = new Date().getFullYear();
+      const two = (n) => String(n % 100).padStart(2, '0');
+      const verdict = (n) => {
+        const r = parseTrailingDate('Eggs Aug 8 ' + two(n));
+        return r && r.iso ? 'parsed' : (r && r.shortYear ? 'rejected' : 'not-a-date');
+      };
+      return { year: y,
+               below: verdict(y - 2), lower: verdict(y - 1), now: verdict(y),
+               upper: verdict(y + 10), above: verdict(y + 11) };
+    });
+    expect(probe.below).toBe('rejected');
+    expect(probe.lower).toBe('parsed');
+    expect(probe.now).toBe('parsed');
+    expect(probe.upper).toBe('parsed');
+    expect(probe.above).toBe('rejected');
+  });
+
+test('3e5. a rejected short year is fixable by typing the four-digit year', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2030 });
+  const bad = 'Juice 1 L May 5 12';
+  const r = await bulkAdd(page, bad);
+  expect(r.items).toHaveLength(0);
+  expect(await page.inputValue('#bulk-add-textarea')).toBe(bad);
+
+  // The guidance names exactly what to type; typing it works, and stores 2012 honestly.
+  // Typed into the REAL visible modal, the way the correction pass actually happens.
+  await page.evaluate(() => { showTab('fridge');
+                              document.getElementById('bulk-add-modal').classList.remove('hidden'); });
+  const fixed = (await page.inputValue('#bulk-add-textarea')).replace('May 5 12', 'May 5 2012');
+  await page.fill('#bulk-add-textarea', fixed);
+  const r2 = await page.evaluate(() => {
+    document.getElementById('bulk-add-warnings').innerHTML = '';
+    confirmBulkAdd();
+    return { items: AppState.pantry.map((x) => ({ name: x.name, quantity: x.quantity,
+                                                  unit: x.unit, expiryDate: x.expiryDate })),
+             textarea: document.getElementById('bulk-add-textarea').value,
+             warnings: (document.getElementById('bulk-add-warnings').textContent || '').trim() };
+  });
+  expect(r2.items).toHaveLength(1);
+  expect(r2.items[0]).toMatchObject({ name: 'Juice', quantity: 1, unit: 'L',
+                                      expiryDate: '2012-05-05' });
+  expect(r2.textarea).toBe('');
+  expect(r2.warnings).toBe('');
+});
+
+test('3e6. the window gates the two-digit SPELLING only, never a four-digit year',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2030 });
+    // Every one of these is far outside the short-year window and every one is stored as
+    // typed. There is no general expiry-age restriction: four-digit years stay governed
+    // solely by real-calendar validation, exactly as before.
+    const cases = { 'Juice May 5 2012': '2012-05-05', 'Juice 5 May 2012': '2012-05-05',
+                    'Juice May 5 1999': '1999-05-05', 'Juice May 5 2099': '2099-05-05',
+                    'Juice 2012-05-05': '2012-05-05' };
+    for (const line of Object.keys(cases)) {
+      const it = only(await bulkAdd(page, line));
+      expect(it.expiryDate, line).toBe(cases[line]);
+      expect(it.name, line).toBe('Juice');
+      expect(it.dateMode, line).toBe('expiry');
+    }
+  });
+
+test('3e7. an impossible calendar day is still "not a date", whatever its short year',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2030 });
+    // Order of judgement matters: a day the calendar does not have is not a date AT ALL,
+    // so it keeps D-067's original leave-the-text-alone behaviour rather than becoming an
+    // actionable short-year line. Only an otherwise-valid date is rejected for its year.
+    for (const line of ['Eggs 12 pcs Feb 31 12', 'Eggs 12 pcs Feb 31 30',
+                        'Eggs 12 pcs 31 Feb 12']) {
+      const it = only(await bulkAdd(page, line));
+      expect(it.expiryDate, line).toBeNull();
+      expect(it.name, line).toBe(line);
+    }
+  });
+
+test('3e8. a rejected short year holds the line back even when exp: is also present',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2030 });
+    // Same treatment an ambiguous slash date already gets: an actionable line is never
+    // committed, because a line cannot both be kept for correction and already exist.
+    // Letting exp: rescue it would leave "May 5 12" sitting inside the item name.
+    const line = 'Juice 1 L May 5 12 exp:2031-09-01';
+    const r = await bulkAdd(page, line);
+    expect(r.items).toHaveLength(0);
+    expect(r.warnings).toContain('outside the expected food-expiry range');
+    expect(await page.inputValue('#bulk-add-textarea')).toBe(line);
+  });
+
 test('3f. a two-digit year naming a day the calendar does not have is rejected',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     // Same strict round-trip check as the four-digit path: no rollover into March.
     for (const line of ['Eggs 12 pcs Feb 31 26', 'Eggs 12 pcs 31 Feb 26',
                         'Eggs 12 pcs Feb 29 26',            // 2026 is not a leap year
@@ -238,7 +403,7 @@ test('6. a trailing natural date outranks the shared expiry field', async ({ pag
 });
 
 test('5b. exp: still outranks a TWO-DIGIT trailing date, which is still stripped', async ({ page }) => {
-  await loadLocalApp(page);
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
   const it = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26 exp:2026-09-01',
                                 { shared: '2026-12-25' }));
   expect(it.expiryDate).toBe('2026-09-01');   // exp: wins, unchanged by D-067's extension
@@ -248,7 +413,7 @@ test('5b. exp: still outranks a TWO-DIGIT trailing date, which is still stripped
 });
 
 test('6b. a two-digit trailing date outranks the shared expiry field', async ({ page }) => {
-  await loadLocalApp(page);
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
   const it = only(await bulkAdd(page, 'Eggs 12 pcs Aug 8 26', { shared: '2026-12-25' }));
   expect(it.expiryDate).toBe('2026-08-08');
   expect(it.dateMode).toBe('expiry');
@@ -410,7 +575,7 @@ test('12. structured fields survive a save and reload', async ({ page }) => {
 
 test('12b. a two-digit-year record survives save and reload as the canonical ISO date',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     await bulkAdd(page, 'Eggs 12 pcs Aug 8 26');
     await page.evaluate(() => saveData());
 
@@ -513,8 +678,13 @@ test('the pre-existing no-comma and comma formats are unchanged', async ({ page 
 
 // ── The date helper in isolation ───────────────────────────────────────────
 
-test('parseTrailingDate accepts only the three documented shapes, at either year width', async ({ page }) => {
-  await loadLocalApp(page);
+// parseTrailingDate() answers with one of THREE verdicts, and the difference between the
+// last two is what stops a rejected short year from being buried inside an item name:
+//   { iso, rest }        a date
+//   { shortYear: 'nn' }  a real date whose two-digit year is not plausible for food
+//   null                 not a date; leave the text completely alone
+test('parseTrailingDate returns the right one of its three verdicts', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
   const out = await page.evaluate(() => {
     const accept = {
       'Eggs aug 8 2026': '2026-08-08',
@@ -524,30 +694,45 @@ test('parseTrailingDate accepts only the three documented shapes, at either year
       'Eggs Dec 31 2026': '2026-12-31',
       'Eggs 2026-08-08': '2026-08-08',
       'Eggs feb 29 2028': '2028-02-29',         // a real leap day
-      // Two-digit years, same grammar, mapped 00-99 -> 2000-2099.
+      // A four-digit year is a statement, not a shorthand: no plausibility window
+      // applies to it, in either direction.
+      'Eggs may 5 2012': '2012-05-05',
+      'Eggs may 5 1999': '1999-05-05',
+      'Eggs may 5 2099': '2099-05-05',
+      // Two-digit years inside the window (fixed clock: 2026, so 2025-2036).
       'Eggs aug 8 26': '2026-08-08',
       'Eggs August 8 26': '2026-08-08',
       'Eggs 8 August 26': '2026-08-08',
       'Eggs, aug 8 26': '2026-08-08',
       'Eggs Dec 31 26': '2026-12-31',
       'Eggs feb 29 28': '2028-02-29',
-      'Eggs aug 8 00': '2000-08-08',
-      'Eggs aug 8 99': '2099-08-08'
+      'Eggs aug 8 25': '2025-08-08',            // lower bound, currentYear - 1
+      'Eggs aug 8 36': '2036-08-08'             // upper bound, currentYear + 10
     };
+    // A real date whose SHORT year is outside the window. Actionable, not silent.
+    const shortYear = ['Eggs aug 8 24', 'Eggs aug 8 37', 'Eggs aug 8 00', 'Eggs aug 8 99',
+                       'Eggs may 5 12', 'Eggs 5 may 12', 'Juice May 5 12'];
+    // Not a date at all. The text is left exactly as the user typed it.
     const reject = ['7 Up', 'Heinz 57 Sauce', 'Vitamin B12', '12 Grain Bread',
                     'Formula 1 Protein', 'Milk 8/8/2026', 'Milk 8/8/26',
                     'Eggs feb 30 2026', 'Eggs feb 29 2026', 'Eggs aug 8',
                     'Eggs 8 2026', 'aug 8 2026', 'Eggs blah 8 2026',
-                    // Two-digit adversarial: a bare two-digit number is never a year,
-                    // and a partial date is not a date.
-                    'Eggs feb 30 26', 'Eggs feb 29 26', 'Eggs blah 8 26',
+                    // A bare two-digit number is never a year, and a partial date is
+                    // not a date: each of these is missing part of the grammar.
                     'Formula 26', 'Protein 8 26', 'Sauce Aug 26', 'Vitamin May 26',
                     'Eggs 8 26', 'Eggs aug 26', 'aug 8 26', 'Eggs aug 8 226',
-                    'Eggs aug 8 2', 'Eggs aug 8 026'];
+                    'Eggs aug 8 2', 'Eggs aug 8 026', 'Eggs blah 8 26',
+                    // An impossible calendar day is judged before its year is, so it
+                    // stays "not a date" even when the short year is also implausible.
+                    'Eggs feb 30 26', 'Eggs feb 29 26', 'Eggs feb 31 12'];
     const bad = [];
     Object.keys(accept).forEach((k) => {
       const r = parseTrailingDate(k);
       if (!r || r.iso !== accept[k]) bad.push({ input: k, got: r, want: accept[k] });
+    });
+    shortYear.forEach((k) => {
+      const r = parseTrailingDate(k);
+      if (!r || !r.shortYear || r.iso) bad.push({ input: k, got: r, want: 'shortYear' });
     });
     reject.forEach((k) => {
       const r = parseTrailingDate(k);
@@ -564,7 +749,7 @@ test.describe('mobile two-digit years', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('390px: a two-digit date parses and the modal still does not overflow', async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     await page.evaluate(() => { showTab('fridge'); openBulkAddModal(); });
     await page.fill('#bulk-add-textarea', 'Eggs 12 pcs Aug 8 26\nMilk 1 L 8 Sep 27');
     await page.click('#bulk-add-modal button:has-text("Add Items")');

@@ -32,8 +32,15 @@ const { waitForAppReady } = require('./app-ready');
 
 test.use({ viewport: { width: 1280, height: 1600 } });
 
-async function loadLocalApp(page) {
+// A two-digit year is expanded relative to the CURRENT year, so a case asserting a
+// literal expansion has to say which year it is standing in. page.clock.setFixedTime pins
+// Date.now()/new Date() while leaving timers running, so the app boots normally.
+const FIXED_2026 = '2026-06-15T12:00:00';
+const FIXED_2030 = '2030-06-15T12:00:00';
+
+async function loadLocalApp(page, { fixedTime = null } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__bulkRetryBootstrapped')) return;
@@ -86,6 +93,10 @@ async function submit(page, text) {
 const AMBIG = 'Milk 2 L 8/8/2026';
 const OK1 = 'Eggs 12 pcs Aug 8 2026';
 const OK2 = 'Chicken 1 kg Sep 1 2026';
+// Same two lines written for a suite pinned to 2030, where 2026 is out of the short-year
+// window; four-digit years are never windowed, so these stay four-digit.
+const OK1_2030 = 'Eggs 12 pcs Aug 8 2031';
+const OK2_2030 = 'Chicken 1 kg Sep 1 2031';
 
 // ── 1-3. The core partial-success behaviour ────────────────────────────────
 
@@ -273,7 +284,7 @@ test('13. natural trailing-date parsing still works', async ({ page }) => {
 // at either year width.
 test('13b. a two-digit trailing year resolves its line; a two-digit slash date does not',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     await openBulk(page);
     const shortAmbig = 'Milk 2 L 8/8/26';
     const r = await submit(page, ['Eggs 12 pcs Aug 8 26', shortAmbig,
@@ -305,7 +316,7 @@ test('13b. a two-digit trailing year resolves its line; a two-digit slash date d
 // It must not become an actionable line that traps the user in the retry loop.
 test('13c. an impossible two-digit date behaves exactly like its four-digit twin',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     await openBulk(page);
     const r = await submit(page, 'Butter 250 g Feb 31 26\nCheese 200 g Feb 31 2026');
     expect(r.pantry.map((p) => p.name))
@@ -314,6 +325,38 @@ test('13c. an impossible two-digit date behaves exactly like its four-digit twin
     expect(r.modalOpen).toBe(false);
     expect(r.textarea).toBe('');
   });
+
+// A short year outside the plausibility window is ACTIONABLE, not silent: the grammar
+// matched, so the text must not be buried in the item name, and the line has to survive
+// for correction exactly like an ambiguous slash date. Pinned to 2030 so the window is
+// stated rather than inherited from whatever year the suite happens to run in.
+test('13d. an implausible short year keeps its line for correction', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2030 });
+  await openBulk(page);
+  const stale = 'Juice 1 L May 5 12';
+  const r = await submit(page, [OK1_2030, stale, OK2_2030].join('\n'));
+
+  expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs']);
+  // Not added under ANY name — the date text was not swallowed into one.
+  expect(r.pantry.some((p) => p.name.includes('May 5'))).toBe(false);
+  expect(r.pantry.some((p) => p.name === 'Juice')).toBe(false);
+  expect(r.modalOpen).toBe(true);
+  expect(r.textarea).toBe(stale);                  // exact original text, nothing rewritten
+  expect(r.summary).toBe('2 items added · 1 line needs attention.');
+  expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+  expect(r.notes.join(' ')).toContain('2012');     // names the year it would have meant
+
+  // Correcting it in place finishes the batch and re-processes nothing.
+  const corrected = (await page.inputValue('#bulk-add-textarea')).replace('May 5 12', 'May 5 2012');
+  const r2 = await submit(page, corrected);
+  expect(r2.pantry).toHaveLength(3);
+  expect(r2.pantry.find((p) => p.name === 'Juice').expiryDate).toBe('2012-05-05');
+  expect(r2.toast).toBe('1 item added.');
+  expect(r2.notes.join(' ')).not.toContain('already in pantry');
+  expect(r2.modalOpen).toBe(false);
+  const names = r2.pantry.map((p) => p.name);
+  expect(new Set(names).size).toBe(names.length);
+});
 
 test('14. slash dates remain refused', async ({ page }) => {
   await loadLocalApp(page);

@@ -22,8 +22,13 @@ const { waitForAppReady } = require('./app-ready');
 
 test.use({ viewport: { width: 1280, height: 1700 } });
 
-async function loadLocalApp(page) {
+// A two-digit year is expanded relative to the CURRENT year, so the short/four-digit
+// parity cases pin the clock rather than inheriting whatever year the suite runs in.
+const FIXED_2026 = '2026-06-15T12:00:00';
+
+async function loadLocalApp(page, { fixedTime = null } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__qtyTruthBootstrapped')) return;
@@ -472,7 +477,7 @@ test('the summary names each outcome separately', async ({ page }) => {
 // widths and asserts the outcomes are identical.
 test('a two-digit trailing year enters the same merge path as its four-digit twin',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
 
     // Safe top-up: same printed expiry on both sides, known quantities, same unit.
     const seed = () => page.evaluate(() => {
@@ -523,7 +528,7 @@ test('a two-digit trailing year enters the same merge path as its four-digit twi
 
 test('two-digit explicit-expiry separation matches the four-digit behaviour',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
     const seed = () => page.evaluate(() => {
       AppState.pantry = [{ id: 'e_2e', name: 'Eggs', category: 'Protein',
         purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
@@ -545,7 +550,7 @@ test('two-digit explicit-expiry separation matches the four-digit behaviour',
 
 test('two-digit unit-incompatible and unknown-quantity cases match the four-digit ones',
   async ({ page }) => {
-    await loadLocalApp(page);
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
 
     // Incompatible units: two honest records, never 501.
     const seedG = () => page.evaluate(() => {
@@ -576,6 +581,28 @@ test('two-digit unit-incompatible and unknown-quantity cases match the four-digi
     expect(shortUnknown.pantry).toHaveLength(2);
     expect(shortUnknown.pantry.map((p) => p.quantity).sort()).toEqual([12, null]);
   });
+
+// A line rejected for an implausible short year never reaches the merge path at all, so
+// existing stock cannot be topped up, replaced or otherwise disturbed by a date the
+// parser refused to believe.
+test('an implausible short year leaves existing stock completely untouched', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
+  await page.evaluate(() => {
+    AppState.pantry = [{ id: 'e_2h', name: 'Eggs', category: 'Protein',
+      purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+      quantity: 6, unit: 'pcs', staple: false }];
+    saveData();
+  });
+  const before = await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)));
+  const r = await bulkSubmit(page, 'Eggs 12 pcs May 5 12');
+
+  expect(r.pantry).toHaveLength(1);
+  expect(await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)))).toEqual(before);
+  expect(r.toast).toBe('');                       // nothing added, nothing merged
+  expect(r.modalOpen).toBe(true);
+  expect(r.textarea).toBe('Eggs 12 pcs May 5 12');
+  expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+});
 
 test('no new top-level AppState collection was introduced', async ({ page }) => {
   await loadLocalApp(page);
