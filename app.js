@@ -11492,8 +11492,14 @@ function confirmBulkAdd() {
   const defaultStorage = defaultStorageInput ? defaultStorageInput.value.trim() : '';
 
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const added = [];
-  const warnings = [];
+  // One result per submitted line, in submission order. Three states, because the user
+  // can only act on one of them:
+  //   'added'     — a pantry record was created. Finished; drops out of the textarea.
+  //   'skipped'   — deliberately not added and NOT fixable by editing the line (already
+  //                 in pantry). Also finished — leaving it would re-warn forever.
+  //   'attention' — not added, and the user can fix it by editing. Stays in the textarea.
+  // Classification is by explicit status, never by matching warning text.
+  const results = [];
 
   // Regex to parse "Name qty unit" when no comma is used (e.g. "Coconut cream 200ml").
   var NO_COMMA_RE = /^(.+?)\s+(\d+(?:\.\d+)?)\s*(g|kg|ml|l|L|oz|lbs?|pcs?|pieces?|cups?|tbsp|tsp|bunch|bunches|cans?|bottles?|boxes?|bags?|packs?|head|cloves?|stalks?|slices?|liters?|litres?|ltr)\s*$/i;
@@ -11509,7 +11515,12 @@ function confirmBulkAdd() {
       if (isRealCalendarDate(+ymd[0], +ymd[1], +ymd[2])) {
         perLineExpiry = expiryMatch[1];
       } else {
-        warnings.push(`Line ${idx + 1}: "${originalLine}" — invalid exp date, ignored`);
+        // Previously this warned and then added the item anyway, silently substituting the
+        // shared expiry for the date the user actually typed. The line is now held back so
+        // the correction lands on the record instead of beside it.
+        results.push({ line: originalLine, status: 'attention',
+                       message: `"${originalLine}" — invalid expiry date, not added` });
+        return;
       }
       line = line.replace(/\s*\bexp:\d{4}-\d{2}-\d{2}\b\s*/i, ' ').trim();
     }
@@ -11523,13 +11534,22 @@ function confirmBulkAdd() {
       naturalExpiry = trailing.iso;
       line = trailing.rest.replace(/[\s,]+$/, '').trim();
     } else if (looksLikeAmbiguousDate(line)) {
-      warnings.push(`Line ${idx + 1}: "${originalLine}" — a date like 8/8/2026 is ambiguous ` +
-                    `(day or month first?). Write it as "Aug 8 2026" or exp:YYYY-MM-DD.`);
+      // Also previously warned and then added the item anyway — with the unparsed date
+      // still sitting inside the name. Holding it back is what makes the correction pass
+      // produce one clean record instead of a junk one plus a second copy.
+      results.push({ line: originalLine, status: 'attention',
+                     message: `"${originalLine}" — a date like 8/8/2026 is ambiguous ` +
+                              `(day or month first?). Write it as "Aug 8 2026" or exp:YYYY-MM-DD.` });
+      return;
     }
 
     const parts = line.split(',').map(p => p.trim());
     let name = parts[0];
-    if (!name) { warnings.push(`Line ${idx + 1}: empty name — skipped`); return; }
+    if (!name) {
+      results.push({ line: originalLine, status: 'attention',
+                     message: `"${originalLine}" — no item name found` });
+      return;
+    }
 
     let qty = parts[1] ? parseFloat(parts[1]) : null;
     let unit = parts[2] || null;
@@ -11541,12 +11561,16 @@ function confirmBulkAdd() {
     }
 
     if (parts[1] && (isNaN(qty) || qty < 0)) {
-      warnings.push(`Line ${idx + 1}: "${line}" — invalid quantity, skipped`);
+      results.push({ line: originalLine, status: 'attention',
+                     message: `"${originalLine}" — invalid quantity, not added` });
       return;
     }
 
     if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      warnings.push(`Line ${idx + 1}: "${name}" already in pantry — skipped`);
+      // Resolved, not actionable: re-submitting the same line can only produce the same
+      // message, so it is reported in the summary and then dropped from the retry text.
+      results.push({ line: originalLine, status: 'skipped',
+                     message: `"${name}" already in pantry — skipped` });
       return;
     }
 
@@ -11573,24 +11597,60 @@ function confirmBulkAdd() {
       expiryDate: itemExpiry || null,
       dateMode: itemExpiry ? 'expiry' : undefined
     });
-    added.push(name);
+    results.push({ line: originalLine, status: 'added', message: '' });
   });
 
-  if (warnings.length > 0) {
-    const warnEl = document.getElementById('bulk-add-warnings');
-    if (warnEl) warnEl.innerHTML = `<div class="bulk-add-warn"><strong>Warnings (${warnings.length}):</strong><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>`;
-    if (added.length === 0) return; // don't close; let user see and fix warnings
-  }
+  const addedRows = results.filter(r => r.status === 'added');
+  const skippedRows = results.filter(r => r.status === 'skipped');
+  const attentionRows = results.filter(r => r.status === 'attention');
+  const summary = buildBulkAddSummary(addedRows.length, skippedRows.length, attentionRows.length);
 
-  if (added.length > 0) {
+  // Valid lines are persisted even when a sibling line needs work — Bulk Add stays
+  // tolerant rather than transactional. This is the pre-existing behaviour and the whole
+  // reason the retry pass must not re-submit them.
+  if (addedRows.length > 0) {
     saveData();
     renderPantry();
     refreshFreshnessAlerts();
     renderGroceryList();
-    showSuccessMessage(`${added.length} item${added.length > 1 ? 's' : ''} added to pantry`);
   }
 
-  if (warnings.length === 0) closeBulkAddModal();
+  // Only unresolved lines survive, in their original text and original order. Everything
+  // finished — added or skipped — drops out, so the correction pass cannot re-add it or
+  // re-trigger its warning.
+  if (ta) ta.value = attentionRows.map(r => r.line).join('\n');
+
+  const warnEl = document.getElementById('bulk-add-warnings');
+  if (attentionRows.length === 0) {
+    // Nothing left for the user to do. Shared Storage / Expiry are left alone; the
+    // existing openBulkAddModal() reset clears the form on the next open.
+    if (warnEl) warnEl.innerHTML = '';
+    closeBulkAddModal();
+    if (summary) showSuccessMessage(summary);
+    return;
+  }
+
+  // Modal stays open. The summary goes inline next to the warnings rather than in a toast,
+  // so it is still readable while the user edits the remaining line(s).
+  if (warnEl) {
+    const notes = skippedRows.concat(attentionRows);
+    warnEl.innerHTML =
+      `<div class="bulk-add-summary">${escapeHtml(summary)}</div>` +
+      `<div class="bulk-add-warn"><ul>${
+        notes.map(n => `<li>${escapeHtml(n.message)}</li>`).join('')
+      }</ul></div>`;
+  }
+}
+
+// "4 items added." / "3 items added · 1 line needs attention." /
+// "2 items added · 1 already in pantry · 1 line needs attention." Empty when a submission
+// produced no rows at all, which only happens on blank input.
+function buildBulkAddSummary(added, skipped, attention) {
+  const parts = [];
+  if (added) parts.push(added + ' item' + (added === 1 ? '' : 's') + ' added');
+  if (skipped) parts.push(skipped + ' already in pantry');
+  if (attention) parts.push(attention + ' line' + (attention === 1 ? ' needs' : 's need') + ' attention');
+  return parts.length ? parts.join(' · ') + '.' : '';
 }
 window.openBulkAddModal = openBulkAddModal;
 window.closeBulkAddModal = closeBulkAddModal;
