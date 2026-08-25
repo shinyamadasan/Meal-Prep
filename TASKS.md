@@ -3123,6 +3123,100 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     Bulk Add date truth · TASK-051
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-051 · Bulk Add: read a trailing date instead of burying it in the item name
+status: done
+owner: claude
+source: direct operator brief (production dogfooding — `eggs 12 pcs aug 8 2026` in Bulk Add) — not BQ
+depends-on: TASK-050 (uses its `expiryDate` / `dateMode` fields and its renderer unchanged)
+files: app.js, index.html, tests/bulk-add-date-truth.spec.js (new),
+        docs/DECISIONS.md, docs/FEATURES.md
+
+objective:
+  Let Bulk Add understand common structured pantry input without special syntax, landing it in the
+  SAME `expiryDate` / `dateMode` fields TASK-050 established. No second expiry model, no NLP layer,
+  no migration of existing records.
+
+notes:
+  TASK-050 fixed the quick-add path; Bulk Add kept its older text parser, so the identical Kitchen
+  Truth failure survived at the other entry point. `confirmBulkAdd()` stored the whole typed string
+  as `name`, `inferCategory()` loose-matched "eggs" → Protein, and `categoryShelfLife('Protein')`
+  supplied **3 days** from today. The Aug 8 the user typed was never read.
+
+  Characterisation (driven through the real `confirmBulkAdd()` in a browser) surfaced two things the
+  brief did not name:
+    - `eggs, 12, pcs, aug 8 2026` parsed name/qty/unit correctly and then **discarded the fourth
+      comma field entirely**, with no warning. The date vanished silently.
+    - `exp:2026-02-31` passed the old `!isNaN(new Date(...))` check and stored a date the D-066
+      renderer showed as **"Expires Mar 3"**. `new Date()` rolls over rather than erroring, so shape
+      validation is not date validation.
+    - Bulk Add had **no parser test coverage at all**; every pre-existing spec matching "bulk" tests
+      bulk *cleanup* (`removeAllExpired`), an unrelated feature.
+
+acceptance:
+  - [x] `eggs 12 pcs aug 8 2026` → name `eggs`, quantity 12, unit `pcs`, expiryDate `2026-08-08`
+  - [x] `eggs, 12, pcs aug 8 2026` and `eggs, 12, pcs, aug 8 2026` both work
+  - [x] Full month form `august 8 2026` works; so do `8 aug 2026`, `2026-08-08`, `Aug 8th, 2026`
+  - [x] Existing `exp:YYYY-MM-DD` still works and still beats the shared field
+  - [x] Trailing natural date beats the shared field; shared field still applies with no line date
+  - [x] No date anywhere → still bought-date + shelf-life mode
+  - [x] Invalid dates (`exp:2026-02-31`, `feb 31 2026`, `blah 8 2026`) rejected, never rolled over
+  - [x] Ambiguous slash dates refused and reported, text left untouched
+  - [x] `7 Up`, `Heinz 57 Sauce`, `Formula 1 Protein`, `Vitamin B12`, `12 Grain Bread`,
+        `Omega 3 6 9`, `Vitamin 2000`, `Sauce 12 2026` all intact, quantity `null`
+  - [x] One submission can mix natural / `exp:` / shared / no date
+  - [x] Structured fields survive save + reload
+  - [x] Renders through the unchanged D-066 model: absolute date + relative badge
+  - [x] Existing free-text records are NOT migrated or re-parsed
+
+constraints:
+  - No broad NLP; only a trailing month-word (or full ISO) date with a four-digit year
+  - No slash-date support — ambiguous by construction
+  - Reuse the existing quantity/unit parser; do not build a parallel one
+  - No second expiry model; no new top-level `AppState` key
+  - Do not change `pantryDaysLeft()`, `pantryExpiryInfo()`, the D-066 renderer, freshness
+    boundaries, Kitchen Truth, grocery → pantry, tombstones, `saveData()`, Firestore merge,
+    notifications or recommendation ranking
+  - Do not modify `wave1-portion-truth`
+  - Do not absorb the automation-generated STATUS.md / CODEX_READY.md / DIGEST.md edits
+
+verification:
+  - [x] `tests/bulk-add-date-truth.spec.js` — 21 passed (first parser coverage this feature has had)
+  - [x] focused bulk-add + inventory-expiry + kitchen-truth + food-attention — 89 passed
+  - [x] `npm run test:local` — 265 passed (was 244)
+  - [x] `npm run test:prod` — post-merge, against the deployed site
+  - [x] `tools/Verify-Decisions.ps1` — all 16 pointers hold (4 new, added by D-067)
+  - [x] Mutation-checked: 14 of 21 fail against unmodified `main`; the 7 that pass are the
+        backward-compatibility guards, which are supposed to hold on both sides
+  - [x] Red-zone grep over the diff returns no sync/storage/auth/freshness identifier touched;
+        `style.css`, `sw.js` and `manifest.json` are byte-unchanged
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Input parsing plus modal copy in `app.js` and
+  `index.html` only. No red-zone surface, no persisted-shape change (the fields already existed),
+  and no migration, so a revert restores prior behaviour exactly.
+
+landed:
+  Merged `--no-ff` at `d2abf03` on the operator's explicit approval of `281c0b4`.
+
+open items (recorded, deliberately NOT fixed):
+  - Warnings keep the Bulk Add modal open even when some items were added successfully; correcting
+    the offending line and resubmitting then hits "already in pantry — skipped". Pre-existing
+    behaviour for ALL warnings, not introduced here, but now easier to reach.
+  - Slash dates (`8/8/2026`) remain intentionally unsupported and only produce a warning.
+  - No year sanity range: `aug 8 1801` is a real calendar date and is accepted, rendering as
+    expired ~82,000 days ago. Garbage-in, honestly displayed.
+  - Historical free-text pantry names are not migrated or back-parsed.
+  - A product whose name genuinely ends in a month and a year (`Special Edition May 5 2026`, typed
+    with no quantity) is read as name + expiry. Adding a quantity moves the date out of trailing
+    position and the name survives whole.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

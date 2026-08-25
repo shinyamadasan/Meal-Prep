@@ -4,6 +4,95 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-051 — APPROVED (bulk-add date truth, D-067) — D-032 `done`, operator-approved
+branch: fix/bulk-add-date-truth @ 281c0b4 → main @ d2abf03 (`--no-ff`, unrebased)
+verdict: approved — input parsing and modal copy; outside the red zone
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**. The diff is `app.js` (a date helper block plus 16 lines inside `confirmBulkAdd()`)
+and `index.html` (modal helper copy and placeholder). `style.css`, `sw.js` and `manifest.json` are
+byte-unchanged. A grep of the whole diff for `saveToFirestore`, `cloudReady`, `AppState.deletions`,
+tombstone/`MASS_DELETE`, `buildFirestorePayload`, `saveData`, auth handlers, `applyTombstones`,
+`FRESHNESS_WARN_DAYS`, `pantryDaysLeft`, `pantryExpiryInfo`, `canMergePurchase`,
+`stockPurchasedGroceryItem`, `collectAttentionItems` and `maybeNotifyAttention` returns **nothing
+added or removed**. No new `AppState` key, no persisted-shape change — the fields already existed —
+and no migration, so a revert restores prior behaviour exactly.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude from an operator brief carrying a production reproduction. Review of
+Claude's own work, disclosed as in TASK-044 through TASK-050.
+
+### What characterisation added to the brief
+The brief named one defect. Driving the real `confirmBulkAdd()` in a browser — rather than reading
+the source — surfaced two more, and one of them is worse than the reported one because it is
+completely silent:
+
+```
+eggs, 12, pcs, aug 8 2026
+  -> name="eggs", quantity=12, unit="pcs", NO expiry, no warning
+```
+
+Name, quantity and unit parsed correctly and the **fourth comma field was dropped on the floor**.
+Nothing on the card looks wrong; the item simply carries a category-derived freshness forever.
+
+```
+Eggs, 12, pcs exp:2026-02-31
+  -> stored "2026-02-31", rendered "Expires Mar 3"
+```
+
+`new Date()` rolls over silently rather than erroring, so the old `!isNaN(...)` guard was shape
+validation masquerading as date validation — the D-066 renderer then displayed a day the user never
+typed. Adjacent to the brief rather than part of it; fixed anyway, and flagged at hand-off as added
+scope the operator could reject. Leaving one date path able to invent a day while hardening the
+other would have been incoherent.
+
+Third finding: **Bulk Add had no parser test coverage of any kind.** Every pre-existing spec matching
+"bulk" tests bulk *cleanup* (`removeAllExpired`), a different feature. This parser had shipped
+untested since it was written.
+
+### What I checked hardest
+**That the safety argument is load-bearing and stated.** The whole defence of the numeric-name list
+is the requirement of a **month word (or full ISO) plus a four-digit year**. `7 Up`,
+`Heinz 57 Sauce`, `Formula 1 Protein`, `Vitamin B12`, `12 Grain Bread`, `Omega 3 6 9`,
+`Vitamin 2000`, `Sauce 12 2026` and `Blend 2026` survive for exactly one reason: none of them ends
+in a month followed by a year. That is written into both the code comment and D-067, because the
+obvious future "improvement" — accepting a bare trailing number — breaks all of them at once.
+
+**That refusing 8/8/2026 is the right call, not laziness.** It is day-first in half the world and
+month-first in the other. A wrong guess moves an expiry by up to eleven months and writes it into a
+food-safety signal, which is the precise failure D-066 and D-067 both exist to close. So it is
+recognised only in order to *say* it is ambiguous; `looksLikeAmbiguousDate()` never produces a date.
+
+**That there is still exactly one expiry model.** The parser writes `expiryDate` / `dateMode` and
+stops. `pantryDaysLeft()`, `pantryExpiryInfo()` and the D-066 renderer are untouched, and the spec
+asserts the resulting card shows the absolute date and the relative badge from that one source.
+
+**That the existing parser was reused, not duplicated.** The date is stripped and the remainder goes
+through the pre-existing comma path and `NO_COMMA_RE`, both byte-unchanged. A regression case pins
+`Coconut cream 200ml`, `Soy Sauce, 1, bottle` and bare `Garlic`.
+
+**That precedence cannot let a weaker source win.** `perLineExpiry || naturalExpiry || bulkExpiry`,
+with the trailing date stripped *even when* `exp:` also appears, so a typed date can never survive
+inside the name while still losing to the stronger source.
+
+### Evidence
+- `tests/bulk-add-date-truth.spec.js` — 21 passed, covering all 16 required proofs
+- focused bulk-add + inventory-expiry + kitchen-truth + food-attention — 89 passed
+- `npm run test:local` — 265 passed (was 244)
+- `tools/Verify-Decisions.ps1` — 16/16 pointers hold (4 new)
+- Mutation-checked: **14 of 21 fail** against unmodified `main`. The 7 that pass are the
+  backward-compatibility guards — they are supposed to hold on both sides, and it would be a
+  problem if they did not.
+
+### Risk-gate
+Low. Input parsing only, reversible in one revert, with no stored-data migration to unwind. The
+residual risks are all stated rather than hidden: a product name genuinely ending in a month and a
+year is read as name + expiry; slash dates stay unsupported; there is no year sanity range; and the
+pre-existing "warnings keep the modal open" behaviour is now easier to reach because a new class of
+warning exists.
+
+---
 ## Review TASK-050 — APPROVED (inventory expiry truth, D-066) — D-032 `done`, operator-approved
 branch: fix/inventory-expiry-date-truth @ e8ad4fb → main @ 142ec35 (`--no-ff`, unrebased)
 verdict: approved — UI, CSS and one manual-entry function; outside the red zone

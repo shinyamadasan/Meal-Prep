@@ -4,6 +4,89 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-25 — Bulk Add date truth merged (TASK-051, D-067) — the same bug, through the other door
+
+`fix/bulk-add-date-truth` → `main` (`d2abf03`, `--no-ff`, unrebased). One commit, `281c0b4`.
+`wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### D-066 fixed one entry point; the defect just moved to the other
+
+Yesterday's TASK-050 gave the quick-add path structured quantity/unit/expiry fields. Bulk Add kept
+its older text parser, so a production dogfooding session hit the identical failure:
+
+```
+input : eggs 12 pcs aug 8 2026
+stored: name="eggs 12 pcs aug 8 2026", quantity=null, unit="", no expiry
+shown : Best by Aug 28 · 3d left
+```
+
+The whole string became the `name`. `inferCategory()` loose-matched "eggs" → Protein, and
+`categoryShelfLife('Protein')` supplied **3 days** from today. The Aug 8 was never read. Same
+invented freshness, same north-star-goal-#2 exposure, different door.
+
+**The lesson worth keeping: fixing a defect at one entry point is not fixing the defect.** The app
+had two manual paths into inventory and only one of them was hardened.
+
+### Characterisation found two more, one of them silent
+
+Driving the real `confirmBulkAdd()` in a browser rather than reading the source:
+
+- `eggs, 12, pcs, aug 8 2026` parsed name/qty/unit correctly and then **discarded the fourth comma
+  field entirely, with no warning**. Worse than the reported case in one way — nothing on the card
+  looks wrong, so the item just carries a category guess forever.
+- `exp:2026-02-31` passed the old `!isNaN(new Date(...))` guard and stored a date the D-066 renderer
+  displayed as **"Expires Mar 3"**. `new Date()` rolls over silently, so shape validation is not
+  date validation.
+- **Bulk Add had no parser test coverage at all.** Every pre-existing spec matching "bulk" tests
+  bulk *cleanup*, an unrelated feature. This parser had shipped untested since it was written.
+
+### What landed
+
+`parseTrailingDate()` recognises exactly three shapes, trailing position only — `aug 8 2026`,
+`8 aug 2026`, `2026-08-08`. On a match the date is stripped and the remainder goes through the
+**existing** quantity/unit parser; the comma path and `NO_COMMA_RE` are byte-unchanged. On no match
+the text is left completely alone.
+
+It is deliberately not an NLP layer, and the reason is load-bearing: requiring a **month word (or
+full ISO) plus a four-digit year** is the entire defence of `7 Up`, `Heinz 57 Sauce`,
+`Formula 1 Protein`, `Vitamin B12`, `12 Grain Bread`, `Omega 3 6 9`, `Vitamin 2000` and
+`Sauce 12 2026`. The obvious future "improvement" — accepting a bare trailing number — breaks all of
+them at once. That warning is written into the code comment and D-067 on purpose.
+
+`8/8/2026` is refused rather than parsed: day-first in half the world, month-first in the other, and
+a wrong guess moves an expiry by up to eleven months into a food-safety signal. It is recognised
+only so the user can be told it is ambiguous.
+
+Precedence, strongest first: line `exp:` → recognised trailing date → shared field → bought-date +
+shelf life. A trailing date is stripped **even when `exp:` also appears**, so a typed date can never
+survive inside the name while still losing to the stronger source.
+
+### Where we are
+
+Local suite 244 → **265**. Focused bulk-add + inventory-expiry + Kitchen Truth + Food Attention
+**89 passed**. `Verify-Decisions` 16/16. Mutation-checked at 14-of-21 failing against unmodified
+`main`. Red zone not entered: `app.js` and `index.html` only, with `style.css`, `sw.js` and
+`manifest.json` byte-unchanged, and a diff grep finding no sync/storage/auth/freshness identifier
+added or removed. One expiry model still — records land in the existing `expiryDate`/`dateMode`
+fields and render through the unchanged D-066 path.
+
+### Carried forward, deliberately not fixed
+
+- Warnings keep the Bulk Add modal open even when some items were added successfully; correcting the
+  offending line and resubmitting then hits "already in pantry — skipped". Pre-existing behaviour for
+  **all** warnings, not introduced here, but a new class of warning makes it easier to reach.
+- Slash dates stay unsupported by design.
+- No year sanity range — `aug 8 1801` is a real calendar date, accepted, and honestly rendered as
+  long expired.
+- Historical free-text pantry names are **not** migrated or back-parsed.
+- A product name genuinely ending in a month and a year, typed with no quantity, is read as
+  name + expiry. Adding a quantity moves the date out of trailing position.
+- The uncommitted automation edits to `STATUS.md`, `planning/CODEX_READY.md` and
+  `planning/DIGEST.md` from the halted 2026-08-23 run were again **not absorbed**. `DIGEST.md` still
+  carries mangled Unicode from the `Add-Content` gotcha and needs the automation to regenerate it.
+
+---
+
 ## 2026-08-24 — Inventory expiry truth merged (TASK-050, D-066) — the badge was not ambiguous, it was wrong
 
 `fix/inventory-expiry-date-truth` → `main` (`142ec35`, `--no-ff`, unrebased). Two commits:
