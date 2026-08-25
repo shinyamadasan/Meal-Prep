@@ -4,6 +4,94 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-052 — APPROVED (bulk-add partial-retry, D-068) — D-032 `done`, operator-approved
+branch: fix/bulk-add-partial-retry @ 73bee77 → main @ dcd69a1 (`--no-ff`, unrebased)
+verdict: approved — control flow and feedback inside `confirmBulkAdd()`; outside the red zone
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**. The diff is `app.js` (the result loop, the post-loop branch, and a new
+`buildBulkAddSummary()`) plus a 12-line CSS block. `index.html`, `sw.js` and `manifest.json` are
+byte-unchanged. A grep of the diff for `saveToFirestore`, `saveToLocalStorage`, `cloudReady`,
+`AppState.deletions`, tombstone/`MASS_DELETE`, `buildFirestorePayload`, auth handlers,
+`applyTombstones`, `snapshotIdBaseline`, `FRESHNESS_WARN_DAYS`, `pantryDaysLeft`,
+`pantryExpiryInfo`, `canMergePurchase`, `stockPurchasedGroceryItem`, `collectAttentionItems`,
+`maybeNotifyAttention` and the three D-067 parser functions returns **nothing added or removed**.
+`results` is a local array — no new `AppState` key, no persisted-shape change.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude from an operator brief. Review of Claude's own work, disclosed as in
+TASK-044 through TASK-051.
+
+### The finding that changed the shape of the task
+The brief described a retry-UX problem and specified that ambiguous and invalid-date lines are
+"actionable" and should remain in the textarea. Driving all eight cases through the real modal showed
+that **those lines were already being added.** Neither warning path returned:
+
+```
+"Milk 2 L 8/8/2026"            -> warned, AND added as name="Milk 2 L 8/8/2026",
+                                  quantity null, shared expiry silently substituted
+"Eggs, 12, pcs exp:2026-02-31" -> warned, AND added as "Eggs", shared expiry
+                                  standing in for the rejected date
+```
+
+Keeping such a line for correction while its record exists produces, on retry, a junk record **plus**
+a clean second copy (Milk — different names, so the duplicate guard never fires) or a confusing
+bounce (Eggs). The brief's own acceptance behaviour is therefore unreachable without changing this:
+**a line cannot both be kept for correction and already be committed.**
+
+So Bulk Add moves from `warn + add anyway` to `actionable warning = hold the line back`. This was
+flagged at hand-off as a behaviour change beyond control flow and explicitly approved. It is the
+single most important thing in this task not to regress. The D-067 parser verdicts are untouched —
+the invalid date is still rejected, the ambiguous one still never guessed.
+
+### What I checked hardest
+**That classification cannot drift with wording.** Every path pushes exactly one
+`{ line, status, message }`, and the textarea is built from `status === 'attention'` alone. A test
+asserts that a duplicate and a malformed-quantity line — both of which read as "skipped"-ish prose —
+are separated correctly by status, not by text.
+
+**That `skipped` deserves to be its own state.** A duplicate cannot be fixed by editing the line, so
+leaving it in the textarea can only reproduce the same message forever. It is removed but still
+reported in the summary and in its own note, which satisfies "do not silently hide that it was
+skipped" without trapping the user. All-duplicate now closes rather than holding the modal open.
+
+**That persistence stayed tolerant.** Valid lines are still committed when a sibling needs work. The
+`saveData()` call site is unchanged. Making the batch transactional was never on the table and would
+have been the wrong reading of the brief.
+
+**That shared controls survive.** Storage and Expiry are untouched by a submit — verified not only
+as values but by asserting they still apply to the corrected line on the retry pass.
+
+### The mutation check I initially got wrong
+Restoring the old "every submitted line stays" behaviour first failed only 6 of 18 — and **not** the
+central retry test. Two reasons, both mine: the test helper overwrote the whole textarea instead of
+editing what was actually in it, and the notes panel is cleared when the modal closes, so asserting
+on notes could not see the difference. Both were fixed: the retry now corrects the date in place in
+the real post-submit contents, and asserts the summary (`'1 item added.'` versus
+`'1 item added · 2 already in pantry.'`), which is the signal that actually distinguishes them.
+7 of 18 now fail under the mutation, including the retry case.
+
+### Shipped assertions changed, and why that is disclosed rather than quiet
+Two D-067 assertions (`bulk-add-date-truth.spec.js` cases 9 and 9b) encoded the old
+warn-and-add-anyway behaviour. They are updated, with the reason recorded inline in the spec and in
+D-068. Their parser-level halves — the date is rejected, the ambiguous one is never guessed — are
+asserted exactly as before. Changing an approved test is worth calling out explicitly; it is
+justified here only because the behaviour they described is the behaviour this task deliberately
+changes.
+
+### Evidence
+- `tests/bulk-add-partial-retry.spec.js` — 18 passed, covering all 21 required proofs
+- focused partial-retry + date-truth + inventory-expiry + kitchen-truth + food-attention — 107 passed
+- `npm run test:local` — 283 passed (was 265)
+- `tools/Verify-Decisions.ps1` — 20/20 pointers hold (4 new)
+
+### Risk-gate
+Low. One function's control flow plus a summary helper and a CSS block; reversible in a single
+revert with no stored-data migration to unwind. The one thing a revert would also undo is the
+approved hold-back behaviour, which is why it is stated at the top of D-068 rather than buried.
+
+---
 ## Review TASK-051 — APPROVED (bulk-add date truth, D-067) — D-032 `done`, operator-approved
 branch: fix/bulk-add-date-truth @ 281c0b4 → main @ d2abf03 (`--no-ff`, unrebased)
 verdict: approved — input parsing and modal copy; outside the red zone

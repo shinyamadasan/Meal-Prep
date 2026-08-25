@@ -4,6 +4,83 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-25 — Bulk Add partial-retry merged (TASK-052, D-068) — you cannot keep a row for correction and commit it too
+
+`fix/bulk-add-partial-retry` → `main` (`dcd69a1`, `--no-ff`, unrebased). One commit, `73bee77`.
+`wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### The retry loop was unusable
+
+Bulk Add persisted the valid lines, held the modal open because a sibling line warned, and left the
+textarea **completely untouched**. Pressing Add Items again resubmitted everything that had already
+succeeded, which then reported "already in pantry — skipped". The only warning the user could see
+was about food already safely in the kitchen, and nothing said which items had actually landed.
+
+### The characterisation that changed the task
+
+The brief specified that ambiguous and invalid-date lines are actionable and should stay in the
+textarea. Driving all eight cases through the real modal showed **those lines were already being
+added** — neither warning path returned:
+
+```
+"Milk 2 L 8/8/2026"            -> warned, AND added as name="Milk 2 L 8/8/2026"
+"Eggs, 12, pcs exp:2026-02-31" -> warned, AND added as "Eggs", shared expiry substituted
+```
+
+Keeping such a line for correction while its record exists produces, on retry, a junk record **plus**
+a clean second copy (Milk — different names, so the duplicate guard never fires) or a confusing
+bounce (Eggs). The brief's own acceptance behaviour was unreachable without changing this.
+
+**So Bulk Add moved from `warn + add anyway` to `actionable warning = hold the line back for
+correction`, because a retry-safe flow cannot commit a row that still needs editing.** Flagged at
+hand-off as a behaviour change beyond control flow, and explicitly approved. Not to be restored.
+D-067 parsing is untouched — the invalid date is still rejected, the ambiguous one never guessed.
+
+### The contract now
+
+| status | meaning | textarea |
+|---|---|---|
+| `added` | committed once | drops out |
+| `skipped` | already in pantry; not fixable by editing | drops out, still reported |
+| `attention` | not committed, user can fix | **stays**, original text and order |
+
+Classified by explicit status, never by matching warning wording. Valid lines are still persisted
+when a sibling needs work — tolerant, not transactional, which is the whole reason the textarea has
+to be pruned. Shared Storage/Expiry survive a partial submit and still apply on the retry.
+All-duplicate now closes instead of trapping the user in a retry that cannot progress.
+
+### The lesson from my own mutation check
+
+The first mutation run failed only 6 of 18 and **not** the central retry test — because my helper
+overwrote the whole textarea instead of editing what was in it, and because the notes panel is
+cleared when the modal closes. A test that cannot see the bug it exists to catch is worse than no
+test. Fixed by correcting the date in place in the real post-submit contents and asserting the
+**summary** text, which is the signal that actually distinguishes the two behaviours. 7 of 18 now
+fail under the mutation.
+
+### Where we are
+
+Local suite 265 → **283**. Focused partial-retry + date-truth + inventory-expiry + Kitchen Truth +
+Food Attention **107 passed**. `Verify-Decisions` 20/20. Red zone not entered: `app.js` and
+`style.css` only, with `index.html`, `sw.js` and `manifest.json` byte-unchanged, no new `AppState`
+key, and no sync/storage/auth/freshness/parser identifier added or removed.
+
+Two shipped D-067 assertions that encoded the old warn-and-add behaviour were updated, with the
+reason recorded inline in the spec. Changing an approved test is worth saying out loud.
+
+### Carried forward, deliberately not fixed
+
+- Slash dates remain unsupported; no year sanity range.
+- Historical free-text pantry records are not migrated.
+- Skipped-line detail is transient — once the modal closes only the toast summary carries the count.
+- A typo'd but otherwise valid name is classified `added` and drops out. Correct: it is in inventory,
+  and the Inventory card is where it gets edited. Bulk Add is an input surface, not an editor.
+- The uncommitted automation edits to `STATUS.md`, `planning/CODEX_READY.md` and
+  `planning/DIGEST.md` from the halted 2026-08-23 run were **again** not absorbed — third session
+  running. `DIGEST.md` still carries mangled Unicode from the `Add-Content` gotcha.
+
+---
+
 ## 2026-08-25 — Bulk Add date truth merged (TASK-051, D-067) — the same bug, through the other door
 
 `fix/bulk-add-date-truth` → `main` (`d2abf03`, `--no-ff`, unrebased). One commit, `281c0b4`.

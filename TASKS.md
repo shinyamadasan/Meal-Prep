@@ -3217,6 +3217,94 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     Bulk Add partial-retry · TASK-052
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-052 · Bulk Add: finish what succeeded, keep only what the user can fix
+status: done
+owner: claude
+source: direct operator brief (dogfooding — partial Bulk Add left every line in the textarea) — not BQ
+depends-on: TASK-051 (starts after D-067 classifies each line; that parser is untouched)
+files: app.js, style.css, tests/bulk-add-partial-retry.spec.js (new),
+        tests/bulk-add-date-truth.spec.js (2 assertions updated), docs/DECISIONS.md, docs/FEATURES.md
+
+objective:
+  After a partial Bulk Add, successful lines are clearly finished and only unresolved lines remain
+  for correction. Improve transparency and retry behaviour — do NOT make the batch transactional,
+  and do not redesign Bulk Add.
+
+notes:
+  Characterising all eight cases through the real modal found what the brief's model could not
+  accommodate: **two warning paths warned and then added the item anyway**, neither returning.
+  `"Milk 2 L 8/8/2026"` was added as `name="Milk 2 L 8/8/2026"` with the shared expiry substituted;
+  `"Eggs, 12, pcs exp:2026-02-31"` was added as `Eggs` with the shared expiry standing in for the
+  rejected date. Both are meant to be corrected and resubmitted, but their records already existed —
+  so a correction produced a junk record plus a clean second copy (Milk: different names, duplicate
+  guard never fires) or a confusing bounce (Eggs).
+
+  **A line cannot both be kept for correction and already be committed.** Bulk Add therefore changes
+  from `warn + add anyway` to `actionable warning = hold the line back for correction`. Operator
+  reviewed and explicitly approved this; the previous behaviour must not be restored.
+
+acceptance:
+  - [x] `added` lines are committed once and removed from the retry textarea
+  - [x] `skipped` (already in pantry) lines are resolved and removed, but still reported
+  - [x] `attention` lines are NOT committed and remain for correction
+  - [x] Unresolved line text and order are preserved exactly
+  - [x] Shared Storage and Expiry survive a partial submit and still apply on the retry
+  - [x] Correcting the one remaining line adds only that item; nothing is reprocessed
+  - [x] Summary reports added / already-in-pantry / needs-attention counts accurately
+  - [x] All-valid still closes the modal and toasts as before
+  - [x] All-actionable adds nothing and keeps every line
+  - [x] All-duplicate adds nothing, says so honestly, and closes rather than trapping the user
+  - [x] Classification is by explicit status, never by matching warning wording
+  - [x] Save/reload shows each successful record exactly once; retry creates no duplicates
+  - [x] D-067 parsing untouched: natural dates, `exp:`, precedence, slash refusal, numeric names
+  - [x] 390px: summary readable, textarea editable, Add Items reachable, no horizontal overflow
+
+constraints:
+  - Do not restore warn-and-add for actionable rows
+  - Do not defer persistence of valid lines — Bulk Add stays tolerant, not transactional
+  - Do not change D-067 date parsing or expiry precedence
+  - Do not change the duplicate policy itself, quantity merging, storage inference,
+    `pantryDaysLeft()`, `pantryExpiryInfo()`, Kitchen Truth, grocery → pantry, tombstones,
+    `saveData()`, Firestore merge, Food Attention or recommendations
+  - No new top-level `AppState` state; no generic import framework
+  - Do not modify `wave1-portion-truth`
+  - Do not absorb the automation-generated STATUS.md / CODEX_READY.md / DIGEST.md edits
+
+verification:
+  - [x] `tests/bulk-add-partial-retry.spec.js` — 18 passed
+  - [x] focused partial-retry + date-truth + inventory-expiry + kitchen-truth + food-attention — 107 passed
+  - [x] `npm run test:local` — 283 passed (was 265)
+  - [x] `npm run test:prod` — post-merge, after the prod smoke was updated to the new contract
+  - [x] `tools/Verify-Decisions.ps1` — all 20 pointers hold (4 new, added by D-068)
+  - [x] Mutation-checked by restoring "every submitted line stays": 7 of 18 fail, including the
+        central retry case. The retry assertion had to be sharpened to the SUMMARY text — the
+        notes panel is cleared when the modal closes, so asserting on notes could not detect it.
+  - [x] Red-zone grep returns no sync/storage/auth/freshness/parser identifier touched;
+        `index.html`, `sw.js`, `manifest.json` byte-unchanged
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Control flow and feedback inside one function plus a
+  small CSS block. No red-zone surface and no persisted-shape change; `results` is a local array.
+
+landed:
+  Merged `--no-ff` at `dcd69a1` on the operator's explicit approval of `73bee77`.
+
+open items (recorded, deliberately NOT fixed):
+  - Slash dates remain unsupported; no year sanity range.
+  - Historical free-text pantry records are not migrated.
+  - Skipped-line detail is transient: once the modal closes only the toast summary carries the
+    count, and the per-line notes are cleared.
+  - A typo'd but otherwise valid name is classified `added` and drops out of the textarea. Correct —
+    it is in inventory, and the Inventory card is where it gets edited. Bulk Add is an input surface,
+    not an editor.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
