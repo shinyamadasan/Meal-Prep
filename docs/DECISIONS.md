@@ -1003,3 +1003,122 @@ Risk gate: **outside D-032 red zone.** No product source file (`app.js`, `index.
 Verify: run-claude.ps1 contains "Test-Path -LiteralPath $docsCheckScript"
 Verify: package.json contains "playwright test --project=local"
 Verify: package.json contains "playwright test --project=prod"
+
+
+## D-066 — The item name is not a notes field: quantity, unit and expiry get their own inputs, and the card shows the date it is counting to
+
+Dogfooding find, 2026-08-24. UI + data-entry only; no storage, sync, tombstone, `saveData()`,
+`cloudReady` or auth code was touched.
+
+### What was actually wrong
+
+A user with a carton of eggs typed everything they knew into the one field the Inventory add row
+offered and got a card reading `eggs 12pcs august 10 2026` · `3d left`. The reported symptom was
+that the date looked embedded in the name and only the relative freshness was exposed.
+
+Characterising it before fixing it showed the symptom was the smaller half. `addToPantry()` took
+`#pantry-input` verbatim as `name`, so the whole string **was** the name — `quantity` stayed `null`,
+`unit` stayed `''`, and `expiryDate` was never set. `inferCategory()` still loose-matched "eggs"
+inside the string and returned `Protein`, whose `categoryShelfLife()` default is **3 days**. That,
+not the typed date, is where `3d left` came from. Replaying the exact input against the shipped code
+confirms it: the same item entered with its real date is `Expired 14d ago`.
+
+So the badge was not ambiguous, it was **wrong** — it asserted three days of remaining life for food
+whose printed date had already passed. Invented freshness is worse than absent freshness, and it
+lands directly on north-star goal #2. The screenshot was a data-entry defect wearing a rendering
+defect's clothes.
+
+### Decision
+
+**Two fields the user can fill, one date the card can show.**
+
+The add row keeps its single name box and gains an optional detail line — `#pantry-qty`,
+`#pantry-unit`, `#pantry-expiry`. `addToPantry()` reads them into `quantity`, `unit`, `expiryDate`
+and `dateMode`, producing the **same record shape `confirmBulkAdd()` already produced**, so the two
+manual entry points stop disagreeing about what an inventory record looks like.
+
+Cards render the three concepts as three elements: `.pi-name`, `.pi-qty`, and a new `.pi-date` line
+beneath the name. The relative badge is untouched — it was never the problem.
+
+`pantryExpiryInfo()` supplies the date and deliberately branches on `dateMode` **exactly as
+`pantryDaysLeft()` does**, rather than computing an expiry boundary of its own. The date on a card
+and the "3d left" beside it are therefore two renderings of one number and cannot drift apart. A
+spec sweeps ±400 days across both modes asserting they always name the same day.
+
+### Why "Best by" and "Expires" are different words
+
+A printed date off a pack is the user's own fact; a bought-date-plus-shelf-life date is the app's
+estimate from a coarse table. Labelling both "Expires" would launder an estimate into a claim the
+app cannot support, which is the same failure the `3d left` badge was already committing. So a
+`dateMode: 'expiry'` record says **Expires ‹date›** and everything else says **Best by ‹date›**, set
+in a quieter style, with a `title` spelling out the derivation. `dateMode` already encoded this
+distinction in the data; the UI simply stopped hiding it.
+
+### Relationship to D-057 — checked, not assumed
+
+D-057 removed `addToPantry()`'s reads of `#pantry-qty-input` / `#pantry-add-where`, and
+`docs/FEATURES.md` recorded that `addToPantry()` "leaves quantity unknown". That reads at first
+glance like this change reverses a decision, so the boundary is worth stating precisely.
+
+D-057's "no modal, no quantity prompt, no date entry" is scoped to **grocery check-off** — Bought ✓
+being the whole interaction — and that path is untouched here. The elements it stopped reading had
+already been deleted from `index.html`; what D-057 removed was dead null-guarded code, not a
+product capability.
+
+What D-057 does assert globally is that the app admits ignorance rather than inventing a number.
+That rule is preserved literally: every new field is optional, and blank means unknown. No quantity
+still stores `quantity: null` rather than `1`, and no date still leaves the item in bought-date mode.
+A user who ignores the detail line gets byte-identical behaviour to before. The change adds a place
+to put a fact the user already has; it never asks for one they do not.
+
+The stale half of the FEATURES line was corrected rather than left to disagree with the code.
+
+### Deliberately not done
+
+- **No natural-language date parsing.** "august 10 2026" is not parsed, and neither is
+  "eggs 12pcs …". Guessing a date from prose is ambiguous across locales, and a mis-parse feeds the
+  freshness system a wrong number silently — the exact failure mode this entry exists to close.
+  An explicit `type="date"` input cannot be misread.
+- **The quick-add box does not adopt the bulk parser's `Name, Qty, Unit` grammar.** The two entry
+  points now agree on the record they produce, which was the real inconsistency; making the name box
+  also swallow trailing numbers would break legitimately numeric ingredient names.
+- **No warning when a name still looks like it contains a quantity or a date.** Speculative, and the
+  fields now make the right place obvious.
+
+### The pre-existing squeeze that made the new fields unusable on a phone
+
+`.pantry-add-row` was `display: flex` with no `flex-wrap`. `.ing-name-wrap` carries a global
+`min-width: 0` and its input is `width: 100%`, so the name field's min-content contribution was
+**zero** and five buttons on one unwrapped line crushed `#pantry-input` to **26px** at both 320px
+and 390px. Measured against unmodified `main`, so it predates this change.
+
+It was found while shipping the fields above and was initially left alone under the surgical-changes
+rule. That was the wrong call once the consequence was clear: the structured fields this entry adds
+are worth nothing if the row carrying them cannot be typed into on the phone the app is dogfooded
+on, so the defect is in scope after all and is fixed here.
+
+Two properties, no redesign: `flex-wrap: wrap` on the row, and `min-width: 12rem` on
+`.pantry-add-row .ing-name-wrap`. The floor stops the name field collapsing and the wrap sends the
+surplus buttons to a second line instead of squeezing it. The override is **scoped to this row**
+because the same `.ing-name-wrap` is reused by the custom-item modal, which must not change.
+
+Measured `#pantry-input` width, before → after: 320px **26 → 188**, 390px **26 → 179**,
+414px **45 → 203**. 768px (399) and 1280px (943) are byte-identical and the desktop row still
+renders on one line, so compact desktop behaviour is preserved rather than traded away. No
+horizontal page overflow at any of the five widths, before or after.
+
+A free-text parser was again rejected as the alternative, for the reasons under "Deliberately not
+done" — the problem was that the fields had no room, not that they were the wrong shape.
+
+Supersedes: nothing. Corrects a stale behaviour description in `docs/FEATURES.md` left by D-057.
+Regression-locked by `tests/inventory-expiry-display.spec.js` (14 cases, 6 of them mobile);
+mutation-checked twice — the 8 data/display cases fail 7-of-8 against unmodified `main`, and the two
+width cases fail against the pre-wrap CSS. The other four mobile cases (overflow, reachability,
+persistence, not-one-column) pass both before and after by design: they guard adjacent failure modes
+this particular bug did not exhibit.
+
+Verify: app.js contains "function pantryExpiryInfo(p)"
+Verify: app.js contains "Best by "
+Verify: index.html contains "pantry-expiry"
+Verify: style.css contains ".pi-date"
+Verify: style.css contains "flex-wrap: wrap"

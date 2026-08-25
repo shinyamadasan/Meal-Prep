@@ -3929,9 +3929,50 @@ select.form-control {
 
 .pantry-add-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
+
+/* The name field is a flex item with the global .ing-name-wrap min-width:0, and its
+   input is width:100%, so its min-content contribution is zero — five buttons on one
+   unwrapped line crushed it to 26px at 390px. A floor plus wrapping keeps it typable
+   and pushes the surplus buttons onto a second line instead of squeezing it. Scoped to
+   this row: the same wrapper is reused by the custom-item modal, which must not change. */
+.pantry-add-row .ing-name-wrap {
+  min-width: 12rem;
+}
+
+/* Second line of the add form: the fields that used to have nowhere to go and
+   ended up typed into the item name. Wraps on narrow screens. */
+.pantry-add-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.pad-field {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pad-label {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.pantry-add-detail .form-control {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  height: auto;
+}
+
+.pad-field .form-control { width: 5.5rem; }
+.pad-field--date .form-control { width: 10rem; }
 
 .pantry-search-wrap {
   margin-bottom: 0.75rem;
@@ -5456,14 +5497,39 @@ select.form-control {
   flex-shrink: 0;
 }
 
-.pi-name {
+/* Name and expiry date stack in one flexible column, so the date reads as its
+   own field instead of looking like part of the item's name. */
+.pi-main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pi-name {
   font-weight: 600;
   font-size: 0.9rem;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Absolute date line. "Best by" (derived) is quieter than a printed "Expires"
+   date the user actually entered. */
+.pi-date {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+}
+
+.pi-date--printed {
+  opacity: 1;
+  font-weight: 500;
 }
 
 .pi-badges {

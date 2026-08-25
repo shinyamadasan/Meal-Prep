@@ -133,6 +133,9 @@ portions for a batch that has none. Read portions through the helpers:
   quantity?,          // number — tracked for non-staples vs minStockQty
   unit?,
   purchaseDate? | expiryDate?, shelfLifeDays?,
+  dateMode?,          // 'expiry' -> count down to the printed expiryDate;
+                      //   anything else (incl. absent) -> purchaseDate + shelfLifeDays.
+                      //   pantryDaysLeft() and pantryExpiryInfo() both branch on this.
   storage?,           // 'fridge' | 'freezer' | 'counter' (inferred INGREDIENT_DB → PANTRY_KNOWLEDGE → category)
   staple?,            // boolean — staple cycles: none → staple → running low; staples not deducted on cook
   stockLevel?,        // 'full' | 'ok' | 'low' | 'empty' — for staples
