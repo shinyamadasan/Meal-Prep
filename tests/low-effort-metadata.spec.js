@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Low-effort cooking wave — Phase 2 characterization + metadata normalization.
@@ -227,7 +227,10 @@ test('export -> import -> reload preserves the new recipe metadata', async ({ pa
   // Save, reload, and confirm the fields survive the localStorage round-trip.
   await page.evaluate(() => saveToLocalStorage());
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // The saved recipe itself, back in AppState. Reading `r.equipment` off `undefined` was
+  // the CI failure this replaces; the wait now names what was missing instead.
+  await waitForRestored(page, () =>
+    !!AppState.recipes.find((x) => String(x.id) === 'ip-1'));
 
   const after = await page.evaluate(() => {
     const r = AppState.recipes.find((x) => String(x.id) === 'ip-1');

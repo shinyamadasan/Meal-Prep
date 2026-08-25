@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Kitchen Truth wave — inventory truth with minimum maintenance.
@@ -720,7 +720,12 @@ test('a grocery transfer survives a localStorage round-trip and reload', async (
   });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // The two things this test is about, and nothing wider: the transferred pantry record
+  // and the checked-off grocery row, both back out of storage. waitForAppReady alone only
+  // proves the dashboard painted, which happens before the restore when init is async.
+  await waitForRestored(page, () =>
+    AppState.pantry.some((x) => x.name === 'Chicken Breast') &&
+    (AppState.groceryList.find((x) => x.id === 900090) || {}).checked === true);
 
   const after = await page.evaluate(() => {
     const p = AppState.pantry.find((x) => x.name === 'Chicken Breast');

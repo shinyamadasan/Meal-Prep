@@ -1000,6 +1000,65 @@ CDN, which is category **B**, and no local readiness condition applies.
 Risk gate: **outside D-032 red zone.** No product source file (`app.js`, `index.html`, `style.css`,
 `sw.js`, `manifest.json`) is touched — verified by diff against `main`.
 
+Addendum (TASK-055, 2026-08-25): **`waitForAppReady()` proves the app painted, not that a saved
+document was restored** — and three CI failures came from tests reading it as the latter.
+
+On 2026-08-25 the local branch gate went red twice on `56d8da7` with the product source
+byte-identical to a run that had passed: `kitchen-truth` (`pantryHas: false`),
+`low-effort-metadata` (recipe `undefined`), then `cook-depletion-tombstones` (`pantryIds: []`).
+Different specs each run, all three asserting immediately after `page.reload()` +
+`waitForAppReady()`, all three passing locally on repeat. A `workflow_dispatch` re-run of the
+identical commit was green.
+
+The mechanism is in this decision's own helper. `initApp()` ends with `showTab('dashboard')` →
+`renderDashboard()` **unconditionally**, on whatever `AppState` holds at that moment. When
+`window.firebase` is present the restore happens later, inside the async `onAuthStateChanged`
+callback, so the dashboard can paint — and this decision's condition go true — against a
+still-default `AppState`. Measured on this app: readiness at 346 ms, the saved pantry landing at
+406 ms. The only thing covering that 60 ms gap was the helper's trailing `waitForTimeout(150)`:
+**elapsed time standing in for a state check**, which is the very substitution this decision
+replaced 2500 ms waits to avoid. It survived because 150 ms is plenty on a developer machine and
+is not on a loaded two-worker runner.
+
+Reproduced rather than assumed. Under 20× CPU throttling with 8-way parallelism the pantry read
+back **empty** after reload — the exact CI symptom. An A/B harness running both strategies against
+the same throttled page, ten times: the old pattern failed **2/10**, waiting for the state itself
+failed **0/10**.
+
+Honest limit on the diagnosis: that reproduction needed the async-init path. The three specs abort
+Firebase, and in that path `initApp()` is fully synchronous, so readiness genuinely implies restore
+— locally it never showed the gap even at 20×. **The failure class is reproduced; the specific
+condition that opened the gap past 150 ms on the runner is inferred.** The fix does not depend on
+which it was: if the state truly never arrives, the wait now times out naming that state instead of
+producing an assertion diff against an empty `AppState`.
+
+### The rule
+
+> Never let elapsed time stand in as evidence that restoration finished when a state condition is
+> available. After a reload, wait for the state the test is about to assert — the narrowest
+> truthful one, not a convenient global.
+
+`tests/app-ready.js` gains `waitForRestored(page, predicate)` — `waitForAppReady()` plus the
+caller's own condition — applied at the three proven sites. `waitForAppReady()` itself is
+**unchanged**: "booted and painted" is still the right contract for the ~300 tests that only need
+that, and narrowing it to "a saved document is loaded" would break the specs that deliberately boot
+an empty or seeded one.
+
+Deliberately not done, and the residual risk: **eleven other `page.reload()` sites across ten specs
+still use the bare helper** (`bulk-add-date-truth` ×2, `inventory-quantity-truth` ×2,
+`seed-isolation` ×2, `bulk-add-partial-retry`, `cook-method-discovery`,
+`food-attention-notifications`, `inventory-expiry-display`, `ready-food-portions`,
+`recipe-edit-preservation`, `starter-pack`). They carry the same latent exposure and were left
+alone because none has yet been observed failing and the wave was scoped to the proven three; a
+repo-wide migration is its own task. The short 200–400 ms interaction waits this decision
+deliberately kept are likewise untouched — none was implicated.
+
+No retries were added. The preferred state for a deterministic branch gate is `retries = 0` with
+tests that do not depend on timing, and adding a retry here would have hidden the defect rather
+than fixed it.
+
+Verify: tests/app-ready.js contains "async function waitForRestored(page, predicate"
+
 Verify: run-claude.ps1 contains "Test-Path -LiteralPath $docsCheckScript"
 Verify: package.json contains "playwright test --project=local"
 Verify: package.json contains "playwright test --project=prod"

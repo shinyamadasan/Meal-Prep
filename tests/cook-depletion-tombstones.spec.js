@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Cook-path depletion tombstones.
@@ -338,7 +338,12 @@ test('a full cook still creates the batch, and every depleted id reaches storage
 
   // 9 (cont.) — reload and the removals hold; nothing is resurrected.
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // Both halves of the claim: the survivor is back AND its six tombstones came with it.
+  // Waiting on the survivor alone would still allow asserting mid-restore; CI read back
+  // an empty pantry here.
+  await waitForRestored(page, (n) =>
+    AppState.pantry.length > 0 && Object.keys(AppState.deletions || {}).length === n,
+    expected.length);
 
   const reloaded = await page.evaluate(() => ({
     pantryIds: AppState.pantry.map((p) => p.id),
