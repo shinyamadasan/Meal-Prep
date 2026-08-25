@@ -1057,6 +1057,18 @@ No retries were added. The preferred state for a deterministic branch gate is `r
 tests that do not depend on timing, and adding a retry here would have hidden the defect rather
 than fixed it.
 
+Landed as an operator-approved D-032 `done` merge: `--no-ff` at `1cee2d9` (parents `56d8da7` +
+`4f1b9d9`), the reviewed commit unchanged. Recorded as TASK-055 — an addendum to this entry, not a
+new decision, because it corrects this decision's own helper rather than establishing a new one.
+
+The first push-triggered run after the merge went red on `bulk-add-partial-retry.spec.js:426` with
+`AppState.pantry` reading back `[]` — the identical signature, in one of the eleven un-migrated
+sites listed above; all three fixed specs passed, and `workflow_dispatch` on the same SHA was green
+(local 335, production 137, no retries). Recorded rather than re-run for green. That is
+corroboration, not falsification: the class is real, the fixed sites hold, and the next flake landed
+exactly where this addendum said it would — which promotes the remaining-reload migration from a
+theory to an evidenced follow-up task.
+
 Verify: tests/app-ready.js contains "async function waitForRestored(page, predicate"
 
 Verify: run-claude.ps1 contains "Test-Path -LiteralPath $docsCheckScript"

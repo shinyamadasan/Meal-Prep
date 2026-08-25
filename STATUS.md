@@ -5,6 +5,135 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-25 — Test gate determinism landed (TASK-055, D-065 addendum) — a painted app is not a restored one
+
+`fix/test-gate-determinism` → `main` (`1cee2d9`, `--no-ff`, unrebased). One commit, `4f1b9d9`,
+landed unchanged. `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+**Test/harness only. Product source byte-unchanged** — `git diff 56d8da7 -- app.js index.html
+style.css sw.js manifest.json` is empty.
+
+### The complaint
+
+The deterministic local branch gate went red twice on `56d8da7` while the product source was
+byte-identical to a run that had passed. Different specs each time:
+
+```
+attempt 1  kitchen-truth:737              pantryHas: false
+           low-effort-metadata:232        TypeError: reading 'equipment' of undefined
+attempt 2  cook-depletion-tombstones:349  pantryIds: []  (expected ['cook_keep'])
+```
+
+All three assert immediately after `page.reload()` + `waitForAppReady()`. All three pass locally on
+repeat. A `workflow_dispatch` on the identical commit was green. A gate that behaves like that is
+worse than no gate, because it teaches you to re-run instead of to read.
+
+### One cause, not three
+
+`initApp()` ends with `showTab('dashboard')` → `renderDashboard()` **unconditionally**, on whatever
+`AppState` holds at that moment. When `window.firebase` is present the restore happens later, inside
+the async `onAuthStateChanged` callback — so the dashboard paints, `waitForAppReady()`'s condition
+goes true, and the test reads a still-default `AppState`. Measured on this app:
+
+```
+readiness condition true   346ms
+saved pantry restored      406ms
+```
+
+The only thing covering that 60ms gap was the helper's trailing `waitForTimeout(150)` — **elapsed
+time standing in for a state check**, which is the exact substitution D-065 replaced 2500ms waits
+to avoid. It survived because 150ms is generous on a developer machine and is not on a loaded
+two-worker runner.
+
+`cook-depletion-tombstones` asserts `storedPantryIds` straight out of localStorage *before* it
+reloads, and that assertion passes. So the data was written; the reload read pre-restore state.
+
+### Reproduced, not assumed
+
+Under 20× CPU throttling with 8-way parallelism the pantry read back **empty** after reload — the
+exact CI symptom. Then A/B, both strategies against the *same* throttled page, ten runs:
+
+| strategy | failures |
+|---|---|
+| `waitForAppReady()` + fixed 150ms | **2/10** |
+| wait for the state itself | **0/10** |
+
+Honest limit, stated rather than buried: that reproduction needed the async-init path. The three
+specs abort Firebase, where `initApp()` is fully synchronous and readiness genuinely implies
+restore, and the gap never appeared there even at 20×. **The failure class is reproduced; the exact
+condition that opened the gap past 150ms on the runner is inferred.** Ruled out along the way: a
+`saveData()` debounce (`saveToLocalStorage()` is synchronous), service workers (do not register
+under `file://`), static `#dashboard` markup (empty in `index.html`), and a reseeding init script
+(all three bootstrap guards are correct).
+
+The fix does not depend on the answer. If the state truly never arrives, the wait now times out
+*naming that state* instead of producing an assertion diff against an empty `AppState`.
+
+### The fix
+
+`tests/app-ready.js` gains `waitForRestored(page, predicate)` — `waitForAppReady()` plus the
+caller's own narrowest condition:
+
+| spec | condition |
+|---|---|
+| `kitchen-truth` | Chicken Breast pantry record **and** grocery `900090` checked |
+| `low-effort-metadata` | recipe `ip-1` present |
+| `cook-depletion-tombstones` | pantry non-empty **and** all six tombstones |
+
+`waitForAppReady()` itself is **unchanged**. "Booted and painted" is still the right contract for
+the ~300 tests that need only that; narrowing it globally would break the specs that deliberately
+boot an empty or seeded document. No assertion was changed or weakened — the spec diff is three
+`require` lines and three wait calls.
+
+Negative-proofed three ways: sabotage the restored state and each new wait times out naming it.
+
+### Retries: deliberately still disabled
+
+None added, none recommended. `playwright.config.js` has no `retries` key, so Playwright's default
+0 applies. This was a deterministic defect in the harness, not infrastructure noise — a retry would
+have printed green while the tests kept asserting against pre-restore state, and the class would
+have resurfaced elsewhere.
+
+### The first push-triggered run failed, and that is the corroboration
+
+Run `32899800754`, attempt 1, no retries: **red** — on `bulk-add-partial-retry.spec.js:426`,
+`AppState.pantry` reading back `[]` after reload. Same signature, in one of the **eleven** reload
+sites this wave deliberately did not migrate. All three fixed specs passed. The production gate was
+skipped because the local gate runs first and failed — D-065's intended ordering, not a second
+defect.
+
+`workflow_dispatch` on the same SHA (`32900172249`): **green** — local 335, production 137, no
+retries.
+
+Recorded rather than re-run for green. The landing is not falsified by this; the three fixed sites
+held and the next flake landed exactly where the review predicted, which promotes the remaining
+migration from theory to evidence.
+
+### The rule
+
+> A rendered application is not proof that persisted state needed by a test has been restored.
+> Tests that depend on restored state must wait on that specific state.
+
+Written into the D-065 addendum and into `tests/app-ready.js` at the point of use, so the next
+person tempted to collapse `waitForRestored` back into `waitForAppReady` reads why not.
+
+### Numbers
+
+kitchen-truth 270/270 · low-effort-metadata 50/50 · cook-depletion-tombstones 90/90 · the three
+together at CI's 2-worker config 123/123 · `npm run test:local` and `npm test` 335/335 ·
+suite-classification 6/6 · `Verify-Decisions.ps1` 30/30 (1 new pointer).
+
+### Carried forward, deliberately not fixed
+- **Eleven `page.reload()` sites across ten specs still use bare `waitForAppReady()`** —
+  `bulk-add-date-truth` ×2, `inventory-quantity-truth` ×2, `seed-isolation` ×2,
+  `bulk-add-partial-retry`, `cook-method-discovery`, `food-attention-notifications`,
+  `inventory-expiry-display`, `ready-food-portions`, `recipe-edit-preservation`, `starter-pack`.
+  `bulk-add-partial-retry` has now been observed failing. **This is the next task**, not started.
+- Short 200–400ms interaction waits (kitchen-truth ×8, cook-depletion ×2) — none implicated.
+- `loadFromLocalStorage()` swallows exceptions and continues with default state. Product code.
+- Production test classification, product code, `wave1-portion-truth`.
+
+---
 ## 2026-08-25 — Bulk Add short years landed (TASK-054, D-067 extension) — the fix that had to be narrowed twice
 
 `fix/bulk-add-two-digit-year` → `main` (`7ce77cc`, `--no-ff`, unrebased). Four commits — `b594e74`,

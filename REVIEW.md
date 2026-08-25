@@ -4,6 +4,96 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-055 — APPROVED (test gate determinism, D-065 addendum) — D-032 `done`, operator-approved
+branch: fix/test-gate-determinism @ 4f1b9d9 → main @ 1cee2d9 (`--no-ff`, unrebased)
+verdict: approved — test/harness infrastructure only; product source byte-unchanged
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**, and unusually easy to justify: the diff is five files and **none of them is
+product code**. `git diff 56d8da7 -- app.js index.html style.css sw.js manifest.json` is empty.
+`tests/app-ready.js` gains one helper; three specs each change one `require` line and one wait
+call; `docs/DECISIONS.md` gains a D-065 addendum. No assertion was touched.
+
+### What was actually wrong
+Three CI failures on `56d8da7` with the product byte-identical to a passing run —
+`kitchen-truth` (`pantryHas: false`), `low-effort-metadata` (recipe `undefined`),
+`cook-depletion-tombstones` (`pantryIds: []`). The investigation's central finding is that these
+are **one cause, not three**: `initApp()` ends with `showTab('dashboard')` → `renderDashboard()`
+unconditionally, so the dashboard paints — and `waitForAppReady()`'s condition goes true — against
+a still-default `AppState` whenever restore happens later in the async `onAuthStateChanged`
+callback. Readiness measured at 346ms; the saved pantry landing at 406ms. The only thing covering
+that gap was the helper's trailing `waitForTimeout(150)` — **elapsed time standing in for a state
+check**, which is precisely what D-065 replaced 2500ms waits to avoid. It survived a year because
+150ms is generous on a developer machine and is not on a loaded two-worker runner.
+
+That is a genuinely good diagnosis: it explains all three symptoms, it explains why they are
+intermittent, it explains why they only appear on CI, and it explains why they rotate between
+specs.
+
+### Evidence quality
+Not asserted — **reproduced**. Under 20× CPU throttling with 8-way parallelism the pantry read back
+empty after reload, the exact CI symptom. Then an A/B harness ran both strategies against the *same*
+throttled page ten times: old pattern **2/10 failed**, waiting on the state itself **0/10**. That
+is the right shape of proof, because it isolates the strategy rather than comparing two runs.
+
+Negative-proofed three ways: sabotaging the restored state makes each of the three new waits time
+out naming that state. This matters — the previous harness printed green without exercising the
+condition, and that is exactly the failure mode being closed.
+
+### Honesty check — the limit is stated, not buried
+The reproduction needed the async-init path. The three specs abort Firebase, where `initApp()` is
+fully synchronous and readiness genuinely implies restore, and the gap never appeared there even at
+20×. So the **failure class is reproduced; the exact condition that opened the gap past 150ms on
+the runner is inferred.** Alternatives were checked and ruled out rather than hand-waved: a
+`saveData()` debounce (`saveToLocalStorage()` is synchronous), service workers (do not register
+under `file://`), static `#dashboard` markup (the element is empty in `index.html`), and a
+reseeding init script (all three bootstrap guards are correct). `cook-depletion-tombstones` asserts
+`storedPantryIds` from localStorage *before* reloading and passes, which independently rules out
+"the save never happened".
+
+The fix does not depend on which condition it was. If the state truly never arrives, the wait now
+times out naming that state instead of producing an assertion diff against an empty `AppState` —
+strictly better diagnostics either way.
+
+### Scope discipline
+`waitForAppReady()` is deliberately **unchanged**. Narrowing it globally to "a saved document is
+loaded" would have been the obvious move and would have broken the specs that intentionally boot an
+empty or seeded document. Keeping the old contract and adding a narrower sibling in the same file
+is the right call, and it avoids two helpers that mean almost the same thing.
+
+Retries were **not** added, and the reasoning is correct: a retry would have made the gate print
+green while the tests continued asserting against pre-restore state. `retries = 0` with
+timing-independent tests is the right state for a branch gate.
+
+### The first push-triggered run — read this before concluding anything
+Run `32899800754`, attempt 1, **failed**, and it is worth being precise about what that means.
+
+It failed on `bulk-add-partial-retry.spec.js:426` with `AppState.pantry` reading back `[]` after
+reload — the **identical signature**, in one of the ELEVEN reload sites this task deliberately did
+not migrate. All three fixed specs passed. The production gate was skipped because the local gate
+runs first and failed, which is D-065's intended ordering, not a second defect.
+
+A `workflow_dispatch` on the same SHA (`32900172249`) was green: local 335, production 137, no
+retries.
+
+So the landing is not falsified — it is corroborated. The class is real, the three fixed sites hold,
+and the next flake landed exactly where this review predicted it would. That promotes the
+remaining-reload migration from a theory to an evidenced follow-up. It was NOT absorbed here, per
+operator instruction.
+
+### The rule this establishes
+> A rendered application is not proof that persisted state needed by a test has been restored.
+> Tests that depend on restored state must wait on that specific state.
+
+Recorded in the D-065 addendum and at the point of use in `tests/app-ready.js`, so the next person
+who is tempted to "simplify" `waitForRestored` back to `waitForAppReady` reads why not.
+
+### Gate chosen, and why
+**`done`**. There is no product surface in this change at all, and the worst case of a wrong test
+wait is a red gate, not lost user data. Operator directed the landing explicitly.
+
+---
 ## Review TASK-054 — APPROVED (Bulk Add short years, D-067 extension) — D-032 `done`, operator-approved
 branch: fix/bulk-add-two-digit-year @ f2aaca8 → main @ 7ce77cc (`--no-ff`, unrebased)
 final main: 88d6357 (production smoke follow-up)

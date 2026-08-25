@@ -3305,6 +3305,93 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-055 · Test gate determinism: a painted app is not a restored one
+status: done
+source: CI flakes on `56d8da7` (operator, 2026-08-25)
+depends-on: TASK-049 (D-065, `waitForAppReady`)
+files: tests/app-ready.js, tests/kitchen-truth.spec.js, tests/low-effort-metadata.spec.js,
+       tests/cook-depletion-tombstones.spec.js, docs/DECISIONS.md
+objective: make the deterministic local branch gate trustworthy by removing the timing
+       assumption behind three observed GitHub Actions flakes. Test/harness only — no
+       product behaviour, no Playwright retries.
+acceptance:
+  - [x] Each of the three flakes characterised from the real CI logs before any edit:
+        `kitchen-truth:737` (`pantryHas: false`), `low-effort-metadata:232` (recipe
+        `undefined`), `cook-depletion-tombstones:349` (`pantryIds: []`).
+  - [x] One root cause identified for all three, not three: `initApp()` ends with
+        `showTab('dashboard')` → `renderDashboard()` unconditionally, so the dashboard can
+        paint — and `waitForAppReady()`'s condition go true — against a still-default
+        `AppState` when restore happens later in the async `onAuthStateChanged` callback.
+        Measured: readiness 346ms, saved pantry 406ms. Only the helper's trailing
+        `waitForTimeout(150)` covered the gap — elapsed time standing in for a state check.
+  - [x] Failure class REPRODUCED, not assumed: under 20× CPU throttling with 8-way
+        parallelism the pantry read back empty after reload — the exact CI symptom.
+  - [x] A/B on the same throttled page, 10 runs: old pattern **2/10 failed**, waiting on
+        the state itself **0/10**.
+  - [x] `waitForRestored(page, predicate)` added to `tests/app-ready.js`; it CALLS
+        `waitForAppReady()` then waits for the caller's narrowest condition. One helper
+        family, not two competing ones.
+  - [x] `waitForAppReady()` itself unchanged — "booted and painted" is still correct for
+        the ~300 tests that need only that, and narrowing it globally would break the specs
+        that deliberately boot an empty or seeded document.
+  - [x] Three call sites converted to the state each test is actually about: Chicken Breast
+        pantry record + checked grocery row; recipe `ip-1`; pantry non-empty + all six
+        tombstones.
+  - [x] No assertion changed or weakened. The spec diff is three `require` lines and three
+        `waitForAppReady` → `waitForRestored` replacements.
+  - [x] Reload/bootstrap audit: all three `addInitScript` blocks correctly guard with a
+        bootstrap key, so `page.reload()` does not reseed. No test was green for the wrong
+        reason.
+  - [x] Negative proof ×3: sabotaging the restored state makes each new wait time out
+        naming that state.
+  - [x] Repeat runs after the fix: kitchen-truth 270/270, low-effort-metadata 50/50,
+        cook-depletion-tombstones 90/90; the three together at CI's 2-worker config
+        123/123; `npm run test:local` and `npm test` 335/335; suite-classification 6/6;
+        `Verify-Decisions.ps1` 30/30.
+  - [x] Retries NOT added and not recommended. `playwright.config.js` has no `retries` key
+        (Playwright default 0), and a retry would have printed green while the tests kept
+        asserting against pre-restore state.
+  - [x] Product source byte-unchanged: `git diff 56d8da7 -- app.js index.html style.css
+        sw.js manifest.json` is empty.
+constraints: test/harness infrastructure only; no product code; no repo-wide reload
+       migration; `wave1-portion-truth` untouched.
+
+merge gate:
+  D-032 **`done`** — approved and reversible, and outside the product entirely: five files,
+  all tests or docs. Operator directed the landing explicitly.
+
+landed:
+  Merged `--no-ff` at `1cee2d9` (parents `56d8da7` + `4f1b9d9`), commit `4f1b9d9`
+  unchanged — not rebased, squashed or amended. Final main: see STATUS/DONE for the
+  documentation commit SHA.
+
+  **First push-triggered CI run failed — and the failure is the predicted evidence, not a
+  regression.** Run `32899800754` (attempt 1, no retries) went red on
+  `bulk-add-partial-retry.spec.js:426` with `AppState.pantry` reading back `[]` after
+  reload — the identical signature, in one of the ELEVEN reload sites this task
+  deliberately did not migrate. All three fixed specs passed. The production gate was
+  skipped because the local gate runs first and failed, which is D-065's intended ordering.
+  Recorded rather than re-run for green, per operator instruction.
+
+open items (recorded, deliberately NOT fixed — these are the follow-up audit):
+  - **Eleven `page.reload()` sites across ten specs still use bare `waitForAppReady()`**
+    and carry the same latent exposure: `bulk-add-date-truth` ×2,
+    `inventory-quantity-truth` ×2, `seed-isolation` ×2, `bulk-add-partial-retry`,
+    `cook-method-discovery`, `food-attention-notifications`, `inventory-expiry-display`,
+    `ready-food-portions`, `recipe-edit-preservation`, `starter-pack`.
+    `bulk-add-partial-retry` has now been OBSERVED failing, which promotes this from
+    theory to evidence. Its own task.
+  - The exact condition that opened the gap past 150ms on the runner remains **inferred**:
+    the reproduction needed the async-init path, and the specs abort Firebase, where
+    `initApp()` is synchronous and readiness genuinely implies restore.
+  - Short 200–400ms interaction waits (kitchen-truth ×8, cook-depletion ×2) untouched —
+    none implicated, and D-065 kept them on purpose.
+  - `loadFromLocalStorage()` swallows exceptions and lets init continue with default
+    state. Product code; not touched.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 ### TASK-054 · Bulk Add short years: `Aug 8 26`, bounded and never guessed
 status: done
 source: dogfooding (operator, 2026-08-25) — follow-up to TASK-051
