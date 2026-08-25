@@ -3028,6 +3028,101 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     Inventory expiry truth · TASK-050
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-050 · Inventory: store and render name, quantity/unit and expiry as three concepts
+status: done
+owner: claude
+source: direct operator brief (dogfooding screenshot — "eggs 12pcs august 10 2026" rendering as one
+        item name next to "3d left") — not BQ
+depends-on: none
+files: app.js, index.html, style.css, tests/inventory-expiry-display.spec.js (new),
+        docs/FEATURES.md, docs/DATA_MODEL.md, docs/DECISIONS.md
+
+objective:
+  An item's name, its quantity/unit and its expiry date must be stored and rendered as three
+  separate concepts. Keep the existing relative freshness indicator ("3d left" / "Use today!" /
+  "Expired Nd ago") — it was never the problem.
+
+notes:
+  The brief asked for characterisation before any fix, and that changed what the defect was.
+  `addToPantry()` read `#pantry-input` verbatim into `name`, so the whole typed string WAS the
+  name — `quantity` stayed null, `unit` stayed '', `expiryDate` was never set. `inferCategory()`
+  still loose-matched "eggs" inside the string and returned Protein, whose `categoryShelfLife()`
+  default is 3 days. **That, not the typed date, produced "3d left."** Replaying the exact input
+  against the shipped code confirms it; the same item entered with its real date is
+  "Expired 14d ago".
+
+  So the badge was not ambiguous, it was **wrong** — three days of claimed life for food whose
+  printed date had already passed. Classified as a data-entry defect wearing a rendering defect's
+  clothes. The schema needed no change: every field already existed and the bulk-add path already
+  populated them correctly. The quick-add form was collecting one of seven.
+
+  Mobile pass (second commit): `.pantry-add-row` was `display: flex` with no `flex-wrap`, and
+  `.ing-name-wrap` carries a global `min-width: 0` with a `width: 100%` input, so the name field's
+  min-content contribution was zero and five buttons crushed `#pantry-input` to **26px** at 320px
+  and 390px. Measured on unmodified `main`, so pre-existing — but it made the new fields unusable
+  on the phone this app is dogfooded on, so it was pulled into scope rather than deferred.
+
+acceptance:
+  - [x] `#pantry-qty`, `#pantry-unit`, `#pantry-expiry` exist on the add row and are optional
+  - [x] `addToPantry()` stores each in its own field; the name field holds only the name
+  - [x] Blank quantity stores `null`; blank date leaves the item in bought-date mode
+  - [x] Produced record shape matches what `confirmBulkAdd()` already produced
+  - [x] Cards render `.pi-name`, `.pi-qty` and `.pi-date` as separate elements
+  - [x] A printed expiry renders "Expires <date>"; a derived one renders "Best by <date>"
+  - [x] The relative `.pantry-fresh-badge` is unchanged and still present
+  - [x] `pantryExpiryInfo()` branches on `dateMode` exactly as `pantryDaysLeft()` does — date and
+        badge always name the same day (swept ±400 days across both modes)
+  - [x] An item tracking no date renders neither a date chip nor a freshness badge
+  - [x] 390px: no horizontal overflow; `#pantry-input` keeps a usable width; qty/unit/expiry/Add
+        all reachable and operable; an explicit expiry survives reload and renders date + freshness
+  - [x] 320px: no horizontal overflow; name input still usable
+  - [x] Desktop add row still renders on one line
+
+constraints:
+  - No natural-language / heuristic date or quantity parsing, and no NLP layer
+  - Do not change freshness boundaries (`FRESHNESS_WARN_DAYS`, `pantryDaysLeft()` semantics)
+  - Do not redesign the Inventory page
+  - Do not touch Firestore, `saveData()`, `cloudReady`, tombstones, merge/deletion or auth
+  - Do not modify `wave1-portion-truth`
+  - Do not absorb the automation-generated STATUS.md / CODEX_READY.md / DIGEST.md edits
+
+verification:
+  - [x] `tests/inventory-expiry-display.spec.js` — 14 passed (8 data/display, 6 mobile)
+  - [x] focused inventory-expiry + kitchen-truth + food-attention — 68 passed
+  - [x] `npm run test:local` — 244 passed (was 238)
+  - [x] `npm run test:prod` — post-merge, against the deployed site
+  - [x] `tools/Verify-Decisions.ps1` — all 12 pointers hold (2 new, added by D-066)
+  - [x] Mutation-checked twice: 7-of-8 data/display cases fail against unmodified `main`; both
+        width cases fail against the pre-wrap CSS
+  - [x] `#pantry-input` width before → after: 320px 26→188, 390px 26→179, 414px 45→203,
+        768px 399→399, 1280px 943→943
+
+merge gate:
+  D-032 **`done`** — approved and reversible. UI, CSS and one manual-entry function. No red-zone
+  surface: `git diff` touches no Firestore, sync, tombstone, `saveData()` or auth code, and
+  `dateMode: undefined` cannot reach Firestore because both write sites pass through
+  `JSON.parse(JSON.stringify(payload))`.
+
+landed:
+  Merged `--no-ff` at `142ec35` on the operator's explicit approval of `e8ad4fb`.
+
+open items (recorded, deliberately NOT fixed):
+  - Pantry records created before this task keep their free-text names. They are not auto-parsed
+    and not migrated; the app has no trustworthy way to split "eggs 12pcs august 10 2026" back
+    into fields, and guessing would re-introduce the exact defect this task closed.
+  - The structured add form is taller on narrow phones — four wrapped lines at 390px. Fitting
+    Qty/Unit/Expires on one 390px line is not possible without shrinking the date input below a
+    workable size.
+  - The quick-add box still does not accept the bulk parser's `Name, Qty, Unit` grammar. The two
+    entry points now agree on the record they produce, which was the real inconsistency.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

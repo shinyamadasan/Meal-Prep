@@ -4,6 +4,108 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-050 — APPROVED (inventory expiry truth, D-066) — D-032 `done`, operator-approved
+branch: fix/inventory-expiry-date-truth @ e8ad4fb → main @ 142ec35 (`--no-ff`, unrebased)
+verdict: approved — UI, CSS and one manual-entry function; outside the red zone
+date: 2026-08-24
+
+### The gate
+D-032 **`done`**. The diff is the add form, the pantry card renderer, two CSS blocks and a spec.
+No Firestore, `saveData()`, `cloudReady`, tombstone, merge/deletion or auth code is touched. The
+one storage-adjacent question — `dateMode: undefined` reaching Firestore — was checked rather than
+assumed: both write sites already pass the payload through `JSON.parse(JSON.stringify(payload))`,
+which strips undefined keys, and this is the same mechanism the pre-existing
+`staple: dbEntry ? … : undefined` in the very same function already relied on.
+
+I flagged at hand-off that `approved` was also defensible, because the first commit changes what
+`addToPantry()` writes into inventory records. The operator approved explicitly at `e8ad4fb` and
+directed the merge, so `done` is the landed gate — recorded here so the choice is not silent.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude from an operator brief with a screenshot. Review of Claude's own
+work, disclosed as in TASK-044 through TASK-049.
+
+### The finding that defines this task
+The brief described a display problem: the expiry date looked embedded in the item name, and only
+the derived "3d left" was exposed. **Characterising before fixing showed the display ambiguity was
+the smaller half of the defect.**
+
+`addToPantry()` read `#pantry-input` verbatim into `name`, so the whole typed string *was* the name.
+`quantity` stayed null, `unit` stayed `''`, `expiryDate` was never set. `inferCategory()` still
+loose-matched "eggs" inside the string and returned `Protein`; the exact-name shelf-life lookup then
+failed (the name was a whole sentence) and fell back to `categoryShelfLife('Protein')` — **3 days**,
+counted from today. That, not the user's typed date, is where `3d left` came from.
+
+Replayed against the shipped code:
+
+```
+STORED: {"name":"eggs 12pcs august 10 2026","category":"Protein",
+         "purchaseDate":"2026-08-24","shelfLifeDays":3,"quantity":null,"unit":""}
+daysLeft: 3 → "3d left"
+
+Same item with the date captured:  daysLeft: -14 → "Expired 14d ago"
+```
+
+So the badge was not ambiguous, it was **wrong**: three days of claimed life for food whose printed
+date had passed a fortnight earlier. That lands on north-star goal #2, and it is why this was
+treated as a correctness fix rather than a polish item.
+
+### What I checked hardest
+**The D-057 boundary.** `docs/FEATURES.md` recorded that D-057 removed quantity from this row and
+that `addToPantry()` "leaves quantity unknown", which reads at first glance like this change
+reverses an approved decision. Read in full, D-057's "no modal, no quantity prompt, no date entry"
+is scoped to **grocery check-off** — Bought ✓ being the whole interaction — and that path is
+untouched here. What D-057 removed from `addToPantry()` was two null-guarded reads of elements
+already deleted from `index.html`: dead code, not a capability.
+
+D-057's rule that *is* global — the app admits ignorance rather than inventing a number — is
+preserved literally. Every new field is optional; blank means unknown. No quantity still stores
+`null` rather than `1`, and no date still leaves bought-date mode. A user who ignores the detail
+line gets byte-identical behaviour. The stale half of the FEATURES line was corrected rather than
+left to disagree with the code.
+
+**Date/badge agreement.** `pantryExpiryInfo()` could have recomputed an expiry boundary of its own;
+that would have been a second freshness model, the exact drift D-057 spent effort eliminating. It
+instead branches on `dateMode` in the same two cases `pantryDaysLeft()` does, so the chip and the
+badge are two renderings of one number. A spec sweeps ±400 days across both modes asserting they
+always name the same day.
+
+**"Best by" vs "Expires".** A printed date is the user's fact; a bought-date-plus-shelf-life date is
+the app's estimate from a coarse table. Labelling both "Expires" would launder the estimate into a
+claim — the same over-reach the old `3d left` badge was already committing. `dateMode` already
+encoded the distinction; the UI stopped hiding it.
+
+**The scoped CSS override.** `.ing-name-wrap` is shared with the custom-item modal at
+`index.html:1038`. The `min-width` floor is scoped to `.pantry-add-row` so that modal is unaffected.
+This was the only place a mistake in the mobile commit could have leaked.
+
+### The scope call I got wrong first, and corrected
+I found the 26px name-input squeeze during the first commit, verified it pre-existing on unmodified
+`main`, and left it out under the surgical-changes rule with a note in D-066 that it "should get its
+own task". That was wrong once the consequence was clear: structured fields are worth nothing if the
+row carrying them cannot be typed into on the phone the app is dogfooded on. The operator called for
+the mobile pass; it landed as `e8ad4fb`, and D-066's section was rewritten to record the fix rather
+than the deferral.
+
+### Evidence
+- `tests/inventory-expiry-display.spec.js` — 14 passed (8 data/display, 6 mobile)
+- focused inventory-expiry + kitchen-truth + food-attention — 68 passed
+- `npm run test:local` — 244 passed (was 238)
+- `tools/Verify-Decisions.ps1` — 12/12 pointers hold
+- Mutation-checked twice. The 8 data/display cases fail **7 of 8** against unmodified `main`. The
+  two width cases fail against the pre-wrap CSS. Reported honestly: the other four mobile cases
+  (overflow, reachability, persistence, not-one-column) pass both before and after **by design** —
+  this bug was a squeeze, not an overflow, and the detail fields were in an already-wrapping row, so
+  they were never unreachable. They guard adjacent failure modes.
+- `#pantry-input` width before → after: 320px **26→188**, 390px **26→179**, 414px **45→203**,
+  768px 399→399, 1280px 943→943. Desktop byte-identical; no horizontal overflow at any width.
+
+### Risk-gate
+Low. Two CSS properties (one parent-scoped), one renderer change, one entry function. Reversible in
+a single revert. The residual cosmetic cost — a taller add form at 390px — is stated in TASKS.md and
+D-066 as carried forward, not hidden.
+
+---
 ## Review TASK-049 — APPROVED (test-infrastructure trust, D-065) — D-032 `done`, operator-approved
 branch: wave-test-infra-trust @ 55f83c2 → main @ a067b8c (`--no-ff`, unrebased)
 verdict: approved — infrastructure only, outside the red zone

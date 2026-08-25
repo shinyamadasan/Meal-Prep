@@ -4,6 +4,80 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+## 2026-08-24 — Inventory expiry truth merged (TASK-050, D-066) — the badge was not ambiguous, it was wrong
+
+`fix/inventory-expiry-date-truth` → `main` (`142ec35`, `--no-ff`, unrebased). Two commits:
+`8b133e3` structured manual pantry add + explicit/derived expiry rendering, `e8ad4fb` mobile
+pantry-add wrapping. `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### Characterise before fixing — it changed what the defect was
+
+A dogfooding screenshot: an item added as `eggs 12pcs august 10 2026` rendered that whole string as
+the item name, next to `3d left`. The reported problem was that the date looked embedded in the
+name and only the relative freshness was exposed.
+
+Replaying the exact input against the shipped code showed the display ambiguity was the **smaller
+half**. `addToPantry()` read `#pantry-input` verbatim into `name`, so the string *was* the name —
+`quantity` stayed `null`, `unit` stayed `''`, `expiryDate` was never set. `inferCategory()` still
+loose-matched "eggs" inside the string and returned `Protein`; the exact-name shelf-life lookup then
+failed and fell back to `categoryShelfLife('Protein')` — **3 days**, counted from today.
+
+**That, not the user's typed date, produced `3d left`.** The same item entered with its real date is
+`Expired 14d ago`. So the badge was not ambiguous — it was **wrong**, claiming three days of life
+for food whose printed date had passed a fortnight earlier. Invented freshness is worse than absent
+freshness, and it lands on north-star goal #2. A polish item turned out to be a correctness fix.
+
+The schema needed no change. `name`, `quantity`, `unit`, `expiryDate`, `dateMode`, `purchaseDate`
+and `shelfLifeDays` all already existed, and the bulk-add path already populated them correctly.
+The quick-add form was collecting one of seven.
+
+### What landed
+
+Optional `#pantry-qty` / `#pantry-unit` / `#pantry-expiry` on the add row, stored in their own
+fields, producing the same record shape `confirmBulkAdd()` already produced — so the two manual
+entry points stop disagreeing about what an inventory record looks like. Blank still means unknown,
+so D-057's "never invent a number" rule holds and storage is still inferred, never asked.
+
+`pantryExpiryInfo()` branches on `dateMode` in the same two cases `pantryDaysLeft()` does, rather
+than computing an expiry boundary of its own — a second freshness model is exactly the drift D-057
+spent effort eliminating. Cards render `.pi-name`, `.pi-qty` and `.pi-date` separately; a printed
+expiry reads **Expires ‹date›**, a derived one **Best by ‹date›** in a quieter style, because
+labelling an estimate an expiry claims a certainty this app does not have.
+
+### The scope call I got wrong, then corrected
+
+The 26px name-input squeeze was found during the first commit, verified pre-existing on unmodified
+`main`, and left alone under the surgical-changes rule. That was wrong: structured fields are worth
+nothing if the row carrying them cannot be typed into on the phone this app is dogfooded on. Fixed
+in `e8ad4fb` with two properties — `flex-wrap: wrap` plus a `min-width` floor **scoped** to
+`.pantry-add-row` because the same `.ing-name-wrap` is reused by the custom-item modal.
+
+`#pantry-input` width before → after: 320px **26→188**, 390px **26→179**, 414px **45→203**;
+768px and 1280px byte-identical, desktop still one line, no horizontal overflow at any width.
+
+### Where we are
+
+Local suite 238 → **244**. Focused inventory-expiry + Kitchen Truth + Food Attention **68 passed**.
+`Verify-Decisions` 12/12. Red zone not entered — no Firestore, `saveData()`, `cloudReady`,
+tombstone, merge/deletion or auth code touched; `dateMode: undefined` cannot reach Firestore because
+both write sites pass through `JSON.parse(JSON.stringify(payload))`.
+
+### Carried forward, deliberately not fixed
+
+- Pantry records created before this task keep their free-text names. **Not auto-parsed, not
+  migrated** — the app cannot trustworthily split `eggs 12pcs august 10 2026` back into fields, and
+  guessing would re-introduce the exact defect this closed.
+- The structured add form is taller on narrow phones (four wrapped lines at 390px). Fitting
+  Qty/Unit/Expires on one 390px line needs a date input narrower than is workable.
+- No parser/NLP layer. The quick-add box still does not accept the bulk parser's `Name, Qty, Unit`
+  grammar; the two entry points now agree on the *record*, which was the real inconsistency.
+- The uncommitted automation edits to `STATUS.md`, `planning/CODEX_READY.md` and
+  `planning/DIGEST.md` from the halted 2026-08-23 run were **not absorbed** into this work and
+  remain in the working tree. `DIGEST.md` still carries mangled Unicode from the `Add-Content`
+  gotcha and needs the automation to regenerate it.
+
+---
+
 ## 2026-08-24 — Test-infrastructure trust merged (TASK-049, D-065) — the wave where the brief's root cause was wrong
 
 `wave-test-infra-trust` → `main` (`a067b8c`, `--no-ff`, unrebased). Infrastructure only: the diff
