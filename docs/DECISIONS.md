@@ -1167,6 +1167,10 @@ and only as a trailing segment preceded by whitespace or a comma:
 | `<day> <month> <year>` | `8 aug 2026` |
 | `<year>-<mm>-<dd>` | `2026-08-08` |
 
+(The two month-word shapes also take a two-digit year — `aug 8 26` — mapped 00-99 to 2000-2099.
+See the TASK-054 addendum at the end of this entry, which supersedes the "No two-digit years"
+bullet below.)
+
 On a match the date is removed and **the remaining text goes through the pre-existing quantity/unit
 parser unchanged** — the comma path and `NO_COMMA_RE` are not touched, so `Eggs, 12, pcs` and
 `Coconut cream 200ml` behave exactly as before. On no match the text is left completely alone.
@@ -1220,7 +1224,7 @@ while hardening the other would have been incoherent.
   that name. Back-parsing stored data would apply a guess to records the user has since edited or
   merged, and a wrong guess writes a wrong expiry into food safety. New submissions only.
 - **No slash-date support**, per the ambiguity argument above.
-- **No two-digit years.** `aug 8 26` is refused; a century guess is a guess.
+- ~~**No two-digit years.** `aug 8 26` is refused; a century guess is a guess.~~ **Superseded by the TASK-054 addendum below** — two-digit years are accepted in the month-word shapes, under a fixed 2000-2099 map rather than a guess.
 - **No change to the quantity/unit parser.** The date is removed and the existing parser runs on
   what is left — one parser, not two.
 - **No second expiry model.** Everything lands in `expiryDate` / `dateMode` and renders through the
@@ -1245,6 +1249,89 @@ Verify: app.js contains "function parseTrailingDate(text)"
 Verify: app.js contains "function isRealCalendarDate(y, m, d)"
 Verify: app.js contains "looksLikeAmbiguousDate"
 Verify: app.js contains "perLineExpiry || naturalExpiry || bulkExpiry"
+
+Addendum (TASK-054, 2026-08-25): **the trailing month-word shapes now accept a two-digit year as
+well as a four-digit one**, mapped `00`-`99` to `2000`-`2099`. The "No two-digit years" bullet above
+is superseded by this paragraph; everything else in this decision stands unchanged.
+
+Dogfooding produced the same complaint one door further along. `Eggs 12 pcs Aug 8 26` — how a carton
+is actually printed and how a person actually types it — reproduced this entry's original symptom
+exactly:
+
+```
+input : Eggs 12 pcs Aug 8 26
+stored: name="Eggs 12 pcs Aug 8 26", quantity=null, unit="", no expiry
+shown : Best by Aug 28 · 3d left        (inferCategory → Protein → 3-day category shelf life)
+```
+
+and the comma spelling reproduced the quieter one — `Eggs, 12, pcs, Aug 8 26` parsed name, quantity
+and unit correctly and dropped the date field on the floor with no warning. The only thing separating
+these from the already-fixed four-digit forms was the width of the year. Requiring `2026` every time
+is a tax the user pays for the parser's convenience, and the tax was being collected in the currency
+this entry exists to protect: an invented freshness date on real food.
+
+**The century rule is total and has no sliding window.** `26` is `2026`, `30` is `2030`, `99` is
+`2099`, `00` is `2000`. A sliding window (nn < current+N ⇒ 20nn, else 19nn) would be the guess this
+entry refuses to make; a fixed map is a *convention*, stated once and never re-litigated per input.
+1900s are not a plausible reading of a grocery expiry, so nothing real is lost by not offering them.
+
+**What keeps product names intact was never the year's width — it is the complete grammar.**
+Recognition still requires a month WORD *and* a day *and* a year, all in trailing position. That is
+what the original regression list was really testing, and every name in it still survives untouched:
+`7 Up`, `Heinz 57 Sauce`, `Formula 1 Protein`, `Vitamin B12`, `12 Grain Bread`, `Omega 3 6 9`,
+`Vitamin 2000`, `Sauce 12 2026`, `Blend 2026`. The adversarial two-digit cases this addendum adds
+survive for the same structural reason, not by luck:
+
+| input | why it is not a date |
+|---|---|
+| `Formula 26` | no month word |
+| `Protein 8 26` | two numbers, still no month word |
+| `Sauce Aug 26` | month word, but only one number where the grammar needs day *and* year |
+| `Vitamin May 26` | same, with the month word that is also an ordinary English word |
+| `Eggs 8 26` | no month word |
+
+**A two-digit number is never a year on its own** — only as the last token of a complete trailing
+date. The expansion lives in one three-line helper, `expandYear()`, called only from inside
+`parseTrailingDate()`, so nothing else in the app's text handling can start reading years into
+numbers.
+
+Everything else about this decision is deliberately untouched:
+
+- **Numeric slash dates remain refused at every year width.** `8/8/26`, `08/08/26`, `8/8/2026` and
+  `08/08/2026` all still go through `looksLikeAmbiguousDate()` to the D-068 attention flow with the
+  original line preserved verbatim. Day-first-vs-month-first is not made less ambiguous by a shorter
+  year, and a two-digit year would arguably make it worse. Supporting them was never a near-miss
+  worth revisiting — it is a permanent refusal.
+- **Calendar validation is unchanged and applies before nothing.** The year is expanded *first*, then
+  `isRealCalendarDate()` round-trips it, so `Feb 31 26`, `31 Feb 26` and `Feb 29 26` (2026 is not a
+  leap year) are rejected exactly as their four-digit twins are, and `Feb 29 28` parses exactly as
+  `feb 29 2028` does. Nothing rolls over into March. The `exp:2026-02-31` fix recorded above is
+  untouched.
+- **Expiry precedence is unchanged**: `exp:` → recognised trailing date → shared field → bought-date
+  + shelf life. A two-digit trailing date is stripped even when `exp:` also appears, same as a
+  four-digit one.
+- **The ISO shape keeps its four-digit year.** `2026-08-08` is the app's own storage format; a
+  two-digit ISO year would be a new format rather than a spelling people already use.
+- **D-068 and D-069 are untouched.** A two-digit-dated line is a resolved line (it leaves the
+  textarea); a two-digit slash date is still actionable and keeps its exact original text. The
+  parser's only job is turning text into the canonical `expiryDate` the merge path already reads, so
+  `Eggs 12 pcs Aug 8 26` and `Eggs 12 pcs Aug 8 2026` produce byte-identical records and identical
+  merge verdicts — proven by paired assertions in `tests/inventory-quantity-truth.spec.js` rather
+  than asserted here.
+
+Known ambiguity, widened slightly and accepted: a product name genuinely ending in a month, a day and
+a two-digit number — `Trail Mix May 5 26` — is now read as `Trail Mix` plus an expiry. This is the
+same trade already accepted above for the four-digit case, and the same escape applies: adding a
+quantity or unit after the name moves the date out of trailing position.
+
+Regression-locked by the extended `tests/bulk-add-date-truth.spec.js` (two-digit parsing, the
+century map, calendar rejection, slash refusal at both widths, precedence, adversarial two-digit
+names, persistence, mobile, console-clean), plus paired D-068 and D-069 parity cases in
+`tests/bulk-add-partial-retry.spec.js` and `tests/inventory-quantity-truth.spec.js`. Mutation-checked
+by restoring the four-digit-only year requirement (`(\d{4}|\d{2})` → `(\d{4})`): **12 tests fail and
+every pre-existing case still passes**, which is the shape the change was supposed to have.
+
+Verify: app.js contains "function expandYear(raw)"
 
 ## D-068 — Bulk Add finishes what it can and keeps only what you can fix
 
