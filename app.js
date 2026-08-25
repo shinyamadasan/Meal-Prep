@@ -9868,37 +9868,86 @@ function canMergePurchase(p) {
   return !(dl != null && dl < 0);
 }
 
+// Same unit, or one side doesn't track a unit at all. Deliberately NO conversion:
+// this app has no canonical unit-conversion helper for pantry quantities —
+// unitConvertFactor() belongs to the price path and getUnitConversion() silently
+// returns 1 for anything it doesn't recognise — and "500 g + 1 kg = 501 g" is exactly
+// the invented number inventory truth exists to prevent. Different units stay separate.
+// See DECISIONS D-069.
+function unitsMergeable(a, b) {
+  var ua = String(a == null ? '' : a).trim().toLowerCase();
+  var ub = String(b == null ? '' : b).trim().toLowerCase();
+  return !ua || !ub || ua === ub;
+}
+
+// canMergePurchase() judges the EXISTING record alone. This adds the three facts only
+// the incoming purchase knows, each of which would make a merge lie:
+//   - the purchase carries its own printed expiry (that date belongs to ITS pack, and
+//     one record cannot honestly hold two expiry dates — see DECISIONS D-069)
+//   - the units don't match and this app cannot safely convert them
+//   - the purchase is explicitly destined for different storage than the record's
+// Staples are exempt: they carry a level, not a quantity, unit or date.
+function canMergePurchaseInto(existing, purchase) {
+  if (!canMergePurchase(existing)) return false;
+  if (isStaple(existing)) return true;
+  var pur = purchase || {};
+  if (pur.expiryDate) return false;
+  if (!unitsMergeable(existing.unit, pur.unit)) return false;
+  if (pur.storage && pur.storage !== (existing.storage || inferStorage(existing.name, existing.category))) return false;
+  return true;
+}
+
+// First exact-name record this purchase can safely fold into. A plain
+// findPantryByExactName() returns whichever copy sorts first, so with a printed-expiry
+// Eggs record sitting in front of a mergeable bought-date one, every future purchase
+// would spawn yet another record instead of topping up the one it belongs in.
+function findMergeableStock(name, purchase) {
+  var n = (name || '').toLowerCase().trim();
+  if (!n) return null;
+  return AppState.pantry.find(function(p) {
+    return (p.name || '').toLowerCase().trim() === n && canMergePurchaseInto(p, purchase);
+  }) || null;
+}
+
+// Fold a purchase into an existing record IN PLACE. Never rebuilds the record, so the
+// id, name, category, dates, storage and staple state all survive untouched — only the
+// stock level or the quantity changes. Callers must have cleared canMergePurchaseInto()
+// first. Returns the same receipt shape stockPurchasedGroceryItem() has always returned,
+// so unstockPurchasedGroceryItem() can still reverse it exactly.
+function applyPurchaseToStock(existing, purchase) {
+  var pur = purchase || {};
+  if (isStaple(existing)) {
+    var prevLevel = existing.stockLevel;
+    existing.stockLevel = 'full';
+    delete existing.suggestDismissed;
+    syncStapleToGrocery(existing);   // drops the auto "Running low" shopping row
+    stampUpdated(existing);
+    return { mode: 'staple', pantryId: existing.id, prevLevel: prevLevel };
+  }
+  // Quantities only add up when BOTH sides are known. If either is unknown the
+  // result stays unknown — an approximate "we have some" beats an invented number.
+  var prevQty = (existing.quantity == null || isNaN(existing.quantity)) ? null : Number(existing.quantity);
+  var addQty = (pur.quantity != null && !isNaN(pur.quantity) && Number(pur.quantity) > 0)
+    ? Number(pur.quantity) : null;
+  existing.quantity = (prevQty != null && addQty != null)
+    ? parseFloat((prevQty + addQty).toFixed(2))
+    : null;
+  // purchaseDate is deliberately left alone: the OLDEST portion in a merged
+  // record decides when it goes bad. Stamping today would quietly make the
+  // older stock look fresh again.
+  if (!existing.unit && pur.unit) existing.unit = pur.unit;
+  stampUpdated(existing);
+  return { mode: 'merge', pantryId: existing.id, prevQty: prevQty };
+}
+
 // Turn a checked-off grocery item into inventory. Returns a receipt describing
 // exactly what changed so that unchecking a mis-tap can undo it precisely.
 function stockPurchasedGroceryItem(item) {
   var name = (item.name || '').trim();
   if (!name) return null;
 
-  var existing = findPantryByExactName(name);
-  if (existing && canMergePurchase(existing)) {
-    if (isStaple(existing)) {
-      var prevLevel = existing.stockLevel;
-      existing.stockLevel = 'full';
-      delete existing.suggestDismissed;
-      syncStapleToGrocery(existing);   // drops the auto "Running low" shopping row
-      stampUpdated(existing);
-      return { mode: 'staple', pantryId: existing.id, prevLevel: prevLevel };
-    }
-    // Quantities only add up when BOTH sides are known. If either is unknown the
-    // result stays unknown — an approximate "we have some" beats an invented number.
-    var prevQty = (existing.quantity == null || isNaN(existing.quantity)) ? null : Number(existing.quantity);
-    var addQty = (item.quantity != null && !isNaN(item.quantity) && Number(item.quantity) > 0)
-      ? Number(item.quantity) : null;
-    existing.quantity = (prevQty != null && addQty != null)
-      ? parseFloat((prevQty + addQty).toFixed(2))
-      : null;
-    // purchaseDate is deliberately left alone: the OLDEST portion in a merged
-    // record decides when it goes bad. Stamping today would quietly make the
-    // older stock look fresh again.
-    if (!existing.unit && item.unit) existing.unit = item.unit;
-    stampUpdated(existing);
-    return { mode: 'merge', pantryId: existing.id, prevQty: prevQty };
-  }
+  var existing = findMergeableStock(name, item);
+  if (existing) return applyPurchaseToStock(existing, item);
 
   // No safe merge target → a new record, using the same inference manual adds use.
   var category = item.category || inferCategory(name);
@@ -11492,11 +11541,13 @@ function confirmBulkAdd() {
   const defaultStorage = defaultStorageInput ? defaultStorageInput.value.trim() : '';
 
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  // One result per submitted line, in submission order. Three states, because the user
+  // One result per submitted line, in submission order. Four states, because the user
   // can only act on one of them:
   //   'added'     — a pantry record was created. Finished; drops out of the textarea.
+  //   'merged'    — the purchase topped up existing stock. Finished; drops out too.
   //   'skipped'   — deliberately not added and NOT fixable by editing the line (already
-  //                 in pantry). Also finished — leaving it would re-warn forever.
+  //                 in pantry, and the line carries no quantity to add). Also finished —
+  //                 leaving it would re-warn forever.
   //   'attention' — not added, and the user can fix it by editing. Stays in the textarea.
   // Classification is by explicit status, never by matching warning text.
   const results = [];
@@ -11566,14 +11617,6 @@ function confirmBulkAdd() {
       return;
     }
 
-    if (AppState.pantry.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      // Resolved, not actionable: re-submitting the same line can only produce the same
-      // message, so it is reported in the summary and then dropped from the retry text.
-      results.push({ line: originalLine, status: 'skipped',
-                     message: `"${name}" already in pantry — skipped` });
-      return;
-    }
-
     const dbEntry = INGREDIENT_DB.find(i =>
       i.name.toLowerCase() === name.toLowerCase() ||
       (i.aliases || []).some(a => a.toLowerCase() === name.toLowerCase())
@@ -11584,6 +11627,46 @@ function confirmBulkAdd() {
     // date on the line, then the shared field. A weaker source never overwrites a stronger
     // one; with none of them the record stays in bought-date + shelf-life mode.
     const itemExpiry = perLineExpiry || naturalExpiry || bulkExpiry;
+    const lineQty = (qty && qty > 0) ? qty : null;
+    const lineUnit = unit || (dbEntry ? dbEntry.unit : '');
+
+    // A name already in the kitchen is usually MORE of something we have, not a mistake to
+    // throw away. Skipping it lost the whole purchase — the eggs the user just carried home
+    // were simply not in inventory. See DECISIONS D-069.
+    if (findPantryByExactName(name)) {
+      const purchase = { name: name, quantity: lineQty, unit: lineUnit,
+                         expiryDate: itemExpiry || null, storage: defaultStorage || '' };
+      const target = findMergeableStock(name, purchase);
+      const stapleTarget = !!target && isStaple(target);
+      // Top up only when the sum is honest: the line must say how much was bought AND the
+      // record must say how much was already there. A staple has neither — it carries a
+      // level, so buying it simply puts it back to full.
+      const canTopUp = stapleTarget ||
+        (!!target && lineQty != null && target.quantity != null && !isNaN(target.quantity));
+      if (canTopUp) {
+        const before = stapleTarget ? null : Number(target.quantity);
+        applyPurchaseToStock(target, purchase);
+        results.push({ line: originalLine, status: 'merged',
+          message: stapleTarget
+            ? `"${name}" restocked`
+            : `"${name}" — ${before} + ${lineQty} = ${target.quantity}` +
+              (target.unit ? ' ' + target.unit : '') });
+        return;
+      }
+      if (lineQty == null) {
+        // Nothing to add, so there is nothing to record: a second quantity-less row would
+        // only repeat "we have this", and folding an unknown amount into a known one would
+        // replace a real number with "unknown". The existing record is left exactly as is.
+        results.push({ line: originalLine, status: 'skipped',
+                       message: `"${name}" already in pantry, no quantity on the line — left as is` });
+        return;
+      }
+      // A real quantity that cannot be folded in truthfully — a printed expiry on either
+      // side, expired stock, a unit or storage that does not match, or an existing record
+      // whose own quantity is untracked — becomes its OWN record below. Two honest rows
+      // beat one averaged one, and beat losing the purchase.
+    }
+
     AppState.pantry.push({
       id: Date.now() + Math.random(),
       name,
@@ -11591,8 +11674,8 @@ function confirmBulkAdd() {
       purchaseDate: todayISO(),
       shelfLifeDays: ingredientShelfLife(name, category),
       storage,
-      quantity: (qty && qty > 0) ? qty : null,
-      unit: unit || (dbEntry ? dbEntry.unit : ''),
+      quantity: lineQty,
+      unit: lineUnit,
       staple: dbEntry ? !!dbEntry.isStaple : undefined,
       expiryDate: itemExpiry || null,
       dateMode: itemExpiry ? 'expiry' : undefined
@@ -11601,14 +11684,16 @@ function confirmBulkAdd() {
   });
 
   const addedRows = results.filter(r => r.status === 'added');
+  const mergedRows = results.filter(r => r.status === 'merged');
   const skippedRows = results.filter(r => r.status === 'skipped');
   const attentionRows = results.filter(r => r.status === 'attention');
-  const summary = buildBulkAddSummary(addedRows.length, skippedRows.length, attentionRows.length);
+  const summary = buildBulkAddSummary(addedRows.length, mergedRows.length,
+                                      skippedRows.length, attentionRows.length);
 
   // Valid lines are persisted even when a sibling line needs work — Bulk Add stays
   // tolerant rather than transactional. This is the pre-existing behaviour and the whole
   // reason the retry pass must not re-submit them.
-  if (addedRows.length > 0) {
+  if (addedRows.length > 0 || mergedRows.length > 0) {
     saveData();
     renderPantry();
     refreshFreshnessAlerts();
@@ -11616,7 +11701,7 @@ function confirmBulkAdd() {
   }
 
   // Only unresolved lines survive, in their original text and original order. Everything
-  // finished — added or skipped — drops out, so the correction pass cannot re-add it or
+  // finished — added, merged or skipped — drops out, so the correction pass cannot re-add it or
   // re-trigger its warning.
   if (ta) ta.value = attentionRows.map(r => r.line).join('\n');
 
@@ -11633,7 +11718,7 @@ function confirmBulkAdd() {
   // Modal stays open. The summary goes inline next to the warnings rather than in a toast,
   // so it is still readable while the user edits the remaining line(s).
   if (warnEl) {
-    const notes = skippedRows.concat(attentionRows);
+    const notes = mergedRows.concat(skippedRows, attentionRows);
     warnEl.innerHTML =
       `<div class="bulk-add-summary">${escapeHtml(summary)}</div>` +
       `<div class="bulk-add-warn"><ul>${
@@ -11642,12 +11727,15 @@ function confirmBulkAdd() {
   }
 }
 
-// "4 items added." / "3 items added · 1 line needs attention." /
+// "4 items added." / "2 items added · 1 stock item updated." /
 // "2 items added · 1 already in pantry · 1 line needs attention." Empty when a submission
-// produced no rows at all, which only happens on blank input.
-function buildBulkAddSummary(added, skipped, attention) {
+// produced no rows at all, which only happens on blank input. A merge is reported as its
+// own outcome, never folded into "added" and never as "skipped": topping up existing stock
+// is a success, and calling it a skip is what made the user think the purchase was lost.
+function buildBulkAddSummary(added, merged, skipped, attention) {
   const parts = [];
   if (added) parts.push(added + ' item' + (added === 1 ? '' : 's') + ' added');
+  if (merged) parts.push(merged + ' stock item' + (merged === 1 ? '' : 's') + ' updated');
   if (skipped) parts.push(skipped + ' already in pantry');
   if (attention) parts.push(attention + ' line' + (attention === 1 ? ' needs' : 's need') + ' attention');
   return parts.length ? parts.join(' · ') + '.' : '';
@@ -12042,19 +12130,29 @@ function confirmAddIngredientToPantry(name, idx, unit) {
   var dbItem = INGREDIENT_DB.find(function(i) { return i.name === name; });
   var category = dbItem ? dbItem.category : '';
 
-  AppState.pantry = AppState.pantry.filter(function(p) {
-    return p.name.toLowerCase() !== name.toLowerCase();
-  });
-  AppState.pantry.push({
-    id: Date.now() + Math.random(),
-    name: name,
-    quantity: qty || null,
-    unit: unit,
-    category: category,
-    purchaseDate: todayISO(),
-    shelfLifeDays: categoryShelfLife(category),
-    storage: inferStorage(name, category)
-  });
+  // Setting a quantity on stock we already have must EDIT that record, not replace it.
+  // This used to delete every same-name row and push a fresh one, which silently dropped
+  // the item's id, printed expiry, date mode, staple flag, stock level and shelf life —
+  // so "change the quantity" also wiped "Expires Aug 10". See DECISIONS D-069.
+  var existing = findPantryByExactName(name);
+  if (existing) {
+    existing.quantity = (qty != null && !isNaN(qty) && qty > 0) ? qty : null;
+    if (!existing.unit && unit) existing.unit = unit;
+    checkAndReplenishLowStock();
+    stampUpdated(existing);
+  } else {
+    AppState.pantry.push({
+      id: Date.now() + Math.random(),
+      name: name,
+      quantity: (qty != null && !isNaN(qty) && qty > 0) ? qty : null,
+      unit: unit,
+      category: category,
+      purchaseDate: todayISO(),
+      shelfLifeDays: categoryShelfLife(category),
+      storage: inferStorage(name, category),
+      updatedAt: new Date().toISOString()
+    });
+  }
   saveData();
   renderIngredientsTab();
   renderPantry();

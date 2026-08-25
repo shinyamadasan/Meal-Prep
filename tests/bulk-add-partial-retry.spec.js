@@ -135,17 +135,21 @@ test('3. the partial summary reports added and needs-attention counts accurately
 
 // ── 4. Duplicate + valid + actionable ──────────────────────────────────────
 
-test('4. duplicate is skipped and dropped from retry; actionable line stays', async ({ page }) => {
+// D-069 changed WHAT a duplicate line does, not how the retry pass treats it. The
+// preloaded Eggs record here has an untracked quantity, so "unknown + 12" has no honest
+// sum — the purchase becomes its own record rather than overwriting a real number with
+// `null` or being thrown away. Either way the line is finished and leaves the textarea.
+test('4. a resolved duplicate is dropped from retry; actionable line stays', async ({ page }) => {
   await loadLocalApp(page);
   await openBulk(page, { preload: ['Eggs'] });
   const r = await submit(page, ['Eggs, 12, pcs', OK2, AMBIG].join('\n'));
 
-  expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs']);
-  // The pre-existing Eggs record was not modified into a new one.
-  expect(r.pantry.find((p) => p.name === 'Eggs').quantity).toBeNull();
-  expect(r.textarea).toBe(AMBIG);            // duplicate line gone, actionable line kept
-  expect(r.summary).toBe('1 item added · 1 already in pantry · 1 line needs attention.');
-  expect(r.notes.join(' ')).toContain('already in pantry');   // surfaced, not hidden
+  expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs', 'Eggs']);
+  // The pre-existing untracked record is untouched; the purchase is now visible too.
+  expect(r.pantry.filter((p) => p.name === 'Eggs').map((p) => p.quantity).sort())
+    .toEqual([12, null]);
+  expect(r.textarea).toBe(AMBIG);            // resolved line gone, actionable line kept
+  expect(r.summary).toBe('2 items added · 1 line needs attention.');
 });
 
 // ── 5-7. All-success, all-actionable, all-duplicate ────────────────────────
@@ -178,15 +182,33 @@ test('6. an all-actionable batch adds nothing and keeps every line', async ({ pa
   expect(r.summary).toBe('3 lines need attention.');
 });
 
-test('7. an all-duplicate batch adds nothing, says so, and does not trap the user', async ({ page }) => {
+test('7. an all-duplicate batch resolves every line and does not trap the user', async ({ page }) => {
   await loadLocalApp(page);
   await openBulk(page, { preload: ['Eggs', 'Chicken', 'Milk'] });
   const r = await submit(page, 'Eggs, 12, pcs\nChicken 1 kg\nMilk 2 L');
 
-  expect(r.pantry).toHaveLength(3);          // the three preloaded, nothing new
-  expect(r.pantry.every((p) => p.quantity === null)).toBe(true);
+  // Every preloaded record has an untracked quantity, so none of the three purchases has
+  // an honest sum to fold into. Each is kept as its own record — losing them was the
+  // dogfooding complaint D-069 exists to fix.
+  expect(r.pantry).toHaveLength(6);
+  expect(r.pantry.filter((p) => p.quantity !== null).map((p) => p.quantity).sort())
+    .toEqual([1, 12, 2]);
   expect(r.modalOpen).toBe(false);           // no pointless retry loop
-  expect(r.toast).toBe('3 already in pantry.');
+  expect(r.toast).toBe('3 items added.');
+});
+
+// A duplicate line with NO quantity still has nothing to add, so it stays a true skip:
+// reported, resolved, and dropped from the retry text without touching the record.
+test('7b. a quantity-less duplicate line is still skipped, and leaves stock alone', async ({ page }) => {
+  await loadLocalApp(page);
+  await openBulk(page, { preload: ['Eggs'] });
+  await page.evaluate(() => { AppState.pantry[0].quantity = 6; AppState.pantry[0].unit = 'pcs'; });
+  const r = await submit(page, 'Eggs');
+
+  expect(r.pantry).toHaveLength(1);
+  expect(r.pantry[0].quantity).toBe(6);      // the known number is not replaced by "unknown"
+  expect(r.modalOpen).toBe(false);
+  expect(r.toast).toBe('1 already in pantry.');
 });
 
 // ── 8-9. Line fidelity and order ───────────────────────────────────────────
@@ -288,7 +310,7 @@ test('classification is by status, not by warning wording', async ({ page }) => 
   // prose; only the structured status decides what stays.
   const r = await submit(page, ['Eggs, 12, pcs', 'Butter, abc, g', OK2].join('\n'));
   expect(r.textarea).toBe('Butter, abc, g');   // only the fixable one
-  expect(r.summary).toBe('1 item added · 1 already in pantry · 1 line needs attention.');
+  expect(r.summary).toBe('2 items added · 1 line needs attention.');
 });
 
 test('blank input still closes the modal without touching inventory', async ({ page }) => {

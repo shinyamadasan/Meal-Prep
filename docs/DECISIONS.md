@@ -1364,3 +1364,122 @@ Verify: app.js contains "status: 'attention'"
 Verify: app.js contains "function buildBulkAddSummary"
 Verify: app.js contains "attentionRows.map"
 Verify: style.css contains ".bulk-add-summary"
+
+## D-069 — A purchase tops up stock when the sum is honest, and otherwise gets its own record
+
+Dogfooding find, 2026-08-25. Two complaints that turn out to be the same idea from opposite
+sides: quantity truth was being traded away for convenience.
+
+### A. "Changing the quantity doesn't take effect"
+
+Characterisation first, because the report named a symptom, not a cause. The pantry card's own
+editor was driven through every gesture and record shape available — typed value then Tab, then
+Enter, then a row tap, then a tab switch; touch and keyboard; float / `buy_` / `ib_` / `staple_`
+ids; string, null and zero quantities; duplicate names; a twenty-item list scrolled to the middle;
+390px and 1280px; and against the **deployed** site as well as this checkout. `updatePantryQty()`
+persisted correctly every time, re-rendered the collapsed card immediately and survived reload.
+It is not the bug.
+
+The writer that actually lost data was `confirmAddIngredientToPantry()` — the Price Book's
+"Add to pantry" button. It did this:
+
+```
+AppState.pantry = AppState.pantry.filter(p => p.name.toLowerCase() !== name.toLowerCase());
+AppState.pantry.push({ id: Date.now() + Math.random(), name, quantity, unit, ... });
+```
+
+Setting a quantity **deleted every same-name record and rebuilt one from scratch**. On a record
+reading "Eggs 6 pcs · Expires Aug 28" the result was a new id, no `expiryDate`, no `dateMode`,
+no `staple`, no `stockLevel`, `purchaseDate` reset to today and `shelfLifeDays` recomputed from a
+blank category (20 → 3). The printed expiry disappeared, freshness restarted, and with two
+same-name rows both were destroyed. It now edits the record in place and `stampUpdated()`s it;
+only the no-existing-record branch still creates one.
+
+Decision: **a quantity edit changes the quantity.** No pantry writer may rebuild a record to
+change one field.
+
+### B. "Eggs already in pantry — skipped"
+
+Buying twelve more eggs and bulk-adding them reported `"Eggs" already in pantry — skipped`, so
+the twelve eggs were not in inventory in any form. The purchase was simply dropped.
+
+Grocery check-off had already solved this in D-057, and its boundary is right: merge unless the
+merge would lie. Bulk Add reuses that boundary instead of inventing a second policy.
+
+`canMergePurchase(existing)` judges the existing record alone — it refuses a printed-expiry
+record (that date belongs to one pack) and an already-expired one (merging would revive old
+food). `canMergePurchaseInto(existing, purchase)` adds the three facts only the **incoming**
+purchase knows, each of which would make a merge lie:
+
+| The purchase carries | Why it blocks a merge |
+|---|---|
+| its own printed expiry | one record cannot hold two expiry dates, and picking either one is false |
+| a different unit | this app cannot convert pantry quantities (see below) |
+| an explicit different storage | a "put these in the freezer" bulk add must not relocate fridge stock |
+
+`findMergeableStock()` then picks the copy a purchase can honestly join rather than whichever
+sorts first, so a printed-expiry Eggs row sitting in front no longer pushes every future purchase
+into yet another record. `applyPurchaseToStock()` folds the purchase in **in place** and
+deliberately leaves `purchaseDate` alone, so the oldest portion still governs freshness — D-057's
+rule, unchanged.
+
+Bulk Add's duplicate branch is now three-way:
+
+| The line | Outcome | Why |
+|---|---|---|
+| safely mergeable, **both** quantities known | top up existing stock → `merged` | the sum is honest |
+| no quantity on the line | `skipped`, record untouched | nothing to add, and folding "unknown" into a known 6 would replace a real number with `null` |
+| a real quantity that cannot fold in honestly | its **own** record → `added` | two honest rows beat one averaged row, and beat losing the purchase |
+
+That third row is why Scenario C works: "Eggs 6 pcs · Expires Aug 28" plus a bulk line
+"Eggs 12 pcs Sep 10 2026" stays two records with their own dates. It never becomes 18 pieces
+under either date.
+
+### Units are added, never converted
+
+`unitsMergeable()` accepts the same unit, or a blank on either side. It does **not** convert.
+This app has no canonical unit-conversion helper for pantry quantities: `unitConvertFactor()`
+belongs to the price path and `getUnitConversion()` silently returns `1` for anything it does not
+recognise. Guessing is exactly the failure mode this decision exists to stop, so `500 g + 1 kg`
+stays two records rather than becoming `501`.
+
+That gate also closes the same latent lie in grocery check-off, which previously added raw numbers
+across units. This is the one behaviour change outside Bulk Add, and it is a bug fix.
+
+### Reporting
+
+`buildBulkAddSummary()` gains a `merged` count, reported as its own outcome — "1 stock item
+updated", never folded into "added" and never called a skip. Calling a successful stock increment
+"already in pantry — skipped" is what made the purchase look lost. A merged line is **resolved**,
+so it drops out of the D-068 retry textarea exactly like an added one; only `attention` lines stay.
+
+### Deliberately not done
+
+- **No lot / FIFO architecture.** Separate records already hold two expiry dates truthfully. No
+  `AppState` collection was added and the Firestore payload keys are unchanged.
+- **No unit-conversion table.** See above.
+- **`updateBrowserItemQty()` left as is.** It edits in place already; its only divergences from
+  `updatePantryQty()` are that it treats an explicit `0` as unknown and matches names without
+  trimming. Neither loses data, and neither is what was reported.
+- **`toggleIngredientFromBrowser()` left as is.** It is a presence toggle, not an add — removing
+  on second tap is its documented behaviour, not a duplicate policy.
+- **No red-zone change.** Tombstones, `cloudReady`, `saveData()` semantics, the Firestore
+  transaction/merge, auth and the service worker are all untouched.
+
+### Known tradeoff
+
+An existing record whose own quantity is untracked (what `confirmKitchenSetup()` and
+`toggleIngredientFromBrowser()` create) cannot be topped up, so bulk-adding "Eggs 12 pcs" over it
+produces a second row rather than one. That is deliberate: writing `12` would claim a total that
+excludes the untracked stock, and writing `null` would throw away the one number in the
+transaction. Two rows is the honest answer and the twelve eggs are visible, which is the whole
+point. It does mean a kitchen seeded from the setup modal can accumulate paired rows.
+`stockPurchasedGroceryItem()` keeps D-057's merge-to-unknown for the same case, because there the
+*grocery row* is what lacks a number and there is nothing to preserve.
+
+Verify: app.js contains "function canMergePurchaseInto"
+Verify: app.js contains "function findMergeableStock"
+Verify: app.js contains "function applyPurchaseToStock"
+Verify: app.js contains "function unitsMergeable"
+Verify: app.js contains "status: 'merged'"
+Verify: app.js contains "stock item"

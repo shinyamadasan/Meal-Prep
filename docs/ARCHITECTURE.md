@@ -61,8 +61,12 @@ Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngred
 ## Shop -> inventory loop
 `toggleGroceryItem()` is the only inbound path from shopping, and it is one tap (D-057):
 1. `stockPurchasedGroceryItem()` either MERGES into an existing pantry record or creates a new one.
-   Merge requires `findPantryByExactName()` (exact, never fuzzy) AND `canMergePurchase()`, which
-   refuses printed-expiry records and already-expired ones. A merge never rewrites `purchaseDate`.
+   `findMergeableStock()` (exact name, never fuzzy) picks the first record that clears
+   `canMergePurchaseInto()`, which refuses printed-expiry records, already-expired ones, and any
+   purchase whose own expiry, unit or explicit storage would make the merge a lie. The fold itself
+   is `applyPurchaseToStock()`, which edits IN PLACE and never rewrites `purchaseDate`, so the
+   oldest portion still governs freshness. Same helpers back Bulk Add's duplicate policy — one
+   merge boundary, not two. See DECISIONS D-069.
 2. A staple purchase sets `stockLevel: 'full'` and lets `syncStapleToGrocery()` drop its auto row.
 3. The transfer returns a receipt stored as `groceryItem.stocked`, so unchecking calls
    `unstockPurchasedGroceryItem()` and reverses exactly that change.
