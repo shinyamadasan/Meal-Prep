@@ -193,6 +193,79 @@ function formatShortDate(isoStr) {
   return d.toLocaleDateString(undefined, opts);
 }
 
+// True only for a date the calendar actually has. `new Date()` silently ROLLS OVER —
+// new Date('2026-02-31') is March 3, not an error — so a round-trip is the only honest
+// check. Used by both bulk-add date paths so neither can invent a day.
+function isRealCalendarDate(y, m, d) {
+  if (!(y >= 1000 && y <= 9999) || !(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return false;
+  var dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
+}
+
+function toISODate(y, m, d) {
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
+var MONTH_WORDS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12
+};
+
+// Deliberately NOT a natural-language date parser. It recognises exactly three shapes,
+// and only as a TRAILING segment preceded by whitespace or a comma:
+//
+//   <month> <day> <year>   "aug 8 2026", "August 8th, 2026"
+//   <day> <month> <year>   "8 aug 2026"
+//   <year>-<mm>-<dd>       "2026-08-08"
+//
+// Anything else is left ALONE rather than guessed. 8/8/2026 in particular is day-first in
+// half the world and month-first in the other half; guessing it wrong moves an expiry by
+// months, which is the exact class of invented freshness D-066 exists to prevent.
+//
+// Requiring a month WORD (or a full ISO date) plus a four-digit year is also what keeps
+// product names intact: "7 Up", "Heinz 57 Sauce", "Formula 1 Protein", "Vitamin B12" and
+// "12 Grain Bread" all fail every pattern, because none of them ends in a month and a year.
+//
+// Returns { iso, rest } with the date removed, or null to leave the text untouched.
+function parseTrailingDate(text) {
+  var s = String(text || ''), m, mon;
+
+  // <month> <day> <year>
+  m = s.match(/^(.*\S)[\s,]+([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\s*$/);
+  if (m) {
+    mon = MONTH_WORDS[m[2].toLowerCase()];
+    if (mon && isRealCalendarDate(+m[4], mon, +m[3])) {
+      return { iso: toISODate(+m[4], mon, +m[3]), rest: m[1] };
+    }
+    return null;   // looked like a date but is not one — do not fall through and guess
+  }
+
+  // <day> <month> <year>
+  m = s.match(/^(.*\S)[\s,]+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\s*$/);
+  if (m) {
+    mon = MONTH_WORDS[m[3].toLowerCase()];
+    if (mon && isRealCalendarDate(+m[4], mon, +m[2])) {
+      return { iso: toISODate(+m[4], mon, +m[2]), rest: m[1] };
+    }
+    return null;
+  }
+
+  // <year>-<mm>-<dd> — the app's own format, already unambiguous
+  m = s.match(/^(.*\S)[\s,]+(\d{4})-(\d{2})-(\d{2})\s*$/);
+  if (m && isRealCalendarDate(+m[2], +m[3], +m[4])) {
+    return { iso: toISODate(+m[2], +m[3], +m[4]), rest: m[1] };
+  }
+  return null;
+}
+
+// A trailing all-numeric date with separators — 8/8/2026, 8.8.26. Recognised ONLY so the
+// user can be told it is ambiguous; never parsed.
+function looksLikeAmbiguousDate(text) {
+  return /[\s,]\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}\s*$/.test(String(text || ''));
+}
+
 // Visual status from days remaining. Threshold is FRESHNESS_WARN_DAYS.
 function freshnessStatus(daysLeft) {
   if (daysLeft == null) return { cls: '', icon: '', label: '' };
@@ -11430,14 +11503,30 @@ function confirmBulkAdd() {
     let perLineExpiry = '';
     const expiryMatch = line.match(/\bexp:(\d{4}-\d{2}-\d{2})\b/i);
     if (expiryMatch) {
-      const dateStr = expiryMatch[1];
-      if (!isNaN(new Date(dateStr + 'T00:00:00').getTime())) {
-        perLineExpiry = dateStr;
+      const ymd = expiryMatch[1].split('-');
+      // Calendar-validated, not just shape-validated: the old `new Date()` check accepted
+      // exp:2026-02-31 and silently stored a date that then rendered as "Expires Mar 3".
+      if (isRealCalendarDate(+ymd[0], +ymd[1], +ymd[2])) {
+        perLineExpiry = expiryMatch[1];
       } else {
         warnings.push(`Line ${idx + 1}: "${originalLine}" — invalid exp date, ignored`);
       }
       line = line.replace(/\s*\bexp:\d{4}-\d{2}-\d{2}\b\s*/i, ' ').trim();
     }
+
+    // Trailing natural date. ALWAYS stripped when recognised, so a date the user typed can
+    // never end up inside the item name; only USED when the line carries no explicit exp:,
+    // which outranks it. Everything downstream stays the pre-existing qty/unit parser.
+    let naturalExpiry = '';
+    const trailing = parseTrailingDate(line);
+    if (trailing) {
+      naturalExpiry = trailing.iso;
+      line = trailing.rest.replace(/[\s,]+$/, '').trim();
+    } else if (looksLikeAmbiguousDate(line)) {
+      warnings.push(`Line ${idx + 1}: "${originalLine}" — a date like 8/8/2026 is ambiguous ` +
+                    `(day or month first?). Write it as "Aug 8 2026" or exp:YYYY-MM-DD.`);
+    }
+
     const parts = line.split(',').map(p => p.trim());
     let name = parts[0];
     if (!name) { warnings.push(`Line ${idx + 1}: empty name — skipped`); return; }
@@ -11467,7 +11556,10 @@ function confirmBulkAdd() {
     );
     const category = dbEntry ? dbEntry.category : inferCategory(name);
     const storage = defaultStorage || inferStorage(name, category);
-    const itemExpiry = perLineExpiry || bulkExpiry;
+    // Precedence, strongest first: explicit exp: on the line, then a recognised trailing
+    // date on the line, then the shared field. A weaker source never overwrites a stronger
+    // one; with none of them the record stays in bought-date + shelf-life mode.
+    const itemExpiry = perLineExpiry || naturalExpiry || bulkExpiry;
     AppState.pantry.push({
       id: Date.now() + Math.random(),
       name,
