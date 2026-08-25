@@ -1122,3 +1122,126 @@ Verify: app.js contains "Best by "
 Verify: index.html contains "pantry-expiry"
 Verify: style.css contains ".pi-date"
 Verify: style.css contains "flex-wrap: wrap"
+
+## D-067 — Bulk Add reads a trailing date, but only three shapes of one, and never guesses
+
+Dogfooding find, 2026-08-25. Parsing and input copy only; the D-066 expiry model, its renderer
+and every freshness boundary are untouched.
+
+### The same defect, through the other door
+
+D-066 gave the quick-add path structured quantity/unit/expiry inputs. Bulk Add kept its older text
+parser, so the failure it fixed simply moved:
+
+```
+input : eggs 12 pcs aug 8 2026
+stored: name="eggs 12 pcs aug 8 2026", quantity=null, unit="", no expiry
+shown : Best by Aug 28 · 3d left
+```
+
+The whole string became the `name`. `inferCategory()` then loose-matched "eggs", returned `Protein`,
+and `categoryShelfLife('Protein')` supplied **3 days** from today. The Aug 8 the user typed was never
+read. Same invented freshness, same north-star-goal-#2 exposure, different entry point.
+
+Characterisation found a second case that is arguably worse because it is silent in a different way:
+
+```
+input : eggs, 12, pcs, aug 8 2026
+stored: name="eggs", quantity=12, unit="pcs", no expiry
+```
+
+Name, quantity and unit parsed correctly and the **fourth comma field was discarded entirely** — no
+warning, no trace. The user typed a date and it evaporated.
+
+Bulk Add had **no parser test coverage at all** before this. Every existing spec matching "bulk"
+tests bulk *cleanup* (`removeAllExpired`), an unrelated feature.
+
+### Decision
+
+**Recognise a trailing date; never infer one.** `parseTrailingDate()` accepts exactly three shapes,
+and only as a trailing segment preceded by whitespace or a comma:
+
+| shape | example |
+|---|---|
+| `<month> <day> <year>` | `aug 8 2026`, `August 8th, 2026`, `Sept. 8 2026` |
+| `<day> <month> <year>` | `8 aug 2026` |
+| `<year>-<mm>-<dd>` | `2026-08-08` |
+
+On a match the date is removed and **the remaining text goes through the pre-existing quantity/unit
+parser unchanged** — the comma path and `NO_COMMA_RE` are not touched, so `Eggs, 12, pcs` and
+`Coconut cream 200ml` behave exactly as before. On no match the text is left completely alone.
+
+This is not an NLP layer and must not become one. The whole safety argument rests on requiring a
+**month word (or a full ISO date) plus a four-digit year**, which is why every name in the regression
+list survives: `7 Up`, `Heinz 57 Sauce`, `Formula 1 Protein`, `Vitamin B12`, `12 Grain Bread`,
+`Omega 3 6 9`, `Vitamin 2000`, `Sauce 12 2026`. None of them ends in a month followed by a year, so
+none of them can be mistaken for one. Loosening that requirement — accepting a bare trailing number,
+say — would break them all at once.
+
+### Why 8/8/2026 is refused rather than parsed
+
+It is day-first in half the world and month-first in the other half. Guessing wrong moves an expiry
+by up to eleven months, which is precisely the invented-freshness failure this entry exists to close;
+a silent wrong date is worse than an unparsed one. So an all-numeric separated trailing date is
+recognised **only in order to say it is ambiguous**, and the line is added with its text intact plus
+a warning naming the two unambiguous ways to write it. `looksLikeAmbiguousDate()` exists for that
+message and for nothing else — it never produces a date.
+
+The same reasoning drives the invalid-date rule: `feb 31 2026` is not nudged to March 3, it simply
+is not a date, and the text is left alone.
+
+### Expiry precedence
+
+One rule, strongest first, with a weaker source never overwriting a stronger one:
+
+1. explicit `exp:YYYY-MM-DD` on the line
+2. a recognised trailing date on the line
+3. the shared Bulk Add expiry field
+4. otherwise `purchaseDate` + `shelfLifeDays` (bought-date mode)
+
+A recognised trailing date is **always stripped even when `exp:` also appears**, so a date the user
+typed can never survive inside the item name; it is stripped for hygiene and used only per the order
+above. Existing `exp:` behaviour, including beating the shared field, is unchanged.
+
+### A pre-existing date bug fixed in passing, deliberately
+
+`exp:2026-02-31` used to pass the old `!isNaN(new Date(...))` check and store `2026-02-31`, which the
+D-066 renderer then displayed as **"Expires Mar 3"** — a date the user never typed. `new Date()` rolls
+over silently rather than erroring, so shape validation is not date validation. `isRealCalendarDate()`
+round-trips through `Date` and is now used by **both** bulk-add date paths.
+
+This is adjacent to the reported defect rather than part of it, and was fixed anyway because it is
+the same class of error in the same function, and because leaving one date path able to invent a day
+while hardening the other would have been incoherent.
+
+### Deliberately not done
+
+- **No migration of existing records.** A pantry item already named `eggs 12 pcs aug 8 2026` keeps
+  that name. Back-parsing stored data would apply a guess to records the user has since edited or
+  merged, and a wrong guess writes a wrong expiry into food safety. New submissions only.
+- **No slash-date support**, per the ambiguity argument above.
+- **No two-digit years.** `aug 8 26` is refused; a century guess is a guess.
+- **No change to the quantity/unit parser.** The date is removed and the existing parser runs on
+  what is left — one parser, not two.
+- **No second expiry model.** Everything lands in `expiryDate` / `dateMode` and renders through the
+  D-066 path; `pantryDaysLeft()`, `pantryExpiryInfo()` and `FRESHNESS_WARN_DAYS` are unmodified.
+
+### Known ambiguity, accepted
+
+A product whose name genuinely ends in a month and a year — `Special Edition May 5 2026` typed with
+no quantity — is read as `Special Edition` plus an expiry. Adding a quantity or unit after it
+(`Special Edition May 5 2026, 1, box`) moves the date out of trailing position and the name survives
+whole. Judged an acceptable trade for reading the date people actually type; the alternative is
+ignoring every trailing date, which is the defect.
+
+Supersedes: nothing. Extends D-066's model to the second manual entry point; corrects no earlier
+decision.
+
+Regression-locked by `tests/bulk-add-date-truth.spec.js` (21 cases, the first parser coverage Bulk
+Add has ever had); mutation-checked against unmodified `main`, where **14 of 21 fail** — the 7 that
+pass are the backward-compatibility guards, which are supposed to hold on both sides.
+
+Verify: app.js contains "function parseTrailingDate(text)"
+Verify: app.js contains "function isRealCalendarDate(y, m, d)"
+Verify: app.js contains "looksLikeAmbiguousDate"
+Verify: app.js contains "perLineExpiry || naturalExpiry || bulkExpiry"
