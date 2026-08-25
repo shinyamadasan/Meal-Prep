@@ -216,6 +216,64 @@ test('live: save/reload contains each successfully added item exactly once', asy
 
 // ── 10. Mobile ─────────────────────────────────────────────────────────────
 
+// ── Short years inside the retry loop (D-067 TASK-054 extension) ───────────
+//
+// D-068's contract is about STATUS, not about dates, so the short-year extension has to
+// slot into it without adding a fifth state: a plausible short year is `added` and
+// disappears, an implausible one is `attention` and stays, and one rescued by an explicit
+// exp: is `added` like any other resolved line. Short years are built from the deployed
+// app's own clock so this gate cannot rot as the calendar advances.
+
+test('live: a plausible short year resolves, an implausible one stays for correction',
+  async ({ page }) => {
+    await loadLiveApp(page);
+    const two = await page.evaluate(() => String(new Date().getFullYear() % 100).padStart(2, '0'));
+    const iso = await page.evaluate(() => new Date().getFullYear() + '-08-08');
+    const good = `Eggs 12 pcs Aug 8 ${two}`;
+    const stale = 'Juice 1 L May 5 12';
+
+    await openLiveBulk(page);
+    const r = await pressAdd(page, [good, stale, 'Chicken 1 kg Sep 1 2031'].join('\n'));
+
+    expect(r.pantry.map((p) => p.name).sort()).toEqual(['Chicken', 'Eggs']);
+    expect(r.pantry.find((p) => p.name === 'Eggs').expiryDate).toBe(iso);
+    // Not added under any name — the date text was not swallowed into one.
+    expect(r.pantry.some((p) => p.name.includes('May 5'))).toBe(false);
+    expect(r.modalOpen).toBe(true);
+    expect(r.textarea).toBe(stale);                 // exact original text, byte for byte
+    expect(r.summary).toBe('2 items added · 1 line needs attention.');
+    expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+
+    // Correcting it finishes the batch and re-processes nothing: the two resolved lines
+    // left the textarea on the first pass, so there is no "already in pantry" here.
+    const corrected = (await page.inputValue('#bulk-add-textarea'))
+      .replace('May 5 12', 'May 5 2012');
+    const r2 = await pressAdd(page, corrected);
+    expect(r2.pantry).toHaveLength(3);
+    expect(r2.pantry.find((p) => p.name === 'Juice').expiryDate).toBe('2012-05-05');
+    expect(r2.toast).toBe('1 item added.');
+    expect(r2.notes.join(' ')).not.toContain('already in pantry');
+    expect(r2.modalOpen).toBe(false);
+    const names = r2.pantry.map((p) => p.name);
+    expect(new Set(names).size).toBe(names.length);  // no duplicate reprocessing
+  });
+
+test('live: an exp:-rescued short year is a resolved line and leaves the textarea',
+  async ({ page }) => {
+    await loadLiveApp(page);
+    await openLiveBulk(page);
+    const rescued = 'Juice 1 L May 5 12 exp:2026-08-08';
+    const stale = 'Nectar 1 L May 5 12';
+    const r = await pressAdd(page, [rescued, stale].join('\n'));
+
+    const juice = r.pantry.find((p) => p.name === 'Juice 1 L May 5 12');
+    expect(juice).toBeTruthy();                     // name keeps the unrecognised text
+    expect(juice.expiryDate).toBe('2026-08-08');    // exp: is the only expiry source
+    expect(r.pantry.some((p) => p.name.startsWith('Nectar'))).toBe(false);
+    expect(r.textarea).toBe(stale);                 // only the actionable line stays
+    expect(r.modalOpen).toBe(true);
+  });
+
 test.describe('deployed mobile partial retry', () => {
   test.use({ viewport: { width: 390, height: 1500 } });
 

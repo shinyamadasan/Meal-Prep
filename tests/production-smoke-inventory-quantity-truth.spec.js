@@ -296,6 +296,96 @@ test('live: the summary names added, updated, skipped and actionable separately'
 
 // ── F. Mobile ──────────────────────────────────────────────────────────────
 
+// ── Short years reach the SAME merge path (D-067 TASK-054 extension) ───────
+//
+// The short-year work only turns text into the canonical expiryDate the merge path
+// already reads, so a short-year line and its four-digit twin must produce identical
+// records and identical verdicts on the deployed build. Years are derived from the live
+// app's clock, so this gate states the rule rather than a literal that rots.
+
+test('live: a short-year line and its four-digit twin produce identical inventory truth',
+  async ({ page }) => {
+    await loadLiveApp(page);
+    const y = await page.evaluate(() => new Date().getFullYear());
+    const two = String(y % 100).padStart(2, '0');
+
+    const seed = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'prod_sy_1', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: 6, unit: 'pcs', staple: false }];
+      saveData();
+    });
+
+    await seed();
+    const short = await pressBulkAdd(page, `Eggs 12 pcs Aug 8 ${two}`);
+    await seed();
+    const long = await pressBulkAdd(page, `Eggs 12 pcs Aug 8 ${y}`);
+
+    // The load-bearing assertion: whatever D-069 decides, both spellings decide it alike.
+    expect(short.pantry).toEqual(long.pantry);
+    expect(short.toast).toBe(long.toast);
+    // And what it decides is separation: a purchase carrying a printed expiry never folds
+    // into existing stock, so the two dates cannot be averaged away.
+    expect(short.pantry).toHaveLength(2);
+    expect(short.pantry.some((p) => p.quantity === 18)).toBe(false);
+    expect(await page.evaluate(() =>
+      AppState.pantry.find((p) => p.id === 'prod_sy_1').quantity)).toBe(6);
+
+    // Safe top-up is untouched by the parser change: no date on the line, honest sum.
+    await seed();
+    const topUp = await pressBulkAdd(page, 'Eggs 12 pcs');
+    expect(topUp.pantry).toHaveLength(1);
+    expect(topUp.pantry[0].quantity).toBe(18);
+    expect(topUp.toast).toBe('1 stock item updated.');
+    expect(await page.evaluate(() => AppState.pantry[0].id)).toBe('prod_sy_1');
+  });
+
+test('live: short-year lines keep unit-incompatibility and unknown-quantity honest',
+  async ({ page }) => {
+    await loadLiveApp(page);
+    const two = await page.evaluate(() => String(new Date().getFullYear() % 100).padStart(2, '0'));
+
+    // Units are added, never converted — 500 g + 1 kg is not 501, short year or not.
+    await page.evaluate(() => {
+      AppState.pantry = [{ id: 'prod_sy_2', name: 'Rice', category: 'Grains',
+        purchaseDate: todayISO(), shelfLifeDays: 300, storage: 'pantry',
+        quantity: 500, unit: 'g', staple: false }];
+    });
+    const units = await pressBulkAdd(page, `Rice 1 kg Aug 8 ${two}`);
+    expect(units.pantry).toHaveLength(2);
+    expect(units.pantry.some((p) => p.quantity === 501)).toBe(false);
+
+    // Unknown + known never fabricates a number, and never loses the purchase.
+    await page.evaluate(() => {
+      AppState.pantry = [{ id: 'prod_sy_3', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: null, unit: '', staple: false }];
+    });
+    const unknown = await pressBulkAdd(page, `Eggs 12 pcs Aug 8 ${two}`);
+    expect(unknown.pantry).toHaveLength(2);
+    expect(unknown.pantry.map((p) => p.quantity).sort()).toEqual([12, null]);
+  });
+
+test('live: an implausible short year never reaches the merge path at all', async ({ page }) => {
+  await loadLiveApp(page);
+  await page.evaluate(() => {
+    AppState.pantry = [{ id: 'prod_sy_4', name: 'Eggs', category: 'Protein',
+      purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+      quantity: 6, unit: 'pcs', staple: false }];
+    saveData();
+  });
+  const before = await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)));
+  const r = await pressBulkAdd(page, 'Eggs 12 pcs May 5 12');
+
+  // Existing stock is untouched in every field — a date the parser refused to believe
+  // cannot top up, replace or disturb inventory.
+  expect(await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)))).toEqual(before);
+  expect(r.pantry).toHaveLength(1);
+  expect(r.modalOpen).toBe(true);
+  expect(r.textarea).toBe('Eggs 12 pcs May 5 12');
+  expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+});
+
 test.describe('mobile', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
