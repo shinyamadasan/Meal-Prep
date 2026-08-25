@@ -164,16 +164,18 @@ test('the documented exp:YYYY-MM-DD syntax still works on the live site', async 
 test('invalid explicit dates are rejected, not rolled over', async ({ page }) => {
   await loadLiveApp(page);
   // 2026-02-31 used to pass validation and render as "Expires Mar 3".
+  //
+  // UPDATED for D-068: the date verdict is unchanged — still rejected, never rolled over —
+  // but the LINE is now held back instead of being added with the shared expiry silently
+  // substituted, because a row that still needs editing cannot also be committed.
   const r = await bulkAdd(page, 'Eggs, 12, pcs exp:2026-02-31');
-  const it = only(r);
-  expect(it.expiryDate).toBeNull();
-  expect(it.dateMode).toBeNull();
-  expect(r.warnings).toContain('invalid exp date');
-  expect(it.chip).not.toContain('Mar 3');
+  expect(r.items).toHaveLength(0);
+  expect(r.warnings).toContain('invalid expiry date');
+  expect(r.warnings).not.toContain('Mar 3');
 
   const r2 = await bulkAdd(page, 'Eggs, 12, pcs exp:2026-13-45');
-  expect(only(r2).expiryDate).toBeNull();
-  expect(r2.warnings).toContain('invalid exp date');
+  expect(r2.items).toHaveLength(0);
+  expect(r2.warnings).toContain('invalid expiry date');
 
   // A natural date naming a day the calendar lacks is left in the text, not nudged.
   const r3 = only(await bulkAdd(page, 'Eggs 12 pcs feb 31 2026'));
@@ -200,10 +202,14 @@ test('the shared expiry still works, and per-line beats it', async ({ page }) =>
 
 test('an ambiguous slash date is not guessed on the live site', async ({ page }) => {
   await loadLiveApp(page);
+  //
+  // UPDATED for D-068: still never guessed, but the line is now held back rather than
+  // added with the unparsed date sitting inside the name. The user's text survives in the
+  // textarea for correction, which is the stronger form of "text untouched".
   const r = await bulkAdd(page, 'Milk 1 L 8/8/2026');
-  expect(only(r).expiryDate).toBeNull();
-  expect(only(r).name).toBe('Milk 1 L 8/8/2026');   // text untouched
+  expect(r.items).toHaveLength(0);
   expect(r.warnings).toContain('ambiguous');
+  expect(await page.inputValue('#bulk-add-textarea')).toBe('Milk 1 L 8/8/2026');
 });
 
 // ── 9. Numeric product names survive ───────────────────────────────────────

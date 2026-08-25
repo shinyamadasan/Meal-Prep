@@ -28,6 +28,7 @@ const PROD_SPECS = [
   'production-smoke-attention-notifications.spec.js',
   'production-smoke-cook-method.spec.js',
   'production-smoke-bulk-add-dates.spec.js',
+  'production-smoke-bulk-add-partial-retry.spec.js',
   'production-smoke-inventory-expiry.spec.js',
   'production-smoke-cook-tombstones.spec.js',
   'production-smoke-kitchen-truth.spec.js',
