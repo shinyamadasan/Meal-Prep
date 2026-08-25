@@ -4,6 +4,83 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-053 — APPROVED (inventory quantity truth, D-069) — D-032 `done`, operator-approved
+branch: fix/inventory-quantity-truth @ 4b0d761 → main @ 0fe2a63 (`--no-ff`, unrebased)
+final main: 006f779 (production smoke follow-up)
+verdict: approved — pantry-record field logic and Bulk Add control flow; outside the red zone
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**. The code diff is `app.js` only: four new helpers (`unitsMergeable`,
+`canMergePurchaseInto`, `findMergeableStock`, `applyPurchaseToStock`), the Bulk Add duplicate
+branch, `buildBulkAddSummary()`'s fourth argument, and `confirmAddIngredientToPantry()`'s
+edit-in-place. `index.html`, `style.css`, `sw.js` and `manifest.json` are byte-unchanged.
+
+A grep of the whole branch diff for `cloudReady`, `AppState.deletions`, tombstone/`MASS_DELETE`,
+`saveToFirestore`, `runTransaction`, `mergeCloudConflict`, `unionById`, `snapshotIdBaseline`,
+`recordLocalDeletions`, `function saveData`, auth handlers and `serviceWorker` returns **nothing
+added or removed**. No new `AppState` key; a test asserts `buildFirestorePayload()`'s keys are
+unchanged and contain no `lots`/`stockLots`.
+
+### Context — Claude-implemented, human-directed
+Implemented directly by Claude from an operator dogfooding brief. Review of Claude's own work,
+disclosed as in TASK-044 through TASK-052.
+
+### The finding that changed the shape of the task
+The brief reported "editing quantity does not reliably take effect" and explicitly said not to
+assume which layer was at fault. Characterisation cleared the obvious suspect: the pantry card's
+`updatePantryQty()` was driven through typed-then-Tab, Enter, row-tap-to-collapse, tab switch,
+two consecutive edits, touch and keyboard, float / `buy_` / `ib_` / `staple_` ids, string / null /
+zero quantities, duplicate names, a twenty-item list scrolled to the middle, 390px and 1280px —
+**and against the deployed site**. It persisted, re-rendered and survived reload every time.
+
+The writer that actually lost data was `confirmAddIngredientToPantry()`, which deleted every
+same-name record and rebuilt one to change a single field. Measured on an `Eggs 6 pcs · Expires
+Aug 28` record: new id, `expiryDate` gone, `dateMode` gone, `staple` gone, `stockLevel` gone,
+`purchaseDate` reset to today, `shelfLifeDays` 20 → 3. That is the "I changed the quantity and the
+expiry disappeared" report, and it is exactly what the brief's requirement 1 forbids.
+
+### What was NOT accepted at face value
+- **"Fix Bulk Add's duplicate policy" did not become "merge everything."** Merging a purchase that
+  carries its own printed expiry into a bought-date record would discard the user's date; merging
+  across units would invent 501 g; merging into an untracked quantity would either fabricate a
+  total or destroy the one real number. Each of those stays a separate record instead.
+- **No second merge policy.** `canMergePurchase()` is reused verbatim. The new predicate only adds
+  the facts the incoming purchase knows.
+- **No unit conversion.** `unitConvertFactor()` is the price path and `getUnitConversion()` returns
+  `1` for anything unrecognised, so neither qualifies as "already tested for pantry quantities".
+
+### Evidence
+- Mutation checks, both confirmed: reverting the Price Book fix fails exactly the field-preservation
+  test (21/22); restoring the duplicate-skip fails 12 merge tests (10/22).
+- Local deterministic suite: **306 passed** on merged main, and again on CI's runner.
+- Production smokes against the deployed bundle: **123 passed, 4 skipped** (the pre-existing
+  notification specs that require `--headed`).
+- Deployed `app.js`, `style.css`, `index.html`, `sw.js` verified SHA-256-identical to `006f779`.
+
+### Landing defect found by CI, and fixed
+The branch updated the LOCAL `bulk-add-partial-retry` spec to the new duplicate policy but not its
+production mirror, which still asserted the pre-D-069 wording. CI's post-deploy gate caught it: the
+deployed build correctly reported `2 items added · 1 stock item updated · 1 already in pantry`
+while the smoke expected the old string. **The shipped behaviour was right; three assertions were
+stale.** Fixed in `006f779` alongside the new D-069 production smoke. This is a real miss in the
+reviewed branch — the two-gate CI design is what caught it, working as D-065 intended.
+
+The first CI run also failed on `tests/recipe-edit-preservation.spec.js` (a 30s timeout). Verified
+unrelated: zero recipe-touching lines in the diff, 3/3 passes locally, the same spec already flaked
+on CI at run 32696176916 on 2026-08-24, and the rerun passed the local gate.
+
+### Must-fix
+None.
+
+### Recorded, deliberately not fixed (operator instruction)
+- **Two-tap pantry-card collapse.** `renderPantryKeepOpen()` replaces `#pantry-list.innerHTML` from
+  the `change` handler, so the tap that triggered the blur never lands as a `click`. The value IS
+  saved; the card just does not collapse until a second tap. Pre-existing. Flagged prominently
+  because it can make a successful quantity edit appear broken — the report that started this task.
+- **Unknown-quantity paired row.** See D-069's tradeoff section.
+
+---
 ## Review TASK-052 — APPROVED (bulk-add partial-retry, D-068) — D-032 `done`, operator-approved
 branch: fix/bulk-add-partial-retry @ 73bee77 → main @ dcd69a1 (`--no-ff`, unrebased)
 verdict: approved — control flow and feedback inside `confirmBulkAdd()`; outside the red zone

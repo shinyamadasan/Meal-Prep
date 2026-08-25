@@ -3305,6 +3305,75 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-053 · Inventory Quantity Truth: a purchase tops up stock when the sum is honest
+status: done
+source: dogfooding (operator, 2026-08-25)
+depends-on: TASK-052 (D-068 partial retry)
+files: app.js, docs/DECISIONS.md, docs/FEATURES.md, docs/ARCHITECTURE.md,
+       tests/inventory-quantity-truth.spec.js, tests/bulk-add-partial-retry.spec.js,
+       tests/production-smoke-inventory-quantity-truth.spec.js,
+       tests/production-smoke-bulk-add-partial-retry.spec.js, playwright.config.js
+acceptance:
+  - [x] Characterise the quantity-edit complaint BEFORE coding. Result: the pantry card's own
+        editor (`updatePantryQty`) is correct — driven through typed/Tab/Enter/row-tap/tab-switch,
+        touch and keyboard, float / `buy_` / `ib_` / `staple_` ids, string / null / zero
+        quantities, duplicate names, a 20-item scrolled list, 390px and 1280px, locally AND
+        against the deployed site. It persisted every time. NOT the bug.
+  - [x] Real root cause found: `confirmAddIngredientToPantry()` (Price Book "Add to pantry")
+        deleted EVERY same-name record and pushed a rebuilt one — dropping the id, `expiryDate`,
+        `dateMode`, `staple`, `stockLevel`, resetting `purchaseDate` to today and recomputing
+        `shelfLifeDays` from a blank category (20 → 3). Now edits in place and stamps.
+  - [x] Bulk Add no longer discards a duplicate line's purchase. Three-way: merge when the sum is
+        honest, `skipped` when the line has no quantity, own record when merging would lie.
+  - [x] Safe boundary REUSES `canMergePurchase()`; `canMergePurchaseInto()` only adds the three
+        facts the incoming purchase knows (its own printed expiry, unit, explicit storage).
+        No second merge policy.
+  - [x] Explicit expiry: Eggs 6 pcs/Aug 28 + "Eggs 12 pcs Sep 10 2026" stays two records. No
+        18-piece row under either date.
+  - [x] Derived expiry: `applyPurchaseToStock()` never rewrites `purchaseDate` (D-057 preserved);
+        `pantryDaysLeft` asserted identical before and after a merge.
+  - [x] Units added, never converted — no second conversion table. 500 g + 1 kg stays two records.
+        Same gate fixes the latent 501 g bug in grocery check-off.
+  - [x] Unknown quantities never fabricate a total, in either direction.
+  - [x] D-068 partial retry intact: a merged line is resolved and leaves the retry textarea;
+        `attention` lines stay; re-pressing Add cannot double-merge.
+  - [x] Mobile 390px: editor usable, feedback visible, no horizontal overflow, no app errors.
+  - [x] Mutation checks both confirmed — reverting the Price Book fix fails exactly the
+        field-preservation test; restoring the duplicate-skip fails 12 merge tests.
+  - [x] Red-zone grep over the whole branch diff returns ZERO lines touching `cloudReady`,
+        tombstones/`AppState.deletions`, `saveToFirestore`, `runTransaction`,
+        `mergeCloudConflict`, `unionById`, `recordLocalDeletions`, `MASS_DELETE_GUARD`,
+        `saveData` semantics, auth or `serviceWorker`. No new `AppState` collection; Firestore
+        payload keys asserted unchanged.
+constraints: no lot/FIFO architecture, no unit-conversion table, no new top-level AppState key,
+       `wave1-portion-truth` untouched.
+
+merge gate:
+  D-032 **`done`** — approved and reversible. Pantry-record field logic and Bulk Add control flow.
+  No red-zone surface and no persisted-shape change. Operator directed the landing explicitly.
+
+landed:
+  Merged `--no-ff` at `0fe2a63` (parents `0922ab7` + `4b0d761`), commits `bf4ad68` and `4b0d761`
+  unchanged — not rebased, squashed or amended. Production smoke follow-up at `006f779`.
+  Final main: `006f779`. CI green; Pages deployed; deployed `app.js`/`style.css`/`index.html`/
+  `sw.js` verified SHA-256-identical to `006f779`.
+
+open items (recorded, deliberately NOT fixed):
+  - **Two-tap pantry-card collapse.** After editing a quantity, the first tap on the row header is
+    swallowed: the `change` handler's `renderPantryKeepOpen()` replaces `#pantry-list.innerHTML`
+    before the `click` lands, so the card does not collapse until a second tap. Pre-existing, not
+    introduced here, and cosmetic — the value IS saved. Recorded because it is the most likely
+    thing to make a SUCCESSFUL quantity edit look broken, which is how this task began.
+  - **Unknown-quantity paired row.** A record with an untracked quantity cannot be topped up, so
+    bulk-adding "Eggs 12 pcs" over it yields two rows. Deliberate (see D-069's tradeoff section);
+    left unresolved by operator instruction.
+  - `updateBrowserItemQty()` treats an explicit `0` as unknown and matches names without trimming,
+    diverging from `updatePantryQty()`. Loses nothing; left alone.
+  - The card's number input is ~27px tall at 390px — below the 44px target. Pre-existing.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

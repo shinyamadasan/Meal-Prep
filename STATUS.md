@@ -4,6 +4,85 @@ Newest entry at top. Append after every session — never edit past entries.
 The top entry is the current **working memory** (where we are / next task / blockers).
 
 ---
+
+## 2026-08-25 — Inventory Quantity Truth landed (TASK-053, D-069) — the bug was not where the report pointed
+
+`fix/inventory-quantity-truth` → `main` (`0fe2a63`, `--no-ff`, unrebased). Two commits, `bf4ad68`
+and `4b0d761`, landed unchanged. Production smoke follow-up `006f779`. **Final main: `006f779`.**
+`wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### The complaint, and where it actually lived
+
+Dogfooding reported two things: "changing a quantity doesn't reliably take effect", and
+"Eggs already in pantry — skipped" after buying twelve more eggs, so the purchase vanished.
+
+The brief said explicitly not to assume which layer was at fault, so the pantry card's own editor
+was driven first: typed-then-Tab, Enter, row-tap-to-collapse, tab switch, two consecutive edits,
+touch and keyboard, float / `buy_` / `ib_` / `staple_` ids, string / null / zero quantities,
+duplicate names, a twenty-item list scrolled to the middle, 390px and 1280px — **and against the
+deployed site**. `updatePantryQty()` persisted, re-rendered and survived reload every single time.
+It was never the bug.
+
+The writer that actually lost data was `confirmAddIngredientToPantry()` — the Price Book's "Add to
+pantry" button — which deleted every same-name record and rebuilt one to change a single field:
+
+```
+before: {id: 5001, quantity: 6, unit: pcs, dateMode: expiry, expiryDate: 2026-08-28,
+         staple: false, stockLevel: ok, shelfLifeDays: 20, purchaseDate: 2026-08-20}
+after:  {id: <new>, quantity: 12, unit: pcs, purchaseDate: <today>, shelfLifeDays: 3,
+         storage: fridge}
+```
+
+Setting a quantity took the printed expiry with it, restarted freshness, and with two same-name
+rows destroyed both. That is the "I changed the quantity and Expires Aug 10 disappeared" report.
+
+### The merge rule
+
+Grocery check-off had already solved the second complaint in D-057, so Bulk Add reuses that
+boundary instead of inventing one. `canMergePurchase()` judges the existing record;
+`canMergePurchaseInto()` adds the three facts only the incoming purchase knows — its own printed
+expiry, its unit, its explicit storage. Bulk Add's duplicate branch is now three-way: top up when
+the sum is honest, `skipped` when the line carries no quantity, and its **own record** when merging
+would lie. A merge is reported as "1 stock item updated", never as a skip.
+
+Units are added, never converted — `unitConvertFactor()` is the price path and
+`getUnitConversion()` returns `1` for anything unrecognised, so 500 g + 1 kg stays two records
+rather than becoming 501. That gate also closed the same latent lie in grocery check-off.
+
+### What CI caught that the branch review did not
+
+The branch updated the LOCAL `bulk-add-partial-retry` spec to the new duplicate policy but missed
+its production mirror. The post-deploy gate failed with the deployed build reporting
+`2 items added · 1 stock item updated · 1 already in pantry` against a smoke still expecting
+`2 items added · 1 already in pantry · 1 line needs attention.` **The shipped behaviour was
+correct; three assertions were stale.** Fixed in `006f779` with the new D-069 production smoke.
+The two-gate design from D-065 is exactly what surfaced it.
+
+The first CI run also failed on `recipe-edit-preservation.spec.js` — verified a pre-existing flake
+(zero recipe lines in the diff, 3/3 local passes, same spec flaked at run 32696176916 on 08-24).
+
+### Evidence
+
+- Mutation checks both confirmed: reverting the Price Book fix fails exactly the field-preservation
+  test; restoring the duplicate-skip fails 12 merge tests.
+- Local deterministic suite **306 passed**, on this machine and on CI.
+- Production smokes **123 passed, 4 skipped** (pre-existing `--headed` notification specs).
+- Deployed `app.js`, `style.css`, `index.html`, `sw.js` all SHA-256-identical to `006f779`.
+- No red-zone line touched: tombstones, `cloudReady`, `saveData()` semantics, the Firestore
+  transaction/merge, auth and the service worker are all unchanged. No new `AppState` collection.
+
+### Next / open
+
+- **Two-tap pantry-card collapse** (follow-up, deliberately not fixed here). After a quantity edit,
+  the first tap on the row header is swallowed — `renderPantryKeepOpen()` replaces
+  `#pantry-list.innerHTML` from the `change` handler before the `click` lands. The value IS saved;
+  the card just needs a second tap. Pre-existing and cosmetic, but it is the most likely reason a
+  successful edit *looks* broken, which is how this whole task started. Worth fixing next.
+- **Unknown-quantity paired row** — deliberate, left unresolved by instruction. See D-069.
+- `updateBrowserItemQty()` treats an explicit `0` as unknown and matches names without trimming.
+- The card's number input is ~27px tall at 390px, below the 44px target. Pre-existing.
+
+---
 ## 2026-08-25 — Bulk Add partial-retry merged (TASK-052, D-068) — you cannot keep a row for correction and commit it too
 
 `fix/bulk-add-partial-retry` → `main` (`dcd69a1`, `--no-ff`, unrebased). One commit, `73bee77`.
@@ -2586,3 +2665,7 @@ overwritten with un-loaded state. **Recommend a real signed-in deploy test befor
 
 ## 2026-07-05 21:00 -- AUTOMATION HALTED: claude -p exited with code 1
 Investigate before the next scheduled run. Nothing further was committed, pushed, or notified this run.
+
+## 2026-08-23 21:02 -- AUTOMATION HALTED: Check-DocsConsistency.ps1 threw an error: The term 'Check-DocsConsistency.ps1' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+Investigate before the next scheduled run. No further planning-doc changes were committed or pushed
+this run (a Telegram notification was sent separately, see Send-Notification).
