@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Bulk Add partial success — finished lines leave, unresolved lines stay.
@@ -420,7 +420,12 @@ test('16-17. save/reload shows each record exactly once after a retry cycle', as
   await submit(page, 'Milk 2 L Aug 8 2026');
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // This is the site that went red on the first CI run after TASK-055 landed, reading
+  // AppState.pantry as [] because the dashboard had painted before the restore. Waiting
+  // for all three names PRESENT proves restoration; the assertions below still own the
+  // exactly-once claim, so a genuine duplicate is a diff rather than a timeout.
+  await waitForRestored(page, () =>
+    ['Chicken', 'Eggs', 'Milk'].every((n) => AppState.pantry.some((p) => p.name === n)));
 
   const names = await page.evaluate(() => AppState.pantry.map((p) => p.name).sort());
   expect(names).toEqual(['Chicken', 'Eggs', 'Milk']);

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Inventory Quantity Truth — the dogfooding wave. See DECISIONS D-069.
@@ -125,7 +125,7 @@ test('1-7. editing Fish 1 kg → 2 kg changes the quantity and nothing else', as
 
   // 4. Survives a real reload.
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  await waitForRestored(page, () => AppState.pantry.some((p) => p.id === 'fish_1'));
   await page.evaluate(() => { showTab('fridge'); renderPantry(); });
   const reloaded = await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry[0])));
   expect(reloaded.quantity).toBe(2);
@@ -225,7 +225,7 @@ test('9-11,16. Eggs 6 pcs + Bulk Add "Eggs 12 pcs" = 18 pcs, reported as updated
 
     // 23. and it survives the save/reload round trip.
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForAppReady(page);
+    await waitForRestored(page, () => AppState.pantry.some((p) => p.id === 'e_1'));
     expect(await page.evaluate(() => AppState.pantry[0].quantity)).toBe(18);
   });
 

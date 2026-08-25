@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Inventory expiry truth — name, quantity/unit and expiry date are three concepts.
@@ -286,7 +286,7 @@ test.describe('mobile add form', () => {
 
     // Survives a reload through the normal saveData() path, not just in memory.
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForAppReady(page);
+    await waitForRestored(page, () => AppState.pantry.some((p) => p.name === 'Eggs'));
     await page.evaluate(() => showTab('fridge'));
 
     const rec = await page.evaluate(() =>

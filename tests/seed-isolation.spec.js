@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForRestored } = require('./app-ready');
 
 /**
  * Seed isolation — AppState must never share recipe objects with the
@@ -203,7 +204,13 @@ test('reload still restores the saved recipes and re-isolates them', async ({ pa
   }, null, { timeout: 30000 });
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await settled(page);
+  // settled() only proves recipes EXIST, and a fresh re-seed also produces ids 27 and 5 —
+  // so identity alone cannot distinguish "restored the user's document" from "seeded the
+  // defaults again". The edit itself is the only honest witness here, so unusually the
+  // predicate names it.
+  await waitForRestored(page, () =>
+    AppState.recipes.some((x) => Number(x.id) === 27 && x.favorite === true) &&
+    AppState.recipes.some((x) => Number(x.id) === 5 && x.currentServings === 6));
 
   const after = await page.evaluate(() => {
     const r27 = AppState.recipes.find((x) => Number(x.id) === 27);

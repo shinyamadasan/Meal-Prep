@@ -1044,8 +1044,9 @@ caller's own condition — applied at the three proven sites. `waitForAppReady()
 that, and narrowing it to "a saved document is loaded" would break the specs that deliberately boot
 an empty or seeded one.
 
-Deliberately not done, and the residual risk: **eleven other `page.reload()` sites across ten specs
-still use the bare helper** (`bulk-add-date-truth` ×2, `inventory-quantity-truth` ×2,
+Deliberately not done, and the residual risk (**the count here is corrected by Addendum 2 below,
+which audited them: 16 reload sites across 13 specs, not eleven across ten**): **other
+`page.reload()` sites still use the bare helper** (`bulk-add-date-truth` ×2, `inventory-quantity-truth` ×2,
 `seed-isolation` ×2, `bulk-add-partial-retry`, `cook-method-discovery`,
 `food-attention-notifications`, `inventory-expiry-display`, `ready-food-portions`,
 `recipe-edit-preservation`, `starter-pack`). They carry the same latent exposure and were left
@@ -1068,6 +1069,76 @@ sites listed above; all three fixed specs passed, and `workflow_dispatch` on the
 corroboration, not falsification: the class is real, the fixed sites hold, and the next flake landed
 exactly where this addendum said it would — which promotes the remaining-reload migration from a
 theory to an evidenced follow-up task.
+
+Addendum 2 (TASK-056, 2026-08-25): **the remaining reload sites, audited and migrated.** The
+addendum above left them alone on the grounds that none had been observed failing. That held for
+one CI run. The very next push-triggered gate went red on
+`bulk-add-partial-retry.spec.js:426` — `Expected ["Chicken","Eggs","Milk"], Received []` — the
+identical signature in one of the sites named as residual risk, so the migration stopped being
+speculative cleanup.
+
+**The inventory in that paragraph was wrong, and the corrected count is worth recording.** A recount
+from source finds **16 `page.reload()` call sites across 13 local specs**, not eleven across ten:
+three were the ones TASK-055 had already fixed, and two more (`ready-food-portions`,
+`recipe-edit-preservation`) already carried correct inline restore-waits and had simply not been
+recognised as such. Every site was classified before anything was edited:
+
+| class | meaning | count |
+|---|---|---|
+| **A** | assertion depends on restored state → migrate | **14** (3 done in Addendum 1, **11 migrated here**) |
+| **B** | reload tests boot/view behaviour only → keep `settled()` | **1** |
+| **C** | harness defect: init setup re-runs on reload | **1** (the same site as the B one) |
+| **D** | asserts ABSENCE; no positive predicate exists | **1** |
+
+14 of the 16 sites now use `waitForRestored()`; two are deliberately retained (the B/C site and the
+D site). No reload site anywhere in the local suite still reads persisted state after a bare
+`waitForAppReady()`.
+
+**Class B/C — `cook-method-discovery`.** Its reload asserts `recipeQuickFilter === ''`, i.e. that a
+module-scoped variable is view state and not a preference. A reload clears JS variables
+unconditionally, so no restored state is involved and `settled()` is the right wait; left unchanged.
+But its `addInitScript` was the **only one of the thirteen with no bootstrap sentinel** —
+`localStorage.clear()` ran on every navigation, reloads included. That is not currently a false
+positive (the assertion holds either way, because the variable is not persisted anywhere), but it
+primes the file: any future reload-persistence test added there would have passed from re-seeding
+rather than from restoration. Guard added to match all twelve siblings. No assertion changed.
+
+**Class D — `seed-isolation`'s "deliberately empty recipe list stays empty".** Its claim is that the
+first-run gate does *not* re-seed, so the state to wait for is an absence, and no predicate can
+prove it has arrived. It already documents this and waits on init completion plus a fixed 1500 ms.
+That fixed wait is a genuine residual risk — if init were slow enough, the test could assert before
+a re-seed would have happened and pass for the wrong reason — but closing it needs a signal the
+product does not currently expose, and inventing one is a product change. Left as-is and recorded.
+
+**Predicate discipline.** The default is to wait on the record's IDENTITY and let the assertions own
+its fields: a pantry row or recipe restores atomically out of one `JSON.parse`, so "the row is back"
+proves restoration, and keeping the field checks in `expect()` means a real persistence bug stays a
+readable diff instead of becoming a timeout. Two sites are deliberate exceptions, because identity
+alone cannot distinguish restored from re-seeded there — `seed-isolation`'s edited-recipe test (a
+fresh seed also has ids 27 and 5, so the predicate has to name `favorite === true` and
+`currentServings === 6`) and `starter-pack` (a fresh seed also yields 40 ids, so the predicate
+requires every saved id to be back).
+
+**Reproduced, not inferred, this time at the exact failing site.** An A/B harness replayed
+`bulk-add-partial-retry`'s reload against the same 20×-throttled page, ten runs: bare
+`waitForAppReady()` failed **4/10**, and what it read was `[]` — the CI symptom exactly.
+`waitForRestored()` failed **0/10**. In the spec's own abort-Firebase mode both were 0/10, which
+remains the honest control: the gap needs the async-init path, so the class is reproduced while the
+specific runner condition stays inferred.
+
+Negative-proofed as one sweep: sabotaging every restored collection makes **all eleven** migrated
+waits time out naming their missing state, across every predicate shape used (pantry-by-name,
+pantry-by-id, recipe-by-id, cookedMeal-by-id, alert ledger, edit-witness, id-set).
+
+Still no retries, for the same reason as before. `waitForAppReady()` is still unchanged and still
+means "booted and painted".
+
+### The finalized rule
+
+> After `page.reload()`, a test that depends on persisted application state must wait for that
+> specific restored state. `waitForAppReady()` proves only boot and render completion. A rendered
+> application is not proof that anything was restored.
+
 
 Verify: tests/app-ready.js contains "async function waitForRestored(page, predicate"
 

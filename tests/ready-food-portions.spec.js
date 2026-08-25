@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForRestored } = require('./app-ready');
 
 /**
  * Ready-food wave — portion tracking on cookedMeals.
@@ -349,11 +350,10 @@ test('portion data survives save, reload, export and the Firestore payload', asy
   // Real reload from localStorage.
   await page.reload({ waitUntil: 'domcontentloaded' });
   // Wait for the RESTORED batch, not for a fixed delay: mid-init the list is empty and the
-  // test would read undefined.
-  await page.waitForFunction(
-    () => typeof AppState !== 'undefined' && (AppState.cookedMeals || []).length > 0,
-    null, { timeout: 30000 });
-  await page.waitForTimeout(300);
+  // test would read undefined. Narrowed from "any cooked meal" to THIS one, and moved onto
+  // the shared helper so there is one restore-wait idiom in the suite rather than several.
+  await waitForRestored(page, () =>
+    (AppState.cookedMeals || []).some((m) => m.id === 'cm_rt'));
 
   const after = await page.evaluate(() => {
     const m = AppState.cookedMeals.find((x) => x.id === 'cm_rt');
