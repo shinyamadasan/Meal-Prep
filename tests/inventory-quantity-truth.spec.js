@@ -22,8 +22,13 @@ const { waitForAppReady } = require('./app-ready');
 
 test.use({ viewport: { width: 1280, height: 1700 } });
 
-async function loadLocalApp(page) {
+// A two-digit year is expanded relative to the CURRENT year, so the short/four-digit
+// parity cases pin the clock rather than inheriting whatever year the suite runs in.
+const FIXED_2026 = '2026-06-15T12:00:00';
+
+async function loadLocalApp(page, { fixedTime = null } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__qtyTruthBootstrapped')) return;
@@ -466,6 +471,167 @@ test('the summary names each outcome separately', async ({ page }) => {
 });
 
 // ── No new architecture ────────────────────────────────────────────────────
+
+// D-067's two-digit-year extension only turns TEXT into a canonical date; it must not
+// create a second merge path. Each case below runs the identical scenario at both year
+// widths and asserts the outcomes are identical.
+test('a two-digit trailing year enters the same merge path as its four-digit twin',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+
+    // Safe top-up: same printed expiry on both sides, known quantities, same unit.
+    const seed = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'e_2d', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: 6, unit: 'pcs', expiryDate: '2026-08-08', dateMode: 'expiry',
+        staple: false }];
+      saveData();
+    });
+
+    await seed();
+    const short = await bulkSubmit(page, 'Eggs 12 pcs Aug 8 26');
+    await seed();
+    const long = await bulkSubmit(page, 'Eggs 12 pcs Aug 8 2026');
+
+    // The load-bearing assertion: identical records and identical reporting. Whatever
+    // D-069 decides, both spellings must decide it the same way.
+    expect(short.pantry).toEqual(long.pantry);
+    expect(short.toast).toBe(long.toast);
+
+    // And what D-069 decides here is separation, not a top-up: a printed expiry on the
+    // purchase line always makes its own record (canMergePurchaseInto refuses any
+    // purchase carrying an expiryDate), so the two dates can never be averaged away.
+    expect(short.pantry).toHaveLength(2);
+    expect(short.pantry.map((p) => p.quantity).sort()).toEqual([12, 6]);
+    expect(short.pantry.some((p) => p.quantity === 18)).toBe(false);
+    expect(short.toast).toBe('1 item added.');
+    // The pre-existing record kept its identity and its number.
+    const kept = await page.evaluate(() => AppState.pantry.find((p) => p.id === 'e_2d'));
+    expect(kept).toBeTruthy();
+    expect(kept.quantity).toBe(6);
+
+    // The merge path itself is untouched by the parser change: against a bought-date
+    // record, a two-digit-dated purchase separates and an undated one tops up in place,
+    // exactly as the four-digit spelling always has.
+    const seedBought = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'e_2d2', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: 6, unit: 'pcs', staple: false }];
+    });
+    await seedBought();
+    const noDate = await bulkSubmit(page, 'Eggs 12 pcs');
+    expect(noDate.pantry).toHaveLength(1);
+    expect(noDate.pantry[0].quantity).toBe(18);
+    expect(noDate.toast).toBe('1 stock item updated.');
+    expect(await page.evaluate(() => AppState.pantry[0].id)).toBe('e_2d2');
+  });
+
+test('two-digit explicit-expiry separation matches the four-digit behaviour',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+    const seed = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'e_2e', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: 6, unit: 'pcs', expiryDate: '2026-08-28', dateMode: 'expiry',
+        staple: false }];
+    });
+
+    await seed();
+    const short = await bulkSubmit(page, 'Eggs 12 pcs Sep 10 26');
+    await seed();
+    const long = await bulkSubmit(page, 'Eggs 12 pcs Sep 10 2026');
+
+    expect(short.pantry).toEqual(long.pantry);
+    expect(short.pantry).toHaveLength(2);               // two dates never collapse into one
+    expect(short.pantry.find((p) => p.expiryDate === '2026-08-28').quantity).toBe(6);
+    expect(short.pantry.find((p) => p.expiryDate === '2026-09-10').quantity).toBe(12);
+    expect(short.pantry.some((p) => p.quantity === 18)).toBe(false);
+  });
+
+test('two-digit unit-incompatible and unknown-quantity cases match the four-digit ones',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+
+    // Incompatible units: two honest records, never 501.
+    const seedG = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'r_2f', name: 'Rice', category: 'Grains',
+        purchaseDate: todayISO(), shelfLifeDays: 300, storage: 'pantry',
+        quantity: 500, unit: 'g', staple: false }];
+    });
+    await seedG();
+    const shortUnit = await bulkSubmit(page, 'Rice 1 kg Aug 8 26');
+    await seedG();
+    const longUnit = await bulkSubmit(page, 'Rice 1 kg Aug 8 2026');
+    expect(shortUnit.pantry).toEqual(longUnit.pantry);
+    expect(shortUnit.pantry).toHaveLength(2);
+    expect(shortUnit.pantry.some((p) => p.quantity === 501)).toBe(false);
+
+    // Unknown existing quantity: the purchase becomes its own record rather than
+    // overwriting a real number with "unknown", or being thrown away.
+    const seedU = () => page.evaluate(() => {
+      AppState.pantry = [{ id: 'e_2g', name: 'Eggs', category: 'Protein',
+        purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+        quantity: null, unit: '', staple: false }];
+    });
+    await seedU();
+    const shortUnknown = await bulkSubmit(page, 'Eggs 12 pcs Aug 8 26');
+    await seedU();
+    const longUnknown = await bulkSubmit(page, 'Eggs 12 pcs Aug 8 2026');
+    expect(shortUnknown.pantry).toEqual(longUnknown.pantry);
+    expect(shortUnknown.pantry).toHaveLength(2);
+    expect(shortUnknown.pantry.map((p) => p.quantity).sort()).toEqual([12, null]);
+  });
+
+// A line rejected for an implausible short year never reaches the merge path at all, so
+// existing stock cannot be topped up, replaced or otherwise disturbed by a date the
+// parser refused to believe.
+test('an implausible short year leaves existing stock completely untouched', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
+  await page.evaluate(() => {
+    AppState.pantry = [{ id: 'e_2h', name: 'Eggs', category: 'Protein',
+      purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+      quantity: 6, unit: 'pcs', staple: false }];
+    saveData();
+  });
+  const before = await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)));
+  const r = await bulkSubmit(page, 'Eggs 12 pcs May 5 12');
+
+  expect(r.pantry).toHaveLength(1);
+  expect(await page.evaluate(() => JSON.parse(JSON.stringify(AppState.pantry)))).toEqual(before);
+  expect(r.toast).toBe('');                       // nothing added, nothing merged
+  expect(r.modalOpen).toBe(true);
+  expect(r.textarea).toBe('Eggs 12 pcs May 5 12');
+  expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+});
+
+// The exp: escape hatch produces an ordinary record, so it meets the ordinary D-069 rule:
+// a purchase carrying a printed expiry never folds into existing stock, it separates.
+test('an exp:-rescued short-year line follows the normal merge rules', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
+  await page.evaluate(() => {
+    AppState.pantry = [{ id: 'e_2i', name: 'Juice May 5 12', category: 'Beverages',
+      purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+      quantity: 6, unit: 'pcs', staple: false }];
+    saveData();
+  });
+  // No quantity on the line — the trailing junk blocks the qty/unit parser — so there is
+  // nothing to add and D-069's ordinary skip applies. Stock is left exactly as it was.
+  const skipped = await bulkSubmit(page, 'Juice May 5 12 exp:2026-08-08');
+  expect(skipped.pantry).toHaveLength(1);
+  expect(skipped.pantry[0].quantity).toBe(6);
+  expect(skipped.toast).toBe('1 already in pantry.');
+
+  // With a quantity (comma form, so the name still ends before the short year), the
+  // purchase carries a printed expiry and therefore separates rather than folding in —
+  // the same verdict any other printed-expiry purchase gets.
+  const r = await bulkSubmit(page, 'Juice May 5 12, 2, L exp:2026-08-08');
+  expect(r.pantry).toHaveLength(2);
+  expect(r.pantry.some((p) => p.quantity === 8)).toBe(false);
+  expect(r.pantry.find((p) => p.expiryDate === '2026-08-08')).toMatchObject({ quantity: 2 });
+  expect(await page.evaluate(() =>
+    AppState.pantry.find((p) => p.id === 'e_2i').quantity)).toBe(6);
+  expect(r.toast).toBe('1 item added.');
+});
 
 test('no new top-level AppState collection was introduced', async ({ page }) => {
   await loadLocalApp(page);
