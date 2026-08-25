@@ -175,13 +175,19 @@ test('9. invalid dates are rejected, not rolled over or guessed', async ({ page 
 
   // exp:2026-02-31 used to pass `new Date()` and silently store a date that
   // rendered as "Expires Mar 3". February has no 31st.
+  //
+  // UPDATED by TASK-052: D-067 rejected the date but still added the item, silently
+  // substituting the shared expiry for the one the user typed. That made the partial-retry
+  // loop unsound — the line had to stay for correction while its record already existed —
+  // so an actionable warning now holds the line back entirely. The PARSER verdict here is
+  // unchanged: the date is still rejected, never rolled over.
   const rollover = await bulkAdd(page, 'Eggs, 12, pcs exp:2026-02-31');
-  expect(only(rollover).expiryDate).toBeNull();
-  expect(rollover.warnings).toContain('invalid exp date');
+  expect(rollover.items).toHaveLength(0);
+  expect(rollover.warnings).toContain('invalid expiry date');
 
   const nonsense = await bulkAdd(page, 'Eggs, 12, pcs exp:2026-13-45');
-  expect(only(nonsense).expiryDate).toBeNull();
-  expect(nonsense.warnings).toContain('invalid exp date');
+  expect(nonsense.items).toHaveLength(0);
+  expect(nonsense.warnings).toContain('invalid expiry date');
 
   // A natural date naming a day that does not exist is left in the text untouched
   // rather than being nudged to a nearby real day.
@@ -199,10 +205,16 @@ test('9b. an all-numeric slash date is refused as ambiguous and reported', async
   await loadLocalApp(page);
   // 8/8/2026 is day-first in half the world and month-first in the other half.
   // Guessing wrong moves an expiry by months, so it is not guessed at all.
+  //
+  // UPDATED by TASK-052: D-067 warned and then added the item anyway, with the unparsed
+  // date still sitting inside the name ("Milk 1 L 8/8/2026"). The line is now held back
+  // instead, so correcting it produces one clean record rather than a junk one plus a
+  // second copy. The parser is untouched — the date is still never guessed.
   const r = await bulkAdd(page, 'Milk 1 L 8/8/2026');
-  expect(only(r).expiryDate).toBeNull();
-  expect(only(r).name).toBe('Milk 1 L 8/8/2026');   // text untouched
+  expect(r.items).toHaveLength(0);
   expect(r.warnings).toContain('ambiguous');
+  // The user's original text survives for correction rather than being rewritten.
+  expect(await page.inputValue('#bulk-add-textarea')).toBe('Milk 1 L 8/8/2026');
 });
 
 // ── 10. Product names containing numbers survive ───────────────────────────

@@ -1245,3 +1245,122 @@ Verify: app.js contains "function parseTrailingDate(text)"
 Verify: app.js contains "function isRealCalendarDate(y, m, d)"
 Verify: app.js contains "looksLikeAmbiguousDate"
 Verify: app.js contains "perLineExpiry || naturalExpiry || bulkExpiry"
+
+## D-068 — Bulk Add finishes what it can and keeps only what you can fix
+
+Dogfooding find, 2026-08-25. Control flow and feedback inside `confirmBulkAdd()`. The D-067
+parser is untouched; this decision begins after each line has been classified.
+
+### The retry loop was unusable
+
+Bulk Add already persisted valid lines and then held the modal open when any line warned — but it
+left the textarea **completely untouched**. Pressing Add Items again resubmitted the lines that had
+already succeeded, which then reported "already in pantry — skipped". Nothing told the user which
+items had landed and which still needed fixing, and the only warning they could see was about items
+that were already safely in the kitchen.
+
+### The finding that forced a behaviour change, not just a UX one
+
+Characterising all eight cases through the real modal turned up something the brief's model did not
+allow for: **two warning paths warned and then added the item anyway.** Neither `return`ed.
+
+```
+"Milk 2 L 8/8/2026"            -> warned, AND added as name="Milk 2 L 8/8/2026",
+                                  quantity null, with the shared expiry substituted
+"Eggs, 12, pcs exp:2026-02-31" -> warned, AND added as "Eggs", with the shared expiry
+                                  standing in for the date the user actually typed
+```
+
+Both are "actionable" — the user is supposed to correct the line and resubmit. But the record
+already existed, so correcting and resubmitting produced either a junk record plus a clean second
+copy (Milk, different names, duplicate guard never fires) or a confusing "already in pantry" bounce
+(Eggs). **A line cannot both be kept for correction and already be committed.**
+
+So an actionable warning now holds the line back entirely. This is the one change here beyond
+control flow, it is deliberate, and it is what makes the retry pass sound. The parser's verdicts are
+unchanged: the invalid date is still rejected and the ambiguous one is still never guessed.
+
+### Decision
+
+**Three states, decided by the code rather than by reading warning text.** One result per submitted
+line, in submission order:
+
+| status | meaning | textarea |
+|---|---|---|
+| `added` | a pantry record was created | drops out — finished |
+| `skipped` | deliberately not added, and **not fixable by editing the line** (already in pantry) | drops out — finished |
+| `attention` | not added, and the user can fix it | **stays**, original text, original order |
+
+`skipped` exists as its own state precisely so a duplicate does not sit in the textarea generating
+the same message forever. It is still reported — "1 already in pantry" in the summary and its own
+note — just not offered back for a retry that cannot change anything.
+
+Classification is by explicit `status`, never by matching message wording, so rephrasing a warning
+can never silently move a line between "finished" and "keep".
+
+### Partial success stays tolerant, not transactional
+
+Valid lines are still persisted even when a sibling line needs work. That was the pre-existing
+behaviour, it is the right one for a bulk paste, and it is the entire reason the textarea must be
+pruned: the alternative is asking the user to remember which of their own lines already went in.
+
+### Feedback
+
+One line, built from the three counts, joined with `·`:
+
+```
+4 items added.
+3 items added · 1 line needs attention.
+2 items added · 1 already in pantry · 1 line needs attention.
+3 already in pantry.
+```
+
+It goes to the existing toast when the modal closes, and inline above the per-line notes when the
+modal stays open — a toast behind an open modal is the wrong surface for something the user has to
+act on. No results screen, no second modal, no extra confirmation step.
+
+Per-line notes dropped their `Line N:` prefix. Once the textarea is pruned, "Line 2" refers to text
+that is no longer on screen; quoting the offending line instead stays true.
+
+### What deliberately did not change
+
+- Shared **Storage** and **Expiry** are left alone across a partial submit — the user almost
+  certainly still wants them for the remaining line. The existing `openBulkAddModal()` reset remains
+  the only thing that clears the form.
+- All-valid still closes the modal and toasts, exactly as before.
+- All-duplicate now **closes** rather than holding the user in a retry that cannot progress.
+- The duplicate policy itself, quantity merging, storage inference, expiry precedence,
+  `pantryDaysLeft()`, `pantryExpiryInfo()`, Kitchen Truth, grocery → pantry, tombstones,
+  `saveData()`, Firestore merge, Food Attention and recommendations are all untouched. No new
+  top-level `AppState` key — `results` is a local array.
+
+### Tests changed rather than added, and why
+
+Two assertions shipped under D-067 encoded the old warn-and-add-anyway behaviour
+(`bulk-add-date-truth.spec.js` cases 9 and 9b). They are updated here, with the reason recorded
+inline in the spec, because the behaviour they described is the behaviour this entry deliberately
+changes. Their parser-level halves — the date is rejected, the ambiguous one is never guessed — are
+asserted exactly as before.
+
+`tests/production-smoke-bulk-add-dates.spec.js` still asserts the deployed behaviour and is
+**knowingly left stale**: it measures what is live, and updating it before this deploys would make
+the prod gate red for a reason that is not a defect. It must be updated in the same landing sequence
+as the merge, the way TASK-050 and TASK-051 added their prod smokes after Pages finished.
+
+### Known limitation, accepted
+
+A line that produces no result at all cannot exist — every path now pushes exactly one result — but
+a line whose *name* is junk for reasons the parser cannot see (a typo, say) is classified `added`
+and drops out of the textarea. That is correct: it is in inventory and the Inventory card is where
+it gets edited. Bulk Add is an input surface, not an editor.
+
+Supersedes: nothing. Adjusts two behaviours introduced by D-067, recorded above.
+
+Regression-locked by `tests/bulk-add-partial-retry.spec.js` (18 cases). Mutation-checked by
+restoring the old "every submitted line stays" behaviour, which fails 7 of 18 including the central
+retry case.
+
+Verify: app.js contains "status: 'attention'"
+Verify: app.js contains "function buildBulkAddSummary"
+Verify: app.js contains "attentionRows.map"
+Verify: style.css contains ".bulk-add-summary"
