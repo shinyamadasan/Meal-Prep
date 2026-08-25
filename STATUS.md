@@ -5,6 +5,125 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-25 — Reload-state harness audit landed (TASK-056, D-065 addendum 2) — the tail of a proven class is not optional
+
+`fix/reload-restore-audit` → `main` (`92dbdea`, `--no-ff`, unrebased). One commit, `ac64da8`,
+landed unchanged. `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+**Test/harness only. Product source byte-unchanged** — `git diff 8b13ddf -- app.js index.html
+style.css sw.js manifest.json` is empty, and `tests/app-ready.js` was not touched at all.
+
+### Why this existed
+
+TASK-055 named the remaining reload sites as residual risk and left them, because none had been
+observed failing. That held for exactly one CI run. The next push-triggered gate went red on
+`bulk-add-partial-retry.spec.js:426`:
+
+```
+Expected: ["Chicken", "Eggs", "Milk"]
+Received: []
+```
+
+Identical signature, in one of the named sites. The lesson worth keeping: the scope call was
+defensible and was still wrong within a day. Once a failure class is *proven*, finishing its tail is
+not optional cleanup.
+
+### The census was wrong, in both directions
+
+Recounted from source: **16 `page.reload()` sites across 13 local specs**, not the eleven across ten
+previously reported. Three were already fixed, and two more — `ready-food-portions`,
+`recipe-edit-preservation` — already carried correct inline restore-waits and had simply not been
+recognised as such. An audit that trusts its own earlier inventory is not an audit.
+
+| class | meaning | count | outcome |
+|---|---|---|---|
+| A | assertion depends on restored state | 14 | 3 done in TASK-055, **11 migrated here** |
+| B | reload tests boot/view behaviour only | 1 | retained |
+| C | harness defect: init re-runs on reload | 1 (same site as B) | fixed |
+| D | asserts an ABSENCE | 1 | retained, risk recorded |
+
+**14 of 16 now use `waitForRestored()`. Zero reload sites read persisted state after a bare
+`waitForAppReady()`.**
+
+### The two judgements that mattered
+
+**Identity, not fields.** The default predicate waits for the record to *exist* and leaves field
+checks to `expect()`. A row restores atomically out of one `JSON.parse`, so identity proves
+restoration — and it keeps a genuine persistence bug a readable diff instead of an opaque timeout.
+
+**Two deliberate exceptions**, because identity there cannot tell *restored* from *re-seeded*:
+`seed-isolation`'s edited recipes (a fresh seed also has ids 27 and 5, so the predicate names
+`favorite === true` and `currentServings === 6`) and `starter-pack` (a fresh seed also yields 40
+ids, so it requires every saved id back). Getting these wrong would have produced two tests that
+pass whether or not restoration happened — precisely the false-positive class this work removes.
+
+### What was deliberately NOT changed
+
+**Class B — `cook-method-discovery`.** Its reload asserts `recipeQuickFilter === ''`, a module-scoped
+variable a reload clears unconditionally. No restored state involved; `settled()` is the honest
+wait. Not converted for consistency's sake.
+
+**Class C — the same spec's bootstrap.** It was the only one of thirteen with **no sentinel**, so
+`localStorage.clear()` ran on every navigation including reload. Not overclaiming: this is *not* a
+false positive today, because that assertion holds either way. It primed the file for one. Sentinel
+added to match all twelve siblings; no assertion touched.
+
+**Class D — `seed-isolation:239`.** It asserts a deliberately empty recipe list is not re-seeded.
+There is no predicate for "the thing that must not happen has finished not happening", and inventing
+a completion signal would be a product change under a freeze. Left as-is with its fixed 1500 ms.
+**The one remaining special-case risk on the reload surface.**
+
+### Evidence
+
+Reproduced **at the exact failing site** this time — stronger than TASK-055 managed. A/B against the
+same 20× throttled page, ten runs:
+
+| strategy | failures | what it read |
+|---|---|---|
+| bare `waitForAppReady()` | **4/10** | `[]` — the CI symptom verbatim |
+| `waitForRestored()` | **0/10** | — |
+
+Abort-Firebase control: 0/10 both. So the position is unchanged and stated plainly — **class
+reproduced, runner condition still inferred.**
+
+Negative-proofed in one sweep across every predicate shape (pantry-by-name, pantry-by-id,
+recipe-by-id, cookedMeal-by-id, alert ledger, edit-witness, id-set): sabotaging all restored
+collections makes **all eleven** migrated waits time out naming their missing state. No new wait is
+decorative.
+
+**No assertion added, removed or altered** anywhere — confirmed by grepping `expect(` over the whole
+diff. Two `waitForTimeout(300)` removed, both trailing settles inside the inline restore-waits
+folded onto the shared helper; none added; no unrelated interaction or animation wait touched.
+Retries still absent.
+
+### Numbers
+
+Focused ×10 on all ten touched specs · the previously failing test ×20 green · 13 reload specs
+together at `--workers=2` ×2 (254 passed each) · `npm run test:local` and `npm test` 335/335 ·
+suite-classification 6/6 · `Verify-Decisions.ps1` 30/30.
+
+### The first push-triggered CI run
+
+**Green on attempt 1, no retries** — local gate **335 passed** at 2 workers, production gate **137
+passed**. `bulk-add-partial-retry` passed, the three TASK-055 specs passed, and the production gate
+followed the local gate normally for the first time in three landings.
+
+One green run is not proof an intermittent class is gone. The next several ordinary push-triggered
+runs are the actual evidence, and no commits will be manufactured to produce them.
+
+### The rule, final form
+
+> After `page.reload()`, a test that depends on persisted application state must wait on that
+> specific restored state. Boot/render completion is not evidence of persistence restoration.
+
+### Carried forward
+- **`seed-isolation:239` (Class D)** — the one remaining special-case risk.
+- The runner condition behind the >150 ms gap remains **inferred**.
+- Short 200–600 ms interaction/animation waits — none implicated, untouched.
+- `loadFromLocalStorage()` swallows exceptions and continues with default state. Product code.
+- `wave1-portion-truth` parked at `88b5598`.
+
+---
 ## 2026-08-25 — Test gate determinism landed (TASK-055, D-065 addendum) — a painted app is not a restored one
 
 `fix/test-gate-determinism` → `main` (`1cee2d9`, `--no-ff`, unrebased). One commit, `4f1b9d9`,

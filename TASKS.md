@@ -3305,6 +3305,88 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-056 · Reload-state harness audit: every persisted-state reload waits on its state
+status: done
+source: first push-triggered CI failure after TASK-055 landed (operator, 2026-08-25)
+depends-on: TASK-055 (`waitForRestored`), TASK-049 (D-065, `waitForAppReady`)
+files: tests/bulk-add-date-truth.spec.js, tests/bulk-add-partial-retry.spec.js,
+       tests/inventory-quantity-truth.spec.js, tests/inventory-expiry-display.spec.js,
+       tests/food-attention-notifications.spec.js, tests/ready-food-portions.spec.js,
+       tests/recipe-edit-preservation.spec.js, tests/seed-isolation.spec.js,
+       tests/starter-pack.spec.js, tests/cook-method-discovery.spec.js,
+       docs/DECISIONS.md
+objective: finish the audit TASK-055 started — classify every local `page.reload()` site and
+       migrate the ones whose assertions depend on restored state. Test/harness only; no
+       product behaviour, no retries, no general timeout cleanup.
+acceptance:
+  - [x] Census recounted from source rather than trusting the prior list: **16 reload sites
+        across 13 local specs**, not the eleven across ten TASK-055 reported. Three were
+        already fixed; two more already carried correct inline restore-waits.
+  - [x] Every site classified BEFORE any edit — A (persisted-state) 14, B (boot-only) 1,
+        C (harness defect) 1 (same site as B), D (absence claim) 1.
+  - [x] **11 sites migrated** to `waitForRestored()`; 14 of 16 now use it. **Zero** reload
+        sites read persisted state after a bare `waitForAppReady()`.
+  - [x] `waitForAppReady()` unchanged — `git diff` on `tests/app-ready.js` is empty. No
+        second helper forked.
+  - [x] Predicate discipline: wait on the record's IDENTITY, let assertions own its fields
+        (a row restores atomically out of one `JSON.parse`, so a real persistence bug stays
+        a readable diff instead of a timeout). Two deliberate exceptions where identity
+        cannot distinguish restored from re-seeded — `seed-isolation`'s edited recipes
+        (a fresh seed also has ids 27 and 5) and `starter-pack`'s saved id set (a fresh
+        seed also yields 40 ids).
+  - [x] Class B retained: `cook-method-discovery`'s reload asserts `recipeQuickFilter === ''`,
+        a module-scoped view variable that a reload clears regardless. Not converted.
+  - [x] Class C fixed: that same spec was the ONLY one of thirteen with no bootstrap
+        sentinel, so `localStorage.clear()` ran on every navigation including reload. Not a
+        false positive today — the assertion holds either way — but it primed the file.
+        Sentinel added to match all twelve siblings.
+  - [x] Class D retained: `seed-isolation:239` asserts an ABSENCE (the empty list must not
+        be re-seeded); no predicate can prove a thing that must not happen has finished not
+        happening, and inventing a completion signal would be a product change. Left with
+        its 1500ms wait and its risk recorded.
+  - [x] Reproduced at the exact failing site: A/B against the same 20x-throttled page, ten
+        runs — bare `waitForAppReady()` failed **4/10** reading `[]` (the CI symptom
+        exactly), `waitForRestored()` **0/10**. Abort-Firebase control 0/10 both, so the
+        class is reproduced and the runner condition stays inferred.
+  - [x] Negative-proofed in one sweep: sabotaging every restored collection makes all
+        **11** migrated waits time out naming their missing state, across every predicate
+        shape used (pantry-by-name, pantry-by-id, recipe-by-id, cookedMeal-by-id, alert
+        ledger, edit-witness, id-set).
+  - [x] **No assertion added, removed or altered** — verified by grep for `expect(` over the
+        whole diff. Two `waitForTimeout(300)` removed, both trailing settles inside the
+        inline restore-waits folded onto the shared helper; none added; no unrelated
+        interaction wait touched.
+  - [x] Retries still absent (`playwright.config.js` has no `retries` key).
+  - [x] Focused x10 on all ten touched specs; the previously failing test x20; 13 reload
+        specs together at `--workers=2` x2 (254 each); `npm run test:local` and `npm test`
+        335/335; suite-classification 6/6; `Verify-Decisions.ps1` 30/30.
+  - [x] Product source byte-unchanged: `git diff 8b13ddf -- app.js index.html style.css
+        sw.js manifest.json` is empty.
+constraints: test/harness only; no product code; no retries; no general timeout cleanup;
+       `wave1-portion-truth` untouched.
+
+merge gate:
+  D-032 **`done`** — reversible and outside the product entirely: eleven files, all tests or
+  docs. Operator directed the landing explicitly.
+
+landed:
+  Merged `--no-ff` at `92dbdea` (parents `8b13ddf` + `ac64da8`), commit `ac64da8` unchanged —
+  not rebased, squashed or amended. Final main: see STATUS/DONE for the documentation SHA.
+  First push-triggered CI result recorded in REVIEW/STATUS exactly as it happened.
+
+open items (recorded, deliberately NOT fixed):
+  - **`seed-isolation:239` (Class D)** keeps a fixed 1500ms. Its claim is an absence, so no
+    predicate can wait for it; closing it needs a product completion signal that does not
+    exist. **The one remaining special-case risk in the reload surface.**
+  - The specific runner condition that opened the >150ms gap remains **inferred** — the
+    reproduction needs the async-init path and the specs abort Firebase.
+  - Short 200–600ms interaction/animation waits untouched — none implicated.
+  - `loadFromLocalStorage()` swallows exceptions and continues with default state. Product
+    code; not touched.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+---
+
 ### TASK-055 · Test gate determinism: a painted app is not a restored one
 status: done
 source: CI flakes on `56d8da7` (operator, 2026-08-25)

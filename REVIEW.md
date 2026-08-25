@@ -4,6 +4,99 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-056 — APPROVED (reload-state harness audit, D-065 addendum 2) — D-032 `done`, operator-approved
+branch: fix/reload-restore-audit @ ac64da8 → main @ 92dbdea (`--no-ff`, unrebased)
+verdict: approved — test/harness infrastructure only; product source byte-unchanged
+date: 2026-08-25
+
+### The gate
+D-032 **`done`**. Eleven files, all tests or docs. `git diff 8b13ddf -- app.js index.html style.css
+sw.js manifest.json` is empty. `tests/app-ready.js` is untouched on this branch, so both helper
+contracts survive exactly as reviewed.
+
+### Why this task existed at all
+TASK-055 named these sites as residual risk and left them, on the reasonable grounds that none had
+been observed failing. That reasoning held for exactly one CI run. The next push-triggered gate went
+red on `bulk-add-partial-retry.spec.js:426` — `Expected ["Chicken","Eggs","Milk"], Received []` —
+the identical signature in one of the named sites. Worth recording plainly: the previous wave's
+scope call was defensible and still turned out to be wrong within a day, which is the argument for
+finishing an audit once its class is proven rather than deferring the tail.
+
+### The census correction is the most valuable finding
+The prior report said eleven reload sites across ten specs. A recount from source gives **16 across
+13**. The gap was not sloppiness in one direction only: three were already fixed, and two more
+(`ready-food-portions`, `recipe-edit-preservation`) already carried correct inline restore-waits and
+had simply not been recognised as such. An audit that trusts its own earlier inventory is not an
+audit, and this one didn't.
+
+### Classification, and the discipline in it
+| class | meaning | count | outcome |
+|---|---|---|---|
+| A | assertion depends on restored state | 14 | 3 done previously, **11 migrated here** |
+| B | reload tests boot/view behaviour only | 1 | retained |
+| C | harness defect: init re-runs on reload | 1 (same site as B) | fixed |
+| D | asserts an ABSENCE | 1 | retained, risk recorded |
+
+Post-change census: **14 of 16 on `waitForRestored()`, zero reading persisted state after a bare
+`waitForAppReady()`.**
+
+Two judgements are worth endorsing explicitly.
+
+**Identity, not fields.** The default predicate waits for the record to exist and leaves the field
+checks to `expect()`. A row restores atomically out of one `JSON.parse`, so identity is sufficient
+proof of restoration — and it keeps a genuine persistence bug a readable diff instead of converting
+it into an opaque timeout. That is the right trade and it was reasoned about rather than defaulted
+into.
+
+**The two exceptions are correct.** `seed-isolation`'s edited-seed case and `starter-pack`'s saved-id
+case cannot use identity, because a fresh re-seed also produces ids 27/5 and also produces 40 ids
+respectively. There the predicate has to witness the persisted *edit* or the *saved set*. Getting
+this wrong would have produced two tests that pass whether or not restoration happened — exactly the
+false-positive class this work exists to remove.
+
+**Class B was not converted for consistency's sake.** `cook-method-discovery`'s reload asserts
+`recipeQuickFilter === ''`, a module-scoped variable that a reload clears unconditionally. No
+restored state is involved and `settled()` is the honest wait. Resisting a tidy-looking blanket
+migration here is a point in the change's favour.
+
+**Class C is preventive, and labelled as such.** That same spec was the only one of thirteen whose
+`addInitScript` had no bootstrap sentinel, so `localStorage.clear()` ran on every navigation. The
+report does not overclaim: it is *not* a false positive today, because the assertion holds either
+way. It primed the file for one. Sentinel added; no assertion touched.
+
+**Class D is left alone, correctly.** `seed-isolation:239` asserts that a deliberately empty recipe
+list is not re-seeded. There is no predicate for "the thing that must not happen has finished not
+happening", and manufacturing a completion signal would be a product change under a product freeze.
+Stopping and recording it was the right call. It is the one remaining special-case risk on the
+reload surface.
+
+### Evidence
+Reproduced **at the exact failing site**, which is stronger than TASK-055 managed: A/B against the
+same 20×-throttled page, ten runs — bare `waitForAppReady()` failed **4/10** and what it read was
+`[]`, the CI symptom verbatim; `waitForRestored()` failed **0/10**. Abort-Firebase control 0/10 for
+both, so the honest position is unchanged: class reproduced, runner condition inferred.
+
+Negative-proofed in one sweep across every predicate shape — sabotaging all restored collections
+makes all eleven migrated waits time out naming their missing state. No new wait is decorative.
+
+**No assertion added, removed or altered** anywhere, confirmed by grepping `expect(` over the whole
+diff. Two `waitForTimeout(300)` removed, both trailing settles inside the inline restore-waits that
+were folded onto the shared helper; none added; no unrelated interaction wait touched. That is
+exactly the diff shape the brief asked for.
+
+### The first push-triggered CI run
+Green on **attempt 1**, no retries: local gate **335 passed** at 2 workers, production gate **137
+passed**. Both formerly-red sites (`bulk-add-partial-retry` and the three TASK-055 specs) passed,
+and the production gate followed the local gate normally for the first time in three landings.
+
+One green run is not proof that an intermittent class is gone, and this review does not claim it is
+— the observation window over the next several ordinary pushes is the actual evidence.
+
+### Gate chosen, and why
+**`done`**. No product surface; the worst case of a wrong test wait is a red gate, not lost data.
+Operator directed the landing explicitly.
+
+---
 ## Review TASK-055 — APPROVED (test gate determinism, D-065 addendum) — D-032 `done`, operator-approved
 branch: fix/test-gate-determinism @ 4f1b9d9 → main @ 1cee2d9 (`--no-ff`, unrebased)
 verdict: approved — test/harness infrastructure only; product source byte-unchanged

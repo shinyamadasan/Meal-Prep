@@ -1133,6 +1133,18 @@ pantry-by-id, recipe-by-id, cookedMeal-by-id, alert ledger, edit-witness, id-set
 Still no retries, for the same reason as before. `waitForAppReady()` is still unchanged and still
 means "booted and painted".
 
+Landed as an operator-approved D-032 `done` merge: `--no-ff` at `92dbdea` (parents `8b13ddf` +
+`ac64da8`), the reviewed commit unchanged. Recorded as TASK-056, an addendum to this entry rather
+than a new decision, because it completes this decision's own testing rule instead of establishing
+another.
+
+The first push-triggered CI run after the merge was **green on attempt 1 with no retries** — local
+gate 335 passed at 2 workers, production gate 137 passed, `bulk-add-partial-retry` passed, the three
+TASK-055 specs passed, and the production gate followed the local gate normally for the first time
+in three landings. One green run is not proof that an intermittent class is gone; the next several
+ordinary push-triggered runs are the evidence, and no commits are being manufactured to produce
+them.
+
 ### The finalized rule
 
 > After `page.reload()`, a test that depends on persisted application state must wait for that
