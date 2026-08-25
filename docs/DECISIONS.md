@@ -1327,9 +1327,42 @@ original text preserved in the textarea, modal stays open, and the note names bo
 the fix — *year "12" is outside the expected food-expiry range. Use a four-digit year if you mean
 2012.* Correcting it to `May 5 2012` then succeeds and stores 2012. This is the same treatment an
 ambiguous slash date already gets, for the same reason: an actionable line is never committed,
-because a line cannot both be kept for correction and already exist. That also means `exp:` does not
-rescue such a line — letting it through would leave `May 5 12` sitting inside the item name, which is
-the failure being prevented.
+because a line cannot both be kept for correction and already exist.
+
+### The one thing that outranks it: an explicit `exp:`
+
+A short-year rejection is only actionable when the line offers **no other deliberate expiry**. A
+valid `exp:YYYY-MM-DD` is the strongest and least ambiguous signal the format has, and this entry
+already puts it at the top of the precedence ladder; a plausibility check on a *different* part of
+the line must not quietly demote it. `exp:` is the documented escape hatch from parser ambiguity, and
+an escape hatch that closes under the one condition you need it for is not an escape hatch.
+
+So the rejection is raised only when `perLineExpiry` is empty:
+
+| line | verdict |
+|---|---|
+| `Juice May 5 12` | **attention** — not added, exact text kept, asks for a four-digit year |
+| `Juice May 5 12 exp:2026-08-08` | **added** — name stays `Juice May 5 12`, expiry `2026-08-08`, `dateMode: 'expiry'` |
+| `Eggs 12 pcs Aug 8 26 exp:2026-09-01` | **added** — plausible date IS stripped, `exp:` still wins: `Eggs`, expiry `2026-09-01` |
+
+Note what the middle row does *not* do: `May 5 12` is **not** stripped out of the name. It was never
+accepted as a date, so removing it would be deleting text on the strength of a reading the parser
+just refused. The record says exactly what the user typed plus the expiry they explicitly gave, and
+nothing is invented in either field. The third row is unchanged from before this addendum — a
+*recognised* date is still always stripped, and `exp:` still outranks it.
+
+**Authority stops at `exp:`.** Neither the shared Bulk Add expiry field nor bought-date + shelf-life
+inference rescues an implausible short-year line, and that asymmetry is the point. `exp:` is a date
+the user typed *for this line*; the shared field and the shelf-life table are defaults that know
+nothing about it. Letting either through would stamp a date unrelated to the one the user actually
+wrote — invented freshness by a quieter door, and the exact class of failure D-066 and D-067 exist
+to close. An **invalid** `exp:` rescues nothing either: it is rejected on its own terms first, and
+the line stays actionable with the expiry error named, since that is the thing to fix.
+
+Left deliberately unchanged: an ambiguous **slash** date is still held back even when the line
+carries a valid `exp:`. That case differs in kind — `8/8/26` cannot be read at all, day-first and
+month-first being equally defensible, whereas `May 5 12` is perfectly readable and merely
+implausible. Extending the escape hatch there is a separate judgement call and was not made here.
 
 **Order of judgement is deliberate.** Calendar validity is decided first: a day the calendar does not
 have is not a date *at all*, whatever its year, so `Feb 31 12` keeps this entry's original
@@ -1371,7 +1404,8 @@ Everything else about this decision is deliberately untouched:
   untouched.
 - **Expiry precedence is unchanged**: `exp:` → recognised trailing date → shared field → bought-date
   + shelf life. A two-digit trailing date is stripped even when `exp:` also appears, same as a
-  four-digit one.
+  four-digit one — and, per the section above, a valid `exp:` also outranks a short-year rejection,
+  which is what keeps that ladder intact rather than putting a new rung above its top.
 - **The ISO shape keeps its four-digit year.** `2026-08-08` is the app's own storage format; a
   two-digit ISO year would be a new format rather than a spelling people already use.
 - **D-068 and D-069 are untouched.** A two-digit-dated line is a resolved line (it leaves the
@@ -1396,11 +1430,13 @@ expansion is now clock-relative, every case asserting a literal expanded year pi
 moves) rather than inheriting whatever year the suite happens to run in; one case derives the bounds
 from the app's own clock so it states the rule and cannot rot.
 
-Mutation-checked six ways, each caught: restoring the four-digit-only year requirement
+Mutation-checked nine ways, each caught: restoring the four-digit-only year requirement
 (`(\d{4}|\d{2})` → `(\d{4})`) fails 12; removing the window (`shortYearPlausible` → `true`) fails 3;
 moving either bound by one in either direction (`SHORT_YEAR_BACK` 1→0 or 1→2, `SHORT_YEAR_AHEAD`
-10→9 or 10→11) fails 3 each; and burying a rejected short year back in the item name
-(`{ shortYear }` → `null`) fails 7. Every pre-existing case passes under all six.
+10→9 or 10→11) fails 3 each; burying a rejected short year back in the item name
+(`{ shortYear }` → `null`) fails 7; removing the `exp:` rescue (`if (!perLineExpiry)` → `if (true)`)
+fails 4; extending the rescue to the shared expiry field fails 1; and stripping the implausible date
+out of a rescued line's name fails 4. Every pre-existing case passes under all nine.
 
 Verify: app.js contains "function expandYear(raw)"
 Verify: app.js contains "function shortYearPlausible(y)"

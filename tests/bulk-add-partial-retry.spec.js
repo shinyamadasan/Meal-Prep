@@ -358,6 +358,42 @@ test('13d. an implausible short year keeps its line for correction', async ({ pa
   expect(new Set(names).size).toBe(names.length);
 });
 
+// A valid exp: makes an implausible short year a RESOLVED line, so it must leave the
+// textarea like any other finished line — the retry pass never sees it again.
+test('13e. exp: turns an implausible short year into a resolved line', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2030 });
+  await openBulk(page);
+  // Two different products with the same implausible short year: one carries an exp:,
+  // one does not. Only the second is something the user can act on.
+  const rescued = 'Juice 1 L May 5 12 exp:2031-08-08';
+  const stale = 'Nectar 1 L May 5 12';
+  const r = await submit(page, [rescued, stale, OK1_2030].join('\n'));
+
+  expect(r.pantry).toHaveLength(2);
+  const juice = r.pantry.find((p) => p.name === 'Juice 1 L May 5 12');
+  expect(juice).toBeTruthy();
+  expect(juice.expiryDate).toBe('2031-08-08');
+  expect(r.pantry.find((p) => p.name === 'Eggs')).toBeTruthy();
+  expect(r.pantry.some((p) => p.name.startsWith('Nectar'))).toBe(false);
+
+  // Only the line WITHOUT exp: stays behind, and it stays byte for byte.
+  expect(r.modalOpen).toBe(true);
+  expect(r.textarea).toBe(stale);
+  expect(r.summary).toBe('2 items added · 1 line needs attention.');
+  expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
+
+  // Correcting the survivor with an exp: finishes the batch. The rescued line was
+  // resolved on the first pass, so it is not re-submitted and produces no duplicate.
+  const r2 = await submit(page, stale + ' exp:2031-09-09');
+  expect(r2.pantry).toHaveLength(3);
+  expect(r2.pantry.find((p) => p.name === 'Nectar 1 L May 5 12').expiryDate).toBe('2031-09-09');
+  expect(r2.toast).toBe('1 item added.');
+  expect(r2.notes.join(' ')).not.toContain('already in pantry');
+  expect(r2.modalOpen).toBe(false);
+  const names = r2.pantry.map((p) => p.name);
+  expect(new Set(names).size).toBe(names.length);
+});
+
 test('14. slash dates remain refused', async ({ page }) => {
   await loadLocalApp(page);
   await openBulk(page);

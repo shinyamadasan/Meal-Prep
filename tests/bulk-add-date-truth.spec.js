@@ -48,9 +48,15 @@ const { waitForAppReady } = require('./app-ready');
  *
  * A short year outside the window is NOT silently swallowed into the item name — the
  * grammar did match, so the line is held back as D-068 attention with its exact text and
- * guidance to write a four-digit year. The window gates the two-digit SPELLING only:
- * `May 5 2012` is still stored as 2012, because a typed four-digit year is a statement
- * rather than a shorthand, and there is no general expiry-age restriction anywhere.
+ * guidance to write a four-digit year. The one exception is a valid explicit `exp:`,
+ * which keeps its place at the top of the D-067 precedence ladder: the line is accepted,
+ * the unrecognised short year stays in the name (it is not a date, so it is not
+ * stripped), and `exp:` supplies the expiry. Nothing was guessed, so nothing needs
+ * correcting. The shared field and shelf-life inference get no such authority.
+ *
+ * The window gates the two-digit SPELLING only: `May 5 2012` is still stored as 2012,
+ * because a typed four-digit year is a statement rather than a shorthand, and there is no
+ * general expiry-age restriction anywhere.
  *
  * Slash dates stay refused at every year width.
  */
@@ -335,45 +341,98 @@ test('3e7. an impossible calendar day is still "not a date", whatever its short 
     }
   });
 
-test('3e8. a rejected short year holds the line back even when exp: is also present',
-  async ({ page }) => {
-    await loadLocalApp(page, { fixedTime: FIXED_2030 });
-    // Same treatment an ambiguous slash date already gets: an actionable line is never
-    // committed, because a line cannot both be kept for correction and already exist.
-    // Letting exp: rescue it would leave "May 5 12" sitting inside the item name.
-    const line = 'Juice 1 L May 5 12 exp:2031-09-01';
-    const r = await bulkAdd(page, line);
-    expect(r.items).toHaveLength(0);
-    expect(r.warnings).toContain('outside the expected food-expiry range');
-    expect(await page.inputValue('#bulk-add-textarea')).toBe(line);
-  });
+// ── 3e8-3e12. exp: is the escape hatch from an implausible short year ──────
+//
+// A rejected short year is actionable ONLY when the line offers no other deliberate
+// expiry. `exp:YYYY-MM-DD` is the strongest, least ambiguous signal the format has, and
+// D-067 already gives it the top of the precedence ladder; a plausibility check on a
+// DIFFERENT part of the line must not demote it. Nothing was guessed on such a line, so
+// there is nothing for the user to correct.
+//
+// The short year is still not accepted as a date, so it is also not stripped: it stays in
+// the name and exp: is the only expiry source. Authority stops there — the shared field
+// and bought-date inference must NOT rescue the line, because they would stamp a date
+// unrelated to the one the user typed, which is invented freshness by a quieter door.
 
-test('3f. a two-digit year naming a day the calendar does not have is rejected',
+test('3e8. no exp: — an implausible short year is attention, not persisted, kept verbatim',
   async ({ page }) => {
     await loadLocalApp(page, { fixedTime: FIXED_2026 });
-    // Same strict round-trip check as the four-digit path: no rollover into March.
-    for (const line of ['Eggs 12 pcs Feb 31 26', 'Eggs 12 pcs 31 Feb 26',
-                        'Eggs 12 pcs Feb 29 26',            // 2026 is not a leap year
-                        'Eggs 12 pcs Aug 32 26', 'Eggs 12 pcs Blah 8 26']) {
-      const it = only(await bulkAdd(page, line));
-      expect(it.expiryDate, line).toBeNull();
-      expect(it.name, line).toBe(line);      // left alone, not nudged to a nearby real day
-    }
-    // ...and the one real leap day at a two-digit year still parses.
-    expect(only(await bulkAdd(page, 'Eggs 12 pcs Feb 29 28')).expiryDate).toBe('2028-02-29');
+    const line = 'Juice May 5 12';
+    const r = await bulkAdd(page, line);
+    expect(r.items).toHaveLength(0);                                   // 2. not persisted
+    expect(r.warnings).toContain('outside the expected food-expiry range');
+    expect(r.warnings).toContain('four-digit year');                   // asks for the fix
+    expect(await page.inputValue('#bulk-add-textarea')).toBe(line);    // 3. exact line kept
   });
 
-test('3g. a slash date is still refused as ambiguous at either year width', async ({ page }) => {
-  await loadLocalApp(page);
-  for (const line of ['Milk 1 L 8/8/26', 'Milk 1 L 08/08/26',
-                      'Milk 1 L 8/8/2026', 'Milk 1 L 08/08/2026']) {
-    const r = await bulkAdd(page, line);
-    expect(r.items, line).toHaveLength(0);
-    expect(r.warnings, line).toContain('ambiguous');
-    // D-068: the exact original line survives in the textarea for correction.
-    expect(await page.inputValue('#bulk-add-textarea'), line).toBe(line);
-  }
+test('3e9. a valid exp: rescues the line, and the short year stays in the name',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+    const it = only(await bulkAdd(page, 'Juice May 5 12 exp:2026-08-08'));
+    expect(it.name).toBe('Juice May 5 12');        // 5. NOT stripped — it is not a date
+    expect(it.expiryDate).toBe('2026-08-08');      // 6. exp: is the only expiry source
+    expect(it.dateMode).toBe('expiry');
+
+    // Nothing was guessed, so nothing is held back and nothing is reported.
+    const r = await bulkAdd(page, 'Juice May 5 12 exp:2026-08-08');
+    expect(r.warnings).toBe('');
+    expect(await page.inputValue('#bulk-add-textarea')).toBe('');
+
+    // The unrecognised date sits in trailing position, so the pre-existing qty/unit
+    // parser finds no "qty unit" at the end and the whole string stays the name. That is
+    // the honest reading: the app was told an expiry and nothing else it could trust.
+    const withQty = only(await bulkAdd(page, 'Juice 1 L May 5 12 exp:2026-08-08'));
+    expect(withQty.name).toBe('Juice 1 L May 5 12');
+    expect(withQty.expiryDate).toBe('2026-08-08');
+  });
+
+test('3e10. the shared expiry field does NOT rescue an implausible short year',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+    const line = 'Juice May 5 12';
+    const r = await bulkAdd(page, line, { shared: '2026-12-25' });
+    expect(r.items).toHaveLength(0);               // 7. still attention, still not added
+    expect(r.warnings).toContain('outside the expected food-expiry range');
+    expect(await page.inputValue('#bulk-add-textarea')).toBe(line);
+
+    // Nor does bought-date inference: the line does not quietly become a shelf-life guess.
+    const noShared = await bulkAdd(page, line);
+    expect(noShared.items).toHaveLength(0);
+    expect(noShared.warnings).not.toContain('Best by');
+  });
+
+test('3e11. an INVALID exp: does not rescue an implausible short year', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
+  // February has no 31st, so the exp: is rejected before the short year is even reached.
+  // The line is still held back and still kept verbatim; the note names the exp:, which
+  // is the first thing the user has to fix. Correcting it to a real date then succeeds.
+  const line = 'Juice May 5 12 exp:2026-02-31';
+  const r = await bulkAdd(page, line);
+  expect(r.items).toHaveLength(0);                 // 9. no rescue, nothing persisted
+  expect(r.warnings).toContain('invalid expiry date');
+  expect(await page.inputValue('#bulk-add-textarea')).toBe(line);
+
+  const fixed = only(await bulkAdd(page, 'Juice May 5 12 exp:2026-03-01'));
+  expect(fixed.name).toBe('Juice May 5 12');
+  expect(fixed.expiryDate).toBe('2026-03-01');
 });
+
+test('3e12. a PLAUSIBLE trailing date plus exp: keeps the D-067 contract exactly',
+  async ({ page }) => {
+    await loadLocalApp(page, { fixedTime: FIXED_2026 });
+    // 8. Unchanged by the rescue rule: a recognised date IS stripped from the name, and
+    // exp: still outranks it as the stored expiry. Both year widths, both shapes.
+    for (const line of ['Eggs 12 pcs Aug 8 26 exp:2026-09-01',
+                        'Eggs 12 pcs Aug 8 2026 exp:2026-09-01',
+                        'Eggs 12 pcs 8 Aug 26 exp:2026-09-01']) {
+      const it = only(await bulkAdd(page, line, { shared: '2026-12-25' }));
+      expect(it.name, line).toBe('Eggs');           // stripped, because it IS a date
+      expect(it.quantity, line).toBe(12);
+      expect(it.unit, line).toBe('pcs');
+      expect(it.expiryDate, line).toBe('2026-09-01');
+      expect(it.dateMode, line).toBe('expiry');
+    }
+  });
 
 // ── 4-7. Precedence ────────────────────────────────────────────────────────
 

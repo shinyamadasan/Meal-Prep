@@ -604,6 +604,35 @@ test('an implausible short year leaves existing stock completely untouched', asy
   expect(r.notes.join(' ')).toContain('outside the expected food-expiry range');
 });
 
+// The exp: escape hatch produces an ordinary record, so it meets the ordinary D-069 rule:
+// a purchase carrying a printed expiry never folds into existing stock, it separates.
+test('an exp:-rescued short-year line follows the normal merge rules', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: FIXED_2026 });
+  await page.evaluate(() => {
+    AppState.pantry = [{ id: 'e_2i', name: 'Juice May 5 12', category: 'Beverages',
+      purchaseDate: todayISO(), shelfLifeDays: 20, storage: 'fridge',
+      quantity: 6, unit: 'pcs', staple: false }];
+    saveData();
+  });
+  // No quantity on the line — the trailing junk blocks the qty/unit parser — so there is
+  // nothing to add and D-069's ordinary skip applies. Stock is left exactly as it was.
+  const skipped = await bulkSubmit(page, 'Juice May 5 12 exp:2026-08-08');
+  expect(skipped.pantry).toHaveLength(1);
+  expect(skipped.pantry[0].quantity).toBe(6);
+  expect(skipped.toast).toBe('1 already in pantry.');
+
+  // With a quantity (comma form, so the name still ends before the short year), the
+  // purchase carries a printed expiry and therefore separates rather than folding in —
+  // the same verdict any other printed-expiry purchase gets.
+  const r = await bulkSubmit(page, 'Juice May 5 12, 2, L exp:2026-08-08');
+  expect(r.pantry).toHaveLength(2);
+  expect(r.pantry.some((p) => p.quantity === 8)).toBe(false);
+  expect(r.pantry.find((p) => p.expiryDate === '2026-08-08')).toMatchObject({ quantity: 2 });
+  expect(await page.evaluate(() =>
+    AppState.pantry.find((p) => p.id === 'e_2i').quantity)).toBe(6);
+  expect(r.toast).toBe('1 item added.');
+});
+
 test('no new top-level AppState collection was introduced', async ({ page }) => {
   await loadLocalApp(page);
   const r = await page.evaluate(() => {

@@ -11617,9 +11617,11 @@ function confirmBulkAdd() {
       line = line.replace(/\s*\bexp:\d{4}-\d{2}-\d{2}\b\s*/i, ' ').trim();
     }
 
-    // Trailing natural date. ALWAYS stripped when recognised, so a date the user typed can
+    // Trailing natural date. ALWAYS stripped when RECOGNISED, so a date the user typed can
     // never end up inside the item name; only USED when the line carries no explicit exp:,
-    // which outranks it. Everything downstream stays the pre-existing qty/unit parser.
+    // which outranks it. A short year outside the plausibility window is not recognised,
+    // so it is neither stripped nor used — see the branch below for what happens instead.
+    // Everything downstream stays the pre-existing qty/unit parser.
     let naturalExpiry = '';
     const trailing = parseTrailingDate(line);
     if (trailing && trailing.iso) {
@@ -11628,13 +11630,25 @@ function confirmBulkAdd() {
     } else if (trailing && trailing.shortYear) {
       // The grammar matched and the calendar agrees, but the two-digit year is not
       // plausible for food. Burying "May 5 12" inside the item name is the exact silent
-      // failure D-067 exists to prevent, so the line is held back for correction instead
-      // — same treatment, and same reason, as an ambiguous slash date below.
-      results.push({ line: originalLine, status: 'attention',
-                     message: `"${originalLine}" — year "${trailing.shortYear}" is outside the ` +
-                              `expected food-expiry range. Use a four-digit year if you mean ` +
-                              `${expandYear(trailing.shortYear)}.` });
-      return;
+      // failure D-067 exists to prevent, so by default the line is held back for
+      // correction — same treatment, and same reason, as an ambiguous slash date below.
+      //
+      // A valid explicit exp: outranks that. It is the strongest, least ambiguous expiry
+      // signal there is and the deliberate escape hatch from parser ambiguity, so a line
+      // carrying one is NOT held back. The short year is still not accepted as a date, so
+      // it is also NOT stripped: it stays part of the name and exp: is the only expiry
+      // source. Nothing was guessed, so nothing needs correcting.
+      //
+      // ONLY exp: has this authority. The shared expiry field and bought-date inference
+      // must not rescue the line — they would put a date on the record that has nothing
+      // to do with the one the user typed, which is invented freshness by a quieter door.
+      if (!perLineExpiry) {
+        results.push({ line: originalLine, status: 'attention',
+                       message: `"${originalLine}" — year "${trailing.shortYear}" is outside the ` +
+                                `expected food-expiry range. Use a four-digit year if you mean ` +
+                                `${expandYear(trailing.shortYear)}.` });
+        return;
+      }
     } else if (looksLikeAmbiguousDate(line)) {
       // Also previously warned and then added the item anyway — with the unparsed date
       // still sitting inside the name. Holding it back is what makes the correction pass
