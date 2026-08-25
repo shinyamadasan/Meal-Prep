@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForRestored } = require('./app-ready');
 
 /**
  * Regression: editing a recipe must not silently drop properties the form
@@ -161,12 +162,10 @@ test('preserved properties survive a save and reload', async ({ page }) => {
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   // Wait for the RESTORED recipe specifically. A fixed wait could read mid-init, when the
-  // list is empty or freshly re-seeded, and report the edit as lost.
-  await page.waitForFunction(
-    () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&
-          AppState.recipes.some((x) => String(x.id) === 'rich-1'),
-    null, { timeout: 30000 });
-  await page.waitForTimeout(300);
+  // list is empty or freshly re-seeded, and report the edit as lost. Identity only — the
+  // rename is the behaviour under test, so a lost edit stays a readable diff below.
+  await waitForRestored(page, () =>
+    AppState.recipes.some((x) => String(x.id) === 'rich-1'));
 
   const after = await page.evaluate(() => {
     const r = AppState.recipes.find((x) => String(x.id) === 'rich-1');

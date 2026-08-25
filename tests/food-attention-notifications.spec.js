@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Food Attention Notifications wave.
@@ -379,7 +379,13 @@ test('the dedup ledger survives a reload', async ({ page }) => {
   expect(await page.evaluate(() => window.__notifications.length)).toBe(1);
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // Both halves this test reads back out of storage: the pantry record that drives the
+  // decision, and the ledger entry that must suppress a second announcement. The
+  // assertion below is about ABSENCE (no notification), which can never be waited for —
+  // so the wait has to pin the state that absence is meaningful against.
+  await waitForRestored(page, () =>
+    AppState.pantry.some((p) => p.id === 1) &&
+    (loadFoodAlertPrefs().announced || {})['pantry:1'] === 'expired');
   // Second open: same unchanged food, silence.
   expect(await page.evaluate(() => window.__notifications.length)).toBe(0);
   expect(await page.evaluate(() => loadFoodAlertPrefs().announced['pantry:1'])).toBe('expired');

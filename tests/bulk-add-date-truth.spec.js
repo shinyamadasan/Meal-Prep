@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { waitForAppReady } = require('./app-ready');
+const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
  * Bulk Add date truth — the same Kitchen Truth failure D-066 fixed on quick-add.
@@ -622,7 +622,10 @@ test('12. structured fields survive a save and reload', async ({ page }) => {
   await page.evaluate(() => saveData());
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForAppReady(page);
+  // The record's IDENTITY, not its fields: a pantry row restores atomically out of one
+  // JSON.parse, so "eggs is back" is enough to prove restoration — and leaving the field
+  // checks to the assertions keeps a real persistence bug a readable diff, not a timeout.
+  await waitForRestored(page, () => AppState.pantry.some((p) => p.name === 'eggs'));
 
   const rec = await page.evaluate(() => AppState.pantry.find((p) => p.name === 'eggs'));
   expect(rec).toBeTruthy();
@@ -642,7 +645,7 @@ test('12b. a two-digit-year record survives save and reload as the canonical ISO
     const stored = await page.evaluate(() =>
       JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForAppReady(page);
+    await waitForRestored(page, () => AppState.pantry.some((p) => p.name === 'Eggs'));
 
     const rec = await page.evaluate(() => AppState.pantry.find((p) => p.name === 'Eggs'));
     expect(rec).toBeTruthy();

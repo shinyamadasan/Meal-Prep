@@ -21,9 +21,15 @@ const { pathToFileURL } = require('url');
 
 async function loadLocalApp(page) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  // addInitScript runs on EVERY navigation, reloads included. Guard the clear so a reload
+  // exercises what the previous page persisted instead of a fresh seed — every sibling
+  // spec already does this, and without it any future reload-persistence test added here
+  // would silently pass from re-seeding rather than from restoration.
   await page.addInitScript(() => {
     try {
+      if (localStorage.getItem('__cookMethodBootstrapped')) return;
       localStorage.clear();
+      localStorage.setItem('__cookMethodBootstrapped', '1');
       localStorage.setItem('mealPrepHelpSeen', '1');
       localStorage.setItem('mealPrepStartDone', '1');
       localStorage.setItem('pantryOnboardingDone', '1');

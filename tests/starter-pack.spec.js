@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const { waitForRestored } = require('./app-ready');
 
 /**
  * Low-effort starter pack — opt-in, additive delivery for EXISTING installs.
@@ -203,7 +204,12 @@ test('the added recipes persist through the normal save path', async ({ page }) 
 
   // Survives a reload with no duplication.
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await settled(page);
+  // settled() fires on ANY non-empty recipe list; the restored document is only proven
+  // once every id the previous page saved is back. The assertion still owns the exact
+  // set and the no-duplication claim.
+  await waitForRestored(page, (want) =>
+    want.every((id) => AppState.recipes.some((r) => String(r.id) === id)),
+    ORIGINAL_IDS.concat(PACK_IDS).map(String));
   expect(await ids(page)).toEqual(ORIGINAL_IDS.concat(PACK_IDS).map(String));
   expect(await promptText(page)).toBeNull();
 });
