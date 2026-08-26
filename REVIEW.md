@@ -4,6 +4,50 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review D-070 — APPROVED AND LANDED (Flavor Library wave)
+branch: wave-flavor-library @ 54099ce → main @ b219e20 (`--no-ff`, unrebased)
+verdict: approved and landed after independent audit
+date: 2026-08-26
+
+### Findings
+The Flavor Library implementation matches D-070's intended shape: `AppState.flavors` is a real
+top-level synced collection, every inbound flavor id is normalized into the `flv-` namespace, old
+local/cloud/import data without `flavors` loads as an empty collection, and normalization does not
+invent `updatedAt` values that could beat tombstones.
+
+Persistence coverage was complete across localStorage, backup/restore, import/export,
+Firestore payloads, conflict merge, sign-in union, realtime snapshots, Clear All Data, and
+local-deletion detection through `TOMBSTONE_KEYS`. Flavor deletion uses the existing `saveData()`
+path and the shared deletion-detection flow rather than writing a one-off tombstone.
+
+The deferred boundaries held. Ready Food has no "Try with" integration, Meal Lego is not present,
+manual cooked-meal names are not protein-classified from free text, and no protein inference layer
+was introduced. D-071 remains open exactly as recorded: the flat cross-collection tombstone bug was
+characterized, not fixed.
+
+### Verification
+Pre-merge local verification passed: targeted Flavor Library Playwright spec 47/47, local suite
+382/382, full `npm test` 382/382, suite-classification 6/6, and `tools/Verify-Decisions.ps1`
+reported all decision pointers valid.
+
+Landing verification recorded the first push-triggered CI result as-is. Run `32983219373`
+(`Button tests`, event `push`, SHA `b219e202eb8b5a1e6208aa1638b3ec59e58ce911`) failed in the
+local branch gate: `tests/inventory-quantity-truth.spec.js` timed out in `waitForRestored()` after
+381 tests had passed. The workflow's Pages wait and production smoke steps were skipped by that
+failure, and no `workflow_dispatch` verification was run.
+
+GitHub Pages itself deployed the pushed SHA successfully in run `32983147959`
+(`pages-build-deployment`, SHA `b219e202eb8b5a1e6208aa1638b3ec59e58ce911`). The served
+`index.html`, `app.js`, and `style.css` from `https://shinyamadasan.github.io/Meal-Prep/` match the
+landed files after line-ending normalization and include the Flavor Library anchors.
+
+### Carried forward
+- D-071 stays open: `AppState.deletions` is still a flat cross-collection id map.
+- Ready Food → "Try with" and Meal Lego remain deferred.
+- `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+→ no TASKS.md status change; this was a landing/review wave, not a numbered Codex task.
+
 ## Review TASK-056 — APPROVED (reload-state harness audit, D-065 addendum 2) — D-032 `done`, operator-approved
 branch: fix/reload-restore-audit @ ac64da8 → main @ 92dbdea (`--no-ff`, unrebased)
 verdict: approved — test/harness infrastructure only; product source byte-unchanged

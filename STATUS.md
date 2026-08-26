@@ -5,6 +5,33 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-26 — Flavor Library wave landed (D-070) with first push CI recorded red
+
+`wave-flavor-library` @ `54099ce` was independently reviewed and merged `--no-ff` into `main` at
+`b219e20`, then pushed to `origin/main`. `wave1-portion-truth` remains parked at `88b5598`,
+untouched.
+
+The audit passed before landing: Flavor Library is a real synced `AppState.flavors` collection,
+uses `flv-` ids, persists through the established localStorage/import/export/Firestore/realtime
+paths, and does not auto-seed starter flavors. Old data without `flavors` loads empty. Flavor
+normalization does not stamp `updatedAt`.
+
+Deliberately still open: **D-071** (flat cross-collection deletion tombstones). Also still deferred:
+Ready Food → "Try with", Meal Lego, and free-text protein inference for cooked meals.
+
+Pre-merge verification was green locally: Flavor Library spec 47/47, local suite 382/382, full
+`npm test` 382/382, suite-classification 6/6, and `Verify-Decisions.ps1` all passed.
+
+First push-triggered CI was recorded as-is, and it failed: run `32983219373`, workflow
+`Button tests`, event `push`, SHA `b219e202eb8b5a1e6208aa1638b3ec59e58ce911`. The local suite
+reported 381 passed and one timeout in `tests/inventory-quantity-truth.spec.js` at
+`waitForRestored()`; workflow Pages wait and production smokes were skipped. No `workflow_dispatch`
+run was started because the push-triggered run did not succeed.
+
+GitHub Pages deployment succeeded separately for the same SHA in run `32983147959`. Served
+`index.html`, `app.js`, and `style.css` at `https://shinyamadasan.github.io/Meal-Prep/` match
+landed `main` after line-ending normalization and include the Flavor Library anchors.
+
 ## 2026-08-25 — Reload-state harness audit landed (TASK-056, D-065 addendum 2) — the tail of a proven class is not optional
 
 `fix/reload-restore-audit` → `main` (`92dbdea`, `--no-ff`, unrebased). One commit, `ac64da8`,

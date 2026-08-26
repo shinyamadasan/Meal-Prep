@@ -5,6 +5,26 @@
 
 ---
 
+## D-070 — landed (branch: wave-flavor-library)
+changed:
+  - app.js (Flavor Library model, CRUD, persistence registration, starter prompt, and UI render
+    flow)
+  - index.html (Flavor Library tab, controls, list mount, and edit modal)
+  - style.css (Flavor Library tab/list/modal styling)
+  - docs/ARCHITECTURE.md; docs/DATA_MODEL.md; docs/DECISIONS.md; docs/FEATURES.md;
+    planning/ROADMAP.md (Flavor Library and D-071 records)
+  - tests/flavor-library.spec.js; tests/kitchen-truth.spec.js (Flavor Library coverage and suite
+    inventory)
+tests: pre-merge local verification passed: `tests/flavor-library.spec.js` 47/47,
+  `npm run test:local` 382/382, `npm test` 382/382, suite-classification 6/6,
+  `tools/Verify-Decisions.ps1` passed
+blockers: first push-triggered CI run `32983219373` failed as recorded: local suite 381 passed,
+  one timeout in `tests/inventory-quantity-truth.spec.js` at `waitForRestored()`;
+  `workflow_dispatch` skipped because the push-triggered run did not succeed
+deviations: no TASKS.md status change; D-071 remains open; Ready Food → "Try with" and Meal Lego
+  remain deferred; `wave1-portion-truth` remains untouched at `88b5598`
+→ merged `--no-ff` to `main` at `b219e20` and pushed to `origin/main`
+
 ## TASK-040 — approved, held for /merge (branch: task-040)
 changed:
   - tests/buttons-functional.spec.js (the "Clear All empties the list" test now clicks

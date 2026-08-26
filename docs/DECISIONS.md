@@ -1955,6 +1955,22 @@ Verify: app.js contains "const defaultFlavors"
 Verify: app.js contains "'customHacks', 'flavors', 'cookedMeals'"
 Verify: tests/flavor-library.spec.js contains "MUTATION: removing flavors from TOMBSTONE_KEYS"
 
+### Landing addendum — 2026-08-26
+
+Reviewed independently at `wave-flavor-library` @ `54099ce` and landed by no-ff merge to
+`main` @ `b219e20`, then pushed to `origin/main`. The review did not change the feature scope.
+
+Landing evidence: pre-merge local verification passed (`tests/flavor-library.spec.js` 47/47,
+local suite 382/382, full `npm test` 382/382, suite-classification 6/6, decision verification
+passed). The first push-triggered CI run was recorded as-is and failed in the local branch gate
+after 381 passed tests, with one timeout in `tests/inventory-quantity-truth.spec.js` at
+`waitForRestored()`; therefore no `workflow_dispatch` verification was run. GitHub Pages deployed
+the pushed SHA successfully, and served `index.html`, `app.js`, and `style.css` match landed `main`
+after line-ending normalization.
+
+D-071 remains open. Ready Food → "Try with", Meal Lego, and free-text protein inference remain
+deferred.
+
 ---
 
 ## D-071 — KNOWN PRE-EXISTING RED-ZONE BUG: `AppState.deletions` is a flat cross-collection id map

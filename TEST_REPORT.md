@@ -5,6 +5,21 @@
 
 ---
 
+## D-070 landing · 2026-08-26
+suite: pre-merge local review checks; first push-triggered GitHub Actions run; GitHub Pages deploy
+  and served-asset comparison
+result: pre-merge local checks passed: `npx playwright test tests/flavor-library.spec.js --project=local --reporter=list`
+  47/47, `npm run test:local` 382/382, `npm test` 382/382, suite-classification 6/6, and
+  `tools/Verify-Decisions.ps1` passed. First push-triggered run `32983219373` (`Button tests`,
+  event `push`, SHA `b219e202eb8b5a1e6208aa1638b3ec59e58ce911`) failed: local suite reported
+  381 passed and one timeout in `tests/inventory-quantity-truth.spec.js` at `waitForRestored()`;
+  Pages-wait and production-smoke workflow steps were skipped. GitHub Pages deployment run
+  `32983147959` succeeded for the same SHA. Served `index.html`, `app.js`, and `style.css` from
+  `https://shinyamadasan.github.io/Meal-Prep/` match landed `main` after line-ending normalization.
+untested: `workflow_dispatch` verification was not run because the first push-triggered run did not
+  succeed; D-071, Ready Food → "Try with", Meal Lego, and free-text protein inference remain
+  deliberately deferred.
+
 ## TASK-040 · 2026-07-23
 suite: `npx playwright test tests/buttons-functional.spec.js -g "Clear All empties" --reporter=list
   --workers=1 --timeout=60000`; full suite `npx playwright test --reporter=list --workers=1
