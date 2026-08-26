@@ -1061,6 +1061,22 @@
                         <label class="form-label">Stored on</label>
                         <input type="date" id="manual-cooked-date" class="form-control">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Protein <span style="color:var(--text-secondary);font-weight:400">(optional)</span></label>
+                        <select id="manual-cooked-protein" class="form-control">
+                            <option value="">Unknown</option>
+                            <option value="chicken">Chicken</option>
+                            <option value="pork">Pork</option>
+                            <option value="beef">Beef</option>
+                            <option value="fish">Fish</option>
+                            <option value="salmon">Salmon</option>
+                            <option value="tuna">Tuna</option>
+                            <option value="shrimp">Shrimp</option>
+                            <option value="egg">Egg</option>
+                            <option value="tofu">Tofu</option>
+                            <option value="none">No protein (meatless)</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -1083,7 +1099,7 @@
                         <input type="number" id="manual-cooked-freezer-life" class="form-control" min="0" step="1" value="90">
                     </div>
                 </div>
-                <p style="margin:0;color:var(--text-secondary);font-size:0.875rem">This only tracks storage freshness. It will not deduct pantry ingredients. Portions are optional — leave blank to skip counting.</p>
+                <p style="margin:0;color:var(--text-secondary);font-size:0.875rem">This only tracks storage freshness. It will not deduct pantry ingredients. Portions are optional — leave blank to skip counting. Protein is optional too — it is only used to match flavours later, and the meal name is never read to guess it.</p>
             </div>
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closeManualCookedModal()">Cancel</button>
