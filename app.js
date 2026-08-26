@@ -11491,6 +11491,8 @@ function openManualCookedModal() {
   if (freezerEl) freezerEl.value = '90';
   var portionsEl = document.getElementById('manual-cooked-portions');
   if (portionsEl) portionsEl.value = ''; // blank = untracked, the pre-wave behaviour
+  var proteinEl = document.getElementById('manual-cooked-protein');
+  if (proteinEl) proteinEl.value = ''; // blank = unknown; never pre-guessed
   modal.classList.remove('hidden');
   if (nameEl) setTimeout(function() { nameEl.focus(); }, 50);
 }
@@ -11526,6 +11528,11 @@ function saveManualCookedMeal() {
   var portionsEl = document.getElementById('manual-cooked-portions');
   var portions = portionCountOrNull(portionsEl ? portionsEl.value : null, 1);
 
+  // Optional. Blank means unknown, and unknown is left off the record entirely —
+  // the name is NOT consulted to fill it in.
+  var proteinEl = document.getElementById('manual-cooked-protein');
+  var protein = proteinEl && isCookedProteinChoice(proteinEl.value) ? proteinEl.value : null;
+
   var meal = normalizeCookedMeal({
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     recipeId: null,
@@ -11538,6 +11545,7 @@ function saveManualCookedMeal() {
     initialPortions: portions,
     portionsRemaining: portions
   });
+  if (protein) meal.proteinType = protein;
   stampUpdated(meal);
 
   AppState.cookedMeals = AppState.cookedMeals || [];
@@ -11576,6 +11584,186 @@ function portionCountOrNull(value, min) {
   return n;
 }
 
+// ── Ready-food protein identity ──────────────────────────────────────────────
+// Groundwork for pairing ready food with Flavor Library entries. This wave gives
+// cooked food a truthful protein identity; it does NOT recommend anything yet.
+//
+// THE ONE RULE: a cooked meal's NAME IS NEVER READ. "Landers Lechon Manok" and
+// "Chicken of the Sea" are product names, not ingredient declarations, and a
+// substring reading of either is wrong in a way the user cannot see or correct.
+// Identity comes from explicit user choice or from structured recipe ingredients,
+// and from nowhere else. Unknown is a first-class answer, not a failure.
+//
+// Vocabulary is REUSED from FLAVOR_PROTEINS rather than forked, so a cooked meal's
+// proteinType and a flavor's worksWith[] speak the same ids and the Meal Lego join
+// is a direct lookup instead of a translation table that can drift.
+
+// Which FLAVOR_PROTEINS ids can describe a cooked batch. 'vegetables' and 'rice'
+// are deliberately excluded: they are things a flavor goes WITH, not protein
+// identities, and answering "what protein is this?" with "rice" is a category error.
+var COOKED_PROTEIN_IDS = ['chicken', 'pork', 'beef', 'fish', 'salmon', 'tuna', 'shrimp', 'egg', 'tofu'];
+
+// Non-family outcomes. Kept out of COOKED_PROTEIN_IDS because they never join to a
+// flavor's worksWith[] — they are statements about our certainty, not about food.
+var COOKED_PROTEIN_NONE = 'none';       // ingredients are known AND contain no protein
+var COOKED_PROTEIN_MIXED = 'mixed';     // two or more distinct families, no single answer
+var COOKED_PROTEIN_UNKNOWN = 'unknown'; // we do not know, and will not pretend
+
+// What a user may explicitly store on a batch: a real family, or "no protein".
+// 'mixed' and 'unknown' are never STORED — 'mixed' is something only ingredients can
+// tell us, and 'unknown' is the absence of a value, not a value.
+var COOKED_PROTEIN_CHOICES = COOKED_PROTEIN_IDS.map(function(id) {
+  return { id: id, label: FLAVOR_PROTEIN_BY_ID[id].label };
+}).concat([{ id: COOKED_PROTEIN_NONE, label: 'No protein (meatless)' }]);
+
+var COOKED_PROTEIN_CHOICE_IDS = COOKED_PROTEIN_CHOICES.map(function(c) { return c.id; });
+
+// EXACT ingredient name -> protein family. A curated table, matched by full
+// case-insensitive equality only — never `includes`, never a prefix, never an alias.
+// Exact-name lookup against a curated list is what the rest of the app already does
+// with INGREDIENT_DB (see ingredientShelfLife(), findIngredientPrice()); substring
+// matching is what this wave exists to avoid.
+//
+// Every INGREDIENT_DB entry with category 'Protein' is listed here EXCEPT the ones
+// whose family genuinely cannot be stated:
+//   Longganisa, Hotdog  — processed sausages sold in pork, chicken and beef versions
+//   Squid, Crab, Mussels, Clams — shellfish/cephalopods, and FLAVOR_PROTEINS has no
+//                                 id for them ('shrimp' is the only one represented)
+// Those stay unmapped ON PURPOSE. An unmapped ingredient that a recipe declares as
+// Protein forces the whole recipe to `unknown` (see recipeProteinType), which is the
+// honest outcome: we read an ingredient we could not identify.
+//
+// The three names carrying a "(recipe)" note are not in INGREDIENT_DB but ARE used by
+// seeded recipes, so they are curated here by exact name for the same reason.
+var PROTEIN_FAMILY_BY_INGREDIENT = {
+  // chicken
+  'chicken breast': 'chicken',
+  'chicken thigh': 'chicken',
+  'chicken leg': 'chicken',
+  'ground chicken': 'chicken',
+  'whole chicken': 'chicken',
+  'lechon manok (ready-roasted)': 'chicken',   // (recipe) — curated exact name, not parsed
+  // pork
+  'pork belly (liempo)': 'pork',
+  'ground pork': 'pork',
+  'pork chop': 'pork',
+  'pork ribs': 'pork',
+  'pork shoulder': 'pork',
+  'pork shoulder (kasim)': 'pork',             // (recipe)
+  'pork liver': 'pork',
+  'bacon': 'pork',
+  'ham': 'pork',
+  // beef
+  'beef': 'beef',
+  'ground beef': 'beef',
+  'beef brisket': 'beef',
+  'beef sirloin': 'beef',
+  'beef shank': 'beef',                        // (recipe)
+  'corned beef (canned)': 'beef',
+  // fish (finfish with no more specific FLAVOR_PROTEINS id)
+  'bangus (milkfish)': 'fish',
+  'tilapia': 'fish',
+  'galunggong': 'fish',
+  'sardines (canned)': 'fish',
+  // fish with their own id
+  'salmon': 'salmon',
+  'tuna': 'tuna',
+  'tuna (canned)': 'tuna',
+  // other
+  'shrimp': 'shrimp',
+  'eggs': 'egg',
+  'tofu (tokwa)': 'tofu'
+};
+
+function proteinFamilyForIngredientName(name) {
+  if (name == null) return null;
+  var key = String(name).toLowerCase().trim();
+  return Object.prototype.hasOwnProperty.call(PROTEIN_FAMILY_BY_INGREDIENT, key)
+    ? PROTEIN_FAMILY_BY_INGREDIENT[key]
+    : null;
+}
+
+// Is this a value a user is allowed to have stored on a batch?
+function isCookedProteinChoice(value) {
+  return value != null && COOKED_PROTEIN_CHOICE_IDS.indexOf(String(value)) >= 0;
+}
+
+// Deterministic protein identity of a RECIPE, from its structured ingredients only.
+//
+//   no ingredient list at all      -> unknown  (we know nothing, not "no protein")
+//   any Protein-category ingredient we cannot identify -> unknown
+//   zero protein ingredients        -> none     (ingredients are known and meatless)
+//   exactly one distinct family     -> that family
+//   two or more distinct families   -> mixed
+//
+// Deliberately NOT done: weighting by quantity, or demoting egg as "probably a side".
+// Tapsilog is Beef Sirloin + Eggs and returns `mixed`; calling it beef would require a
+// rule that egg is decorative, which is a guess dressed as logic. `mixed` is true.
+function recipeProteinType(recipe) {
+  if (!recipe) return COOKED_PROTEIN_UNKNOWN;
+  var ingredients = recipe.baseIngredients || recipe.ingredients;
+  if (!Array.isArray(ingredients) || !ingredients.length) return COOKED_PROTEIN_UNKNOWN;
+
+  var families = [];
+  var sawUnidentifiedProtein = false;
+
+  ingredients.forEach(function(ing) {
+    if (!ing) return;
+    var family = proteinFamilyForIngredientName(ing.name);
+    if (family) {
+      if (families.indexOf(family) < 0) families.push(family);
+      return;
+    }
+    // Declared a protein by the recipe, but not one we can name. Read, not ignored.
+    if (String(ing.category || '').toLowerCase() === 'protein') sawUnidentifiedProtein = true;
+  });
+
+  if (sawUnidentifiedProtein) return COOKED_PROTEIN_UNKNOWN;
+  if (!families.length) return COOKED_PROTEIN_NONE;
+  if (families.length === 1) return families[0];
+  return COOKED_PROTEIN_MIXED;
+}
+
+// THE helper Meal Lego will consume. Precedence, highest first:
+//   1. what the user explicitly said about THIS batch
+//   2. what the batch's recipe deterministically says
+//   3. unknown
+// There is no step 4. The meal's name is never consulted at any step.
+//
+// Recipe-derived identity is DERIVED, never copied onto the batch. That follows
+// readyFoodBalanceHint(), which reads recipe.mealBalance live for the same reason:
+// storing it would duplicate a truth that already exists and then let the copy rot
+// when the recipe is edited. The tradeoff is stated in the wave notes — editing a
+// recipe retroactively changes what last week's leftovers report, and a deleted
+// recipe drops them to unknown. A user who cares can pin the batch explicitly,
+// which is exactly what precedence 1 is for.
+function getCookedMealProteinType(meal) {
+  if (!meal) return COOKED_PROTEIN_UNKNOWN;
+
+  if (isCookedProteinChoice(meal.proteinType)) return String(meal.proteinType);
+
+  if (meal.recipeId != null) {
+    var recipe = (AppState.recipes || []).find(function(r) {
+      return r && String(r.id) === String(meal.recipeId);
+    });
+    if (recipe) return recipeProteinType(recipe);   // deleted recipe -> falls through
+  }
+
+  return COOKED_PROTEIN_UNKNOWN;
+}
+
+// Groundwork only — NOTHING renders this yet. Proves a flavor's worksWith[] can be
+// joined to a cooked batch's identity by direct id lookup, with no translation.
+// Returns [] for unknown / mixed / none: a non-answer must produce no suggestions
+// rather than a guess. How to pair a `mixed` batch is Meal Lego's decision, not this
+// wave's, so it deliberately returns nothing instead of inventing a rule now.
+function flavorsForProteinType(proteinType) {
+  if (COOKED_PROTEIN_IDS.indexOf(String(proteinType)) < 0) return [];
+  return (AppState.flavors || []).filter(function(f) {
+    return f && Array.isArray(f.worksWith) && f.worksWith.indexOf(String(proteinType)) >= 0;
+  });
+}
+
 // Idempotent. Only ever repairs an incoherent pair; never invents portions for a
 // batch that has none, so records saved before this wave stay untracked.
 function normalizeCookedMeal(meal) {
@@ -11596,6 +11784,13 @@ function normalizeCookedMeal(meal) {
 
   meal.initialPortions = initial;
   meal.portionsRemaining = remaining;
+
+  // Optional and additive. An absent field stays absent — records saved before this
+  // wave are left exactly as they were, and nothing is inferred to fill the gap.
+  // A value we do not recognise (hand-edited, or from a newer client) is dropped
+  // rather than trusted, which returns the batch to `unknown`.
+  if (meal.proteinType != null && !isCookedProteinChoice(meal.proteinType)) delete meal.proteinType;
+
   return meal;
 }
 
