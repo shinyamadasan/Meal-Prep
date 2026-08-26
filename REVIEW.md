@@ -4,6 +4,114 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-057 / D-071 — PASS → D-032 `approved` (HELD) → OWNER-AUTHORIZED FOR LANDING
+branch: d-071-tombstone-namespace @ f73ce3c (base `main @ 98cf393`) — held, then released by the owner
+verdict: **PASS** — no P0, P1 or P2 findings remaining
+date: 2026-08-26
+
+### Verdict
+Independent review of collection-aware deletion tombstones. Two commits were reviewed:
+- **`1f443ac`** — original implementation candidate ("fix: namespace deletion tombstones")
+- **`f73ce3c`** — repair ("fix: restore aggregate tombstone guard"), the final branch HEAD
+
+The first review pass did **not** pass. It found an **aggregate `MASS_DELETE_GUARD` regression**:
+namespacing the tombstone map had also split the mass-delete safety check per collection, so a
+small collection could fall through the guard while the larger collections were correctly
+suppressing a transient-empty startup/sync race. That is exactly the phantom-mass-delete class the
+guard exists to stop. It was repaired in `f73ce3c`, which restores aggregate semantics —
+`recordLocalDeletions()` now sums vanished ids across every `TOMBSTONE_KEYS` collection into
+`totalVanished` and compares that single total against `MASS_DELETE_GUARD` before writing any
+tombstone. A **signed-out load side effect** introduced alongside the original candidate was also
+removed. Both fixes are present at `f73ce3c` and re-reviewed clean.
+
+The **collection-aware tombstone architecture passes**. `AppState.deletions` is now the nested
+collection-keyed shape pinned by the task, not the flat global id map. A tombstone written for
+recipe `5` can no longer reach cooking-hack `5`, pantry item `5`, custom ingredient `5`, cooked
+meal `5` or user ingredient `5`. Every writer, reader, merge path and purge path named in the
+Phase 1 characterization was checked and is collection-aware. The deterministic cross-collection
+deletion bug that motivated D-071 is closed at the architectural level.
+
+### The migration is knowingly lossy — accepted
+Legacy flat tombstones carry no collection identity, and nothing persisted anywhere can recover
+it (`_idBaseline` is in-memory only). **Ambiguous legacy tombstones are therefore deliberately
+dropped** rather than fanned out across all collections — fanning out would reproduce the exact
+data-loss bug D-071 exists to end.
+
+The consequence is recorded and accepted: **some historical ambiguous deletes may become
+resurrectable from a stale remote copy.** An old delete whose tombstone was dropped can come back
+if a device still holding the record syncs in. **This is the accepted trade for ending
+deterministic cross-collection deletion.** A resurrected item is a visible, user-correctable
+annoyance; silent destruction of five unrelated records is neither. The task brief stated the
+migration could not be lossless and forbade pretending otherwise; the implementation does not
+pretend otherwise.
+
+**Old clients preserve but do not honor nested tombstones.** A client running pre-D-071 code
+round-trips the nested `deletions` object through localStorage and Firestore without discarding it,
+but does not apply it — so deletions made on a new client will not take effect on an old one until
+that client updates. Preservation without honoring is the correct failure mode here: the data
+survives the round trip, so the deletion applies as soon as the old client upgrades.
+
+### Residual P3 observations (recorded, not blocking)
+1. The aggregate guard now sums **per-collection** disappearances. The same raw id vanishing from
+   two collections counts twice, where the old flat map counted one distinct global id. This is
+   **slightly stricter** than the previous behavior and **fails safer** — it suppresses marginally
+   more, never less. Correct direction for a data-loss guard.
+2. **More than 5 genuine vanish-diff deletes can still be suppressed indefinitely** by
+   `MASS_DELETE_GUARD`. A user deleting six or more items in one save gets no tombstones and the
+   baseline is intentionally left unchanged. This is **inherited base behavior, not introduced by
+   D-071** — the guard predates this task and its threshold was not in scope. Worth a future
+   decision; not a reason to hold this branch.
+3. **Production-smoke changes cannot be validated until deployed.** The three
+   `tests/production-smoke-*.spec.js` files were updated for the nested shape but exercise the
+   live Pages deployment, so they prove nothing while the branch is unmerged. They are a
+   post-landing verification step, not pre-landing evidence.
+
+### The gate
+D-032 **RED ZONE → `approved` (HELD)**. This is tombstone-merge-deletion machinery, a wire-format
+change, and an admitted lossy migration — the precise surface CLAUDE.md's risk-gated merge policy
+holds back. `TASKS.md` TASK-057 is set to **`approved`, not `done`**: no auto-merge, no deploy.
+
+**Owner authorization is required before merge.** The branch is not merged, not pushed, and stays
+at `f73ce3c`. `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+### Not yet done — deliberately deferred to landing
+D-071 is **not** closed out. `docs/DECISIONS.md`, `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`,
+`planning/ROADMAP.md` Known Issues and `planning/DONE.md` are **unchanged** and stay that way until
+the branch actually lands and is deployed. Recording a decision as closed before it ships would
+make the docs lie about production.
+
+→ `TASKS.md` TASK-057 set to `status: approved`. Held for owner.
+
+### Owner authorization — GRANTED, 2026-08-26
+The HELD gate above is **explicitly released by the owner.** Recorded on `main` in its own commit
+**before** the merge, per the D-040 audit convention (`/merge` reads `TASKS.md` from `main`, not the
+branch, so landing records never ride inside the reviewed branch's commits).
+
+What the owner is authorizing, stated plainly:
+
+- **TASK-057 review passed** — independent review, no P0, P1 or P2 findings remaining.
+- **D-032 gate was `approved` (HELD)** — red zone: tombstone-merge-deletion machinery, a wire-format
+  change, and a knowingly lossy migration. It did not auto-merge and was not pushed on any agent's
+  judgement.
+- **The owner has now explicitly authorized the merge and push.**
+- **Reviewed implementation SHAs: `1f443ac` (original) and `f73ce3c` (repair).** `f73ce3c` is the
+  final reviewed branch HEAD and the tree that lands. Neither commit is rebased, squashed or amended.
+- **The migration deliberately DROPS ambiguous historical flat tombstones.** A legacy flat key with
+  no collection-exclusive prefix (bare numerics, timestamps, imported ids) carries no recoverable
+  collection identity, so it is discarded rather than applied to every collection.
+- **Consequence, accepted with eyes open: some historical ambiguous deletes may become resurrectable
+  from stale remote data.** A device still holding such a record can sync it back after its
+  tombstone is dropped.
+- **This is the accepted tradeoff for stopping deterministic cross-collection deletion.** A
+  resurrected item is visible and user-correctable; the silent destruction of five unrelated records
+  sharing an id is neither, and it was reproducible on `main @ 98cf393` before this work.
+
+TASK-057 is **NOT** marked `done` by this record. It stays `approved` through the merge and is only
+set to `done` after the push, the first CI run, GitHub Pages deployment verification and the
+production-smoke suite all pass against the deployed build. D-071 likewise stays open in
+`docs/DECISIONS.md` until production verification succeeds — recording a decision as closed before
+it demonstrably ships would make the docs lie about production.
+
 ## Review D-070 — APPROVED AND LANDED (Flavor Library wave)
 branch: wave-flavor-library @ 54099ce → main @ b219e20 (`--no-ff`, unrebased)
 verdict: approved and landed after independent audit
