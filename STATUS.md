@@ -5,6 +5,73 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-26 — D-071 landed: deletion tombstones are collection-aware, verified in production
+
+`d-071-tombstone-namespace` @ `f73ce3c` was independently reviewed, held under D-032, explicitly
+authorized by the owner, and merged `--no-ff` into `main` at `bd89d5d`, then pushed to
+`origin/main`. The owner authorization was recorded on `main` in its own commit `6e28903` **before**
+the merge, per the D-040 convention. `wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+**What shipped.** `AppState.deletions` changed from one flat `{ [rawId]: deletedAtISO }` map — which
+`applyTombstones()` consulted against every key in `TOMBSTONE_KEYS` — to a collection-keyed map with
+one namespace per collection. Deleting recipe `5` used to also destroy hack `5`, pantry item `5`,
+custom ingredient `5`, cooked meal `5` and user ingredient `5`, on this device and every synced one;
+seeded recipe ids `1-40` overlap default-hack ids `1-14` completely, so the collision was live.
+Reviewed commits `1f443ac` (implementation) and `f73ce3c` (repair) landed unrebased and unamended.
+
+**Review did not pass on the first candidate.** `1f443ac` namespaced the map correctly but, in the
+same motion, split `MASS_DELETE_GUARD` per collection — reopening the phantom-mass-delete class the
+guard exists to stop. On an identical transient-empty fixture, base `98cf393` wrote nothing while
+the candidate wrote real tombstones for all three flavors, both cooked meals and the user
+ingredient. The suite was 401/401 green throughout; no test covered a multi-collection race.
+`f73ce3c` restored aggregate semantics (`totalVanished` summed across collections, compared once,
+`_idBaseline` untouched on a trip, constant still `5`) and removed a signed-out `loadFromLocalStorage()`
+side effect that was also out of D-071 scope. Both invariants are now negative-proofed by mutating
+**production** code, not simulations.
+
+**Migration is knowingly lossy.** Collection-exclusive prefixes migrate (`flv-`, `cm_`, `ui_`,
+`buy_`/`ib_`/`staple_`); ambiguous numerics/timestamps/imported ids are dropped, counted and warned
+once, with no `_legacy` bucket and no global fallback. Accepted consequence: **some historical
+ambiguous deletes may resurrect from stale remote copies** — preferable to continuing deterministic
+cross-collection destruction.
+
+Local verification on merged `main` was green: `npm test` and `npm run test:local` 404/404, focused
+deletion/sync specs 154/154, suite-classification green, `Verify-Decisions.ps1` 41/41,
+`git diff --check` clean.
+
+**First push-triggered CI was recorded as-is, and it failed:** run `33000618114` attempt 1, workflow
+`Button tests`, event `push`, SHA `bd89d5d0715d386a645e90b983699d80ae470ac7`. Local gate reported
+401 passed with three `waitForRestored()` timeouts (`bulk-add-partial-retry:416`,
+`flavor-library:328`, `inventory-quantity-truth:81`); the Pages wait and production smokes were
+skipped because the local gate runs first. It was diagnosed, not re-run for green: two of the three
+specs are byte-untouched by D-071, the third's failing test is untouched, none of the predicates
+involve `AppState.deletions`, `normalizeDeletions()` measures 0.0004-0.004 ms against a 30,000 ms
+timeout, and `bulk-add-partial-retry.spec.js:416` — same test, same line — already failed on `main`
+at run `32899800754` before D-071 existed. Pre-existing D-065 reload-race class, amplified by the
+suite growing 381 to 404 tests. No `workflow_dispatch` run was started.
+
+GitHub Pages deployed the pushed SHA successfully in run `33000615788`. All five served assets
+(`app.js`, `index.html`, `style.css`, `sw.js`, `manifest.json`) match landed `main` after
+line-ending normalization, and the deployed bundle carries every D-071 helper plus the aggregate
+guard, with zero occurrences of the old per-vanish guard or raw-id tombstone writes.
+
+Production smoke against the deployed build: **137 passed / 4 skipped / 0 failed**, plus a targeted
+serial re-run of two specs that stalled under parallel navigation load (26/26, including
+`kitchen-truth:259` bulk cleanup crossing the guard live). Ten further live proofs were run against
+the deployed URL: cross-collection isolation both directions, flavor isolation, prefix
+normalization, ambiguous-numeric drop, the aggregate transient-empty guard, a below-guard delete,
+LWW, and no console errors.
+
+**Where we are now.** TASK-057 is `done`; D-071 is closed as landed and verified. Nothing is in
+flight. Carried forward, deliberately not fixed: more than `MASS_DELETE_GUARD` genuine vanish-diff
+deletes can still be suppressed indefinitely (predates D-071, now in ROADMAP Known Issues);
+`restoreBackup()` still does not restore deletions and `exportData()` still omits them; old clients
+preserve but do not honor nested tombstones until they update; the ten live D-071 proofs are not
+yet pinned as a committed production-smoke spec; and the D-065 reload-race class remains the
+standing CI flake. Still deferred: Ready Food → "Try with", Meal Lego, free-text protein inference.
+
+---
+
 ## 2026-08-26 — Flavor Library wave landed (D-070) with first push CI recorded red
 
 `wave-flavor-library` @ `54099ce` was independently reviewed and merged `--no-ff` into `main` at

@@ -92,9 +92,34 @@ unifies the attention experience, not the data model.
 Actions: `keepAttentionItem()` writes `keptOn = todayISO()` (suppresses the record from attention
 surfaces for the day; alters no dates), `removeAttentionItem()` removes one, `removeAllExpired()`
 removes the whole `expired` bucket. Both removal paths write EXPLICIT tombstones into
-`AppState.deletions` and call `snapshotIdBaseline()` before dropping records, because
-`recordLocalDeletions()` deliberately ignores more than `MASS_DELETE_GUARD` simultaneous
-disappearances. `getExpiredPantryItems()` and `getFreshnessAlerts()` honour `keptOn` too.
+`AppState.deletions` — into the record's OWN collection bucket via `writeTombstone(collection, id)`,
+`'cookedMeals'` or `'pantry'` depending on the record (D-071) — and call `snapshotIdBaseline()`
+before dropping records, because `recordLocalDeletions()` deliberately ignores more than
+`MASS_DELETE_GUARD` simultaneous disappearances **in aggregate across all collections**. Writing
+explicitly is what keeps a legitimate bulk removal from being swallowed by that guard.
+`getExpiredPantryItems()` and `getFreshnessAlerts()` honour `keptOn` too.
+
+### Deletion identity and the mass-delete guard (D-071)
+
+`AppState.deletions` is collection-keyed: `{ recipes: {...}, pantry: {...}, ... }`, one bucket per
+`TOMBSTONE_KEYS` entry. A tombstone can only remove a record from the collection that wrote it —
+see `docs/DATA_MODEL.md` for the shape, helpers and legacy-migration rule.
+
+Deletions reach the map two ways. **Explicit writers** call `writeTombstone()` directly and are
+never subject to the guard: `clearLocalStorage()`, `deleteSelectedPantryItems()`,
+`clearExpiredPantryItems()`, `unstockPurchasedGroceryItem()`, `deductIngredientsForRecipe()`,
+`removeAttentionItem()`, `removeAllExpired()`. **Every other delete rides the vanish-diff** in
+`recordLocalDeletions()`, which diffs `collectSyncedIds()` against `_idBaseline` — both keyed by
+collection — and tombstones what disappeared into its own namespace.
+
+`recordLocalDeletions()` computes vanished ids per collection, then sums them into `totalVanished`
+and compares that **single aggregate** against `MASS_DELETE_GUARD` (5). If it trips, it warns and
+returns having written nothing, leaving `_idBaseline` unchanged so state re-aligns once a transient
+empty resolves. The guard must stay aggregate: evaluating it per collection lets a small collection
+fall through while the large ones correctly suppress a startup/sync race, which writes phantom
+tombstones that propagate a real delete to every device. That regression was caught in review of
+`1f443ac` and repaired in `f73ce3c`; `tests/tombstone-namespace.spec.js` pins it with a mutation
+test that bypasses the aggregate check and asserts the phantoms reappear.
 
 ## Nutrition lookup
 `calculateRecipeNutrition(recipe)` uses `nutritionPerServing` if present, else ingredient lookup.

@@ -5,6 +5,41 @@
 
 ---
 
+## TASK-057 / D-071 landing · 2026-08-26
+suite: post-merge deterministic local suite on merged `main`; focused deletion/sync specs; decision
+  pointer verification; first push-triggered GitHub Actions run; GitHub Pages deploy and
+  served-asset comparison; production smoke against the deployed build; live D-071 proofs.
+result: Merged `--no-ff` at `bd89d5d`. Local on merged main — `node --check app.js` OK;
+  `npm test` 404/404; `npm run test:local` 404/404; focused specs (tombstone-namespace,
+  flavor-library, cook-depletion-tombstones, kitchen-truth, starter-pack, what-should-we-eat,
+  suite-classification) 154/154; `Verify-Decisions.ps1` 41/41; `git diff --check` clean.
+  FIRST push-triggered CI FAILED and is recorded exactly as it happened, with no re-run: run
+  `33000618114`, attempt 1, workflow `Button tests`, SHA `bd89d5d` — local gate 401 passed and 3
+  failed, all `page.waitForFunction` 30s timeouts on `waitForRestored()` predicates
+  (`bulk-add-partial-retry.spec.js:416`, `flavor-library.spec.js:328`,
+  `inventory-quantity-truth.spec.js:81`); Pages-wait and production-smoke steps skipped because the
+  local gate runs first. Classified as the pre-existing D-065 reload-race harness class, not a
+  product regression: the same test at the same line already failed on `main` at run `32899800754`
+  before D-071 existed; two of the three specs are byte-untouched by D-071 and the third's failing
+  test is untouched; none of the predicates read `AppState.deletions`; and `normalizeDeletions()`
+  measures 0.0004–0.004 ms per call against a 30,000 ms timeout.
+  Pages deployment succeeded separately in run `33000615788`; served `app.js`, `index.html`,
+  `style.css`, `sw.js` and `manifest.json` all match landed `main` after line-ending normalization,
+  and the deployed bundle carries every D-071 helper plus `totalVanished > MASS_DELETE_GUARD` with
+  zero old per-vanish-guard or raw-id tombstone writes.
+  Production smoke against the deployed build: `npm run test:prod` 137 passed / 4 skipped / 0
+  failed. An isolated re-run of three specs then hit two 7.1-minute navigation stalls against
+  GitHub Pages — an environment/rate-limit symptom well outside the 30s test timeout, not a test
+  failure — and a targeted serial re-run passed 26/26, including `kitchen-truth:259` (live bulk
+  cleanup crossing MASS_DELETE_GUARD) and `cook-method:267` (tombstoned starter recipe not
+  re-added). Ten further live proofs against the deployed URL all passed: cross-collection
+  isolation both directions, flavor isolation, exclusive-prefix normalization, ambiguous-numeric
+  drop with no global fallback, the aggregate transient-empty guard writing zero phantoms, a
+  below-guard delete, LWW three ways, and no page/console errors.
+untested: the ten live D-071 proofs are a landing verification artifact and are NOT committed as a
+  production-smoke spec — pinning them is recommended follow-up. The pre-existing D-065 reload-race
+  CI flake remains open and is not addressed here.
+
 ## TASK-057 repair · 2026-08-26
 suite: `node --check app.js`; focused D-071 Playwright specs; full local suite; suite-classification; `tools/Verify-Decisions.ps1`; `git diff --check`
 result: `node --check app.js` passed. `npx playwright test tests/tombstone-namespace.spec.js --project=local --reporter=list` passed 22/22, including the new multi-collection transient-empty aggregate guard regression, below-guard legitimate deletion proof, real namespace mutation, and real aggregate-guard mutation. `npx playwright test tests/flavor-library.spec.js tests/cook-depletion-tombstones.spec.js tests/kitchen-truth.spec.js tests/starter-pack.spec.js tests/what-should-we-eat.spec.js --project=local --reporter=list` passed 126/126. `npm run test:local` first failed before tests with sandbox `spawn EPERM`; escalated rerun passed 404/404. `npm test` passed 404/404. `npx playwright test tests/suite-classification.spec.js --project=local --reporter=list` passed 6/6. `powershell -ExecutionPolicy Bypass -File tools/Verify-Decisions.ps1` passed with all 38 pointers valid. `git diff --check` passed with LF/CRLF warnings only.

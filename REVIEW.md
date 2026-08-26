@@ -74,11 +74,69 @@ holds back. `TASKS.md` TASK-057 is set to **`approved`, not `done`**: no auto-me
 **Owner authorization is required before merge.** The branch is not merged, not pushed, and stays
 at `f73ce3c`. `wave1-portion-truth` remains parked at `88b5598`, untouched.
 
-### Not yet done — deliberately deferred to landing
-D-071 is **not** closed out. `docs/DECISIONS.md`, `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`,
-`planning/ROADMAP.md` Known Issues and `planning/DONE.md` are **unchanged** and stay that way until
-the branch actually lands and is deployed. Recording a decision as closed before it ships would
-make the docs lie about production.
+### Not yet done at review time — deferred to landing (now complete)
+At review time D-071 was **not** closed out: `docs/DECISIONS.md`, `docs/DATA_MODEL.md`,
+`docs/ARCHITECTURE.md`, `planning/ROADMAP.md` Known Issues and `planning/DONE.md` were left
+unchanged, because recording a decision as closed before it ships would make the docs lie about
+production. All of them were updated after deployment verification succeeded — see the landing
+addendum below.
+
+### LANDED — 2026-08-26
+Merged `--no-ff` into `main` at **`bd89d5d`**, parents `6e28903` (owner-authorization record) and
+`f73ce3c` (reviewed branch HEAD). `1f443ac` and `f73ce3c` landed **unrebased, unsquashed and
+unamended**; both remain ancestors of `main`. Pushed to `origin/main`. `wave1-portion-truth`
+untouched at `88b5598`.
+
+**Local, on merged `main`:** `node --check app.js` OK; `npm test` 404/404; `npm run test:local`
+404/404; focused deletion/sync specs (tombstone-namespace, flavor-library, cook-depletion-tombstones,
+kitchen-truth, starter-pack, what-should-we-eat, suite-classification) 154/154;
+`Verify-Decisions.ps1` 41/41 — the three new D-071 pointers added by this landing all hold;
+`git diff --check` clean.
+
+**First push-triggered CI: FAILED, attempt 1, recorded as-is and NOT re-run for green.**
+Run `33000618114`, workflow `Button tests`, event `push`, SHA `bd89d5d`. Local gate: 401 passed,
+3 failed — `bulk-add-partial-retry.spec.js:416`, `flavor-library.spec.js:328`,
+`inventory-quantity-truth.spec.js:81`, all `page.waitForFunction` 30s timeouts on `waitForRestored()`
+post-reload predicates. Production gate **skipped**, because the local gate runs first.
+
+Diagnosed as **pre-existing test-harness (D-065 reload-race), not a D-071 product regression**, on
+evidence rather than assertion:
+- `bulk-add-partial-retry.spec.js:416` — the same test at the same line — already failed on `main`
+  at run `32899800754` (TASK-055 merge), before D-071 existed.
+- Two of the three specs are byte-untouched by D-071; the third's failing test is untouched (only
+  the tombstone tests changed in that file).
+- None of the three predicates involve `AppState.deletions`.
+- `normalizeDeletions()` measures 0.0004–0.004 ms per call; it cannot contribute to a 30,000 ms
+  timeout.
+- CI on `main` has been intermittently red with this class across several merges.
+The most likely amplifier is the suite growing 381 → 404 tests, increasing runner contention — the
+exact condition TASK-056 identified and left as an inferred runner condition. No `workflow_dispatch`
+run was started.
+
+**Pages deployment: SUCCEEDED** in run `33000615788` (separate workflow). All five served assets —
+`app.js`, `index.html`, `style.css`, `sw.js`, `manifest.json` — match landed `main` byte-for-byte
+after line-ending normalization. The deployed `app.js` contains every D-071 helper and the aggregate
+guard (`totalVanished > MASS_DELETE_GUARD`), with **zero** occurrences of the old per-vanish guard or
+raw-id tombstone writes.
+
+**Production smoke against the deployed build:** `npm run test:prod` — **137 passed, 4 skipped, 0
+failed**. A subsequent isolated re-run of three specs hit two 7.1-minute navigation stalls against
+GitHub Pages (far beyond the 30s test timeout, consistent with rate limiting after 170+ live
+navigations); a targeted serial re-run passed 26/26, including `kitchen-truth:259` (bulk cleanup
+crossing `MASS_DELETE_GUARD` live) and `cook-method:267` (a tombstoned starter recipe not re-added).
+Recorded as environmental, not relabelled.
+
+**Ten further live proofs** were run against the deployed URL, using the committed production-smoke
+conventions, covering what the committed specs do not yet pin: recipe-5 tombstone leaves hack 5 and
+pantry 5 alone; reverse for `customHacks` and `pantry`; flavor isolation both directions; exclusive
+prefix normalization; ambiguous-numeric drop with no global fallback; the aggregate transient-empty
+guard writing zero phantoms; a below-guard delete still tombstoning its own collection only; LWW
+three ways; no page or console errors. All 10 pass. These are **not committed** — pinning them as a
+production-smoke spec is recommended follow-up rather than unreviewed scope added during a landing.
+
+`TASKS.md` TASK-057 → `status: done`. D-071 closed as landed in `docs/DECISIONS.md`;
+`docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`, `planning/ROADMAP.md`, `planning/DONE.md` and
+`STATUS.md` updated.
 
 → `TASKS.md` TASK-057 set to `status: approved`. Held for owner.
 

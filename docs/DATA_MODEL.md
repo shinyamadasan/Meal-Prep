@@ -152,10 +152,51 @@ and NOT a cooking hack (a hack is five prose fields).
 }
 ```
 
-**The `flv-` id prefix is mandatory.** `AppState.deletions` is a single FLAT `id -> deletedAt` map
-shared by every key in `TOMBSTONE_KEYS`, so a bare numeric flavor id would be matched by a tombstone
-written for a recipe, hack or pantry item that shares the number. `normalizeFlavorId()` re-prefixes
-any inbound id that lacks it, idempotently. See D-071 for the underlying defect.
+**The `flv-` id prefix is part of the wire shape.** `normalizeFlavorId()` re-prefixes any inbound
+id that lacks it, idempotently. It originally existed because `AppState.deletions` was a single FLAT
+`id -> deletedAt` map shared by every key in `TOMBSTONE_KEYS`, so a bare numeric flavor id could be
+matched by a tombstone written for a recipe, hack or pantry item sharing the number. **D-071 fixed
+that for every collection** (see `deletions` below), so the prefix is now id hygiene and old-data
+migration rather than the only thing protecting flavors.
+
+## `AppState.deletions` — collection-keyed tombstones (D-071)
+
+Deletions sync as tombstones so a union merge cannot resurrect a deleted record. Since D-071 the map
+is **namespaced by collection**, one bucket per key in `TOMBSTONE_KEYS`:
+
+```js
+AppState.deletions = {
+  recipes:           { "5": "2026-06-01T00:00:00.000Z" },
+  pantry:            { "buy_17...": "..." },
+  customIngredients: { ... },
+  customHacks:       { ... },
+  flavors:           { "flv-x": "..." },
+  cookedMeals:       { "cm_...": "..." },
+  userIngredients:   { "ui_...": "..." }
+}
+```
+
+The invariant: **a tombstone may affect records only inside the collection that created it.** Before
+D-071 the map was flat (`{ [rawId]: deletedAtISO }`) and consulted against every collection, so
+deleting recipe `5` also destroyed hack `5`, pantry item `5`, custom ingredient `5`, cooked meal `5`
+and user ingredient `5` — seeded recipe ids `1-40` and default-hack ids `1-14` overlap completely.
+
+Access goes through helpers, never a raw index: `normalizeDeletions()` (accepts a missing key, a
+legacy flat map, or an already-namespaced map; idempotent), `ensureDeletions()`, `deletionBucket()`,
+`writeTombstone(collection, id, when)`, `readTombstone()`, `clearTombstone()`, `tombstoneCount()`.
+Every persistence path normalizes on the way in and out — `saveToLocalStorage()`,
+`loadFromLocalStorage()`, `buildFirestorePayload()`, `loadFromFirestore()`, the `saveToFirestore()`
+conflict retry, `setupRealtimeListeners()`, `snapshotData()`.
+
+**Legacy migration is knowingly lossy.** Collection-exclusive prefixes migrate (`flv-` to `flavors`,
+`cm_` to `cookedMeals`, `ui_` to `userIngredients`, `buy_`/`ib_`/`staple_` to `pantry`). Ambiguous
+keys — bare numerics, timestamps, imported ids — are **dropped**, counted, and `console.warn`ed once.
+There is no `_legacy` bucket and no global fallback. The accepted consequence: some historical
+ambiguous deletes may resurrect from stale remote copies. See D-071.
+
+**LWW is unchanged:** `applyTombstones()` removes an item only when the tombstone is newer than the
+item's `updatedAt`; an item with no `updatedAt` loses. `purgeOldTombstones()` drops markers older
+than 180 days, per bucket.
 
 **`normalizeFlavor()` never sets `updatedAt`.** Stamping one during normalization would let a
 normalize pass hand a flavor a fresh timestamp that beats its own tombstone under

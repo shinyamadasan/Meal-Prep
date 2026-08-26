@@ -5,6 +5,37 @@
 
 ---
 
+## TASK-057 / D-071 — landed (branch: d-071-tombstone-namespace)
+merged: `--no-ff` into `main` at `bd89d5d` (parents `6e28903` owner-authorization record +
+  `f73ce3c` reviewed branch HEAD). Reviewed commits `1f443ac` and `f73ce3c` landed unrebased,
+  unsquashed and unamended. Pushed to `origin/main`.
+gate: D-032 RED ZONE → `approved` (HELD) → explicitly released by the owner; authorization recorded
+  on `main` in its own commit `6e28903` BEFORE the merge, per the D-040 convention.
+shape: `AppState.deletions` flat `{ [rawId]: deletedAtISO }` → collection-keyed
+  `{ recipes, pantry, customIngredients, customHacks, flavors, cookedMeals, userIngredients }`.
+post-merge local: `node --check app.js` OK; `npm test` 404/404; `npm run test:local` 404/404;
+  focused deletion/sync specs 154/154; suite-classification green; `Verify-Decisions.ps1` 41/41;
+  `git diff --check` clean.
+first push CI: **failed**, run `33000618114` attempt 1 — local gate 401 passed / 3 failed, all
+  `waitForRestored()` 30s timeouts (`bulk-add-partial-retry:416`, `flavor-library:328`,
+  `inventory-quantity-truth:81`); production gate skipped. Recorded as-is, NOT re-run for green.
+  Pre-existing D-065 reload-race class: `bulk-add-partial-retry:416` already failed on `main` at
+  run `32899800754` before D-071 existed, two of three specs are byte-untouched by this work, and
+  `normalizeDeletions()` measures 0.0004–0.004 ms against a 30,000 ms timeout.
+deployment: Pages run `33000615788` succeeded; `app.js`, `index.html`, `style.css`, `sw.js`,
+  `manifest.json` all match landed `main` after line-ending normalization; deployed bundle contains
+  every D-071 helper and the aggregate guard, with zero old per-vanish-guard or raw-id writes.
+production smoke: `npm run test:prod` 137 passed / 4 skipped / 0 failed; targeted serial re-run of
+  two specs that stalled under parallel navigation load 26/26; ten additional live D-071
+  isolation / guard / migration / LWW proofs against the deployed URL, all passing.
+docs: D-071 closed as landed in `docs/DECISIONS.md`; `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`,
+  `planning/ROADMAP.md`, `planning/DONE.md`, `STATUS.md`, `REVIEW.md` and `TASKS.md` updated.
+carried forward, NOT fixed: >`MASS_DELETE_GUARD` genuine vanish-diff deletes can still be suppressed
+  indefinitely (predates D-071); `restoreBackup()` still does not restore deletions and
+  `exportData()` still omits them; old clients preserve but do not honor nested tombstones; the ten
+  live proofs are not yet a committed production-smoke spec.
+→ TASK-057 `status: done`; D-071 CLOSED as landed and production-verified.
+
 ## TASK-057 repair — done (branch: d-071-tombstone-namespace)
 changed:
   - app.js (`recordLocalDeletions()` restores the original aggregate `MASS_DELETE_GUARD` safety invariant before writing any collection-specific vanish-diff tombstones; `loadFromLocalStorage()` no longer applies/purges tombstones as a signed-out load side effect; conflict payload tombstones are normalized before assignment, 28 loc)

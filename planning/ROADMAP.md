@@ -106,17 +106,18 @@ needed to unblock. Resolve, then re-add to the top of the Task Queue.
 Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commit).
 
 ### Bugs / broken
-- **`AppState.deletions` is a flat cross-collection id map (RED ZONE)** — `applyTombstones()` matches
-  a tombstone by id alone against every key in `TOMBSTONE_KEYS`, so deleting a record in one
-  collection also deletes an unrelated record that happens to share the id. Seeded recipe ids 1-40
-  and default-hack ids 1-14 already overlap completely. Verified and reproduced; **not fixed** in the
-  Flavor Library wave because it is an unrelated red-zone sync migration. Flavors sidestep it via
-  `flv-` prefixed ids. Full write-up, reproduction and follow-up scope: DECISIONS **D-071**.
 - **Family sharing acceptance flow** — invitations write to `familyInvitations` but there's no UI to
   accept; `status` stays `pending` forever. (Feature is Hidden anyway.)
 - **Sentry inactive** — code loads only when `SENTRY_DSN` is set; it's empty.
 
 ### Gaps
+- **Vanish-diff deletes past `MASS_DELETE_GUARD` are suppressed indefinitely** — deleting more than
+  5 items in one save window writes NO tombstones, and because `_idBaseline` is deliberately left
+  unchanged the guard re-trips on the same set every subsequent save, so those deletes can be
+  resurrected from a remote copy. Explicit writers (Clear All Data, cook depletion, bulk expired
+  cleanup, grocery unstock, attention removal) are unaffected — they tombstone directly. Predates
+  D-071 and was NOT introduced by it; confirmed and recorded while landing TASK-057. Needs its own
+  decision. See DECISIONS **D-071** § Residual limitation.
 - **USDA `DEMO_KEY` rate limit** — ~1000/hr/IP, no retry or user-facing message (DECISIONS D-007).
 - **Snack serving scaling** — snacks use the recipe's global `currentServings`; no per-slot override.
 - **Prep Mode** — no batch-cook ingredient aggregation across the week's recipes.

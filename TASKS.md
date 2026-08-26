@@ -3306,7 +3306,7 @@ open items (recorded, deliberately NOT fixed):
 ---
 
 ### TASK-057 · Collection-aware deletion tombstones: a recipe delete stops destroying the hack, pantry item and ingredient that share its id
-status: review
+status: done
 owner: codex
 source: docs/DECISIONS.md **D-071** (open, red zone) — direct operator brief, 2026-08-26. Not a BQ item.
 depends-on: none. Phase 1 characterization is COMPLETE and is reproduced in full below — Codex
@@ -3590,6 +3590,43 @@ merge gate:
   lossy migration. Codex hands off at `status: review` and stops. Claude reviews and may recommend
   `approved` at most — **never `done`, never auto-merge, never push**. The owner reads the branch
   and merges by hand, or does not. Nothing here ships on an agent's judgement.
+
+review outcome (Claude, independent review, 2026-08-26):
+  **PASS** — no P0, P1 or P2 findings remaining. Implementation candidate `1f443ac`; repair
+  `f73ce3c`. The first review pass did NOT pass: it found that namespacing had also split
+  `MASS_DELETE_GUARD` per collection, letting small collections take phantom tombstones during a
+  transient-empty load race, plus a signed-out `loadFromLocalStorage()` side effect outside scope.
+  Both were repaired in `f73ce3c` and re-reviewed clean, with production-code mutation proofs for
+  namespace isolation and the aggregate guard. Full verdict in `REVIEW.md`.
+
+landed:
+  Owner-authorized under D-032 (authorization recorded on `main` in `6e28903` before the merge).
+  Merged `--no-ff` at `bd89d5d`, parents `6e28903` + `f73ce3c`; `1f443ac` and `f73ce3c` landed
+  unrebased, unsquashed and unamended. Pushed to `origin/main`.
+  Local on merged main: `npm test` / `npm run test:local` 404/404, focused deletion/sync specs
+  154/154, suite-classification green, `Verify-Decisions.ps1` 41/41, `git diff --check` clean.
+  First push-triggered CI recorded as it happened and NOT re-run: run `33000618114` attempt 1
+  failed the local gate with three pre-existing `waitForRestored()` timeouts (D-065 class;
+  `bulk-add-partial-retry:416` had already failed on `main` at run `32899800754` before D-071
+  existed), so the production gate was skipped. Pages deployed the SHA in run `33000615788`; all
+  five served assets match landed `main`. Production smoke run separately against the deployed
+  build: 137 passed / 4 skipped / 0 failed, plus 26/26 on a serial re-run of two specs that
+  stalled under parallel load, plus ten live D-071 isolation/guard/migration/LWW proofs.
+  D-071 closed as landed in `docs/DECISIONS.md`; `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`,
+  `planning/ROADMAP.md`, `planning/DONE.md` and `STATUS.md` updated.
+
+open items (recorded, deliberately NOT fixed):
+  - **More than `MASS_DELETE_GUARD` genuine vanish-diff deletions can still be suppressed
+    indefinitely.** `_idBaseline` is left unchanged on a trip, so the guard re-trips on the same
+    set every save. Predates D-071 and was not introduced by it. Now in ROADMAP Known Issues and
+    D-071 § Residual limitation; needs its own decision.
+  - `restoreBackup()` still does not restore `deletions`; `exportData()` still omits them. Both
+    investigated under §F and deliberately left — fixing either expands product behaviour beyond
+    deletion identity.
+  - Old clients preserve but do not honor nested tombstones until they update.
+  - The ten live D-071 proofs run against the deployed build are not pinned as a committed
+    production-smoke spec.
+  - `wave1-portion-truth` remains parked at `88b5598`, untouched.
 
 documentation ownership:
   Deliberately excluded from this handoff. AGENTS.md § Ownership says Codex never edits `docs/`, so

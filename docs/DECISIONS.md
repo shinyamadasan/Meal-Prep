@@ -1973,10 +1973,14 @@ deferred.
 
 ---
 
-## D-071 — KNOWN PRE-EXISTING RED-ZONE BUG: `AppState.deletions` is a flat cross-collection id map
+## D-071 — `AppState.deletions` is now collection-keyed (was a flat cross-collection id map)
 
-**Status:** Open. Recorded during Prep Leverage Wave 1 characterization. **Deliberately not fixed
-there** — it is unrelated to flavors and is its own red-zone change.
+**Status:** **CLOSED — LANDED and verified in production, 2026-08-26** (TASK-057). Originally
+recorded as an open red-zone bug during Prep Leverage Wave 1 characterization, where it was
+**deliberately not fixed** because it is unrelated to flavors and is its own red-zone change.
+Landed on `main` at merge `bd89d5d` (reviewed commits `1f443ac` + `f73ce3c`), owner-authorized
+under D-032 after the authorization record in `6e28903`. The resolution is at the end of this
+entry; the defect write-up below is kept verbatim as the historical record of what was wrong.
 
 ### The defect
 
@@ -2025,5 +2029,116 @@ cannot silently drift apart.
   `purgeOldTombstones()`, the `importData()` tombstone-clear, and `clearLocalStorage()`.
 - Red zone, so `approved` (held) under D-032. Never chained (Hard Rule 10).
 
+---
+
+## The resolution (TASK-057, landed 2026-08-26)
+
+### The shape change
+
+OLD — one flat map consulted against every collection:
+
+    deletions = {
+      [rawId]: timestamp
+    }
+
+NEW — one namespace per tombstoned collection:
+
+    deletions = {
+      recipes:           {...},
+      pantry:            {...},
+      customIngredients: {...},
+      customHacks:       {...},
+      flavors:           {...},
+      cookedMeals:       {...},
+      userIngredients:   {...}
+    }
+
+The invariant this buys: **a tombstone may affect records only inside the collection that created
+it.** Deleting recipe `5` no longer touches hack `5`, pantry item `5`, custom ingredient `5`,
+cooked meal `5` or user ingredient `5`.
+
+Access is centralized so a raw-id write cannot easily reappear: `normalizeDeletions()`,
+`ensureDeletions()`, `deletionBucket()`, `writeTombstone()`, `readTombstone()`, `clearTombstone()`
+and `tombstoneCount()`. Every writer routes through them; every persistence path normalizes.
+
+### The legacy migration rule — knowingly lossy, deliberately so
+
+A legacy flat key carries no collection identity, and nothing persisted can recover it
+(`_idBaseline` is in-memory only). A fully lossless automatic migration is impossible, so:
+
+- **Collection-exclusive prefixes migrate** to their collection: `flv-` to `flavors`, `cm_` to
+  `cookedMeals`, `ui_` to `userIngredients`, `buy_` / `ib_` / `staple_` to `pantry`. Each prefix
+  was re-proven exclusive by inspecting every id-minting site in `app.js`, not by pattern-matching
+  the name.
+- **Ambiguous flat keys are DROPPED** — bare numerics, timestamps, imported ids. Counted, and
+  `console.warn`ed once at migration time so the loss is observable rather than silent.
+- **No `_legacy` bucket.** Quarantining them would add a persisted shape every round-trip path
+  must then carry, for no behavioural gain.
+- **No global fallback.** An ambiguous tombstone is never applied across every collection — that
+  is precisely the defect this record exists to end.
+
+**The accepted tradeoff, stated plainly: some historical ambiguous deletes may resurrect from
+stale remote copies.** A device still holding such a record can sync it back once its tombstone is
+dropped. That is preferable to continuing deterministic cross-collection data loss — a resurrected
+item is visible and user-correctable; the silent destruction of five unrelated records is neither.
+
+### `MASS_DELETE_GUARD` stays AGGREGATE — the repair that review forced
+
+The first implementation candidate (`1f443ac`) namespaced the tombstone map and, in doing so, also
+split the mass-delete guard **per collection**. That reopened the phantom-mass-delete class the
+guard exists to stop: in a transient-empty startup/sync race the large collections correctly
+suppressed, while every collection holding `<= MASS_DELETE_GUARD` records fell through and was
+tombstoned for real. Measured against `98cf393` on an otherwise identical fixture, the pre-repair
+candidate wrote phantom tombstones for all three flavors, both cooked meals and the user
+ingredient; base wrote none.
+
+`f73ce3c` restores aggregate semantics: `recordLocalDeletions()` computes vanished ids per
+collection, sums them into `totalVanished`, and compares that **single total** against
+`MASS_DELETE_GUARD` before writing anything. On a trip it warns and returns with `_idBaseline`
+wholly unchanged, exactly as the flat implementation did. The constant is still `5`.
+
+One deliberate nuance: the aggregate is a **sum of per-collection counts**, so an id vanishing from
+two collections counts twice where the old flat map counted one distinct id. That is *stricter*
+than base — it suppresses marginally more, never less, which is the correct direction for a
+data-loss guard.
+
+Explicit writers are unaffected by the guard, by design — `clearLocalStorage()`,
+`deleteSelectedPantryItems()`, `clearExpiredPantryItems()`, `unstockPurchasedGroceryItem()`,
+`deductIngredientsForRecipe()`, `removeAttentionItem()` and `removeAllExpired()` all still
+tombstone every id they remove, including well past 5.
+
+### Residual limitation, carried forward and NOT fixed here
+
+> **More than `MASS_DELETE_GUARD` genuine vanish-diff deletions can still be suppressed
+> indefinitely.** A user deleting six or more items in one save window gets no tombstones, and
+> because `_idBaseline` is deliberately left unchanged, every subsequent save re-trips the guard on
+> the same set. Those deletes can therefore be resurrected from a remote copy.
+
+This predates D-071 and is unchanged by it — the guard and its threshold were never in scope. It is
+recorded here because D-071 is the moment the behaviour was re-derived and confirmed, not because
+this work introduced it. Worth a future decision on its own terms.
+
+### What was NOT changed
+
+`snapshotData()` still captures deletions and `restoreBackup()` still does not restore them;
+`exportData()` still omits them while `importData()` clears tombstones for imported records — now
+only within the imported record's own collection. Both asymmetries were investigated and
+deliberately left alone: correcting either would expand product behaviour beyond deletion identity.
+`cloudReady`, `saveData()` semantics, the Firestore read-before-write guard, auth and `sw.js` are
+untouched.
+
+### Verification
+
+Deterministic local suite 404/404 on merged `main`. Namespace isolation and the aggregate guard
+were both negative-proofed by mutating **production** code, not by test simulation: collapsing
+`applyTombstones()` to a flat map turns 11 tests red; reverting the guard to per-collection turns 3
+red with the exact phantom signature. Verified live against the deployed build after landing —
+cross-collection isolation in both directions, flavor isolation, prefix normalization, ambiguous
+drop, the aggregate transient-empty guard, explicit >5 cook depletion and bulk expired cleanup, and
+LWW.
+
 Verify: app.js contains "var TOMBSTONE_KEYS ="
 Verify: tests/flavor-library.spec.js contains "prefixed flavor ids survive a numeric tombstone"
+Verify: app.js contains "totalVanished > MASS_DELETE_GUARD"
+Verify: app.js contains "function legacyDeletionCollectionForId"
+Verify: tests/tombstone-namespace.spec.js contains "MUTATION: bypassing the aggregate MASS_DELETE_GUARD writes phantom small-collection tombstones"
