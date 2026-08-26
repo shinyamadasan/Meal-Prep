@@ -500,8 +500,6 @@ function loadFromLocalStorage() {
       AppState.prepModeSession = data.prepModeSession || null;
       AppState.deletions = normalizeDeletions(data.deletions);
       AppState.dataVersion = data.version || 0;
-      purgeOldTombstones();
-      applyTombstones();
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
       markInitialized();   // a saved record exists → not first run
 
@@ -8000,27 +7998,32 @@ function recordLocalDeletions() {
   if (!_idBaseline) { snapshotIdBaseline(); return; }
   var now = collectSyncedIds();
   var when = new Date().toISOString();
-  var nextBaseline = {};
+  var vanishedByCollection = {};
+  var totalVanished = 0;
   TOMBSTONE_KEYS.forEach(function(collection) {
     var before = (_idBaseline && _idBaseline[collection]) || {};
     var after = now[collection] || {};
     var vanished = Object.keys(before).filter(function (id) { return !after[id]; });
-    // SAFETY GUARD: a real user deletes items one or two at a time, and every edit saves — so a
-    // genuine delete records only a few tombstones per call. A large batch vanishing at once almost
-    // always means AppState was transiently empty during a startup/sync race, NOT a real delete.
-    // Tombstoning those ids would propagate a phantom mass-delete to every device and wipe a whole
-    // category (this is what emptied the pantry after a reload). Skip that collection and keep its
-    // baseline so the list re-aligns once it repopulates. "Clear All Data" tombstones explicitly in
-    // clearLocalStorage(), so that intentional wipe is unaffected by this guard.
-    if (vanished.length > MASS_DELETE_GUARD) {
-      console.warn('recordLocalDeletions: ignored ' + vanished.length + ' simultaneous disappearances in ' + collection + ' as a suspected transient load state (not tombstoning).');
-      nextBaseline[collection] = before;
-      return;
-    }
-    vanished.forEach(function (id) { writeTombstone(collection, id, when); });
-    nextBaseline[collection] = after;
+    vanishedByCollection[collection] = vanished;
+    totalVanished += vanished.length;
   });
-  _idBaseline = nextBaseline;
+  // SAFETY GUARD: a real user deletes items one or two at a time, and every edit saves — so a
+  // genuine delete records only a few tombstones per call. A large batch vanishing at once almost
+  // always means AppState was transiently empty during a startup/sync race, NOT a real delete.
+  // Tombstoning those ids would propagate phantom mass-deletes to every device and wipe data.
+  // Keep the old aggregate guard semantics even though tombstones are now collection-keyed: a
+  // small collection must not fall through just because the larger collections tripped the race.
+  // "Clear All Data" tombstones explicitly in clearLocalStorage(), so that intentional wipe is
+  // unaffected by this guard.
+  if (totalVanished > MASS_DELETE_GUARD) {
+    console.warn('recordLocalDeletions: ignored ' + totalVanished + ' simultaneous disappearances across synced collections as a suspected transient load state (not tombstoning).');
+    return; // keep _idBaseline unchanged so state can re-align once the transient empty resolves
+  }
+  TOMBSTONE_KEYS.forEach(function(collection) {
+    var vanished = vanishedByCollection[collection] || [];
+    vanished.forEach(function (id) { writeTombstone(collection, id, when); });
+  });
+  _idBaseline = now;
 }
 
 // Union two tombstone maps; the later deletedAt wins.
@@ -8189,7 +8192,7 @@ async function saveToFirestore() {
         if (remoteVersion > (AppState.dataVersion || 0)) {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
-          payload.deletions = AppState.deletions; // carry the merged tombstones
+          payload.deletions = normalizeDeletions(AppState.deletions); // carry the merged tombstones
           TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
             payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !readTombstone(key, it.id); });
           });

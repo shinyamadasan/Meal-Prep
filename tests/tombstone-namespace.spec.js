@@ -6,6 +6,7 @@ const { waitForAppReady, waitForRestored } = require('./app-ready');
 const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
 const OLD = '2026-01-01T00:00:00.000Z';
 const TOMB = '2026-06-01T00:00:00.000Z';
+const TOMBSTONE_COLLECTIONS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'];
 
 function bootstrapStorage(doc) {
   return (saved) => {
@@ -95,6 +96,18 @@ function deletionDoc(collection, id, when = TOMB) {
   return { deletions: { [collection]: { [String(id)]: when } } };
 }
 
+function transientEmptyDoc() {
+  return {
+    recipes: Array.from({ length: 40 }, (_, i) => ({ id: String(i + 1), name: 'Recipe ' + i, baseIngredients: [] })),
+    pantry: Array.from({ length: 30 }, (_, i) => ({ id: 'p_guard_' + i, name: 'Pantry ' + i })),
+    customHacks: Array.from({ length: 14 }, (_, i) => ({ id: String(i + 1), title: 'Hack ' + i, category: 'Storage' })),
+    customIngredients: Array.from({ length: 8 }, (_, i) => ({ id: 'ing_guard_' + i, name: 'Ingredient ' + i })),
+    flavors: Array.from({ length: 3 }, (_, i) => ({ id: 'flv-guard-' + i, name: 'Flavor ' + i })),
+    cookedMeals: Array.from({ length: 2 }, (_, i) => ({ id: 'cm_guard_' + i, name: 'Cooked ' + i, cookedDate: '2026-01-01' })),
+    userIngredients: [{ id: 'ui_guard_0', name: 'User Ingredient' }]
+  };
+}
+
 async function loadFixture(page) {
   await loadLocalApp(page);
   await page.evaluate((doc) => {
@@ -118,26 +131,26 @@ const counts = (page) => page.evaluate(() => ({
 test('BASE REPRO: old flat tombstones delete every collection sharing id 5', async ({ page }) => {
   await loadLocalApp(page);
   const result = await page.evaluate((doc) => {
+    const originalApply = applyTombstones;
+    applyTombstones = eval('(' + originalApply.toString()
+      .replace('var dels = ensureDeletions();', 'var dels = AppState.deletions || {};')
+      .replace('var bucket = dels[key] || {};', 'var bucket = dels;') + ')');
     Object.assign(AppState, doc);
-    const flat = { '5': '2026-06-01T00:00:00.000Z' };
-    TOMBSTONE_KEYS.forEach((key) => {
-      AppState[key] = (AppState[key] || []).filter((it) => {
-        if (!it || it.id == null) return true;
-        const tombAt = flat[String(it.id)];
-        if (!tombAt) return true;
-        if (!it.updatedAt) return false;
-        return it.updatedAt > tombAt;
-      });
-    });
-    return {
-      recipes: AppState.recipes.length,
-      customHacks: AppState.customHacks.length,
-      pantry: AppState.pantry.length,
-      customIngredients: AppState.customIngredients.length,
-      cookedMeals: AppState.cookedMeals.length,
-      userIngredients: AppState.userIngredients.length,
-      flavors: AppState.flavors.map((f) => f.id)
-    };
+    AppState.deletions = { '5': '2026-06-01T00:00:00.000Z' };
+    try {
+      applyTombstones();
+      return {
+        recipes: AppState.recipes.length,
+        customHacks: AppState.customHacks.length,
+        pantry: AppState.pantry.length,
+        customIngredients: AppState.customIngredients.length,
+        cookedMeals: AppState.cookedMeals.length,
+        userIngredients: AppState.userIngredients.length,
+        flavors: AppState.flavors.map((f) => f.id)
+      };
+    } finally {
+      applyTombstones = originalApply;
+    }
   }, collidingDoc());
   expect(result).toEqual({
     recipes: 0, customHacks: 0, pantry: 0, customIngredients: 0,
@@ -225,6 +238,52 @@ test('generic vanish-diff records collection identity and keeps MASS_DELETE_GUAR
   expect(Object.keys(result.recipes)).toEqual(['5']);
   expect(result.customHacks || {}).toEqual({});
   expect(result.pantry || {}).toEqual({});
+});
+
+test('multi-collection transient empty trips the aggregate MASS_DELETE_GUARD before small buckets write', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((doc) => {
+    AppState.deletions = {};
+    Object.assign(AppState, doc);
+    snapshotIdBaseline();
+    TOMBSTONE_KEYS.forEach((key) => { AppState[key] = []; });
+    recordLocalDeletions();
+    const afterEmpty = normalizeDeletions(AppState.deletions);
+
+    Object.assign(AppState, doc);
+    recordLocalDeletions();
+    const afterRepopulate = normalizeDeletions(AppState.deletions);
+
+    return { afterEmpty, afterRepopulate };
+  }, transientEmptyDoc());
+
+  TOMBSTONE_COLLECTIONS.forEach((key) => {
+    expect(result.afterEmpty[key], key).toEqual({});
+    expect(result.afterRepopulate[key], key).toEqual({});
+  });
+});
+
+test('legitimate disappearances below the aggregate guard still write collection-specific tombstones', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate(() => {
+    AppState.deletions = {};
+    AppState.recipes = [{ id: 'r_small', name: 'Recipe', baseIngredients: [] }];
+    AppState.flavors = [{ id: 'flv-small', name: 'Flavor' }];
+    AppState.userIngredients = [{ id: 'ui_small', name: 'User Ingredient' }];
+    snapshotIdBaseline();
+
+    AppState.recipes = [];
+    AppState.flavors = [];
+    AppState.userIngredients = [];
+    recordLocalDeletions();
+    return normalizeDeletions(AppState.deletions);
+  });
+
+  expect(Object.keys(result.recipes)).toEqual(['r_small']);
+  expect(Object.keys(result.flavors)).toEqual(['flv-small']);
+  expect(Object.keys(result.userIngredients)).toEqual(['ui_small']);
+  expect(result.pantry).toEqual({});
+  expect(result.cookedMeals).toEqual({});
 });
 
 test('explicit tombstone writers record their own collections', async ({ page }) => {
@@ -356,9 +415,12 @@ test('localStorage round-trips namespaced tombstones', async ({ page }) => {
     saveData();
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForRestored(page, () => AppState.deletions.recipes && AppState.deletions.recipes['5']);
+  await waitForRestored(page, () =>
+    AppState.deletions.recipes &&
+    AppState.deletions.recipes['5'] &&
+    AppState.recipes.some((r) => String(r.id) === '5'));
   const result = await counts(page);
-  expect(result.recipes).toEqual([]);
+  expect(result.recipes).toEqual(['5']);
   expect(result.customHacks).toContain('5');
   expect(result.deletions.recipes).toEqual({ '5': TOMB });
 });
@@ -467,21 +529,50 @@ test('MUTATION: collapsing namespaces recreates collateral deletion', async ({ p
     };
 
     Object.assign(AppState, doc);
-    const flat = { '5': TOMB };
-    TOMBSTONE_KEYS.forEach((key) => {
-      AppState[key] = (AppState[key] || []).filter((it) => !it || it.id == null || !flat[String(it.id)]);
-    });
-    return {
-      isolated,
-      mutant: {
-        recipes: AppState.recipes.length,
-        customHacks: AppState.customHacks.length,
-        pantry: AppState.pantry.length
-      }
-    };
+    AppState.deletions = { recipes: { '5': TOMB } };
+    const originalApply = applyTombstones;
+    applyTombstones = eval('(' + originalApply.toString()
+      .replace('var bucket = dels[key] || {};', 'var bucket = {}; TOMBSTONE_KEYS.forEach(function(k) { Object.assign(bucket, dels[k] || {}); });') + ')');
+    try {
+      applyTombstones();
+      return {
+        isolated,
+        mutant: {
+          recipes: AppState.recipes.length,
+          customHacks: AppState.customHacks.length,
+          pantry: AppState.pantry.length
+        }
+      };
+    } finally {
+      applyTombstones = originalApply;
+    }
   }, collidingDoc());
   expect(result.isolated).toEqual({ recipes: 0, customHacks: 1, pantry: 1 });
   expect(result.mutant).toEqual({ recipes: 0, customHacks: 0, pantry: 0 });
+});
+
+test('MUTATION: bypassing the aggregate MASS_DELETE_GUARD writes phantom small-collection tombstones', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((doc) => {
+    AppState.deletions = {};
+    Object.assign(AppState, doc);
+    snapshotIdBaseline();
+    TOMBSTONE_KEYS.forEach((key) => { AppState[key] = []; });
+
+    const originalRecord = recordLocalDeletions;
+    recordLocalDeletions = eval('(' + originalRecord.toString()
+      .replace('if (totalVanished > MASS_DELETE_GUARD) {', 'if (false && totalVanished > MASS_DELETE_GUARD) {') + ')');
+    try {
+      recordLocalDeletions();
+      return normalizeDeletions(AppState.deletions);
+    } finally {
+      recordLocalDeletions = originalRecord;
+    }
+  }, transientEmptyDoc());
+
+  expect(Object.keys(result.flavors).sort()).toEqual(['flv-guard-0', 'flv-guard-1', 'flv-guard-2']);
+  expect(Object.keys(result.cookedMeals).sort()).toEqual(['cm_guard_0', 'cm_guard_1']);
+  expect(Object.keys(result.userIngredients)).toEqual(['ui_guard_0']);
 });
 
 test('clear all data tombstones every collection in its own namespace', async ({ page }) => {
