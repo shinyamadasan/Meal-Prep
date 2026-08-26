@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-057 · 2026-08-26
+suite: base-behavior reproduction; prefix-validation audit; `node --check app.js`; focused Playwright D-071 suites; full deterministic local suite `npm test`; production-smoke deletion-reference audit
+result: Prefix validation passed for exclusive legacy prefixes: `flv-` → flavors, `cm_` → cookedMeals, `ui_` → userIngredients, and `buy_`/`ib_`/`staple_` → pantry. Before app changes, a temporary base reproduction in `tests/tombstone-namespace.spec.js` passed against the old flat behavior, proving one raw `5` tombstone deleted recipe/hack/pantry/customIngredient/cookedMeal/userIngredient `5`. Final checks passed: `node --check app.js`; `npx playwright test tests/tombstone-namespace.spec.js --project=local --reporter=list` 19/19; `npx playwright test tests/flavor-library.spec.js --project=local --reporter=list` 47/47; `npx playwright test tests/kitchen-truth.spec.js tests/cook-depletion-tombstones.spec.js tests/starter-pack.spec.js tests/what-should-we-eat.spec.js --project=local --reporter=list` 79/79; final focused run across all six touched local specs 145/145; `npm test` 401/401. Production-smoke audit updated the three deployed-site specs whose deletion assertions would otherwise expect the old flat shape; those production specs were not run because the deployed site does not contain this branch yet.
+untested: live deployed production-smoke verification after deployment; human/owner review for whether backup restore should ever restore tombstones or export should ever include them as a separate product-contract change.
+
 ## D-070 landing · 2026-08-26
 suite: pre-merge local review checks; first push-triggered GitHub Actions run; GitHub Pages deploy
   and served-asset comparison

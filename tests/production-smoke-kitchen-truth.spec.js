@@ -247,7 +247,7 @@ test('live: one-tap removal tombstones the record', async ({ page }) => {
 
   const after = await page.evaluate(() => ({
     pantryCount: AppState.pantry.length,
-    tombstoned: !!AppState.deletions['prod_gone'],
+    tombstoned: !!((AppState.deletions.pantry || {})['prod_gone']),
     persisted: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry.length
   }));
 
@@ -292,7 +292,8 @@ test('live: bulk cleanup crosses MASS_DELETE_GUARD, tombstones every id, and spa
   const after = await page.evaluate(() => ({
     pantry: AppState.pantry.map((p) => String(p.id)).sort(),
     cooked: (AppState.cookedMeals || []).map((m) => String(m.id)),
-    tombstones: Object.keys(AppState.deletions).sort(),
+    tombstones: Object.keys(AppState.deletions.pantry || {})
+      .concat(Object.keys(AppState.deletions.cookedMeals || {})).sort(),
     persisted: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry.map((p) => String(p.id)).sort()
   }));
 

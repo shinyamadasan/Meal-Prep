@@ -313,12 +313,11 @@ test('prefixed flavor ids survive a numeric tombstone that deletes a recipe, hac
       flavors: AppState.flavors.map((f) => f.id)
     };
   });
-  // The collateral damage among the numeric-id collections is the KNOWN
-  // pre-existing bug (D-071) and is not this wave's to fix — it is asserted here
-  // only to prove the flavor collection is genuinely outside that blast radius.
-  expect(result.recipes).toBe(0);
-  expect(result.hacks).toBe(0);
-  expect(result.pantry).toBe(0);
+  // The legacy numeric tombstone is now ambiguous and is dropped instead of
+  // applying globally across every TOMBSTONE_KEYS collection.
+  expect(result.recipes).toBe(1);
+  expect(result.hacks).toBe(1);
+  expect(result.pantry).toBe(1);
   expect(result.flavors).toEqual(['flv-soy-calamansi']); // untouched
 });
 
@@ -560,12 +559,12 @@ test('deleting a flavor while signed in tombstones it through the normal save pa
   await page.click('.confirm-overlay .confirm-ok-btn');
 
   await page.waitForFunction(
-    () => AppState.flavors.length === 0 && !!(AppState.deletions || {})['flv-to-delete'],
+    () => AppState.flavors.length === 0 && !!((AppState.deletions || {}).flavors || {})['flv-to-delete'],
     null, { timeout: 15000 });
 
   const last = await page.evaluate(() => window.__writes[window.__writes.length - 1]);
   expect(last.flavors).toEqual([]);
-  expect(last.deletions['flv-to-delete']).toBeTruthy();
+  expect(last.deletions.flavors['flv-to-delete']).toBeTruthy();
 });
 
 test('a tombstoned flavor is not resurrected by a cloud copy that still has it', async ({ page }) => {
@@ -606,7 +605,7 @@ test('MUTATION: removing flavors from TOMBSTONE_KEYS resurrects a deleted flavor
       AppState.flavors = normalizeFlavors([
         { id: 'flv-zombie', name: 'Zombie', updatedAt: '2026-08-01T00:00:00.000Z' }
       ]);
-      AppState.deletions = { 'flv-zombie': '2026-08-20T00:00:00.000Z' };
+      AppState.deletions = { flavors: { 'flv-zombie': '2026-08-20T00:00:00.000Z' } };
     };
     const original = TOMBSTONE_KEYS.slice();
 
@@ -646,10 +645,17 @@ test('MUTATION: an unprefixed flavor id is destroyed by an unrelated numeric tom
       applyTombstones();
       return AppState.flavors.length;
     };
-    return { prefixed: run('flv-5'), bare: run(5) };
+    const oldFlatBare = (() => {
+      AppState.flavors = [{ id: 5, name: 'Victim', updatedAt: '2026-08-01T00:00:00.000Z' }];
+      const flat = { '5': '2026-08-20T00:00:00.000Z' };
+      AppState.flavors = AppState.flavors.filter((f) => !flat[String(f.id)]);
+      return AppState.flavors.length;
+    })();
+    return { prefixed: run('flv-5'), bare: run(5), oldFlatBare };
   });
   expect(result.prefixed).toBe(1); // the rule protects it
-  expect(result.bare).toBe(0);     // without the rule it is collateral damage
+  expect(result.bare).toBe(1);     // collection-aware tombstones protect it too
+  expect(result.oldFlatBare).toBe(0); // the old flat map is the mutant
 });
 
 // ───────────────────────────────────────────────────────────────────────────

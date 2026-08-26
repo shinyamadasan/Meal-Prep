@@ -98,7 +98,7 @@ test('live: cooking that empties six pantry items crosses MASS_DELETE_GUARD and 
     snapshotIdBaseline();
     AppState.pantry = [];
     recordLocalDeletions();
-    const guardSwallowed = Object.keys(AppState.deletions).length;
+    const guardSwallowed = Object.keys(AppState.deletions.pantry || {}).length;
 
     // REAL ARM: the same six items, emptied through the deployed cook path.
     AppState.deletions = {};
@@ -109,7 +109,7 @@ test('live: cooking that empties six pantry items crosses MASS_DELETE_GUARD and 
     return {
       guardSwallowed: guardSwallowed,
       pantryIds: AppState.pantry.map((p) => p.id),
-      tombstones: Object.keys(AppState.deletions).sort()
+      tombstones: Object.keys(AppState.deletions.pantry || {}).sort()
     };
   }, [PANTRY_FN, RECIPE_FN, NAMES]);
 
@@ -141,10 +141,10 @@ test('live: a full cook keeps partial stock, creates the batch, and lands every 
       portions: AppState.cookedMeals[0].portionsRemaining,
       pantryIds: AppState.pantry.map((p) => p.id),
       keepQty: AppState.pantry[0].quantity,
-      tombstones: Object.keys(AppState.deletions).sort(),
+      tombstones: Object.keys(AppState.deletions.pantry || {}).sort(),
       storedPantryIds: stored.pantry.map((p) => p.id),
-      storedTombstones: Object.keys(stored.deletions).sort(),
-      payloadTombstones: Object.keys(payload.deletions).sort()
+      storedTombstones: Object.keys(stored.deletions.pantry || {}).sort(),
+      payloadTombstones: Object.keys(payload.deletions.pantry || {}).sort()
     };
   }, [PANTRY_FN, RECIPE_FN, NAMES]);
 

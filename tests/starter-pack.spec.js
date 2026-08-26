@@ -74,7 +74,7 @@ async function existingInstall(page, opts) {
     }
     AppState.deletions = AppState.deletions || {};
     (o.deleted || []).forEach((id) => {
-      AppState.deletions[String(id)] = new Date().toISOString();
+      writeTombstone('recipes', id, new Date().toISOString());
     });
     saveData();
     showTab('recipes');
@@ -284,7 +284,7 @@ test('a deleted starter recipe is not resurrected', async ({ page }) => {
 
   // The tombstones themselves are left exactly as they were — the pack reads
   // them, never writes them.
-  const dels = await page.evaluate(() => Object.keys(AppState.deletions).sort());
+  const dels = await page.evaluate(() => Object.keys(AppState.deletions.recipes || {}).sort());
   expect(dels).toEqual(['29', '34', '39']);
 });
 
@@ -297,7 +297,7 @@ test('deleting a starter recipe after adding it keeps it gone on the next offer'
   // Now delete one the way the app does, then re-render.
   await page.evaluate(() => {
     AppState.recipes = AppState.recipes.filter((r) => Number(r.id) !== 35);
-    AppState.deletions['35'] = new Date().toISOString();
+    writeTombstone('recipes', '35', new Date().toISOString());
     saveData();
     renderRecipes();
   });
