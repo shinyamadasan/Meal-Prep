@@ -1840,3 +1840,174 @@ Verify: app.js contains "function applyPurchaseToStock"
 Verify: app.js contains "function unitsMergeable"
 Verify: app.js contains "status: 'merged'"
 Verify: app.js contains "stock item"
+
+---
+
+## D-070 — The Flavor Library is a real top-level collection, because the alternatives were worse
+
+**Task:** Prep Leverage Wave 1 — Flavor Library (branch `wave-flavor-library`)
+
+### Context
+
+The app answers "which full recipe should we cook?". It does not answer "we already have cooked
+chicken — how do we make it taste different tonight?". Expressing that today means creating a
+separate Chicken Teriyaki, Chicken Soy-Calamansi and Chicken Spicy Mayo recipe, which is three
+recipes for one protein and two tablespoons of sauce.
+
+The app already *gives* this advice as prose. Three of the fourteen seeded Cooking Hacks say it
+outright — #7 "a different sauce each time", #9 "Oven Chicken, Three Sauces", #13 "Make Sauces
+Separately: the same batch becomes a different meal each day". There was simply no structure
+behind the advice.
+
+### Decision
+
+A flavor is a new top-level synced collection, `AppState.flavors`, holding a small structured
+object: `id, name, ingredients, instructions, activeTime, preparationStyle, worksWith, tags,
+updatedAt`.
+
+Three representations were characterised before coding. Two were rejected:
+
+- **Flavors as recipes** (`kind: 'flavor'`) — zero registry changes, but it puts a permanent filter
+  obligation on every consumer of `AppState.recipes`: What Should We Eat, cook suggestions, the
+  planner, the recipe grid and quick filters, grocery generation, nutrition totals, cook history,
+  the starter pack, `patchMissingNutrition()`. Dozens of call sites, and every one missed is a
+  visible bug — spicy mayo offered as tonight's dinner, or mayonnaise on the grocery list. This
+  trades 17 deliberate edits in one well-understood subsystem for an unbounded tax across the app.
+  It is **higher** risk than the schema change it avoids, not lower.
+- **Flavors inside `customHacks`** — also zero registry changes, and genuinely viable: `customHacks`
+  is already a `TOMBSTONE_KEY`, already synced, already has CRUD, and only about six consumers would
+  need a `kind` filter. Rejected because the sync layer stops noticing while the model starts lying.
+  A hack is five prose fields; a flavor carries ingredients, instructions, a time, a preparation
+  style and a compatibility list. The collection would hold two unrelated shapes forever, and a
+  future Meal Lego would read flavors out of a collection named for something else.
+
+The new collection was taken with explicit owner approval, and lands as `approved` (held) under
+D-032 — never `done`, never auto-merged.
+
+### Why the fields are these fields, and no others
+
+`prepared`, `portionsRemaining`, `batchSize`, freezer quantity, expiry, thaw state and nutrition are
+all deliberately absent. Every one of them turns the library into a daily logging job, and the
+feature's whole value is that it is knowledge you read, not stock you maintain. Whether
+prepared-flavor inventory deserves to exist is a question dogfooding answers, not one the schema
+should pre-empt. All of them remain additive later, exactly as D-055 and D-056 were.
+
+`preparationStyle` is a **label**, not a state: `freezer-friendly` says a flavor freezes well, never
+that any is currently frozen. `activeTime` follows D-055's rule — blank means `null` ("not stated"),
+never `0`, so a flavor nobody filled in does not claim to be instant. `normalizeFlavor()` never
+invents `updatedAt`; stamping one there would let a normalize pass hand a flavor a fresh timestamp
+that beats its own tombstone under `applyTombstones()`' LWW rule and resurrect it on every device.
+
+### Every flavor id is string-prefixed `flv-`
+
+`AppState.deletions` is a single **flat** `id -> deletedAt` map shared by every key in
+`TOMBSTONE_KEYS`. A bare numeric flavor id would be matched by a tombstone written for a recipe, a
+hack or a pantry item that happened to share the number. The prefix removes flavors from that shared
+numeric space entirely. See D-071 for the underlying defect, which this wave does not fix.
+
+Inbound data missing the prefix is **re-prefixed** rather than dropped: an unprefixed id is exactly
+the hazard, and no legitimate tombstone can refer to an id that was never a valid flavor id. The
+rewrite is idempotent, so normalizing twice can never rewrite a live id and orphan its tombstone.
+
+### Persistence — all 17 sites, no partial implementation
+
+`AppState` default, `saveToLocalStorage()`, `loadFromLocalStorage()`, `snapshotData()`,
+`restoreBackup()`, `exportData()`, `importData()` (x4: `KNOWN`, tombstone-clear, union, re-stamp),
+`TOMBSTONE_KEYS`, `buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`,
+`loadUserData()` (x2: `UKEYS` union, post-merge normalize), `setupRealtimeListeners()`.
+
+`clearLocalStorage()` and `collectSyncedIds()` needed **no** edit: both iterate `TOMBSTONE_KEYS`, so
+adding the key enrols flavors in Clear All Data and in local-deletion detection automatically.
+`deleteFlavor()` writes no tombstone by hand for the same reason — `recordLocalDeletions()` diffs the
+curated lists against the per-session baseline at save time, which is the one deletion concept the
+whole app shares.
+
+No existing persistence semantics changed. The export version moved `1.1` to `1.2`; import accepts
+both, because a `1.1` file simply has no `flavors` key.
+
+### Starter flavors use the D-063 opt-in pattern, never first-run auto-seeding
+
+Ten flavors, offered by a prompt, added on tap. An id already present is a permanent skip (the user
+may have edited it); an id in `AppState.deletions` is a permanent skip (deleting it was a decision).
+Auto-seeding on load would give every flavor back to an account that deliberately deleted them all.
+The pack is derived from `defaultFlavors` rather than a hand-listed id array — unlike
+`STARTER_PACK_IDS` — because `defaultFlavors` *is* the pack, so a future addition should become
+offerable through the same opt-in prompt.
+
+### Ready Food "Try with" was cut to Wave 2
+
+The bridge needs to know what protein a cooked batch is, and `cookedMeals` has no protein field.
+Batches created by `_doMarkCooked()` carry a `recipeId` and could be resolved through the source
+recipe's `baseIngredients`. Batches created by the manual add-cooked-meal path carry
+`recipeId: null` and nothing but a free-text name — and those are the common case for exactly the
+food this feature is about (takeout, leftovers). Matching those means guessing protein from an
+arbitrary string. That is a separate subsystem with its own vocabulary bridge and its own tests, and
+guessing would produce confident wrong answers, so it is deferred rather than half-built.
+
+**Prerequisite for Wave 2:** a protein classifier for `cookedMeals` — either a real field captured at
+cook/add time, or a resolver over `recipeId` to `baseIngredients` to a `FLAVOR_PROTEINS` slug, with
+an explicit "unknown" result rather than a fallback guess.
+
+Verify: app.js contains "var FLAVOR_ID_PREFIX = 'flv-'"
+Verify: app.js contains "function normalizeFlavor("
+Verify: app.js contains "function flavorStarterCandidates"
+Verify: app.js contains "const defaultFlavors"
+Verify: app.js contains "'customHacks', 'flavors', 'cookedMeals'"
+Verify: tests/flavor-library.spec.js contains "MUTATION: removing flavors from TOMBSTONE_KEYS"
+
+---
+
+## D-071 — KNOWN PRE-EXISTING RED-ZONE BUG: `AppState.deletions` is a flat cross-collection id map
+
+**Status:** Open. Recorded during Prep Leverage Wave 1 characterization. **Deliberately not fixed
+there** — it is unrelated to flavors and is its own red-zone change.
+
+### The defect
+
+`AppState.deletions` is one flat `id -> deletedAt` map. `applyTombstones()` walks **all** of
+`TOMBSTONE_KEYS` — `recipes`, `pantry`, `customIngredients`, `customHacks`, `flavors`,
+`cookedMeals`, `userIngredients` — against that single map. A tombstone is therefore matched by id
+alone, with no idea which collection the id belonged to.
+
+Any two collections that share an id space can destroy each other's records. The seeded data already
+does: **recipe ids 1-40 and default cooking-hack ids 1-14 overlap completely on 1-14.**
+
+### Reproduction (verified on `main @ c6ccc1e`, before this wave)
+
+    AppState.recipes     = [{ id: 5, name: 'Recipe Five',  updatedAt: '2026-01-01...' }];
+    AppState.customHacks = [{ id: 5, title: 'Hack Five',   updatedAt: '2026-01-01...' }];
+    AppState.pantry      = [{ id: 5, name: 'Pantry Five',  updatedAt: '2026-01-01...' }];
+    AppState.deletions   = { '5': '2026-06-01...' };   // only the RECIPE was deleted
+    applyTombstones();
+    // recipes: []   expected
+    // hacks:   []   COLLATERAL
+    // pantry:  []   COLLATERAL
+
+`loadFromFirestore()` backfills `updatedAt` on untimestamped items with the document's save time,
+and a tombstone written after that save is newer — so LWW does not save the bystanders.
+
+### Why it is not fixed here
+
+The fix is to namespace `deletions` by collection (`{ recipes: {...}, pantry: {...} }`) plus a
+migration that reads the legacy flat map. That changes the tombstone wire format, the merge, the
+sign-in union, the import tombstone-clear and the realtime apply — a red-zone sync migration with a
+blast radius of its own, and nothing to do with the Flavor Library. Bundling it would have made a
+feature wave unreviewable.
+
+### What Wave 1 did instead
+
+Kept flavors out of the shared numeric space entirely via the `flv-` id prefix (D-070). That
+protects the new collection; it does **not** protect recipes, hacks, pantry, custom ingredients,
+cooked meals or user ingredients from each other. `tests/flavor-library.spec.js` asserts the
+collateral damage among those collections as current, known behaviour, so this record and the code
+cannot silently drift apart.
+
+### Follow-up scope when it is picked up
+
+- Namespace `AppState.deletions` per collection, with a read-migration for the flat legacy map.
+- Update `applyTombstones()`, `collectSyncedIds()`, `recordLocalDeletions()`, `mergeDeletions()`,
+  `purgeOldTombstones()`, the `importData()` tombstone-clear, and `clearLocalStorage()`.
+- Red zone, so `approved` (held) under D-032. Never chained (Hard Rule 10).
+
+Verify: app.js contains "var TOMBSTONE_KEYS ="
+Verify: tests/flavor-library.spec.js contains "prefixed flavor ids survive a numeric tombstone"

@@ -15,6 +15,7 @@ AppState.cookHistory        // [{ recipeId, recipeName, date, servings }] newest
 AppState.nutritionGoals     // { calories, protein, carbs, fat, fiber, sodium }
 AppState.customIngredients  // [] storage-guide items (feeds dead #storage tab)
 AppState.customHacks        // [] user cooking hacks
+AppState.flavors            // [] reusable finishing knowledge (see "Flavor object" below, D-070)
 AppState.userIngredients    // [] user-created INGREDIENT_DB-style entries
 AppState.ingredientPrices   // {} per-store price overrides
 AppState.myStores           // [] stores the user shops at (filter)
@@ -126,6 +127,47 @@ portions for a batch that has none. Read portions through the helpers:
 | `readyFoodMetaLine(meal)` | "2 portions · fridge · use soon · 1d left" |
 | `readyFoodBalanceHint(meal)` | "add veg + rice" from the source recipe's `mealBalance` (D-055), or '' |
 
+## Flavor object (D-070)
+Reusable finishing knowledge: how to make a protein you already cooked taste like a different meal.
+Deliberately NOT a recipe (no servings, no nutrition, no cook time; never planned or shopped for)
+and NOT a cooking hack (a hack is five prose fields).
+
+```js
+{
+  id,                 // STRING, always prefixed 'flv-'. Never a bare number - see below.
+  name,               // 'Soy-Calamansi'
+  ingredients: [      // same row shape as recipe.baseIngredients, so INGREDIENT_DB lookups work
+    { name, baseQuantity, unit, category }
+  ],
+  instructions,       // prose string, like recipe.instructions - not an array of steps
+  activeTime,         // minutes, or null = 'not stated' (never 0 as a stand-in - D-055's rule)
+  preparationStyle,   // 'make-fresh' | 'fridge-batch' | 'freezer-friendly', or null.
+                      // A LABEL, not a state: 'freezer-friendly' means it freezes well,
+                      // never that any is currently frozen.
+  worksWith: [],      // slugs from FLAVOR_PROTEINS (chicken, pork, beef, fish, salmon, tuna,
+                      // shrimp, egg, tofu, vegetables, rice)
+  tags: [],           // slugs from FLAVOR_TAGS (= RECIPE_TAGS + spicy, sweet-savory, creamy,
+                      // tangy, garlicky)
+  updatedAt           // set ONLY by stampUpdated() on a real user edit - see below
+}
+```
+
+**The `flv-` id prefix is mandatory.** `AppState.deletions` is a single FLAT `id -> deletedAt` map
+shared by every key in `TOMBSTONE_KEYS`, so a bare numeric flavor id would be matched by a tombstone
+written for a recipe, hack or pantry item that shares the number. `normalizeFlavorId()` re-prefixes
+any inbound id that lacks it, idempotently. See D-071 for the underlying defect.
+
+**`normalizeFlavor()` never sets `updatedAt`.** Stamping one during normalization would let a
+normalize pass hand a flavor a fresh timestamp that beats its own tombstone under
+`applyTombstones()`' LWW rule, resurrecting a deleted flavor on every device.
+
+`normalizeFlavors()` runs at every point `flavors` is assigned from stored data:
+`loadFromLocalStorage()`, `loadFromFirestore()`, `restoreBackup()`, `importData()`,
+`setupRealtimeListeners()`, and after the `loadUserData()` sign-in union.
+
+Explicitly NOT in v1, and each would create a recurring logging job: `prepared`,
+`portionsRemaining`, `batchSize`, freezer quantity, expiry, thaw state, nutrition.
+
 ## Pantry item
 ```js
 {
@@ -204,10 +246,14 @@ otherwise it becomes `null` (unknown) rather than an invented number.
 | `INGREDIENT_DB` | ~175 | `{ name, unit, category, price, store, aliases, fridgeDays, freezerDays, trackExpiry, priceValue, minStockQty }` — autocomplete, pricing, storage inference |
 | `LOCAL_NUTRITION_DB` | ~120 | `{ name, calories, protein, carbs, fat, fiber, sodium }` per 100g — offline nutrition |
 | `PANTRY_KNOWLEDGE` | 22 | Storage guidance prose (location, lasts, store, spoilage, freshness) |
-| `defaultCookingHacks` | 6 | Seeded hacks |
+| `defaultCookingHacks` | 14 | Seeded hacks (ids 1-14) |
+| `defaultFlavors` | 10 | Starter Flavor Library, ids `flv-*`; offered opt-in via `flavorStarterCandidates()`, never auto-seeded (D-070) |
 | `defaultStorageData` | ~40 | Seeds `customIngredients` ONLY in the Firebase-unavailable fallback |
 
 ## Versioning
 `version` on the Firestore doc is incremented every save and used to detect concurrent edits.
 It is **not** a schema-migration system — backward-compat is handled by `patchMissingNutrition()`
 and defensive `|| []` / `|| {}` defaults on load.
+
+The export payload carries its own `version` string: `1.1` predates the Flavor Library, `1.2`
+adds `flavors`. `importData()` accepts both - a `1.1` file simply has no `flavors` key.

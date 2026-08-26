@@ -26,6 +26,7 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
 | Nutrition | `#nutrition` | `renderNutritionTab()` → `renderWeeklyNutritionTotals()`, `renderWeeklyNutritionChart()`, `renderDailyNutritionBreakdown()`, `filterRecipesByNutrition()` |
 | Price Book | `#ingredients` | `renderIngredientsTab()` |
 | Cooking Hacks | `#hacks` | `renderCookingHacks()` |
+| Flavor Library | `#flavors` | `renderFlavors()` |
 | Storage Guide | `#storage` | `renderStorageGuide()` — **dead UI, no nav button** |
 
 ## Save / load / sync pipeline
@@ -37,6 +38,15 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
   Real-time `onSnapshot` listener applies remote changes live across devices/tabs.
 - **Always after loading recipes:** call `patchMissingNutrition(AppState.recipes)` — old saved
   recipes are plain JSON missing fields added later (D-005).
+- **Always after loading flavors:** call `normalizeFlavors()`. It fills absent fields, drops unknown
+  slugs, and enforces the mandatory `flv-` id prefix. It must never set `updatedAt` — see D-070.
+- **Adding a synced collection touches 17 sites.** `AppState` default, `saveToLocalStorage()`,
+  `loadFromLocalStorage()`, `snapshotData()`, `restoreBackup()`, `exportData()`, `importData()` (x4),
+  `TOMBSTONE_KEYS`, `buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`,
+  `loadUserData()` (x2), `setupRealtimeListeners()`. `clearLocalStorage()` and `collectSyncedIds()`
+  need no edit — both iterate `TOMBSTONE_KEYS`. A partial implementation loses data: skip the
+  sign-in union and local records are shadowed by the cloud copy; skip `TOMBSTONE_KEYS` and a
+  deletion is resurrected by the next union. See D-070 for the worked example.
 - **Write guard — never write before read:** `saveToFirestore()` no-ops until `AppState.cloudReady`
   is true (set only after the cloud doc is read, or on sign-up). This stops a load-window save (the
   30s auto-save, the `online` event, a render) from overwriting good cloud data with an un-loaded

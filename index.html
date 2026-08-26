@@ -59,6 +59,7 @@
                         <div class="tab-more-menu hidden">
                             <button class="tab-btn" data-tab="nutrition">Nutrition</button>
                             <button class="tab-btn" data-tab="ingredients">Price Book</button>
+                            <button class="tab-btn" data-tab="flavors">Flavor Library</button>
                             <button class="tab-btn" data-tab="hacks">Cooking Hacks</button>
                             <div class="tab-more-sep"></div>
                             <button class="tab-btn" onclick="openSettingsModal()"><span class="ic" data-icon="settings"></span> Settings</button>
@@ -561,6 +562,22 @@
                     <div id="ingredients-catalog"></div>
                 </section>
 
+                <!-- Flavor Library Tab -->
+                <section id="flavors" class="tab-content">
+                    <div class="section-header">
+                        <h2><span class="ic" data-icon="citrus"></span> Flavor Library</h2>
+                        <div class="flavor-controls">
+                            <button class="btn btn--primary" id="add-flavor-btn">Add Flavor</button>
+                            <input type="text" class="form-control" id="flavor-search" placeholder="Search flavors...">
+                            <select class="form-control" id="flavor-style-filter"></select>
+                            <select class="form-control" id="flavor-protein-filter"></select>
+                        </div>
+                    </div>
+                    <p class="flavor-intro">Fast ways to make a protein you already cooked taste like a different meal.</p>
+                    <div id="flavor-starter-prompt" class="hidden"></div>
+                    <div id="flavor-list" class="flavor-list"></div>
+                </section>
+
                 <section id="hacks" class="tab-content">
                     <div class="section-header">
                         <h2><span class="ic" data-icon="lightbulb"></span> Cooking Hacks &amp; Meal Prep Tips</h2>
@@ -796,6 +813,57 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn--outline" id="cancel-hack-btn">Cancel</button>
                     <button type="submit" class="btn btn--primary">Save Hack</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Flavor Modal -->
+    <div id="flavor-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="flavor-modal-title">Add Flavor</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="flavor-form" class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="flavor-name">Name</label>
+                        <input type="text" class="form-control" id="flavor-name" placeholder="e.g. Soy-Calamansi" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="flavor-prep-style">Preparation</label>
+                        <select class="form-control" id="flavor-prep-style" required>
+                            <option value="">Select preparation</option>
+                            <option value="make-fresh">Make fresh &mdash; mix it at the table</option>
+                            <option value="fridge-batch">Fridge batch &mdash; worth making a jar</option>
+                            <option value="freezer-friendly">Freezer-friendly &mdash; freezes well ahead</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="flavor-active-time">Active time (minutes)</label>
+                    <input type="number" class="form-control" id="flavor-active-time" min="0" step="1" placeholder="Leave blank if you are not sure">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="flavor-ingredients">Ingredients &mdash; one per line</label>
+                    <textarea class="form-control" id="flavor-ingredients" rows="4" placeholder="4 tbsp Soy Sauce&#10;6 pieces Calamansi&#10;2 cloves Garlic"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="flavor-instructions">How to make it</label>
+                    <textarea class="form-control" id="flavor-instructions" rows="3" placeholder="Squeeze the calamansi into the soy sauce..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Works with</label>
+                    <div id="flavor-works-with" class="flavor-choices"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tags</label>
+                    <div id="flavor-tag-choices" class="flavor-choices"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" id="cancel-flavor-btn">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save Flavor</button>
                 </div>
             </form>
         </div>

@@ -23,8 +23,10 @@ const AppState = {
   },
   currentEditingIngredient: null,
   currentEditingHack: null,
+  currentEditingFlavor: null,
   customIngredients: [],
   customHacks: [],
+  flavors: [],                // reusable finishing knowledge — see the Flavor Library section (D-070)
   pantry: [],
   userIngredients: [],
   ingredientPrices: {},
@@ -433,6 +435,7 @@ function saveToLocalStorage() {
       nutritionGoals: AppState.nutritionGoals,
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
+      flavors: AppState.flavors,
       pantry: AppState.pantry,
       userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
@@ -483,6 +486,9 @@ function loadFromLocalStorage() {
       };
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
+      // A record saved before flavors existed simply has no `flavors` key — it
+      // loads as an empty library, exactly as an install that deleted them all.
+      AppState.flavors = normalizeFlavors(data.flavors || []);
       AppState.pantry = data.pantry || [];
       AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
@@ -627,6 +633,671 @@ function normalizeRecipeMeta(recipe) {
   return recipe;
 }
 
+// ── Flavor Library ───────────────────────────────────────────────────────────
+// A flavor is reusable KNOWLEDGE: how to turn a protein you already cooked into a
+// different meal. It is deliberately NOT a recipe (no servings, no nutrition, no
+// cook time, never planned or shopped for) and NOT a cooking hack (a hack is five
+// prose fields; a flavor carries ingredients, instructions, a time, a preparation
+// style and a compatibility list).
+//
+// This IS a new top-level synced collection — AppState.flavors — which is why it
+// touches the Firestore payload, the load path, the sign-in union, the cloud-merge
+// and TOMBSTONE_KEYS. That is D-032 red-zone work and lands as `approved`, held for
+// a human merge. It was taken deliberately rather than hiding flavors inside
+// recipes (which would force a filter on every recipe consumer forever) or inside
+// customHacks (zero sync cost, but the collection would then hold two unrelated
+// shapes). See DECISIONS D-070.
+//
+// What a flavor deliberately does NOT have, and must not grow without evidence:
+// prepared, portionsRemaining, batchSize, freezer quantity, expiry, thaw state,
+// nutrition. Any of those turns the library into a daily logging job, which is the
+// one outcome that would make the feature a net loss.
+
+// Every flavor id is string-prefixed. AppState.deletions is a single FLAT
+// id -> deletedAt map shared by EVERY key in TOMBSTONE_KEYS, so a bare numeric id
+// in flavors[] would be matched by a tombstone written for a recipe, a hack or a
+// pantry item that happened to share the number, and the flavor would vanish. The
+// prefix removes flavors from that shared numeric space entirely. (The underlying
+// flat-map collision between the EXISTING collections — recipe ids 1-40 already
+// overlap default-hack ids 1-14 — is a real pre-existing bug that is explicitly
+// out of scope here; see DECISIONS D-071.)
+var FLAVOR_ID_PREFIX = 'flv-';
+
+// How much work the flavor is, and therefore how the app should talk about it.
+// This is a LABEL, not an inventory state: 'freezer-friendly' says a flavor freezes
+// well, never that any is currently frozen.
+var FLAVOR_PREP_STYLES = [
+  { id: 'make-fresh',       label: 'Make fresh',       icon: 'timer',        hint: 'Mix it at the table' },
+  { id: 'fridge-batch',     label: 'Fridge batch',     icon: 'refrigerator', hint: 'Worth making a jar' },
+  { id: 'freezer-friendly', label: 'Freezer-friendly', icon: 'snowflake',    hint: 'Freezes well ahead' }
+];
+
+// The smallest vocabulary that answers "will this go with what I already cooked?".
+// Deliberately coarse: no pairwise scoring, no ontology, no per-cut distinctions.
+// The slugs line up with INGREDIENT_DB's Protein entries so a future Meal Lego can
+// match a cooked batch to a flavor without any new field on either side.
+var FLAVOR_PROTEINS = [
+  { id: 'chicken',    label: 'Chicken' },
+  { id: 'pork',       label: 'Pork' },
+  { id: 'beef',       label: 'Beef' },
+  { id: 'fish',       label: 'Fish' },
+  { id: 'salmon',     label: 'Salmon' },
+  { id: 'tuna',       label: 'Tuna' },
+  { id: 'shrimp',     label: 'Shrimp' },
+  { id: 'egg',        label: 'Egg' },
+  { id: 'tofu',       label: 'Tofu' },
+  { id: 'vegetables', label: 'Vegetables' },
+  { id: 'rice',       label: 'Rice' }
+];
+
+// EXTENDS the existing recipe vocabulary rather than forking a parallel one, so a
+// flavor tagged 'minimal-cleanup' means exactly what a recipe tagged that means.
+// The seed data does not use 'freezer-friendly' as a tag — preparationStyle is the
+// authoritative field for that, and saying it twice invites the two to disagree.
+var FLAVOR_TAGS = RECIPE_TAGS.concat([
+  { id: 'spicy',        label: 'Spicy' },
+  { id: 'sweet-savory', label: 'Sweet-savoury' },
+  { id: 'creamy',       label: 'Creamy' },
+  { id: 'tangy',        label: 'Tangy' },
+  { id: 'garlicky',     label: 'Garlicky' }
+]);
+
+var FLAVOR_PREP_STYLE_BY_ID = idLookup(FLAVOR_PREP_STYLES);
+var FLAVOR_PROTEIN_BY_ID    = idLookup(FLAVOR_PROTEINS);
+var FLAVOR_TAG_BY_ID        = idLookup(FLAVOR_TAGS);
+
+function flavorSlug(text) {
+  return String(text == null ? '' : text).toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Inbound data missing the prefix is RE-PREFIXED rather than dropped: an unprefixed
+// id is precisely the hazard described above, and no legitimate tombstone can refer
+// to an id that was never a valid flavor id. Idempotent — an already-prefixed id is
+// returned untouched, so normalizing twice can never rewrite a live id and orphan
+// its tombstone.
+function normalizeFlavorId(id, name) {
+  var raw = String(id == null ? '' : id).trim();
+  if (raw.indexOf(FLAVOR_ID_PREFIX) === 0 && raw.length > FLAVOR_ID_PREFIX.length) return raw;
+  var body = flavorSlug(raw) || flavorSlug(name);
+  return FLAVOR_ID_PREFIX + (body || String(Date.now()));
+}
+
+function newFlavorId() { return FLAVOR_ID_PREFIX + Date.now(); }
+
+function normalizeFlavorPrepStyle(value) {
+  var s = String(value == null ? '' : value).trim();
+  return FLAVOR_PREP_STYLE_BY_ID[s] ? s : null;
+}
+
+// Same row shape as recipe.baseIngredients, so INGREDIENT_DB lookups and the
+// existing ingredient parser keep working with no translation layer. A row with no
+// name is not an ingredient and is dropped; a missing quantity becomes 0 rather
+// than NaN.
+function normalizeFlavorIngredients(value) {
+  if (!Array.isArray(value)) return [];
+  var out = [];
+  value.forEach(function(ing) {
+    if (!ing || typeof ing !== 'object') return;
+    var name = String(ing.name == null ? '' : ing.name).trim();
+    if (!name) return;
+    var qty = Number(ing.baseQuantity != null ? ing.baseQuantity : ing.quantity);
+    var unit = String(ing.unit == null ? '' : ing.unit).trim();
+    out.push({
+      name: name,
+      baseQuantity: (Number.isFinite(qty) && qty >= 0) ? qty : 0,
+      unit: unit || 'pieces',
+      category: String(ing.category == null ? '' : ing.category).trim()
+    });
+  });
+  return out;
+}
+
+// Fills absent/garbage fields with honest defaults and never invents a value the
+// user did not give. Note what it does NOT touch: updatedAt. Stamping one here
+// would let a normalize pass hand a flavor a fresh timestamp that beats its own
+// tombstone under applyTombstones()' LWW rule, resurrecting a deleted flavor on
+// every device. Only stampUpdated() — called from a real user edit — may set it.
+function normalizeFlavor(flavor) {
+  if (!flavor || typeof flavor !== 'object' || Array.isArray(flavor)) return null;
+  flavor.id = normalizeFlavorId(flavor.id, flavor.name);
+  flavor.name = String(flavor.name == null ? '' : flavor.name).trim() || 'Untitled Flavor';
+  flavor.ingredients = normalizeFlavorIngredients(flavor.ingredients);
+  flavor.instructions = String(flavor.instructions == null ? '' : flavor.instructions);
+  // null = "not stated", never 0 — a flavor nobody filled this in for must not
+  // claim to be instant. Same rule as recipe.activeTime.
+  flavor.activeTime = normalizeActiveTime(flavor.activeTime);
+  flavor.preparationStyle = normalizeFlavorPrepStyle(flavor.preparationStyle);
+  flavor.worksWith = normalizeSlugList(flavor.worksWith, FLAVOR_PROTEIN_BY_ID);
+  flavor.tags = normalizeSlugList(flavor.tags, FLAVOR_TAG_BY_ID);
+  return flavor;
+}
+
+// Returns a NEW array: normalizing can re-prefix ids, and two rows that collide
+// after prefixing must not both survive into a collection whose merges are keyed
+// by id. First copy wins, matching unionById's existing local-preferred behaviour.
+function normalizeFlavors(flavors) {
+  if (!Array.isArray(flavors)) return [];
+  var out = [], seen = {};
+  flavors.forEach(function(f) {
+    var n = normalizeFlavor(f);
+    if (!n || seen[n.id]) return;
+    seen[n.id] = true;
+    out.push(n);
+  });
+  return out;
+}
+
+function findFlavor(id) {
+  return (AppState.flavors || []).find(function(f) { return String(f.id) === String(id); }) || null;
+}
+
+function flavorPrepStyleLabel(flavor) {
+  var s = FLAVOR_PREP_STYLE_BY_ID[flavor && flavor.preparationStyle];
+  return s ? s.label : '';
+}
+
+function flavorProteinLabels(flavor) {
+  return ((flavor && flavor.worksWith) || []).map(function(id) {
+    return FLAVOR_PROTEIN_BY_ID[id].label;
+  });
+}
+
+// "3 tbsp Soy Sauce (Toyo)" — a whole quantity prints without a trailing .0, and a
+// zero quantity prints the name alone rather than claiming "0 pieces".
+function flavorIngredientLine(ing) {
+  if (!ing) return '';
+  if (!ing.baseQuantity) return ing.name;
+  var qty = Number(ing.baseQuantity);
+  var shown = Number.isInteger(qty) ? String(qty) : String(qty);
+  return shown + ' ' + ing.unit + ' ' + ing.name;
+}
+
+// ── Starter flavors ──────────────────────────────────────────────────────────
+// Ten flavors covering different taste directions, common ingredients, little
+// active work, and more than one protein each. Delivered through the D-063 opt-in
+// starter-pack pattern, NOT through first-run auto-seeding: an id already present
+// is a permanent skip (the user may have edited it) and an id in AppState.deletions
+// is a permanent skip (deleting it was a decision, and re-adding it with a fresh
+// updatedAt would beat its own tombstone under LWW and resurrect it everywhere).
+const defaultFlavors = [
+  {
+    id: 'flv-soy-calamansi',
+    name: 'Soy-Calamansi',
+    ingredients: [
+      { name: 'Soy Sauce (Toyo)', baseQuantity: 4, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Calamansi', baseQuantity: 6, unit: 'pieces', category: 'Fruit' },
+      { name: 'Garlic (Bawang)', baseQuantity: 2, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Black Pepper', baseQuantity: 1, unit: 'tsp', category: 'Pantry' }
+    ],
+    instructions: 'Squeeze the calamansi into the soy sauce. Add crushed garlic and pepper. Stir. Keeps in a jar in the fridge for about a week — shake before using.',
+    activeTime: 3,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'pork', 'beef', 'fish', 'salmon'],
+    tags: ['minimal-cleanup', 'tangy', 'batch-friendly']
+  },
+  {
+    id: 'flv-honey-garlic',
+    name: 'Honey Garlic',
+    ingredients: [
+      { name: 'Honey', baseQuantity: 3, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Soy Sauce (Toyo)', baseQuantity: 2, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Garlic (Bawang)', baseQuantity: 4, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Vinegar', baseQuantity: 1, unit: 'tbsp', category: 'Pantry' }
+    ],
+    instructions: 'Soften the minced garlic in a little oil, then add honey, soy sauce and vinegar. Simmer 2 minutes until it coats a spoon. Pour over already-cooked protein and toss.',
+    activeTime: 5,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'pork', 'salmon', 'tofu'],
+    tags: ['sweet-savory', 'garlicky', 'batch-friendly']
+  },
+  {
+    id: 'flv-teriyaki-style',
+    name: 'Teriyaki-style',
+    ingredients: [
+      { name: 'Soy Sauce (Toyo)', baseQuantity: 4, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Brown Sugar', baseQuantity: 2, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Ginger (Luya)', baseQuantity: 1, unit: 'tbsp', category: 'Vegetable' },
+      { name: 'Garlic (Bawang)', baseQuantity: 2, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Cornstarch', baseQuantity: 1, unit: 'tsp', category: 'Pantry' }
+    ],
+    instructions: 'Simmer soy sauce, sugar, grated ginger and garlic with 4 tbsp water. Stir the cornstarch into a little cold water and add it — the sauce thickens in about a minute. Glaze the protein off the heat.',
+    activeTime: 8,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'beef', 'salmon', 'tofu', 'egg'],
+    tags: ['sweet-savory', 'batch-friendly']
+  },
+  {
+    id: 'flv-japanese-spicy-mayo',
+    name: 'Japanese Spicy Mayo',
+    ingredients: [
+      { name: 'Mayonnaise', baseQuantity: 3, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Sriracha', baseQuantity: 1, unit: 'tbsp', category: 'Pantry' }
+    ],
+    instructions: 'Stir together. That is the whole recipe. Add a squeeze of calamansi if you have one.',
+    activeTime: 1,
+    preparationStyle: 'make-fresh',
+    worksWith: ['chicken', 'salmon', 'tuna', 'shrimp', 'egg'],
+    tags: ['minimal-cleanup', 'spicy', 'creamy', 'shortcut']
+  },
+  {
+    id: 'flv-sesame-soy',
+    name: 'Sesame-Soy',
+    ingredients: [
+      { name: 'Soy Sauce (Toyo)', baseQuantity: 2, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Sesame Oil', baseQuantity: 1, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Sesame Seeds', baseQuantity: 1, unit: 'tsp', category: 'Pantry' },
+      { name: 'Green Onion (Sibuyas Dahon)', baseQuantity: 2, unit: 'stalks', category: 'Vegetable' }
+    ],
+    instructions: 'Mix the soy sauce and sesame oil, spoon over the protein, then scatter sesame seeds and sliced green onion on top. No cooking.',
+    activeTime: 2,
+    preparationStyle: 'make-fresh',
+    worksWith: ['chicken', 'beef', 'tofu', 'egg', 'vegetables', 'rice'],
+    tags: ['minimal-cleanup', 'shortcut']
+  },
+  {
+    id: 'flv-gochujang-sesame',
+    name: 'Gochujang-Sesame',
+    ingredients: [
+      { name: 'Gochujang', baseQuantity: 2, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Sesame Oil', baseQuantity: 1, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Honey', baseQuantity: 1, unit: 'tbsp', category: 'Pantry' },
+      { name: 'Garlic (Bawang)', baseQuantity: 2, unit: 'cloves', category: 'Vegetable' }
+    ],
+    instructions: 'Whisk gochujang, sesame oil, honey and minced garlic with 1 tbsp water until smooth. Thin with more water if you want it pourable rather than sticky.',
+    activeTime: 3,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'pork', 'beef', 'tofu', 'egg'],
+    tags: ['spicy', 'sweet-savory', 'batch-friendly']
+  },
+  {
+    id: 'flv-garlic-yogurt',
+    name: 'Garlic Yogurt',
+    ingredients: [
+      { name: 'Plain Yogurt', baseQuantity: 200, unit: 'g', category: 'Dairy' },
+      { name: 'Garlic (Bawang)', baseQuantity: 2, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Calamansi', baseQuantity: 2, unit: 'pieces', category: 'Fruit' },
+      { name: 'Salt', baseQuantity: 1, unit: 'tsp', category: 'Pantry' }
+    ],
+    instructions: 'Grate the garlic into the yogurt, add calamansi juice and salt, stir. Better after an hour in the fridge. Cools down anything spicy.',
+    activeTime: 3,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'beef', 'vegetables'],
+    tags: ['creamy', 'tangy', 'garlicky', 'minimal-cleanup']
+  },
+  {
+    id: 'flv-curry-coconut-finish',
+    name: 'Curry-Coconut Finish',
+    ingredients: [
+      { name: 'Coconut Milk', baseQuantity: 200, unit: 'ml', category: 'Pantry' },
+      { name: 'Curry Powder', baseQuantity: 2, unit: 'tsp', category: 'Pantry' },
+      { name: 'Onion (Sibuyas)', baseQuantity: 1, unit: 'pieces', category: 'Vegetable' },
+      { name: 'Garlic (Bawang)', baseQuantity: 3, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Ginger (Luya)', baseQuantity: 1, unit: 'tbsp', category: 'Vegetable' }
+    ],
+    instructions: 'Soften onion, garlic and ginger. Add curry powder and cook 30 seconds until fragrant. Pour in coconut milk and simmer 5 minutes. Add cooked protein just to heat through. Freezes well in flat bags.',
+    activeTime: 10,
+    preparationStyle: 'freezer-friendly',
+    worksWith: ['chicken', 'shrimp', 'fish', 'tofu', 'vegetables'],
+    tags: ['batch-friendly', 'creamy']
+  },
+  {
+    id: 'flv-garlic-butter',
+    name: 'Garlic Butter',
+    ingredients: [
+      { name: 'Butter', baseQuantity: 100, unit: 'g', category: 'Dairy' },
+      { name: 'Garlic (Bawang)', baseQuantity: 6, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Green Onion (Sibuyas Dahon)', baseQuantity: 2, unit: 'stalks', category: 'Vegetable' },
+      { name: 'Salt', baseQuantity: 1, unit: 'tsp', category: 'Pantry' }
+    ],
+    instructions: 'Soften the butter, mash in minced garlic, chopped green onion and salt. Roll in baking paper and freeze. Slice off a coin and melt it over hot food straight from the freezer.',
+    activeTime: 5,
+    preparationStyle: 'freezer-friendly',
+    worksWith: ['chicken', 'shrimp', 'fish', 'salmon', 'vegetables', 'rice'],
+    tags: ['garlicky', 'minimal-cleanup', 'batch-friendly']
+  },
+  {
+    id: 'flv-chili-garlic',
+    name: 'Chili-Garlic',
+    ingredients: [
+      { name: 'Cooking Oil', baseQuantity: 150, unit: 'ml', category: 'Pantry' },
+      { name: 'Garlic (Bawang)', baseQuantity: 10, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Chili', baseQuantity: 6, unit: 'pieces', category: 'Vegetable' },
+      { name: 'Salt', baseQuantity: 1, unit: 'tsp', category: 'Pantry' }
+    ],
+    instructions: 'Fry minced garlic in the oil over LOW heat until it just turns pale gold, then take it off the heat and stir in the chopped chili and salt. It keeps going in the residual heat — pull it early or the garlic turns bitter. Store in a jar.',
+    activeTime: 10,
+    preparationStyle: 'fridge-batch',
+    worksWith: ['chicken', 'pork', 'shrimp', 'egg', 'tofu', 'vegetables', 'rice'],
+    tags: ['spicy', 'garlicky', 'batch-friendly']
+  }
+];
+
+// Which starter flavors this install is genuinely missing. Derived from
+// defaultFlavors rather than a hand-listed id array (unlike STARTER_PACK_IDS)
+// because defaultFlavors IS the pack — there is no other flavor seed — so a future
+// addition should become offerable through this same opt-in prompt.
+function flavorStarterCandidates() {
+  var present = {};
+  (AppState.flavors || []).forEach(function(f) { if (f && f.id != null) present[String(f.id)] = true; });
+  var deleted = AppState.deletions || {};
+  return defaultFlavors.filter(function(f) {
+    var key = String(f.id);
+    return !present[key] && !deleted[key];
+  });
+}
+
+function addStarterFlavors() {
+  var missing = flavorStarterCandidates();
+  if (!missing.length) { renderFlavors(); return; }
+
+  var stampedAt = new Date().toISOString();
+  if (!Array.isArray(AppState.flavors)) AppState.flavors = [];
+  missing.forEach(function(source) {
+    // Deep copy (D-064): AppState must never hold a reference into the
+    // defaultFlavors constant, or editing an added flavor would rewrite the seed.
+    var copy = JSON.parse(JSON.stringify(source));
+    copy.updatedAt = stampedAt; // an added flavor is a local change now
+    AppState.flavors.push(normalizeFlavor(copy));
+  });
+
+  saveData(); // Hard Rule 5 — localStorage AND Firestore, through the one save path
+  renderFlavors();
+  showFlavorStarterAdded(missing.length);
+}
+
+function showFlavorStarterAdded(count) {
+  var el = document.getElementById('flavor-starter-prompt');
+  if (!el) return;
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="fsp-card fsp-card--done" role="status">' +
+      '<div class="fsp-text">' +
+        '<div class="fsp-title">' + count + ' flavor' + (count === 1 ? '' : 's') + ' added</div>' +
+        '<div class="fsp-sub">Tap any flavor to see how to make it.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderFlavorStarterPrompt() {
+  var el = document.getElementById('flavor-starter-prompt');
+  if (!el) return;
+  var missing = flavorStarterCandidates();
+  // Nothing left to offer — the prompt retires itself. No dismiss flag, because
+  // there is nothing to remember once the offer is empty.
+  if (!missing.length) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+
+  var all = missing.length === defaultFlavors.length;
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="fsp-card">' +
+      '<div class="fsp-text">' +
+        '<div class="fsp-title">Starter flavors</div>' +
+        '<div class="fsp-sub">' +
+          (all ? 'Ten easy ways to make the same protein taste different.'
+               : missing.length + ' starter flavor' + (missing.length === 1 ? '' : 's') + ' available.') +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="btn btn--primary btn--sm flavor-sp-add" onclick="addStarterFlavors()">' +
+        'Add flavors</button>' +
+    '</div>';
+}
+
+// ── Flavor filtering ─────────────────────────────────────────────────────────
+// Transient view state, deliberately NOT on AppState — a filter is not user data
+// and must not enter the sync payload.
+var flavorFilters = { search: '', style: '', protein: '' };
+
+// Deterministic: same state in, same order out. Sorted by name so the list never
+// reshuffles between renders.
+function getFilteredFlavors() {
+  var q = flavorFilters.search.toLowerCase().trim();
+  return (AppState.flavors || []).filter(function(f) {
+    if (!f) return false;
+    if (flavorFilters.style && f.preparationStyle !== flavorFilters.style) return false;
+    if (flavorFilters.protein && (f.worksWith || []).indexOf(flavorFilters.protein) < 0) return false;
+    if (!q) return true;
+    var hay = [f.name, f.instructions]
+      .concat((f.ingredients || []).map(function(i) { return i.name; }))
+      .concat(flavorProteinLabels(f))
+      .join(' ').toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }).sort(function(a, b) { return String(a.name).localeCompare(String(b.name)); });
+}
+
+function filterFlavors() {
+  var s = document.getElementById('flavor-search');
+  var st = document.getElementById('flavor-style-filter');
+  var p = document.getElementById('flavor-protein-filter');
+  flavorFilters.search = s ? s.value : '';
+  flavorFilters.style = st ? st.value : '';
+  flavorFilters.protein = p ? p.value : '';
+  renderFlavors();
+}
+
+// Fills the two vocabulary-driven selects ONCE at startup. Rebuilding them on every
+// render would silently reset whatever the user had selected.
+function initFlavorFilters() {
+  var st = document.getElementById('flavor-style-filter');
+  if (st && !st.dataset.filled) {
+    st.innerHTML = '<option value="">Any preparation</option>' +
+      FLAVOR_PREP_STYLES.map(function(s) {
+        return '<option value="' + s.id + '">' + escapeHtml(s.label) + '</option>';
+      }).join('');
+    st.dataset.filled = '1';
+  }
+  var p = document.getElementById('flavor-protein-filter');
+  if (p && !p.dataset.filled) {
+    p.innerHTML = '<option value="">Goes with anything</option>' +
+      FLAVOR_PROTEINS.map(function(x) {
+        return '<option value="' + x.id + '">' + escapeHtml(x.label) + '</option>';
+      }).join('');
+    p.dataset.filled = '1';
+  }
+}
+
+// ── Flavor rendering ─────────────────────────────────────────────────────────
+
+function flavorStyleChip(flavor) {
+  var s = FLAVOR_PREP_STYLE_BY_ID[flavor && flavor.preparationStyle];
+  if (!s) return ''; // style not stated — say nothing rather than guess one
+  return '<span class="flavor-style flavor-style--' + s.id + '">' +
+    icon(s.icon) + ' ' + escapeHtml(s.label) + '</span>';
+}
+
+function flavorCardHtml(f) {
+  // Hard Rule 3: ids are QUOTED in every handler. Flavor ids are strings, so an
+  // unquoted one would render as a bare identifier and throw.
+  var id = escJ(String(f.id));
+  var proteins = flavorProteinLabels(f);
+  var ings = (f.ingredients || []).map(function(i) {
+    return '<li>' + escapeHtml(flavorIngredientLine(i)) + '</li>';
+  }).join('');
+  var tags = (f.tags || []).map(function(t) {
+    return '<span class="flavor-tag">' + escapeHtml(FLAVOR_TAG_BY_ID[t].label) + '</span>';
+  }).join('');
+
+  return '<div class="flavor-card" data-flavor-id="' + escapeHtml(String(f.id)) + '">' +
+    '<button type="button" class="flavor-head" onclick="toggleFlavorDetail(\'' + id + '\')">' +
+      '<span class="flavor-name">' + escapeHtml(f.name) + '</span>' +
+      '<span class="flavor-meta">' +
+        flavorStyleChip(f) +
+        (f.activeTime != null ? '<span class="flavor-time">' + f.activeTime + ' min active</span>' : '') +
+      '</span>' +
+      (proteins.length
+        ? '<span class="flavor-proteins">' + escapeHtml(proteins.join(' · ')) + '</span>'
+        : '') +
+    '</button>' +
+    '<div class="flavor-detail hidden" id="flavordetail-' + escapeHtml(String(f.id)) + '">' +
+      (ings ? '<div class="flavor-sec-label">You need</div><ul class="flavor-ings">' + ings + '</ul>' : '') +
+      (f.instructions ? '<div class="flavor-sec-label">How</div><p class="flavor-instructions">' + escapeHtml(f.instructions) + '</p>' : '') +
+      (tags ? '<div class="flavor-tags">' + tags + '</div>' : '') +
+      '<div class="flavor-actions">' +
+        '<button type="button" class="btn btn--outline btn--sm flavor-edit" onclick="openEditFlavorModal(\'' + id + '\')">Edit</button>' +
+        '<button type="button" class="btn btn--outline btn--sm flavor-delete" onclick="deleteFlavor(\'' + id + '\')">Delete</button>' +
+      '</div>' +
+    '</div>' +
+    '</div>';
+}
+
+function toggleFlavorDetail(id) {
+  var el = document.getElementById('flavordetail-' + id);
+  if (el) el.classList.toggle('hidden');
+}
+
+function renderFlavors() {
+  var list = document.getElementById('flavor-list');
+  if (!list) return;
+  renderFlavorStarterPrompt();
+
+  var flavors = getFilteredFlavors();
+  if (!flavors.length) {
+    var total = (AppState.flavors || []).length;
+    list.innerHTML = total
+      ? emptyState('search', 'No flavors match', 'Try a different search, preparation style, or protein.')
+      : emptyState('citrus', 'No flavors yet',
+          'A flavor is a fast way to make a protein you already cooked taste like a different meal. Add the starter set above, or write your own.');
+    return;
+  }
+  list.innerHTML = flavors.map(flavorCardHtml).join('');
+}
+
+// ── Flavor CRUD ──────────────────────────────────────────────────────────────
+
+// Checkbox groups are built from the vocabularies so the lists live in exactly one
+// place and a new protein or tag needs no HTML change.
+function renderFlavorChoiceGroup(containerId, vocabulary, fieldName, selected) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var chosen = selected || [];
+  el.innerHTML = vocabulary.map(function(item) {
+    var on = chosen.indexOf(item.id) >= 0;
+    return '<label class="flavor-choice">' +
+      '<input type="checkbox" name="' + fieldName + '" value="' + escapeHtml(item.id) + '"' + (on ? ' checked' : '') + '>' +
+      '<span>' + escapeHtml(item.label) + '</span>' +
+      '</label>';
+  }).join('');
+}
+
+function readFlavorChoiceGroup(containerId) {
+  var el = document.getElementById(containerId);
+  if (!el) return [];
+  return Array.prototype.slice.call(el.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(function(cb) { return cb.value; });
+}
+
+// One ingredient per line, parsed by the EXISTING parseIngredientLine() the recipe
+// importer already uses. Deliberately not a four-input row builder: that is what
+// makes the recipe modal a recipe modal, and a flavor is three things in a jar.
+function flavorIngredientsToText(ingredients) {
+  return (ingredients || []).map(flavorIngredientLine).join('\n');
+}
+
+function flavorIngredientsFromText(text) {
+  return String(text || '').split('\n').map(function(line) {
+    var trimmed = line.trim();
+    if (!trimmed) return null;
+    var parsed = parseIngredientLine(trimmed);
+    if (!parsed) return null;
+    return { name: parsed.name, baseQuantity: parsed.quantity, unit: parsed.unit, category: parsed.category };
+  }).filter(Boolean);
+}
+
+function openAddFlavorModal() {
+  AppState.currentEditingFlavor = null;
+  document.getElementById('flavor-modal-title').textContent = 'Add Flavor';
+  document.getElementById('flavor-form').reset();
+  document.getElementById('flavor-ingredients').value = '';
+  renderFlavorChoiceGroup('flavor-works-with', FLAVOR_PROTEINS, 'worksWith', []);
+  renderFlavorChoiceGroup('flavor-tag-choices', FLAVOR_TAGS, 'tags', []);
+  document.getElementById('flavor-modal').classList.remove('hidden');
+}
+
+function openEditFlavorModal(flavorId) {
+  var f = findFlavor(flavorId);
+  if (!f) return;
+  AppState.currentEditingFlavor = String(f.id);
+  document.getElementById('flavor-modal-title').textContent = 'Edit Flavor';
+  document.getElementById('flavor-name').value = f.name;
+  document.getElementById('flavor-prep-style').value = f.preparationStyle || '';
+  document.getElementById('flavor-active-time').value = f.activeTime == null ? '' : f.activeTime;
+  document.getElementById('flavor-ingredients').value = flavorIngredientsToText(f.ingredients);
+  document.getElementById('flavor-instructions').value = f.instructions || '';
+  renderFlavorChoiceGroup('flavor-works-with', FLAVOR_PROTEINS, 'worksWith', f.worksWith);
+  renderFlavorChoiceGroup('flavor-tag-choices', FLAVOR_TAGS, 'tags', f.tags);
+  document.getElementById('flavor-modal').classList.remove('hidden');
+}
+
+function closeFlavorModal() {
+  document.getElementById('flavor-modal').classList.add('hidden');
+  AppState.currentEditingFlavor = null;
+}
+
+function saveFlavor(e) {
+  if (e) e.preventDefault();
+  var editingId = AppState.currentEditingFlavor;
+  var existing = editingId ? findFlavor(editingId) : null;
+
+  var draft = {
+    // An EDIT keeps the existing id untouched. Minting a new one would orphan the
+    // old id's tombstone and duplicate the flavor on every other device.
+    id: existing ? existing.id : newFlavorId(),
+    name: document.getElementById('flavor-name').value,
+    preparationStyle: document.getElementById('flavor-prep-style').value,
+    activeTime: document.getElementById('flavor-active-time').value,
+    ingredients: flavorIngredientsFromText(document.getElementById('flavor-ingredients').value),
+    instructions: document.getElementById('flavor-instructions').value,
+    worksWith: readFlavorChoiceGroup('flavor-works-with'),
+    tags: readFlavorChoiceGroup('flavor-tag-choices')
+  };
+  normalizeFlavor(draft);
+  stampUpdated(draft); // LWW: a real user edit, so it must beat an older cloud copy
+
+  if (!Array.isArray(AppState.flavors)) AppState.flavors = [];
+  if (existing) {
+    var i = AppState.flavors.findIndex(function(f) { return String(f.id) === String(existing.id); });
+    AppState.flavors[i] = draft;
+  } else {
+    AppState.flavors.push(draft);
+  }
+
+  closeFlavorModal();
+  renderFlavors();
+  saveData();
+  showSuccessMessage(existing ? 'Flavor updated.' : 'Flavor added.');
+}
+
+function deleteFlavor(flavorId) {
+  var f = findFlavor(flavorId);
+  if (!f) return;
+  showConfirmDialog(
+    'Delete flavor?',
+    '<p>Delete <strong>' + escapeHtml(f.name) + '</strong>?</p>' +
+      '<p>It is removed on every signed-in device.</p>',
+    'Delete',
+    'Cancel',
+    function() {
+      AppState.flavors = (AppState.flavors || []).filter(function(x) { return String(x.id) !== String(flavorId); });
+      // No tombstone is written here on purpose. recordLocalDeletions() diffs the
+      // curated lists against the per-session baseline at save time and tombstones
+      // whatever vanished — the same path every other collection uses. Writing one
+      // by hand would be a second deletion concept to keep in sync.
+      renderFlavors();
+      saveData();
+      showSuccessMessage('Flavor deleted.');
+    }
+  );
+}
+
+window.addStarterFlavors = addStarterFlavors;
+window.toggleFlavorDetail = toggleFlavorDetail;
+window.openAddFlavorModal = openAddFlavorModal;
+window.openEditFlavorModal = openEditFlavorModal;
+window.closeFlavorModal = closeFlavorModal;
+window.deleteFlavor = deleteFlavor;
+window.filterFlavors = filterFlavors;
+
 // ── Recipe times ─────────────────────────────────────────────────────────────
 // `recipe.baseCookTime || recipe.cookTime` silently turns a legitimate 0 into
 // undefined, and every arithmetic downstream then produced NaN — a no-cook recipe
@@ -764,6 +1435,7 @@ function snapshotData() {
     nutritionGoals: AppState.nutritionGoals,
     customIngredients: AppState.customIngredients,
     customHacks: AppState.customHacks,
+    flavors: AppState.flavors,
     pantry: AppState.pantry,
     userIngredients: AppState.userIngredients,
     ingredientPrices: AppState.ingredientPrices,
@@ -807,6 +1479,7 @@ function restoreBackup() {
       AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
       AppState.customIngredients = d.customIngredients || [];
       AppState.customHacks = d.customHacks || [];
+      AppState.flavors = normalizeFlavors(d.flavors || []);
       AppState.pantry = d.pantry || [];
       AppState.userIngredients = d.userIngredients || [];
       AppState.ingredientPrices = d.ingredientPrices || {};
@@ -822,6 +1495,7 @@ function restoreBackup() {
       renderWeeklyPlanner();
       renderStorageGuide();
       renderCookingHacks();
+      renderFlavors();
       renderCookedMeals();
       renderPantry();
       renderIngredientsTab();
@@ -2651,6 +3325,7 @@ function initApp() {
         renderWeeklyPlanner();
         renderStorageGuide();
         renderCookingHacks();
+        renderFlavors();
         renderCookedMeals();
         renderPantry();
         renderDashboard();
@@ -2687,6 +3362,7 @@ function initApp() {
     renderWeeklyPlanner();
     renderStorageGuide();
     renderCookingHacks();
+    renderFlavors();
     renderPantry();
     renderCookedMeals();
     renderDashboard();
@@ -2808,6 +3484,15 @@ function setupEventListeners() {
   document.getElementById('add-cooking-hack').addEventListener('click', openAddHackModal);
   document.getElementById('hack-form').addEventListener('submit', saveHack);
   document.getElementById('cancel-hack-btn').addEventListener('click', closeHackModal);
+
+  // Flavor Library
+  initFlavorFilters();
+  document.getElementById('add-flavor-btn').addEventListener('click', openAddFlavorModal);
+  document.getElementById('flavor-form').addEventListener('submit', saveFlavor);
+  document.getElementById('cancel-flavor-btn').addEventListener('click', closeFlavorModal);
+  document.getElementById('flavor-search').addEventListener('input', filterFlavors);
+  document.getElementById('flavor-style-filter').addEventListener('change', filterFlavors);
+  document.getElementById('flavor-protein-filter').addEventListener('change', filterFlavors);
   
   // Modal close handlers
   document.getElementById('nutrition-goals-modal').addEventListener('click', (e) => {
@@ -2818,6 +3503,9 @@ function setupEventListeners() {
   });
   document.getElementById('hack-modal').addEventListener('click', (e) => {
     if (e.target.id === 'hack-modal') closeHackModal();
+  });
+  document.getElementById('flavor-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'flavor-modal') closeFlavorModal();
   });
   
   // Additional modal close buttons
@@ -2910,7 +3598,7 @@ function showTab(tabId) {
   // Reflect "More" section state + close its menu after navigating
   const moreBtn = document.querySelector('.tab-more-btn');
   const moreMenu = document.querySelector('.tab-more-menu');
-  if (moreBtn) moreBtn.classList.toggle('active', tabId === 'ingredients' || tabId === 'hacks');
+  if (moreBtn) moreBtn.classList.toggle('active', tabId === 'ingredients' || tabId === 'hacks' || tabId === 'flavors');
   if (moreMenu) {
     moreMenu.classList.add('hidden');
     if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
@@ -2937,6 +3625,8 @@ function showTab(tabId) {
     renderPantry();
   } else if (tabId === 'hacks') {
     renderCookingHacks();
+  } else if (tabId === 'flavors') {
+    renderFlavors();
   } else if (tabId === 'nutrition') {
     renderNutritionTab();
   } else if (tabId === 'ingredients') {
@@ -6813,6 +7503,7 @@ function exportData() {
       nutritionGoals: AppState.nutritionGoals,
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
+      flavors: AppState.flavors,
       pantry: AppState.pantry,
       userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
@@ -6821,7 +7512,9 @@ function exportData() {
       cookedMeals: AppState.cookedMeals,
       recentRecipes: AppState.recentRecipes,
       exportedAt: new Date().toISOString(),
-      version: '1.1'
+      // Bumped because the payload gained a field. Import accepts BOTH: an older
+      // 1.1 file simply has no `flavors` key and imports as it always did.
+      version: '1.2'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -6878,7 +7571,7 @@ function importData() {
         const importedData = JSON.parse(e.target.result);
         
         // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'groceryList', 'cookedMeals'];
+        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'groceryList', 'cookedMeals'];
         if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
           throw new Error('Invalid data format');
         }
@@ -6899,7 +7592,7 @@ function importData() {
             // not be silently filtered on the next signed-in reload by a tombstone
             // left over from a previous Clear All Data that included it.
             if (AppState.deletions) {
-              ['recipes', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
+              ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
                 (importedData[key] || []).forEach(function(it) {
                   if (it && it.id != null) delete AppState.deletions[String(it.id)];
                 });
@@ -6912,13 +7605,14 @@ function importData() {
             patchMissingNutrition(AppState.recipes);
             AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
             AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
+            AppState.flavors = normalizeFlavors(unionById(AppState.flavors, importedData.flavors || []));
             AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
             AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
             AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
-            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
+            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
               var importedIds = {};
               (importedData[key] || []).forEach(function(it) {
                 if (it && it.id != null) importedIds[String(it.id)] = true;
@@ -6944,6 +7638,7 @@ function importData() {
             renderWeeklyPlanner();
             renderStorageGuide();
             renderCookingHacks();
+            renderFlavors();
             renderCookedMeals();
             renderPantry();
             renderIngredientsTab();
@@ -7205,7 +7900,7 @@ async function recheckVerification() {
 // in every merge. Deletions are detected by DIFFING the curated lists against a per-session baseline
 // (refreshed after each load/merge) — so no delete handler needs instrumenting. groceryList is
 // excluded: it's regenerated from the plan, so a "missing" grocery item isn't a real deletion.
-var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients'];
+var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'];
 var _idBaseline = null; // map of ids present right after the last load/merge
 // recordLocalDeletions() treats a bigger simultaneous vanish than this as a transient
 // load-race artifact, not a real user delete — see the guard there.
@@ -7287,6 +7982,7 @@ function buildFirestorePayload() {
     nutritionGoals: AppState.nutritionGoals,
     customIngredients: AppState.customIngredients,
     customHacks: AppState.customHacks,
+    flavors: AppState.flavors,
     pantry: AppState.pantry,
     userIngredients: AppState.userIngredients,
     ingredientPrices: AppState.ingredientPrices,
@@ -7342,7 +8038,7 @@ function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(
 // elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
 function mergeCloudConflict(remote, local) {
   var out = Object.assign({}, local);
-  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks'].forEach(function(key) {
+  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors'].forEach(function(key) {
     out[key] = unionById(local[key] || [], remote[key] || []);
   });
   return out;
@@ -7467,6 +8163,11 @@ async function loadFromFirestore() {
       };
       AppState.customIngredients = data.customIngredients || [];
       AppState.customHacks = data.customHacks || [];
+      // An account whose cloud doc predates flavors has no `flavors` key. It loads
+      // as an empty library and the starter prompt offers the seed — it must NOT be
+      // auto-seeded, or an account that deliberately deleted every flavor would get
+      // them all back on the next sign-in.
+      AppState.flavors = normalizeFlavors(data.flavors || []);
       AppState.pantry = data.pantry || [];
       AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
@@ -7560,7 +8261,7 @@ async function loadUserData() {
       if (raw) {
         const local = JSON.parse(raw) || {};
         const cloudDelN = Object.keys(AppState.deletions || {}).length;
-        const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'cookedMeals', 'userIngredients', 'groceryList'];
+        const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients', 'groceryList'];
         let before = 0;
         var localNow = new Date().toISOString();
         var mergeStats = { localWins: 0 };
@@ -7578,6 +8279,7 @@ async function loadUserData() {
         });
         patchMissingNutrition(AppState.recipes);
         normalizeCookedMeals(AppState.cookedMeals); // portions may arrive from the other device
+        AppState.flavors = normalizeFlavors(AppState.flavors); // flavors may arrive from the other device
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
@@ -7609,6 +8311,7 @@ async function loadUserData() {
   renderWeeklyPlanner();
   renderStorageGuide();
   renderCookingHacks();
+  renderFlavors();
   renderCookedMeals();
   renderPantry();
   renderDashboard();
@@ -7711,6 +8414,7 @@ function setupRealtimeListeners() {
         AppState.nutritionGoals = data.nutritionGoals || AppState.nutritionGoals;
         AppState.customIngredients = data.customIngredients || [];
         AppState.customHacks = data.customHacks || [];
+        AppState.flavors = normalizeFlavors(data.flavors || []);
         AppState.pantry = data.pantry || [];
         AppState.userIngredients = data.userIngredients || [];
         AppState.ingredientPrices = data.ingredientPrices || {};
@@ -7730,6 +8434,7 @@ function setupRealtimeListeners() {
         renderGroceryList();
         renderStorageGuide();
         renderCookingHacks();
+        renderFlavors();
         renderCookedMeals();
         renderPantry();
         renderIngredientsTab();
