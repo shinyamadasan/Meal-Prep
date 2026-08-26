@@ -62,7 +62,7 @@ async function makeExistingInstall(page, opts) {
     (o.extraRecipes || []).forEach((r) => AppState.recipes.push(r));
     AppState.deletions = AppState.deletions || {};
     (o.deleted || []).forEach((id) => {
-      AppState.deletions[String(id)] = new Date().toISOString();
+      writeTombstone('recipes', id, new Date().toISOString());
     });
     saveData();
     showTab('recipes');
@@ -284,7 +284,7 @@ test('a tombstoned starter recipe is not re-added on the deployed site', async (
   expect(ids).not.toContain('39');
 
   // The tombstone map is read, never rewritten.
-  expect(await page.evaluate(() => Object.keys(AppState.deletions).sort()))
+  expect(await page.evaluate(() => Object.keys(AppState.deletions.recipes || {}).sort()))
     .toEqual(['29', '34', '39']);
 });
 

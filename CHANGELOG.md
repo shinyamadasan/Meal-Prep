@@ -5,6 +5,65 @@
 
 ---
 
+## TASK-057 repair — done (branch: d-071-tombstone-namespace)
+changed:
+  - app.js (`recordLocalDeletions()` restores the original aggregate `MASS_DELETE_GUARD` safety invariant before writing any collection-specific vanish-diff tombstones; `loadFromLocalStorage()` no longer applies/purges tombstones as a signed-out load side effect; conflict payload tombstones are normalized before assignment, 28 loc)
+  - tests/tombstone-namespace.spec.js (adds the real multi-collection transient-empty regression, legitimate below-guard deletion proof, real source-patched namespace mutation, real source-patched aggregate-guard mutation, and rewrites the localStorage test to prove nested shape persistence without requiring signed-out tombstone application, 91 loc net)
+tests: `node --check app.js` (pass); `npx playwright test tests/tombstone-namespace.spec.js --project=local --reporter=list` (22 passed); `npx playwright test tests/flavor-library.spec.js tests/cook-depletion-tombstones.spec.js tests/kitchen-truth.spec.js tests/starter-pack.spec.js tests/what-should-we-eat.spec.js --project=local --reporter=list` (126 passed); `npm run test:local` (initial sandboxed run failed before tests with `spawn EPERM`; escalated rerun passed 404/404); `npm test` (404/404); `npx playwright test tests/suite-classification.spec.js --project=local --reporter=list` (6/6); `powershell -ExecutionPolicy Bypass -File tools/Verify-Decisions.ps1` (38/38 pointers valid); `git diff --check` (pass, LF/CRLF warnings only)
+review repair:
+  - Independent review found a P0 aggregate-guard regression: the first implementation evaluated `MASS_DELETE_GUARD` inside each collection, allowing small collections to write phantom tombstones when many records disappeared across the whole synced state.
+  - Fixed behavior now computes vanished ids per collection, totals them across all `TOMBSTONE_KEYS`, writes zero tombstones when the aggregate count exceeds `MASS_DELETE_GUARD`, and preserves `_idBaseline` unchanged so a transient empty can re-align when state repopulates.
+  - Base safety semantics are restored while keeping nested collection-aware tombstones, collection-specific explicit writers, LWW, the 180-day horizon, `saveData()`, `cloudReady`, and Firestore architecture intact.
+transient-empty regression: fixture with 40 recipes, 30 pantry, 14 customHacks, 8 customIngredients, 3 flavors, 2 cookedMeals and 1 userIngredient transiently emptied all collections; result was zero tombstones in every namespace, including the small `flavors`, `cookedMeals`, and `userIngredients` buckets.
+below-guard deletion: three legitimate disappearances across recipes, flavors and userIngredients wrote exactly those three collection-specific tombstones.
+explicit >5 deletion: existing cook-depletion proof remains green; six explicit pantry depletions still bypass the vanish-diff guard and write six pantry tombstones.
+P1 removal: removed the `purgeOldTombstones()` / `applyTombstones()` calls added to `loadFromLocalStorage()`. The localStorage test now proves nested deletion shape serialization/deserialization only; signed-out local load behavior stays at the base contract.
+mutation evidence: namespace mutation source-patches production `applyTombstones()` to union every deletion bucket and proves collateral recipe/hack/pantry deletion returns. Aggregate-guard mutation source-patches production `recordLocalDeletions()` to bypass the aggregate guard and proves phantom small-collection tombstones appear.
+`AppState.deletions` access audit: unchanged from the prior handoff except the conflict retry now assigns `normalizeDeletions(AppState.deletions)` instead of the live object. Remaining app hits are normalized persistence, loaders, helper normalization, sign-in tombstone counts, realtime adoption, or comments.
+final diff audit: nested collection-aware tombstones remain; ambiguous legacy tombstones remain dropped; explicit writers remain collection-specific; aggregate `MASS_DELETE_GUARD` now matches base safety semantics; `loadFromLocalStorage()` no longer applies tombstones as a new side effect; no unrelated persistence behavior was added.
+remaining risks: old-client interoperability remains unresolved by design: old clients treat nested deletion buckets as inert, preserve/round-trip them, and do not honor new-client deletions. Backup/export tombstone asymmetry remains a product-contract follow-up, unchanged here.
+blockers: none
+deviations: `npm run test:local` needed one escalated rerun after the sandboxed process failed with `spawn EPERM` before tests started; no test failure was rerun without a code/environment cause. No push, merge or rebase.
+→ status remains `review` in TASKS.md
+
+## TASK-057 — done (branch: d-071-tombstone-namespace)
+changed:
+  - app.js (`AppState.deletions` now normalizes to `{ collection: { id: deletedAtISO } }`; added `normalizeDeletions()`, `deletionBucket()`, `writeTombstone()`, `readTombstone()`, `clearTombstone()`, and `tombstoneCount()`; made baseline diff, apply, merge, purge, storage, Firestore, sign-in, realtime and import paths collection-aware; preserved `saveData()`, `cloudReady`, `MASS_DELETE_GUARD`, 180-day purge and LWW semantics, 232 loc net)
+  - tests/tombstone-namespace.spec.js (new D-071 reproduction, namespace isolation, legacy migration, persistence/sync paths, import, backup/export asymmetry and mutation-check coverage, 19 cases)
+  - tests/flavor-library.spec.js (kept the two D-071-pinned test names verbatim, inverted their assertions from known-bug flat collision to namespace isolation, and updated flavor tombstone checks to the nested shape, 28 loc)
+  - tests/cook-depletion-tombstones.spec.js, tests/kitchen-truth.spec.js, tests/starter-pack.spec.js (updated existing local assertions/setup from flat tombstones to the relevant collection bucket, 41 loc)
+  - tests/production-smoke-cook-method.spec.js, tests/production-smoke-cook-tombstones.spec.js, tests/production-smoke-kitchen-truth.spec.js (production-smoke audit found flat-shape assertions that would break after deploy; updated them to the nested shape, 19 loc; not run because production cannot pass until this branch is deployed)
+tests: `npx playwright test tests/tombstone-namespace.spec.js --project=local --reporter=list` (19 passed); `npx playwright test tests/flavor-library.spec.js --project=local --reporter=list` (47 passed); `npx playwright test tests/kitchen-truth.spec.js tests/cook-depletion-tombstones.spec.js tests/starter-pack.spec.js tests/what-should-we-eat.spec.js --project=local --reporter=list` (79 passed); focused final run across all six touched local specs (145 passed); `npm test` (401 passed); `node --check app.js` (pass)
+prefix validation:
+  - Proven exclusive by repository inspection before implementation: `flv-` is minted only by Flavor Library/default flavors; `cm_` only by cooked-meal ids; `ui_` only by user ingredients; `buy_`, `ib_`, and `staple_` only by pantry/inventory purchase/staple flows.
+  - Additional discovered product-created ids are bare numeric, timestamp-shaped, `p_` test-only, user/import supplied, or otherwise not collection-identifiable; they are ambiguous and are not inferred.
+old deletion shape: flat `{ [rawId]: deletedAtISO }`, applied against every `TOMBSTONE_KEYS` collection.
+new deletion shape: nested `{ recipes, pantry, customIngredients, customHacks, flavors, cookedMeals, userIngredients }`, each mapping its own ids to `deletedAtISO`.
+legacy migration: no-key, legacy flat and already-namespaced payloads normalize safely and idempotently. Only exclusive-prefix legacy keys migrate (`flv-` → `flavors`, `cm_` → `cookedMeals`, `ui_` → `userIngredients`, `buy_`/`ib_`/`staple_` → `pantry`).
+ambiguous tombstones: ambiguous legacy keys are dropped and counted with a one-time `console.warn`; no `_legacy` bucket is persisted, and numeric tombstones no longer apply globally. Some ambiguous historical deletes may become capable of resurrection from stale remote data after this migration, because their original collection identity was already lost before the migration ran. That is preferable to continuing deterministic cross-collection data loss.
+explicit writers changed: `clearLocalStorage()`; `deleteSelectedPantryItems()`; `clearExpiredPantryItems()`; `unstockPurchasedGroceryItem()`; `deductIngredientsForRecipe()`; `removeAttentionItem(kind, id)`; `removeAllExpired()`.
+generic vanish-diff: `collectSyncedIds()`, `snapshotIdBaseline()` and `recordLocalDeletions()` now preserve collection identity end to end; `MASS_DELETE_GUARD` still applies per collection and keeps the skipped baseline when a collection looks transiently empty.
+apply/merge/purge: `mergeDeletions()` merges per collection with later timestamp winning; `applyTombstones()` filters each list only by its own bucket while preserving LWW; `purgeOldTombstones()` keeps the 180-day horizon per bucket.
+`AppState.deletions` access accounting:
+  - `saveToLocalStorage()` and `snapshotData()` write normalized nested maps.
+  - `loadFromLocalStorage()`, `loadFromFirestore()` and the realtime listener normalize incoming maps before applying tombstones.
+  - `buildFirestorePayload()` writes the normalized nested map.
+  - `saveToFirestore()` conflict retry carries merged nested tombstones and filters payload records via `readTombstone(collection, id)`.
+  - `loadUserData()` compares tombstone totals through `tombstoneCount()` during sign-in local/cloud reconciliation.
+  - `ensureDeletions()` is the only direct normalizing assignment helper; all direct writers route through `writeTombstone()` and all collection reads route through `deletionBucket()` / `readTombstone()`.
+  - Remaining mentions are comments documenting the nested shape and starter/flavor tombstone behavior.
+localStorage result: save/load round-trip writes and reloads nested tombstones; recipe id `5` tombstone removes only recipe `5`.
+Firestore result: `buildFirestorePayload()` and `loadFromFirestore()` round-trip nested tombstones; same-id records in other collections survive.
+sign-in merge result: local recipe tombstone unions into cloud data without deleting same-id hack.
+concurrent/cloud merge result: conflict retry merges remote tombstones and filters only the tombstoned collection.
+realtime result: remote deletion adoption applies only the remote tombstone's collection.
+import behavior: import clears tombstones only for ids imported into that same collection; `groceryList` is not tombstone-cleared because it is not in `TOMBSTONE_KEYS`.
+backup/export asymmetry: `snapshotData()` still captures normalized deletions, but `restoreBackup()` intentionally still does not restore them; changing that would expand the restore product contract beyond D-071. `exportData()` still omits deletions while `importData()` clears tombstones for imported records; adding export tombstone support would also expand the product contract, so it remains unchanged and should be a Claude/owner follow-up if desired.
+mutation-check: `tests/tombstone-namespace.spec.js` includes a mutant that collapses namespaces back to a flat map and confirms the collateral-damage signature returns: recipe id `5` deletion also removes pantry/customHacks/customIngredients/cookedMeals/userIngredients id `5`.
+blockers: none
+deviations: production-smoke specs with flat-shape assertions were updated under TASK-057 §G even though they were not listed in the initial `files:` list; they were not run because they target the deployed site and cannot pass until this branch is deployed. Pre-existing dirty `planning/CODEX_READY.md` and `planning/DIGEST.md` were not edited or staged.
+→ status set to `review` in TASKS.md
+
 ## D-070 — landed (branch: wave-flavor-library)
 changed:
   - app.js (Flavor Library model, CRUD, persistence registration, starter prompt, and UI render

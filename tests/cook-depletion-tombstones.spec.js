@@ -72,7 +72,7 @@ test('cooking that empties one pantry item writes a tombstone for it', async ({ 
 
     return {
       pantryIds: AppState.pantry.map((p) => p.id),
-      tombstones: Object.keys(AppState.deletions),
+      tombstones: Object.keys(AppState.deletions.pantry || {}),
       outOfStock: sum.outOfStock
     };
   }, [PANTRY_FN, RECIPE_FN]);
@@ -100,7 +100,7 @@ test('cooking that empties six pantry items tombstones every removed id', async 
     snapshotIdBaseline();
     AppState.pantry = [];
     recordLocalDeletions();
-    const guardSwallowed = Object.keys(AppState.deletions).length;
+    const guardSwallowed = Object.keys(AppState.deletions.pantry || {}).length;
 
     // REAL ARM: the same six items, depleted through the cook path.
     AppState.deletions = {};
@@ -113,7 +113,7 @@ test('cooking that empties six pantry items tombstones every removed id', async 
       guardSwallowed: guardSwallowed,
       guardThreshold: MASS_DELETE_GUARD,
       pantryIds: AppState.pantry.map((p) => p.id),
-      tombstones: Object.keys(AppState.deletions).sort(),
+      tombstones: Object.keys(AppState.deletions.pantry || {}).sort(),
       outOfStock: sum.outOfStock.slice().sort()
     };
   }, [PANTRY_FN, RECIPE_FN]);
@@ -142,8 +142,8 @@ test('eight simultaneous depletions still tombstone one-for-one', async ({ page 
     deductIngredientsForRecipe(mkRecipe('r_eight', names.map((n) => [n, 50])), 1);
     return {
       pantryCount: AppState.pantry.length,
-      tombstoneCount: Object.keys(AppState.deletions).length,
-      allPrefixed: Object.keys(AppState.deletions).every((k) => k.indexOf('p8_') === 0)
+      tombstoneCount: Object.keys(AppState.deletions.pantry || {}).length,
+      allPrefixed: Object.keys(AppState.deletions.pantry || {}).every((k) => k.indexOf('p8_') === 0)
     };
   }, [PANTRY_FN, RECIPE_FN]);
 
@@ -176,7 +176,7 @@ test('partially depleted items stay in the pantry with no tombstone and correct 
     return {
       pantryIds: AppState.pantry.map((p) => p.id).sort(),
       quantities: byId,
-      tombstones: Object.keys(AppState.deletions),
+      tombstones: Object.keys(AppState.deletions.pantry || {}),
       outOfStock: sum.outOfStock
     };
   }, [PANTRY_FN, RECIPE_FN]);
@@ -204,7 +204,7 @@ test('a multiplier scales the deduction and only tombstones what it actually emp
     return {
       pantryIds: AppState.pantry.map((p) => p.id),
       kale: AppState.pantry[0] ? AppState.pantry[0].quantity : null,
-      tombstones: Object.keys(AppState.deletions)
+      tombstones: Object.keys(AppState.deletions.pantry || {})
     };
   }, [PANTRY_FN, RECIPE_FN]);
 
@@ -234,7 +234,7 @@ test('untracked-quantity pantry items are neither deducted nor tombstoned', asyn
     return {
       pantryIds: AppState.pantry.map((p) => p.id),
       unknownQty: unknown ? unknown.quantity : 'MISSING',
-      tombstones: Object.keys(AppState.deletions),
+      tombstones: Object.keys(AppState.deletions.pantry || {}),
       deducted: sum.deducted.length
     };
   }, [PANTRY_FN, RECIPE_FN]);
@@ -274,7 +274,7 @@ test('insufficient inventory still raises the warning dialog before cooking', as
 
   const after = await page.evaluate(() => ({
     pantryIds: AppState.pantry.map((p) => p.id),
-    tombstones: Object.keys(AppState.deletions),
+    tombstones: Object.keys(AppState.deletions.pantry || {}),
     cookedCount: AppState.cookedMeals.length
   }));
 
@@ -309,10 +309,10 @@ test('a full cook still creates the batch, and every depleted id reaches storage
       cookHistoryCount: AppState.cookHistory.length,
       pantryIds: AppState.pantry.map((p) => p.id),
       keepQty: AppState.pantry[0].quantity,
-      tombstones: Object.keys(AppState.deletions).sort(),
+      tombstones: Object.keys(AppState.deletions.pantry || {}).sort(),
       storedPantryIds: stored.pantry.map((p) => p.id),
-      storedTombstones: Object.keys(stored.deletions).sort(),
-      payloadTombstones: Object.keys(payload.deletions).sort(),
+      storedTombstones: Object.keys(stored.deletions.pantry || {}).sort(),
+      payloadTombstones: Object.keys(payload.deletions.pantry || {}).sort(),
       payloadPantryIds: payload.pantry.map((p) => p.id)
     };
   }, [PANTRY_FN, RECIPE_FN]);
@@ -342,12 +342,12 @@ test('a full cook still creates the batch, and every depleted id reaches storage
   // Waiting on the survivor alone would still allow asserting mid-restore; CI read back
   // an empty pantry here.
   await waitForRestored(page, (n) =>
-    AppState.pantry.length > 0 && Object.keys(AppState.deletions || {}).length === n,
+    AppState.pantry.length > 0 && Object.keys((AppState.deletions || {}).pantry || {}).length === n,
     expected.length);
 
   const reloaded = await page.evaluate(() => ({
     pantryIds: AppState.pantry.map((p) => p.id),
-    tombstones: Object.keys(AppState.deletions).sort(),
+    tombstones: Object.keys(AppState.deletions.pantry || {}).sort(),
     cookedCount: AppState.cookedMeals.length
   }));
 

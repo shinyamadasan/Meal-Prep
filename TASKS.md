@@ -3305,6 +3305,303 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-057 · Collection-aware deletion tombstones: a recipe delete stops destroying the hack, pantry item and ingredient that share its id
+status: review
+owner: codex
+source: docs/DECISIONS.md **D-071** (open, red zone) — direct operator brief, 2026-08-26. Not a BQ item.
+depends-on: none. Phase 1 characterization is COMPLETE and is reproduced in full below — Codex
+       needs no other source and must not re-derive it.
+priority: P0 (deterministic, reproducible user-data loss)
+
+branch: **`d-071-tombstone-namespace`** — already created off `main @ 98cf393`, currently zero
+       commits. Commit onto that existing branch. This overrides AGENTS.md § Git Workflow's
+       `task-<id>` convention by explicit operator instruction (Decision Priority #1). Do NOT
+       create `task-057`, do NOT rebase, do NOT push, do NOT merge to `main`.
+
+canonical base: `main @ 98cf393`
+
+files: app.js,
+       tests/tombstone-namespace.spec.js (new),
+       tests/flavor-library.spec.js,
+       and, only where they assert the flat tombstone shape and would otherwise break:
+       tests/cook-depletion-tombstones.spec.js, tests/kitchen-truth.spec.js,
+       tests/starter-pack.spec.js, tests/what-should-we-eat.spec.js
+       — no `docs/`, no `planning/`, no `STATUS.md`/`REVIEW.md`/`PLAN.md`. See § documentation
+       ownership below: documentation for this change is Claude/owner work, deliberately removed
+       from this handoff because AGENTS.md § Ownership forbids Codex editing `docs/`.
+
+objective:
+       Give every deletion tombstone a collection identity, so a tombstone for id `5` can only
+       ever remove the record it was actually written for. Today `AppState.deletions` is ONE flat
+       `id -> deletedAtISO` map consulted against EVERY collection in `TOMBSTONE_KEYS`, so
+       deleting recipe 5 deterministically also destroys cooking-hack 5, pantry item 5, custom
+       ingredient 5, cooked meal 5 and user ingredient 5 — on this device and every synced device.
+       Fix the identity. Change nothing else about the sync model.
+
+characterization already done (treat as given — do NOT re-derive):
+  Current shape is one flat map, `AppState.deletions = { [rawId]: deletedAtISO }`, shared by every
+  collection in `var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks',
+  'flavors', 'cookedMeals', 'userIngredients'];`
+
+  Known live collision: seeded recipes use numeric ids `1..40`; seeded `customHacks` use numeric
+  ids `1..14`. They overlap completely on `1..14`. Other collections also mint numeric or
+  timestamp-shaped ids. D-070's Flavor Library dodged NEW collisions with the `flv-` prefix; it did
+  nothing for the six pre-existing collections, and D-071 stays live for them.
+
+  Everything that currently assumes a raw id is globally unique: `collectSyncedIds()` ·
+  `snapshotIdBaseline()` · `recordLocalDeletions()` · `mergeDeletions()` · `applyTombstones()` ·
+  `purgeOldTombstones()` · `saveToFirestore()`'s conflict-path payload filter ·
+  `loadFromFirestore()`'s adopt-and-apply path · the sign-in local/cloud merge · the realtime
+  listener's remote-tombstone adopt · `importData()`'s tombstone clear · `starterPackCandidates()` ·
+  `flavorStarterCandidates()`.
+
+  Explicit raw-id tombstone writers, every one of which must become collection-aware:
+  `clearLocalStorage()` (Clear All Data — writes one tombstone per id across ALL `TOMBSTONE_KEYS`) ·
+  `deleteSelectedPantryItems()` · `clearExpiredPantryItems()` · `unstockPurchasedGroceryItem()` ·
+  `deductIngredientsForRecipe()` (cook depletion) · `removeAttentionItem(kind, id)` (its `kind`
+  already distinguishes `'cooked'` from pantry — the collection is already in hand at the call
+  site) · `removeAllExpired()`.
+
+  Every other single-item deletion rides the generic vanish-diff in `recordLocalDeletions()`, which
+  diffs `collectSyncedIds()` against `_idBaseline` — both of which flatten collection identity away
+  today.
+
+  **Migration is inherently lossy and the task must not pretend otherwise.** Once
+  `deletions["5"] = ts` exists there is nothing persisted anywhere saying whether `5` meant a
+  recipe, a hack, a pantry item, a custom ingredient, a cooked meal or a user ingredient.
+  `_idBaseline` is in-memory only and cannot reconstruct history. A fully lossless automatic
+  migration is impossible.
+
+  Two inconsistencies found during characterization — do NOT reflexively "fix" either; see
+  acceptance §F:
+    1. `snapshotData()` includes `deletions`, but `restoreBackup()` never assigns
+       `AppState.deletions` back from the backup. A restore keeps whatever tombstones are live now.
+    2. `exportData()` omits `deletions` entirely, while `importData()` actively deletes existing
+       tombstones for every imported id.
+
+target architecture (pinned by Claude — not Codex's call):
+  Collection-keyed tombstones. Collection isolation is the INVARIANT; the nested map is the
+  required representation:
+
+      AppState.deletions = {
+        recipes:           { "5": "2026-06-01T00:00:00.000Z" },
+        pantry:            { "5": "..." },
+        customHacks:       { "5": "..." },
+        customIngredients: { ... },
+        cookedMeals:       { ... },
+        userIngredients:   { ... },
+        flavors:           { "flv-x": "..." }
+      }
+
+  A composite-key flat representation (`"recipes:5"`) is permitted ONLY if the nested shape has a
+  concrete defect Codex can name — in that case record the comparison and the defect in
+  `CHANGELOG.md`, and every criterion below still applies unchanged. Do not switch shapes on taste.
+  Do NOT change any record's id to sidestep the migration. The ids are user data.
+
+legacy policy — VALIDATE BEFORE IMPLEMENTING (this is a gate, see acceptance §E):
+  Proposed policy, which Codex must confirm against the repository before relying on it:
+  - A legacy flat tombstone key converts to a namespaced one ONLY when its collection identity can
+    be inferred SAFELY — i.e. the id carries a prefix proven by repository inspection to be minted
+    by exactly one collection and by no other.
+  - Candidate prefixes observed during characterization, each to be re-proven by Codex:
+    `flv-` → `flavors` · `cm_` → `cookedMeals` · `ui_` → `userIngredients` ·
+    `buy_` / `ib_` / `staple_` → `pantry`. Prove each by inspecting every id-minting site in
+    `app.js`, not by pattern-matching the name. If a prefix is minted by two collections it is NOT
+    inferable and its keys are dropped.
+  - Ambiguous keys (bare numerics, timestamps, anything without an exclusive prefix) must NOT keep
+    applying globally across every collection. That is the bug.
+  - **Ambiguous keys are DROPPED — not preserved, and not quarantined into a new persisted bucket.**
+    What they carry is already unusable (it cannot be applied to any collection safely), and a
+    `_legacy` bucket would add a persisted shape every round-trip path must then carry for no
+    behavioural gain. Log the dropped count once at migration time via `console.warn`, so the loss
+    is observable rather than silent.
+  - The tradeoff goes into `CHANGELOG.md` in plain words, unsoftened:
+    "Some ambiguous historical deletes may become capable of resurrection from stale remote data
+    after this migration, because their original collection identity was already lost before the
+    migration ran. That is preferable to continuing deterministic cross-collection data loss."
+  - If the validation FAILS — prefixes not exclusive, or a case this policy cannot classify — set
+    `status: blocked`, record exactly what broke, and stop. Do not invent a fallback rule.
+
+acceptance:
+
+  A · Reproduce first, on unmodified behaviour
+  - [ ] Before touching `app.js`, land a reproduction of the cross-collection collision against the
+        branch base (`main @ 98cf393`): one tombstone for raw id `5` removes the recipe, the hack,
+        the pantry item, the custom ingredient, the cooked meal and the user ingredient sharing it.
+  - [ ] The reproduction is a real test in `tests/tombstone-namespace.spec.js`, not a transcript.
+
+  B · Collection-aware tombstones
+  - [ ] `AppState.deletions` becomes collection-keyed per the pinned shape.
+  - [ ] Tombstone access is centralized enough that a new raw-id write cannot easily reappear —
+        conceptually `writeTombstone(collection, id, when)` / `readTombstone(collection, id)`, or
+        equivalent helpers that fit the existing one-file, global-function, no-module style (D-001).
+        Every writer goes through them.
+  - [ ] `applyTombstones()` isolates strictly: a `recipes` tombstone for `5` removes recipe 5 and
+        NOTHING in `pantry`, `customHacks`, `customIngredients`, `cookedMeals`, `userIngredients`
+        or `flavors` sharing the id `5`.
+  - [ ] Generic vanish-diff preserves collection identity end to end: `collectSyncedIds()`,
+        `snapshotIdBaseline()` and `recordLocalDeletions()` all carry the collection, so a
+        disappearance is tombstoned into its own collection only.
+  - [ ] `mergeDeletions()` and `purgeOldTombstones()` operate per collection.
+  - [ ] All seven explicit writers listed above are updated and pass their own collection;
+        `removeAttentionItem()` uses the `kind` it already receives.
+  - [ ] `clearLocalStorage()` still tombstones every id in every collection — each into its own
+        namespace — and still writes the explicit EMPTY document instead of deleting the doc (R1 /
+        SYNC_AUDIT F1 behaviour preserved exactly).
+  - [ ] `starterPackCandidates()` and `flavorStarterCandidates()` consult only their own
+        collection's tombstones: a deleted starter recipe is still not re-offered, and a deleted
+        hack no longer suppresses a starter recipe.
+  - [ ] At completion, grep every direct reference to `AppState.deletions` in `app.js` and account
+        for EVERY hit in `CHANGELOG.md` — updated, routed through the new helpers, or deliberately
+        unchanged with the reason. No unexplained survivors.
+
+  C · Preserved semantics
+  - [ ] LWW unchanged: an item newer than its tombstone survives; a tombstone newer than its item
+        wins; an item with no `updatedAt` still loses to a tombstone.
+  - [ ] `MASS_DELETE_GUARD` (5) still suppresses a suspected transient mass-vanish, and still does
+        not interfere with the explicit writers.
+  - [ ] The 180-day tombstone retention horizon still purges.
+  - [ ] `AppState.cloudReady` write-guard untouched (Hard Rule: never write to Firestore before
+        reading it — D-010).
+  - [ ] `saveData()` semantics untouched (Hard Rule: persist through `saveData()`).
+  - [ ] `patchMissingNutrition()` call sites untouched (Hard Rule / D-005).
+  - [ ] The sync/conflict architecture is otherwise unchanged — the ONLY thing that changes is
+        deletion identity.
+
+  D · Compatibility across every persistence path
+  - [ ] The normalizer accepts all three inputs without crashing: no `deletions` key at all; a
+        legacy flat map; an already-namespaced map. Idempotent — running it twice changes nothing.
+  - [ ] localStorage save → load round-trip.
+  - [ ] Firestore `buildFirestorePayload()` → `loadFromFirestore()` round-trip.
+  - [ ] Sign-in local/cloud union.
+  - [ ] Concurrent-writer conflict merge (the `saveToFirestore()` retry path that calls
+        `mergeDeletions(remote.deletions)` and re-filters the payload).
+  - [ ] Realtime listener adopting a remote deletion.
+  - [ ] `importData()`'s tombstone clear only clears the imported item's OWN collection.
+  - [ ] Backup/restore behaves exactly as §F concludes — no silent change either way.
+  - [ ] Do NOT invent export tombstone support. `exportData()` omits `deletions` today; change that
+        only if §F concludes D-071 genuinely requires it, and say why.
+
+  E · Legacy migration
+  - [ ] The prefix-exclusivity validation is performed and its result recorded in `CHANGELOG.md`
+        BEFORE the migration is written — including any prefix that failed.
+  - [ ] Inferable legacy keys migrate into the right collection.
+  - [ ] Ambiguous legacy keys are dropped, counted, and `console.warn`ed once.
+  - [ ] An ambiguous legacy numeric tombstone can no longer delete unrelated live records in any
+        collection.
+
+  F · Investigate, decide, do NOT reflexively fix
+  - [ ] Determine whether D-071 requires adapting `restoreBackup()` (which never restores
+        `deletions`) to the new shape, or whether existing product semantics should stay unchanged.
+        Record the determination and the reasoning in `CHANGELOG.md`.
+  - [ ] Same for the `exportData()`-omits / `importData()`-manipulates asymmetry.
+  - [ ] Neither is to be "fixed" as a bonus. If correcting either would materially expand product
+        behaviour beyond deletion identity, STOP: leave it unchanged, report it separately in
+        `CHANGELOG.md` as a recommendation for Claude/owner, and carry on with the rest.
+
+  G · Tests (LOCAL suite)
+  New `tests/tombstone-namespace.spec.js` proves at minimum:
+  - [ ] the current recipe/hack collision reproduces on base behaviour (§A)
+  - [ ] a recipe deletion does not remove the hack with the same id
+  - [ ] a recipe deletion does not remove the pantry item with the same id
+  - [ ] a pantry deletion does not remove the recipe with the same id
+  - [ ] a hack deletion does not remove the recipe with the same id
+  - [ ] a flavor deletion stays isolated
+  - [ ] `cm_` (cookedMeals) and `ui_` (userIngredients) prefixed records stay safe
+  - [ ] each explicit tombstone writer is collection-aware — one case per writer
+  - [ ] the generic vanish-diff is collection-aware
+  - [ ] `MASS_DELETE_GUARD` still works
+  - [ ] a newer item still beats an older tombstone
+  - [ ] a newer tombstone still beats an older item
+  - [ ] the purge horizon still works
+  - [ ] a legacy flat `deletions` payload loads without crashing
+  - [ ] inferable legacy prefixes migrate to the correct collection
+  - [ ] an ambiguous numeric legacy tombstone does not globally delete unrelated objects
+  - [ ] localStorage round trip
+  - [ ] Firestore payload/load round trip
+  - [ ] sign-in union
+  - [ ] concurrent/cloud conflict merge
+  - [ ] realtime remote deletion
+  Existing suites:
+  - [ ] `tests/flavor-library.spec.js` green. NOTE: two of its tests currently assert the BUG as
+        known behaviour and must be rewritten to assert isolation instead — `prefixed flavor ids
+        survive a numeric tombstone that deletes a recipe, hack and pantry item` and `MUTATION: an
+        unprefixed flavor id is destroyed by an unrelated numeric tombstone`. **Both test-name
+        strings must survive verbatim**: `tools/Verify-Decisions.ps1` pins them via D-070/D-071
+        `Verify:` pointers, and Codex cannot edit `docs/DECISIONS.md` to update those pointers.
+        Change the bodies and the assertions; keep the titles. Same for the pinned `app.js`
+        strings `var TOMBSTONE_KEYS =` and `'customHacks', 'flavors', 'cookedMeals'`.
+  - [ ] `tests/kitchen-truth.spec.js` green
+  - [ ] `tests/cook-depletion-tombstones.spec.js` green
+  - [ ] the whole deterministic local suite (`npm test`) green
+  - [ ] `tests/suite-classification.spec.js` green — the new spec is local-only and must not
+        reference the deployed site
+  - [ ] Mutation-check at least the collection-isolation invariant: collapse the namespaces back to
+        one flat map and confirm the isolation tests fail with the exact collateral-damage
+        signature. Record the mutation and its result.
+  - [ ] The four `production-smoke-*` specs that reference `deletions` are AUDITED and the result
+        reported: leave them unchanged unless they assert the flat shape and would break. If one
+        must change, change it and state plainly in `CHANGELOG.md` that it cannot pass until this
+        work is deployed and was therefore not run.
+
+constraints:
+  - Product code + tests ONLY. Do NOT edit `docs/`, `planning/`, `PLAN.md`, `REVIEW.md`,
+    `STATUS.md`, `CLAUDE.md`, or any `TASKS.md` field other than this task's `status`
+    (AGENTS.md § Ownership).
+  - Do NOT change any record's id to avoid the migration.
+  - Do NOT introduce a second deletion mechanism alongside the new one.
+  - Do NOT change `MASS_DELETE_GUARD`, the 180-day horizon, `cloudReady`, `saveData()` semantics,
+    the Firestore read-before-write guard, auth, or `sw.js`.
+  - Do NOT add a framework, build step or module system (D-001). One file, global functions.
+  - Do NOT touch Playwright retries or timeouts. The `tests/inventory-quantity-truth.spec.js`
+    `waitForRestored()` CI timeout seen after D-070 landed is NOT part of this task and must not be
+    absorbed into it — unless D-071's own change demonstrably causes it, in which case say so
+    explicitly rather than silently patching the harness.
+  - Do NOT touch the `wave1-portion-truth` branch. It stays parked at `88b5598`.
+  - Do NOT modify `planning/CODEX_READY.md` or `planning/DIGEST.md`. Both carry uncommitted
+    operator edits on `main` and must be preserved byte-for-byte.
+  - Do NOT push, do NOT merge to `main`, do NOT rebase the branch.
+
+sync/deletion safety (the reason this is D-032 RED ZONE):
+  This changes the tombstone WIRE FORMAT and every path that reads or writes it — the Firestore
+  payload, the localStorage record, the sign-in union, the concurrent-conflict merge, the realtime
+  adopt, and the import clear — and it carries an admitted lossy migration. That is squarely the
+  surface CLAUDE.md's risk-gated merge policy names red zone: the tombstone-merge-deletion
+  machinery, `saveData()`, the `cloudReady` write-guard, storage and sync. A broken UI change is
+  reverted in a minute; lost user data cannot be reverted at all. Hard Rule 10 applies: **never
+  chained**, solo execution only, regardless of any group header.
+
+verification steps:
+  - [ ] `npx playwright test tests/tombstone-namespace.spec.js` — all pass, count recorded
+  - [ ] `npx playwright test tests/flavor-library.spec.js` — all pass
+  - [ ] `npx playwright test tests/kitchen-truth.spec.js tests/cook-depletion-tombstones.spec.js tests/starter-pack.spec.js tests/what-should-we-eat.spec.js` — all pass
+  - [ ] `npm test` (local project) — full result recorded in `TEST_REPORT.md`, pass AND fail
+  - [ ] mutation check performed and recorded (§G)
+  - [ ] full `AppState.deletions` grep accounted for in `CHANGELOG.md` (§B)
+  - [ ] `SELF_REVIEW.md` code-health checklist passes; `QA.md` AI-verifiable checks pass
+  - [ ] `git diff 98cf393 --stat` shows ONLY `app.js` and files under `tests/` — no `docs/`, no
+        `planning/`, no `style.css`, no `index.html`, no `sw.js`, no `manifest.json`
+  - [ ] `planning/CODEX_READY.md` and `planning/DIGEST.md` remain the only modified files in the
+        working tree, unchanged in content
+  - [ ] `status: review` set in `TASKS.md`; `CHANGELOG.md` and `TEST_REPORT.md` appended
+
+merge gate:
+  D-032 **RED ZONE → `approved` (HELD)**. Deletion/tombstone machinery, a wire-format change and a
+  lossy migration. Codex hands off at `status: review` and stops. Claude reviews and may recommend
+  `approved` at most — **never `done`, never auto-merge, never push**. The owner reads the branch
+  and merges by hand, or does not. Nothing here ships on an agent's judgement.
+
+documentation ownership:
+  Deliberately excluded from this handoff. AGENTS.md § Ownership says Codex never edits `docs/`, so
+  no documentation criterion appears above. After the held implementation returns and is reviewed,
+  Claude/owner writes `REVIEW.md`, updates `STATUS.md`, closes out `docs/DECISIONS.md` D-071 (plus
+  any new record the implementation warrants), refreshes the deletion-shape section of
+  `docs/DATA_MODEL.md` and the sync section of `docs/ARCHITECTURE.md`, updates
+  `planning/ROADMAP.md` Known Issues, and appends `planning/DONE.md`. Codex's evidence goes only in
+  `CHANGELOG.md` and `TEST_REPORT.md`, which it owns.
+
+---
+
 ### TASK-056 · Reload-state harness audit: every persisted-state reload waits on its state
 status: done
 source: first push-triggered CI failure after TASK-055 landed (operator, 2026-08-25)

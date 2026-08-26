@@ -36,7 +36,7 @@ const AppState = {
   cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
-  deletions: {},              // { id: deletedAtISO } tombstones — sync deletes so a union can't resurrect them
+  deletions: {},              // { collection: { id: deletedAtISO } } tombstones — sync deletes so a union can't resurrect them
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
@@ -445,7 +445,7 @@ function saveToLocalStorage() {
       cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
       prepModeSession: AppState.prepModeSession,
-      deletions: AppState.deletions || {},
+      deletions: normalizeDeletions(AppState.deletions),
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
@@ -498,7 +498,7 @@ function loadFromLocalStorage() {
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
-      AppState.deletions = data.deletions || {};
+      AppState.deletions = normalizeDeletions(data.deletions);
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
       markInitialized();   // a saved record exists → not first run
@@ -653,14 +653,11 @@ function normalizeRecipeMeta(recipe) {
 // nutrition. Any of those turns the library into a daily logging job, which is the
 // one outcome that would make the feature a net loss.
 
-// Every flavor id is string-prefixed. AppState.deletions is a single FLAT
-// id -> deletedAt map shared by EVERY key in TOMBSTONE_KEYS, so a bare numeric id
-// in flavors[] would be matched by a tombstone written for a recipe, a hack or a
-// pantry item that happened to share the number, and the flavor would vanish. The
-// prefix removes flavors from that shared numeric space entirely. (The underlying
-// flat-map collision between the EXISTING collections — recipe ids 1-40 already
-// overlap default-hack ids 1-14 — is a real pre-existing bug that is explicitly
-// out of scope here; see DECISIONS D-071.)
+// Every flavor id is string-prefixed. Before D-071, AppState.deletions was a
+// flat id -> deletedAt map shared by EVERY key in TOMBSTONE_KEYS, so a bare
+// numeric flavor id could be matched by an unrelated recipe, hack or pantry
+// tombstone. The nested tombstone map fixes that for all collections, and the
+// prefix remains part of the Flavor Library wire shape for old-data migration.
 var FLAVOR_ID_PREFIX = 'flv-';
 
 // How much work the flavor is, and therefore how the app should talk about it.
@@ -981,7 +978,7 @@ const defaultFlavors = [
 function flavorStarterCandidates() {
   var present = {};
   (AppState.flavors || []).forEach(function(f) { if (f && f.id != null) present[String(f.id)] = true; });
-  var deleted = AppState.deletions || {};
+  var deleted = deletionBucket('flavors');
   return defaultFlavors.filter(function(f) {
     var key = String(f.id);
     return !present[key] && !deleted[key];
@@ -1443,7 +1440,7 @@ function snapshotData() {
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
     recentRecipes: AppState.recentRecipes,
-    deletions: AppState.deletions || {}
+    deletions: normalizeDeletions(AppState.deletions)
   };
 }
 
@@ -1523,9 +1520,8 @@ async function clearLocalStorage() {
       // and writing an empty (not deleted) doc means loadFromFirestore returns 'loaded' on reload — so the
       // 'empty'-path auto-recreate never fires either.
       var when = new Date().toISOString();
-      if (!AppState.deletions) AppState.deletions = {};
       TOMBSTONE_KEYS.forEach(function (key) {
-        (AppState[key] || []).forEach(function (it) { if (it && it.id != null) AppState.deletions[String(it.id)] = when; });
+        (AppState[key] || []).forEach(function (it) { if (it && it.id != null) writeTombstone(key, it.id, when); });
         AppState[key] = [];
       });
       AppState.groceryList = [];
@@ -4253,8 +4249,8 @@ var STARTER_PACK_IDS = [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40];
 //   ALREADY PRESENT — the user may have edited it. Their copy wins, always. We
 //     never compare, merge, or overwrite on an id match; presence alone is a
 //     permanent skip.
-//   TOMBSTONED — AppState.deletions holds `id -> deletedAtISO` for everything
-//     the user has deleted, and `recipes` is one of the TOMBSTONE_KEYS. Deleting
+//   TOMBSTONED — AppState.deletions holds collection-keyed tombstones for
+//     records the user has deleted, and recipes has its own namespace. Deleting
 //     a starter recipe is a decision; re-offering it would undo that decision.
 //     Worse, adding it back with a fresh updatedAt would beat its tombstone
 //     under applyTombstones()' LWW rule and resurrect it across every device.
@@ -4267,7 +4263,7 @@ function starterPackCandidates() {
   (AppState.recipes || []).forEach(function(r) {
     if (r && r.id != null) present[String(r.id)] = true;
   });
-  var deleted = AppState.deletions || {};
+  var deleted = deletionBucket('recipes');
 
   return STARTER_PACK_IDS.filter(function(id) {
     var key = String(id);
@@ -7591,13 +7587,11 @@ function importData() {
             // Explicit import overrides prior deletion — a re-imported item should
             // not be silently filtered on the next signed-in reload by a tombstone
             // left over from a previous Clear All Data that included it.
-            if (AppState.deletions) {
-              ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
-                (importedData[key] || []).forEach(function(it) {
-                  if (it && it.id != null) delete AppState.deletions[String(it.id)];
-                });
+            TOMBSTONE_KEYS.forEach(function(key) {
+              (importedData[key] || []).forEach(function(it) {
+                if (it && it.id != null) clearTombstone(key, it.id);
               });
-            }
+            });
 
             // MERGE, don't replace — union list-type data by id (existing items
             // win on a collision, so re-importing your own backup is a no-op).
@@ -7901,15 +7895,97 @@ async function recheckVerification() {
 // (refreshed after each load/merge) — so no delete handler needs instrumenting. groceryList is
 // excluded: it's regenerated from the plan, so a "missing" grocery item isn't a real deletion.
 var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'];
-var _idBaseline = null; // map of ids present right after the last load/merge
+var _idBaseline = null; // map of collection -> ids present right after the last load/merge
 // recordLocalDeletions() treats a bigger simultaneous vanish than this as a transient
 // load-race artifact, not a real user delete — see the guard there.
 var MASS_DELETE_GUARD = 5;
+var _warnedDroppedLegacyDeletions = false;
+
+function isTombstoneCollection(collection) {
+  return TOMBSTONE_KEYS.indexOf(collection) >= 0;
+}
+
+function emptyDeletionMap() {
+  var out = {};
+  TOMBSTONE_KEYS.forEach(function(key) { out[key] = {}; });
+  return out;
+}
+
+function legacyDeletionCollectionForId(id) {
+  var key = String(id);
+  if (key.indexOf('flv-') === 0) return 'flavors';
+  if (key.indexOf('cm_') === 0) return 'cookedMeals';
+  if (key.indexOf('ui_') === 0) return 'userIngredients';
+  if (key.indexOf('buy_') === 0 || key.indexOf('ib_') === 0 || key.indexOf('staple_') === 0) return 'pantry';
+  return null;
+}
+
+function normalizeDeletions(raw) {
+  var out = emptyDeletionMap();
+  var dropped = 0;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+
+  Object.keys(raw).forEach(function(key) {
+    var value = raw[key];
+    if (isTombstoneCollection(key) && value && typeof value === 'object' && !Array.isArray(value)) {
+      Object.keys(value).forEach(function(id) {
+        if (value[id]) out[key][String(id)] = String(value[id]);
+      });
+      return;
+    }
+
+    var collection = legacyDeletionCollectionForId(key);
+    if (collection && out[collection] && value) out[collection][String(key)] = String(value);
+    else if (value) dropped++;
+  });
+
+  if (dropped && !_warnedDroppedLegacyDeletions) {
+    console.warn('Dropped ' + dropped + ' ambiguous legacy deletion tombstone(s); collection identity was not recoverable.');
+    _warnedDroppedLegacyDeletions = true;
+  }
+  return out;
+}
+
+function ensureDeletions() {
+  AppState.deletions = normalizeDeletions(AppState.deletions);
+  return AppState.deletions;
+}
+
+function deletionBucket(collection) {
+  var dels = ensureDeletions();
+  return isTombstoneCollection(collection) ? dels[collection] : {};
+}
+
+function writeTombstone(collection, id, when) {
+  if (!isTombstoneCollection(collection) || id == null) return;
+  var dels = ensureDeletions();
+  dels[collection][String(id)] = when || new Date().toISOString();
+}
+
+function readTombstone(collection, id) {
+  if (!isTombstoneCollection(collection) || id == null) return null;
+  var bucket = deletionBucket(collection);
+  return bucket[String(id)] || null;
+}
+
+function clearTombstone(collection, id) {
+  if (!isTombstoneCollection(collection) || id == null) return;
+  var dels = ensureDeletions();
+  delete dels[collection][String(id)];
+}
+
+function tombstoneCount(deletions) {
+  var dels = normalizeDeletions(deletions);
+  var n = 0;
+  TOMBSTONE_KEYS.forEach(function(key) { n += Object.keys(dels[key] || {}).length; });
+  return n;
+}
 
 function collectSyncedIds() {
   var s = {};
   TOMBSTONE_KEYS.forEach(function (key) {
-    (AppState[key] || []).forEach(function (it) { if (it && it.id != null) s[String(it.id)] = true; });
+    s[key] = {};
+    (AppState[key] || []).forEach(function (it) { if (it && it.id != null) s[key][String(it.id)] = true; });
   });
   return s;
 }
@@ -7921,40 +7997,57 @@ function snapshotIdBaseline() { _idBaseline = collectSyncedIds(); }
 function recordLocalDeletions() {
   if (!_idBaseline) { snapshotIdBaseline(); return; }
   var now = collectSyncedIds();
-  var vanished = Object.keys(_idBaseline).filter(function (id) { return !now[id]; });
+  var when = new Date().toISOString();
+  var vanishedByCollection = {};
+  var totalVanished = 0;
+  TOMBSTONE_KEYS.forEach(function(collection) {
+    var before = (_idBaseline && _idBaseline[collection]) || {};
+    var after = now[collection] || {};
+    var vanished = Object.keys(before).filter(function (id) { return !after[id]; });
+    vanishedByCollection[collection] = vanished;
+    totalVanished += vanished.length;
+  });
   // SAFETY GUARD: a real user deletes items one or two at a time, and every edit saves — so a
   // genuine delete records only a few tombstones per call. A large batch vanishing at once almost
   // always means AppState was transiently empty during a startup/sync race, NOT a real delete.
-  // Tombstoning those ids would propagate a phantom mass-delete to every device and wipe a whole
-  // category (this is what emptied the pantry after a reload). Skip them and keep the baseline so
-  // the list re-aligns once it repopulates. "Clear All Data" tombstones explicitly in
-  // clearLocalStorage(), so that intentional wipe is unaffected by this guard.
-  if (vanished.length > MASS_DELETE_GUARD) {
-    console.warn('recordLocalDeletions: ignored ' + vanished.length + ' simultaneous disappearances as a suspected transient load state (not tombstoning).');
-    return; // keep _idBaseline unchanged so a real delete is still caught once state settles
+  // Tombstoning those ids would propagate phantom mass-deletes to every device and wipe data.
+  // Keep the old aggregate guard semantics even though tombstones are now collection-keyed: a
+  // small collection must not fall through just because the larger collections tripped the race.
+  // "Clear All Data" tombstones explicitly in clearLocalStorage(), so that intentional wipe is
+  // unaffected by this guard.
+  if (totalVanished > MASS_DELETE_GUARD) {
+    console.warn('recordLocalDeletions: ignored ' + totalVanished + ' simultaneous disappearances across synced collections as a suspected transient load state (not tombstoning).');
+    return; // keep _idBaseline unchanged so state can re-align once the transient empty resolves
   }
-  var when = new Date().toISOString();
-  vanished.forEach(function (id) { AppState.deletions[id] = when; });
+  TOMBSTONE_KEYS.forEach(function(collection) {
+    var vanished = vanishedByCollection[collection] || [];
+    vanished.forEach(function (id) { writeTombstone(collection, id, when); });
+  });
   _idBaseline = now;
 }
 
 // Union two tombstone maps; the later deletedAt wins.
 function mergeDeletions(remote) {
-  remote = remote || {};
-  if (!AppState.deletions) AppState.deletions = {};
-  Object.keys(remote).forEach(function (id) {
-    if (!AppState.deletions[id] || remote[id] > AppState.deletions[id]) AppState.deletions[id] = remote[id];
+  remote = normalizeDeletions(remote);
+  var local = ensureDeletions();
+  TOMBSTONE_KEYS.forEach(function(collection) {
+    Object.keys(remote[collection] || {}).forEach(function (id) {
+      if (!local[collection][id] || remote[collection][id] > local[collection][id]) {
+        local[collection][id] = remote[collection][id];
+      }
+    });
   });
 }
 
 // Drop any tombstoned item from the curated lists. A re-add makes a NEW id, so it isn't suppressed.
 function applyTombstones() {
-  var dels = AppState.deletions || {};
-  if (!Object.keys(dels).length) return;
+  var dels = ensureDeletions();
   TOMBSTONE_KEYS.forEach(function (key) {
+    var bucket = dels[key] || {};
+    if (!Object.keys(bucket).length) return;
     AppState[key] = (AppState[key] || []).filter(function (it) {
       if (!it || it.id == null) return true;
-      var tombAt = dels[String(it.id)];
+      var tombAt = bucket[String(it.id)];
       if (!tombAt) return true;        // no tombstone — keep
       if (!it.updatedAt) return false; // legacy item without timestamp — tombstone wins
       return it.updatedAt > tombAt;    // LWW: keep item only if it's newer than the tombstone
@@ -7964,9 +8057,13 @@ function applyTombstones() {
 
 // Keep the tombstone map bounded — forget markers older than 180 days.
 function purgeOldTombstones() {
-  if (!AppState.deletions) { AppState.deletions = {}; return; }
+  var dels = ensureDeletions();
   var cutoff = new Date(Date.now() - 180 * 864e5).toISOString();
-  Object.keys(AppState.deletions).forEach(function (id) { if (AppState.deletions[id] < cutoff) delete AppState.deletions[id]; });
+  TOMBSTONE_KEYS.forEach(function(collection) {
+    Object.keys(dels[collection] || {}).forEach(function (id) {
+      if (dels[collection][id] < cutoff) delete dels[collection][id];
+    });
+  });
 }
 
 function buildFirestorePayload() {
@@ -7992,7 +8089,7 @@ function buildFirestorePayload() {
     cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
     prepModeSession: AppState.prepModeSession,
-    deletions: AppState.deletions || {},
+    deletions: normalizeDeletions(AppState.deletions),
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
   };
@@ -8095,9 +8192,9 @@ async function saveToFirestore() {
         if (remoteVersion > (AppState.dataVersion || 0)) {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
-          payload.deletions = AppState.deletions; // carry the merged tombstones
+          payload.deletions = normalizeDeletions(AppState.deletions); // carry the merged tombstones
           TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
-            payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !AppState.deletions[String(it.id)]; });
+            payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !readTombstone(key, it.id); });
           });
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
@@ -8177,7 +8274,7 @@ async function loadFromFirestore() {
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
-      AppState.deletions = data.deletions || {};
+      AppState.deletions = normalizeDeletions(data.deletions);
       purgeOldTombstones();
       // Stamp items that pre-date this feature with the document's save time.
       // applyTombstones() uses LWW: a tombstone only removes an item if the tombstone
@@ -8260,7 +8357,7 @@ async function loadUserData() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const local = JSON.parse(raw) || {};
-        const cloudDelN = Object.keys(AppState.deletions || {}).length;
+        const cloudDelN = tombstoneCount(AppState.deletions);
         const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients', 'groceryList'];
         let before = 0;
         var localNow = new Date().toISOString();
@@ -8288,7 +8385,7 @@ async function loadUserData() {
         applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt (D-020)
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
-        if (after !== before || mergeStats.localWins > 0 || Object.keys(AppState.deletions).length !== cloudDelN) {
+        if (after !== before || mergeStats.localWins > 0 || tombstoneCount(AppState.deletions) !== cloudDelN) {
           console.log('loadUserData: reconciled local data/tombstones — syncing the merged set up');
           saveData(); // persist the reconciled superset to BOTH local + cloud so the account has everything
         }
@@ -8424,7 +8521,7 @@ function setupRealtimeListeners() {
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
         AppState.prepModeSession = data.prepModeSession || null;
-        AppState.deletions = data.deletions || {}; // adopt the remote tombstones...
+        AppState.deletions = normalizeDeletions(data.deletions); // adopt the remote tombstones...
         applyTombstones();                          // ...so a delete made on another device lands here too
         snapshotIdBaseline();
 
@@ -10314,9 +10411,8 @@ function deleteSelectedPantryItems() {
   if (ids.length === 0) return;
   var selected = {};
   ids.forEach(function(id) { selected[String(id)] = true; });
-  if (!AppState.deletions) AppState.deletions = {};
   var when = new Date().toISOString();
-  ids.forEach(function(id) { AppState.deletions[String(id)] = when; });
+  ids.forEach(function(id) { writeTombstone('pantry', id, when); });
   AppState.pantry = AppState.pantry.filter(function(p) { return !selected[String(p.id)]; });
   pantrySelectMode = false;
   pantrySelectedIds.clear();
@@ -10339,10 +10435,9 @@ function clearExpiredPantryItems() {
     function() {
       var expiredIds = {};
       var when = new Date().toISOString();
-      if (!AppState.deletions) AppState.deletions = {};
       expired.forEach(function(item) {
         expiredIds[String(item.id)] = true;
-        AppState.deletions[String(item.id)] = when;
+        writeTombstone('pantry', item.id, when);
       });
       AppState.pantry = AppState.pantry.filter(function(item) {
         return !expiredIds[String(item.id)];
@@ -10727,8 +10822,7 @@ function unstockPurchasedGroceryItem(receipt) {
   if (receipt.mode === 'created') {
     // Explicit tombstone: the MASS_DELETE_GUARD diff in recordLocalDeletions()
     // is for detecting deletes, not for recording ones we already know about.
-    if (!AppState.deletions) AppState.deletions = {};
-    AppState.deletions[String(p.id)] = new Date().toISOString();
+    writeTombstone('pantry', p.id, new Date().toISOString());
     AppState.pantry.splice(idx, 1);
     snapshotIdBaseline();
     return;
@@ -11219,12 +11313,11 @@ function deductIngredientsForRecipe(recipe, multiplier = 1) {
     // tracked items would drop them locally with NO tombstone and let another device
     // resurrect the food on the next merge. Recording the deletes we already know
     // about here makes the cook path independent of the vanish-diff entirely.
-    if (!AppState.deletions) AppState.deletions = {};
     var when = new Date().toISOString();
     var doomed = {};
     depleted.forEach(function(id) {
       doomed[String(id)] = true;
-      AppState.deletions[String(id)] = when;
+      writeTombstone('pantry', id, when);
     });
     AppState.pantry = AppState.pantry.filter(function(p) {
       return !doomed[String(p.id)];
@@ -11810,8 +11903,8 @@ function keepAttentionItem(kind, id) {
 function removeAttentionItem(kind, id) {
   var rec = findAttentionRecord(kind, id);
   if (!rec) return;
-  if (!AppState.deletions) AppState.deletions = {};
-  AppState.deletions[String(rec.id)] = new Date().toISOString();
+  var collection = kind === 'cooked' ? 'cookedMeals' : 'pantry';
+  writeTombstone(collection, rec.id, new Date().toISOString());
   if (kind === 'cooked') {
     AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return String(x.id) !== String(id); });
   } else {
@@ -11845,15 +11938,15 @@ function removeAllExpired() {
     'Remove ' + expired.length,
     'Cancel',
     function() {
-      if (!AppState.deletions) AppState.deletions = {};
       var when = new Date().toISOString();
-      var doomed = {};
+      var doomed = { pantry: {}, cookedMeals: {} };
       expired.forEach(function(e) {
-        doomed[String(e.id)] = true;
-        AppState.deletions[String(e.id)] = when;
+        var collection = e.kind === 'cooked' ? 'cookedMeals' : 'pantry';
+        doomed[collection][String(e.id)] = true;
+        writeTombstone(collection, e.id, when);
       });
-      AppState.pantry = (AppState.pantry || []).filter(function(x) { return !doomed[String(x.id)]; });
-      AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return !doomed[String(x.id)]; });
+      AppState.pantry = (AppState.pantry || []).filter(function(x) { return !doomed.pantry[String(x.id)]; });
+      AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return !doomed.cookedMeals[String(x.id)]; });
       pantrySelectMode = false;
       pantrySelectedIds.clear();
       snapshotIdBaseline();

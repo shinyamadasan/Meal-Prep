@@ -139,7 +139,7 @@ test('unchecking a mis-tapped item undoes the transfer exactly', async ({ page }
     return {
       afterCheck: afterCheck,
       afterUncheck: AppState.pantry.length,
-      tombstoned: !!AppState.deletions[String(createdId)],
+      tombstoned: !!((AppState.deletions.pantry || {})[String(createdId)]),
       receiptCleared: AppState.groceryList[0].stocked === undefined,
       renderedChecked: groceryItemChecked(AppState.groceryList[0])
     };
@@ -425,7 +425,7 @@ test('one tap removes a single expired item and tombstones it', async ({ page })
 
   const after = await page.evaluate(() => ({
     pantryCount: AppState.pantry.length,
-    tombstoned: !!AppState.deletions['p_gone'],
+    tombstoned: !!((AppState.deletions.pantry || {})['p_gone']),
     persisted: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry.length
   }));
 
@@ -471,7 +471,8 @@ test('bulk cleanup removes every expired record and nothing else', async ({ page
   const after = await page.evaluate(() => ({
     pantry: AppState.pantry.map((p) => p.id).sort(),
     cooked: (AppState.cookedMeals || []).map((m) => m.id),
-    tombstones: Object.keys(AppState.deletions).sort(),
+    tombstones: Object.keys(AppState.deletions.pantry || {})
+      .concat(Object.keys(AppState.deletions.cookedMeals || {})).sort(),
     persistedPantry: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry.map((p) => p.id).sort()
   }));
 
