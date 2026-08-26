@@ -794,7 +794,12 @@ test('export and the Firestore payload carry the new fields without new collecti
       'recipes', 'weeklyPlan', 'groceryList', 'nutritionGoals', 'customIngredients',
       'customHacks', 'pantry', 'userIngredients', 'ingredientPrices', 'myStores',
       'customStores', 'cookedMeals', 'cookHistory', 'recentRecipes', 'prepModeSession',
-      'deletions', 'lastUpdated', 'lastSaved'
+      'deletions', 'lastUpdated', 'lastSaved',
+      // 'flavors' is the Flavor Library collection (D-070) — a DELIBERATE, owner-
+      // approved new top-level collection, which is why it is listed rather than
+      // the check being loosened. The guard still fails on any key nobody decided
+      // on, which is the whole point of it.
+      'flavors'
     ];
     return {
       unexpectedTopLevelKeys: Object.keys(payload).filter((k) => known.indexOf(k) < 0),

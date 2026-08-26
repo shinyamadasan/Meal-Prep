@@ -7139,3 +7139,256 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .dash-ready-use { padding: 0.35rem 0.7rem; }
   .dash-ready-name { font-size: 0.9rem; }
 }
+
+/* Flavor Library -----------------------------------------------------------
+   A flavor list is a reference the user scans, not a grid they browse — so this
+   is a compact stack of one-line rows that expand in place, deliberately unlike
+   the recipe card grid. Reuses the existing tokens — no :root block (Hard Rule 7). */
+
+.flavor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+/* .form-control is width:100% globally, so each control would claim its own row.
+   Cap them so the whole toolbar sits on one line on a desktop and still wraps
+   gracefully as the window narrows. */
+.flavor-controls #flavor-search { flex: 1 1 180px; min-width: 140px; max-width: 260px; }
+.flavor-controls select { flex: 0 1 auto; width: auto; min-width: 150px; max-width: 200px; }
+
+.flavor-intro {
+  margin: 0 0 var(--space-12);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.flavor-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.flavor-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base, 8px);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* The whole row is the disclosure control, so the tap target is the full width
+   rather than a chevron nobody can hit on a phone. */
+.flavor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-12);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  min-height: 44px;
+}
+
+.flavor-head:hover { background: var(--color-secondary); }
+
+.flavor-name {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.flavor-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex: 0 0 auto;
+}
+
+/* The three preparation styles must read differently at a glance — that is the
+   whole point of the field. Colour + icon, never colour alone. */
+.flavor-style {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-8);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.flavor-style .lc-icon { width: 13px; height: 13px; }
+
+/* Three genuinely different hues, NOT three shades of one. --color-success and
+   --color-primary both resolve to --color-teal-500 in this theme, so using those
+   two would have rendered make-fresh and fridge-batch identically — the exact
+   failure the distinct-styles test now guards against. Each chip also carries its
+   own icon, so the distinction never rests on colour alone. */
+.flavor-style--make-fresh {
+  color: var(--color-orange-500);
+  background: var(--color-bg-2);
+  border-color: var(--color-orange-500);
+}
+
+.flavor-style--fridge-batch {
+  color: var(--color-primary);
+  background: var(--color-secondary);
+  border-color: var(--color-primary);
+}
+
+.flavor-style--freezer-friendly {
+  color: var(--color-slate-500);
+  background: var(--color-bg-1);
+  border-color: var(--color-slate-500);
+}
+
+.flavor-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.flavor-proteins {
+  flex: 1 1 100%;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.flavor-detail {
+  padding: 0 var(--space-12) var(--space-12);
+  border-top: 1px solid var(--color-card-border-inner, var(--color-border));
+}
+
+.flavor-sec-label {
+  margin: var(--space-12) 0 var(--space-4);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.flavor-ings {
+  margin: 0;
+  padding-left: var(--space-20);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.flavor-ings li { margin-bottom: 2px; }
+
+.flavor-instructions {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.flavor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-12);
+}
+
+.flavor-tag {
+  padding: 2px var(--space-8);
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.flavor-actions {
+  display: flex;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+
+.flavor-delete { color: var(--color-danger, var(--color-error)); }
+
+/* Modal checkbox groups (Works with / Tags) */
+.flavor-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.flavor-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  min-height: 34px;
+}
+
+.flavor-choice input { margin: 0; }
+.flavor-choice:hover { background: var(--color-secondary); }
+
+@media (max-width: 768px) {
+  /* Stack the controls so nothing overflows the viewport width on a phone. */
+  .flavor-controls { width: 100%; }
+  .flavor-controls #add-flavor-btn { width: 100%; }
+  .flavor-controls #flavor-search { flex: 1 1 100%; min-width: 0; }
+  .flavor-controls select { flex: 1 1 calc(50% - var(--space-4)); min-width: 0; }
+  .flavor-head { padding: var(--space-8); }
+  .flavor-name { flex: 1 1 100%; }
+  .flavor-meta { flex-wrap: wrap; }
+  .flavor-actions { flex-wrap: wrap; }
+  .flavor-actions .btn { flex: 1 1 calc(50% - var(--space-4)); min-height: 36px; }
+}
+
+/* Flavor starter prompt ----------------------------------------------------
+   Same visual treatment as the recipe starter pack, but its OWN class names.
+   Sharing .sp-card would put two prompts behind one selector and make the
+   existing starter-pack specs ambiguous — a test that can no longer name the
+   element it is asserting on has been weakened, not extended. */
+
+.fsp-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  margin: 0 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base, 8px);
+  background: var(--color-secondary, transparent);
+}
+
+.fsp-text { flex: 1 1 240px; min-width: 0; }
+
+.fsp-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.fsp-sub {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.flavor-sp-add { flex: 0 0 auto; white-space: nowrap; }
+
+.fsp-card--done { border-color: var(--color-primary); }
+
+@media (max-width: 768px) {
+  .fsp-card { padding: 0.55rem 0.7rem; gap: 0.5rem; }
+  .flavor-sp-add { width: 100%; min-height: 36px; }
+}

@@ -106,6 +106,12 @@ needed to unblock. Resolve, then re-add to the top of the Task Queue.
 Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commit).
 
 ### Bugs / broken
+- **`AppState.deletions` is a flat cross-collection id map (RED ZONE)** — `applyTombstones()` matches
+  a tombstone by id alone against every key in `TOMBSTONE_KEYS`, so deleting a record in one
+  collection also deletes an unrelated record that happens to share the id. Seeded recipe ids 1-40
+  and default-hack ids 1-14 already overlap completely. Verified and reproduced; **not fixed** in the
+  Flavor Library wave because it is an unrelated red-zone sync migration. Flavors sidestep it via
+  `flv-` prefixed ids. Full write-up, reproduction and follow-up scope: DECISIONS **D-071**.
 - **Family sharing acceptance flow** — invitations write to `familyInvitations` but there's no UI to
   accept; `status` stays `pending` forever. (Feature is Hidden anyway.)
 - **Sentry inactive** — code loads only when `SENTRY_DSN` is set; it's empty.

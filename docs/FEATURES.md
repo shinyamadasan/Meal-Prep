@@ -76,7 +76,22 @@
 - ~175 `INGREDIENT_DB` entries — Working · `renderIngredientsTab()` · per-store pricing, My Stores filter, add custom ingredient, Add to Pantry, text search (`#ingcat-search`), category filter.
 
 ## Cooking Hacks
-- 6 built-in Filipino hacks + user add/edit/delete — Working · `renderCookingHacks()`.
+- 14 built-in Filipino hacks + user add/edit/delete — Working · `renderCookingHacks()`.
+
+## Flavor Library (D-070)
+- 10 starter flavors + user add/edit/delete — Working · `renderFlavors()` · `#flavors` tab under
+  "More". Reusable finishing knowledge, not recipes: name, ingredients, instructions, active time,
+  preparation style (`make-fresh` / `fridge-batch` / `freezer-friendly`) and compatible proteins.
+- Search + preparation-style filter + protein filter — Working · `getFilteredFlavors()` ·
+  deterministic, sorted by name, read-only (viewing a flavor mutates nothing).
+- Starter set — Working · `flavorStarterCandidates()` / `addStarterFlavors()` · opt-in prompt using
+  the D-063 pattern: an already-present id is a permanent skip (the user may have edited it), a
+  tombstoned id is a permanent skip (deleting it was a decision). Never auto-seeded.
+- **Not built (deferred to Wave 2):** Ready Food -> "Try with" suggestions. Requires a protein
+  classifier for `cookedMeals`, which has no protein field; manually added batches carry
+  `recipeId: null` and only a free-text name. See D-070.
+- **Not built, deliberately:** prepared-flavor inventory, portion counting, sauce expiry, freezer
+  stock, nutrition. Each would turn the library into a daily logging job.
 
 ## Settings & Help
 - Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, **Food expiry alerts** opt-in, export/import, restore backup, clear all (snapshots first).
