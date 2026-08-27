@@ -70,10 +70,12 @@ Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngred
 
 ## Protein identity for cooked food (D-072)
 
-Answers "what protein is this batch?" so a future Meal Lego can match cooked food to a flavor.
-**Groundwork only — nothing recommends anything yet.** `flavorsForProteinType()` proves the join is a
-direct id lookup and is not rendered anywhere; flavor pairing and the "Try with" surface remain
-separate, unstarted work — see [DECISIONS.md](DECISIONS.md) D-070 and D-072 for what it still needs.
+Answers "what protein is this batch?" so Meal Lego can match cooked food to a flavor.
+`flavorsForProteinType()` is the original D-072 groundwork join (exact `worksWith` only, unrendered).
+Meal Lego v1 (D-073) consumes `getCookedMealProteinType()` through
+`getCompatibleFlavorsForCookedMeal(meal)` — one derived, non-persisting helper that adds the one-way
+fish supertype, the `mixed`/`none`/`unknown` non-answers, and deterministic ranking, and feeds the
+Fridge "Try with" chip row plus one flavor line on Home's "Eat this first" pick.
 
 **A cooked meal's name is never read.** Identity comes from an explicit user pin or from the source
 recipe's structured ingredients, and from nowhere else — `unknown` is a first-class answer rather
@@ -81,7 +83,7 @@ than a failure to guess.
 
 Entry points, in precedence order:
 - `getCookedMealProteinType(meal)` — the answer. Explicit `meal.proteinType` → recipe-derived →
-  `'unknown'`. **The helper Meal Lego will consume.**
+  `'unknown'`. **Consumed by Meal Lego v1 via `getCompatibleFlavorsForCookedMeal()` (D-073).**
 - `derivedCookedProteinType(meal)` → `recipeProteinType(recipe)` — step 2 alone. Reads the recipe's
   `baseIngredients` by **exact case-insensitive name** against `PROTEIN_FAMILY_BY_INGREDIENT`
   (curated, never substring-matched — same discipline as `ingredientShelfLife()` over

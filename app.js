@@ -4786,6 +4786,10 @@ function buildReadyEatPick(meal) {
   if (cookedMealTracksPortions(meal)) reasons.push(formatPortions(meal.portionsRemaining));
 
   var tracks = cookedMealTracksPortions(meal);
+  // Meal Lego v1: at most ONE flavor idea on Home — it answers "what should I
+  // eat?", not "what can I turn this into?" (that is the Fridge card's job).
+  var compat = getCompatibleFlavorsForCookedMeal(meal);
+  var legoFlavor = compat.matchable && compat.flavors.length ? compat.flavors[0].flavor : null;
   return {
     key: 'eat-first',
     kind: 'ready',
@@ -4795,6 +4799,7 @@ function buildReadyEatPick(meal) {
     name: meal.name,
     reasons: reasons,
     hint: readyFoodCompletionHint(meal),
+    flavor: legoFlavor ? { id: String(legoFlavor.id), name: legoFlavor.name } : null,
     action: {
       type: tracks ? 'use-portion' : 'finish',
       id: String(meal.id),
@@ -4900,6 +4905,7 @@ function renderWhatShouldWeEatCard() {
         '<span class="wse-label">' + icon(p.icon) + ' ' + escapeHtml(p.label) + '</span>' +
         '<span class="wse-name">' + escapeHtml(p.name) + '</span>' +
         '<span class="wse-chips">' + chips + '</span>' +
+        (p.flavor ? '<span class="wse-lego">Try ' + escapeHtml(p.flavor.name) + '</span>' : '') +
         (p.hint ? '<span class="wse-hint">' + escapeHtml(p.hint) + '</span>' : '') +
       '</button>' +
       '<button class="dash-inline-btn wse-action" onclick="' + onAction + '">' +
@@ -11780,6 +11786,86 @@ function flavorsForProteinType(proteinType) {
   });
 }
 
+// ── Meal Lego v1 — cooked food → flavor compatibility ────────────────────────
+// ONE deterministic layer. Every "Try with" surface (the Fridge card, the Home
+// "Eat this first" pick) reads getCompatibleFlavorsForCookedMeal() and NOTHING
+// else, so the matching rule lives in exactly one place and cannot drift between
+// screens. It is a pure function of the batch's already-derived protein identity
+// (getCookedMealProteinType(), which is name-blind by contract) and the current
+// Flavor Library. It NEVER mutates AppState and NEVER persists — rendering a
+// suggestion writes nothing. There is no sauce inventory: a flavor is knowledge,
+// not stock, so the UI says "Try with", never "Available".
+
+// One-WAY fish supertype. A flavor authored for generic 'fish' is reasonably
+// applicable to salmon and tuna; a flavor authored specifically for 'salmon' is
+// NOT automatically proven to suit every fish. So the widening is directional:
+//   cooked salmon  -> worksWith 'salmon' (exact) OR 'fish' (supertype)
+//   cooked tuna    -> worksWith 'tuna'   (exact) OR 'fish' (supertype)
+//   cooked fish    -> worksWith 'fish' ONLY — never widened to salmon/tuna
+var COOKED_PROTEIN_SUPERTYPES = { salmon: 'fish', tuna: 'fish' };
+
+// preparationStyle order for the ranking tie-break: when specificity and
+// activeTime are equal, the simpler option wins. Mirrors FLAVOR_PREP_STYLES.
+var FLAVOR_PREP_STYLE_RANK = { 'make-fresh': 0, 'fridge-batch': 1, 'freezer-friendly': 2 };
+
+var MEAL_LEGO_MAX_SUGGESTIONS = 3;
+
+// THE compatibility + ranking layer. Returns a derived, non-persisted result:
+//   {
+//     protein:   <string>   resolved identity, verbatim from getCookedMealProteinType
+//     matchable: <boolean>  is this an identity we pair flavors for at all?
+//     flavors:   [ { flavor, specificity: 'exact' | 'supertype' } ]   ranked, <= 3
+//   }
+// matchable is false for mixed / none / unknown: each returns flavors: [] with no
+// guess. mixed does NOT union its constituent families (getCookedMealProteinType
+// does not expose them, and inventing a rule is out of scope for v1); none does
+// NOT map to 'vegetables' (a meatless recipe is not proof the ready food is a
+// vegetable component); unknown does NOT parse the name.
+function getCompatibleFlavorsForCookedMeal(meal) {
+  var protein = getCookedMealProteinType(meal);
+  var result = { protein: protein, matchable: false, flavors: [] };
+
+  // COOKED_PROTEIN_IDS excludes none / mixed / unknown by construction, so this
+  // one membership check rejects all three non-answers.
+  if (COOKED_PROTEIN_IDS.indexOf(protein) < 0) return result;
+  result.matchable = true;
+
+  var supertype = COOKED_PROTEIN_SUPERTYPES[protein] || null;
+
+  var matches = [];
+  (AppState.flavors || []).forEach(function(f) {
+    if (!f || !Array.isArray(f.worksWith)) return;
+    var exact = f.worksWith.indexOf(protein) >= 0;
+    var viaSuper = !exact && supertype != null && f.worksWith.indexOf(supertype) >= 0;
+    if (!exact && !viaSuper) return;
+    matches.push({ flavor: f, specificity: exact ? 'exact' : 'supertype' });
+  });
+
+  matches.sort(function(a, b) {
+    // 1. exact family match before generic-supertype match
+    var sa = a.specificity === 'exact' ? 0 : 1;
+    var sb = b.specificity === 'exact' ? 0 : 1;
+    if (sa !== sb) return sa - sb;
+    // 2. lower activeTime first; "not stated" (null) sorts last
+    var ta = a.flavor.activeTime == null ? Infinity : a.flavor.activeTime;
+    var tb = b.flavor.activeTime == null ? Infinity : b.flavor.activeTime;
+    if (ta !== tb) return ta - tb;
+    // 3. simpler preparation wins when otherwise equal (make-fresh first)
+    var pa = FLAVOR_PREP_STYLE_RANK[a.flavor.preparationStyle];
+    var pb = FLAVOR_PREP_STYLE_RANK[b.flavor.preparationStyle];
+    pa = pa == null ? 99 : pa;
+    pb = pb == null ? 99 : pb;
+    if (pa !== pb) return pa - pb;
+    // 4. stable deterministic tie-break: name, then id
+    var n = String(a.flavor.name).localeCompare(String(b.flavor.name));
+    if (n !== 0) return n;
+    return String(a.flavor.id).localeCompare(String(b.flavor.id));
+  });
+
+  result.flavors = matches.slice(0, MEAL_LEGO_MAX_SUGGESTIONS);
+  return result;
+}
+
 // ── Correcting a batch's identity ────────────────────────────────────────────
 // The selector on the add form was the only way to state a protein, which meant a
 // batch saved as Unknown, a mis-tap, or a batch whose recipe later changed could
@@ -12061,6 +12147,56 @@ function removeCookedMeal(id) {
   refreshFreshnessAlerts();
 }
 
+// ── Meal Lego v1 — "Try with" on a Ready Food card ───────────────────────────
+// Pure rendering: the whole decision is getCompatibleFlavorsForCookedMeal(). A
+// secondary row UNDER the card controls so it never competes with [Used 1] for
+// attention. Nothing here mutates or persists.
+function mealLegoTryWithHtml(meal) {
+  var compat = getCompatibleFlavorsForCookedMeal(meal);
+
+  if (compat.matchable && compat.flavors.length) {
+    var chips = compat.flavors.map(function(entry) {
+      var f = entry.flavor;
+      var t = f.activeTime != null ? ' · ' + f.activeTime + ' min' : '';
+      return '<button type="button" class="meal-lego-chip" ' +
+        'onclick="openFlavorFromReadyFood(\'' + escJ(String(f.id)) + '\')">' +
+        escapeHtml(f.name) + escapeHtml(t) + '</button>';
+    }).join('');
+    return '<div class="meal-lego-try">' +
+      '<span class="meal-lego-label">Try with</span>' +
+      '<span class="meal-lego-chips">' + chips + '</span>' +
+      '</div>';
+  }
+
+  // Unknown ONLY: a quiet, visually secondary nudge toward the protein selector
+  // already on this card. Not an error, not a blocker, never a modal. Not shown
+  // for mixed / none — those are real answers, not gaps to fill.
+  if (compat.protein === COOKED_PROTEIN_UNKNOWN) {
+    return '<div class="meal-lego-try meal-lego-try--hint">' +
+      '<span class="meal-lego-set-hint">' + icon('lightbulb') + ' Set protein to see flavor ideas</span>' +
+      '</div>';
+  }
+  return '';
+}
+
+// Open the Flavor Library entry behind a "Try with" chip. The user's existing
+// flavor filters are LEFT INTACT: we navigate to the tab, let renderFlavors()
+// apply the filters as it always does, then reveal the target only if it
+// survived them. A chip for a flavor the user has filtered out shows a one-line
+// notice rather than silently resetting their filter preferences.
+function openFlavorFromReadyFood(flavorId) {
+  showTab('flavors');
+  var card = document.querySelector('.flavor-card[data-flavor-id="' + escJ(String(flavorId)) + '"]');
+  if (!card) {
+    var f = findFlavor(flavorId);
+    showSuccessMessage((f ? f.name : 'That flavor') + ' is hidden by your current Flavor Library filter.');
+    return;
+  }
+  var detail = card.querySelector('.flavor-detail');
+  if (detail) detail.classList.remove('hidden');
+  if (card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function renderCookedMeals() {
   var list = document.getElementById('cooked-meals-list');
   if (!list) return;
@@ -12095,7 +12231,7 @@ function renderCookedMeals() {
     h += '</div>';
     // Occasional correction, not a logging chore: it sits with the other in-place
     // card fields (date, storage) and is never prompted for. Blank stays blank.
-    h += '<label class="cooked-field cooked-protein-field" title="Protein — only used to match flavours later">' + icon('drumstick') +
+    h += '<label class="cooked-field cooked-protein-field" title="Protein — used to suggest flavours to try">' + icon('drumstick') +
          ' <select onchange="setCookedProteinType(\'' + escJ(m.id) + '\', this.value)">' +
          cookedProteinOptionsHtml(cookedProteinAutoLabel(m), isCookedProteinChoice(m.proteinType) ? m.proteinType : '') +
          '</select></label>';
@@ -12104,6 +12240,7 @@ function renderCookedMeals() {
     }
     h += '<button class="cooked-remove" onclick="removeCookedMeal(\'' + escJ(m.id) + '\')" title="Ate it all / remove">' + icon('check') + ' Done</button>';
     h += '</div>';
+    h += mealLegoTryWithHtml(m);
     h += '</div>';
     return h;
   }

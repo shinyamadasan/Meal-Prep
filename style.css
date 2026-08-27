@@ -7149,6 +7149,59 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .cooked-protein-field select { max-width: 9rem; }
   .dash-ready-use { padding: 0.35rem 0.7rem; }
   .dash-ready-name { font-size: 0.9rem; }
+  .meal-lego-chip { min-height: 34px; }
+}
+
+/* Meal Lego v1 — "Try with" on a Ready Food card ---------------------------
+   A secondary row UNDER the card controls. It must never out-shout [Used 1],
+   so it is small, muted-labelled, and wraps cleanly on a narrow phone. Reuses
+   existing tokens — no :root block (Hard Rule 7). */
+.meal-lego-try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+}
+.meal-lego-label {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.meal-lego-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.meal-lego-chip {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+  min-height: 32px;
+}
+.meal-lego-chip:hover { background: var(--color-secondary); }
+.meal-lego-try--hint { margin-top: 0.35rem; }
+.meal-lego-set-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-style: italic;
+}
+.meal-lego-set-hint .lc-icon { width: 13px; height: 13px; }
+
+/* Home "Eat this first" — one flavor line, a visual peer of .wse-hint. */
+.wse-lego {
+  font-size: 0.73rem;
+  color: var(--color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Flavor Library -----------------------------------------------------------

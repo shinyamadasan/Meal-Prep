@@ -2317,3 +2317,67 @@ post-deploy production gate failed on one pre-existing D-056 portions test
 (`production-smoke-ready-food.spec.js:212`) with a `locator.click` timeout — a spec `da75a7d` does
 not touch, which had passed 18/18 against the same deployed SHA locally. Known live-site contention
 class; **not re-run to manufacture green**.
+
+## D-073 — Meal Lego v1 pairs ready food with flavors through one derived helper, and the fish supertype is one-way
+
+**Status:** OPEN — implemented on branch `wave-meal-lego-v1` (from `main` @ `3197391`), returned for
+review, not merged. Builds directly on the protein-identity contract of D-072 / `8711a9c` without
+changing it.
+
+### Context
+
+D-072 gave a cooked batch a truthful, name-blind protein identity and left a groundwork join
+(`flavorsForProteinType()`) that nothing rendered. The product goal for Meal Lego v1: *"I already
+cooked protein — show me a few flavors that truthfully work with it, so I can turn the same ready
+food into a different meal without cooking another full recipe."* Not a component inventory, not a
+sauce-stock system — the Flavor Library stays **knowledge, not prepared inventory**.
+
+### Decision
+
+**1. One compatibility layer, `getCompatibleFlavorsForCookedMeal(meal)`.** Every "Try with" surface
+(the Fridge Ready Food card, the Home "Eat this first" pick) reads this helper and nothing else, so
+the matching rule exists in exactly one place. It resolves identity via `getCookedMealProteinType()`
+(unchanged, name-blind) and returns `{ protein, matchable, flavors: [{ flavor, specificity }] }`. It
+**never mutates AppState and never persists** — rendering a suggestion writes nothing. Rejected:
+scattering `worksWith` checks through the render functions; forking a second matching vocabulary.
+`flavorsForProteinType()` stays as the D-072 groundwork join; the new helper is the product layer.
+
+**2. The fish supertype is one-way.** A flavor authored for generic `fish` is reasonably applicable
+to salmon and tuna, so cooked `salmon` matches `worksWith` `salmon` (exact) OR `fish` (supertype);
+cooked `tuna` matches `tuna` (exact) OR `fish` (supertype); cooked generic `fish` matches `fish`
+ONLY — never widened up to `salmon`/`tuna`. A flavor authored specifically for salmon is not
+automatically proven compatible with every fish, so the widening never runs in reverse.
+
+**3. `mixed` / `none` / `unknown` get no automatic pairing.** `mixed` does NOT union its constituent
+families (`getCookedMealProteinType()` returns only `mixed`, not the parts). `none` does NOT map to
+`vegetables` (a meatless recipe is not proof the ready food is a vegetable component). `unknown` does
+NOT parse the name. Each returns `matchable: false, flavors: []`.
+
+**4. Ranking is deterministic Flavor Library metadata only**: exact family match before
+generic-supertype match; then lower `activeTime` (null last); then `make-fresh` preparationStyle
+before others; then a stable `name`-then-`id` tie-break. No availability, stock, popularity,
+nutrition, or model. Capped at 3 per ready-food item; Home shows at most 1.
+
+**5. UI stays small and honest.** The Fridge card gets a secondary `Try with:` chip row BELOW the
+controls row, so it never competes with `[Used 1]`. An `unknown` batch gets one visually-secondary
+"Set protein to see flavor ideas" line — never a modal, error, or blocker on `[Used 1]`.
+`mixed`/`none` show nothing. Home's "Eat this first" pick gains one `Try <flavor>` line.
+`openFlavorFromReadyFood()` navigates to the existing Flavor Library entry and does NOT mutate the
+user's flavor filters — a chip for a filtered-out flavor shows a one-line notice instead of silently
+resetting preferences.
+
+**6. Zero persisted-state delta.** No new `AppState` key, no new `cookedMeal`/`flavor` field, no
+recommendation cache, no `saveData()` / Firestore / tombstone change. Pinned by test.
+
+**7. No sauce inventory.** Prepared flavor batches, sauce portions, `preparedAt`, expiration, freezer
+cubes, thaw state, stock decrement — all deferred to a later Flavor Bomb wave, after Meal Lego is
+dogfooded. The UI says "Try with", never "Available".
+
+### D-032 gate
+
+Derived helpers + rendering + tests. No sync, Firestore merge, tombstone, `cloudReady`, `saveData`
+semantics, auth, service-worker, or persistence-contract change. **Outside the red zone -> `done`
+gate** (reversible UI).
+
+Verify: app.js contains "function getCompatibleFlavorsForCookedMeal"
+Verify: tests/meal-lego.spec.js contains "cooked GENERIC fish never matches a salmon-only or tuna-only flavor"
