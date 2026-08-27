@@ -5,6 +5,127 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — Protein Identity P2 finalization landed: P2-1 and P2-2 CLOSED, foundation clean for Meal Lego
+
+`fix/protein-identity-p2-finalization` @ `da75a7d` was reviewed, held under D-032, authorized, and
+merged `--no-ff` into `main` at `0c19c58`, then pushed to `origin/main`. The review record was
+committed to `main` in its own commit `4534404` **before** the merge, per the D-040 convention. The
+reviewed commit landed **unrebased, unsquashed and unamended** — `app.js`, `index.html` and
+`style.css` blobs on merged `main` are byte-identical to the branch tip, and the diff the merge
+introduced is byte-identical to `git diff 8e2a541 da75a7d`. `wave1-portion-truth` remains parked at
+`88b5598`, untouched.
+
+**P2-1 — CLOSED.** `cookedProteinAutoLabel()` ended in an unguarded
+`FLAVOR_PROTEIN_BY_ID[derived].label`. Characterizing it first found the blast radius **worse than
+the finding stated**: `recipeProteinType()` returns raw `PROTEIN_FAMILY_BY_INGREDIENT` values that
+are never filtered against `COOKED_PROTEIN_IDS` or `FLAVOR_PROTEINS`, so a future table entry naming
+an unlabelled family reaches the lookup directly; the call site is inside `buildCookedCard()`; and
+`renderCookedMeals()` assigns `list.innerHTML` **last**, so a mid-build throw wrote nothing at all
+and left the Fridge list on its previous content — the "No stored meals yet" empty state, with real
+batches sitting in `AppState`. `showTab('fridge')` calls `renderCookedMeals()` directly, so the
+throw escaped the tab switch too. The lookup now goes through `Object.prototype.hasOwnProperty.call`
+and falls back to `'Unknown'`, the vocabulary's existing non-answer — **no label invented from the
+slug, no vocabulary widened**. `hasOwnProperty` rather than truthiness, because a truthiness check
+alone still renders `'Auto · undefined'` for an id colliding with an `Object.prototype` key.
+Derivation is unchanged: the batch still resolves to the family; only the label degrades.
+
+**Mutation-proven both ways.** Test 27 in `tests/ready-food-protein-hardening.spec.js` manufactures
+the exact vocabulary mismatch a future `PROTEIN_FAMILY_BY_INGREDIENT` edit would introduce, asserts
+the mismatch is genuinely present first (so it cannot silently stop testing anything), and proves
+three cards still render with a working correction control. Mutation A (original direct lookup
+restored) fails it on `threw`; mutation B (truthiness-only guard) fails it on `'Auto · undefined'`.
+Both reverted.
+
+**P2-2 — CLOSED.** `docs/ARCHITECTURE.md` and `docs/DATA_MODEL.md` did not hold *stale* protein
+sentences — they held **none**, which is what left "`cookedMeals` has no protein identity" standing
+as the operative claim. Both now document the optional `cookedMeals[].proteinType` field, the
+explicit → recipe-derived → unknown precedence, exact-name derivation from Protein-category
+ingredients rather than cooked-meal-name parsing, `none` / `mixed` / `unknown` semantics, pinning /
+correction / Auto-unpin, that derived recipe identity is read live and never duplicated onto the
+batch, the shared `COOKED_PROTEIN_IDS ⊂ FLAVOR_PROTEINS` vocabulary, and that this is Meal Lego
+**groundwork** with pairing and recommendation still separate, unstarted work. `docs/FEATURES.md`
+was corrected in the same commit for the same reason — it asserted "Try with" is blocked on a
+classifier "which has no protein field", the exact claim P2-2 names.
+
+**No persisted-state or sync change.** The `app.js` diff is eleven lines inside one function body.
+Grepping it for `saveData`, `saveToFirestore`, `saveToLocalStorage`, `cloudReady`, `TOMBSTONE_KEYS`,
+`AppState.`, `localStorage` and firestore identifiers returns nothing. No schema, no new persisted
+field, no normalizer change, no tombstone, no auth, no service worker, no new `AppState` key.
+
+**Local verification on merged `main`, all first-run, nothing re-run:**
+
+| Check | Result |
+|---|---|
+| `node --check app.js` | clean |
+| `npm run test:local` | **473 / 473** |
+| `npm test` | **473 / 473** |
+| focused protein-identity + hardening + ready-food + flavor | **134 / 134** |
+| `tools/Verify-Decisions.ps1` | **46 / 46** pointers hold |
+| `tools/Check-DocsConsistency.ps1` | 31 items, byte-identical to clean `main` — no new drift |
+| `git diff --check` | clean |
+
+**Pages deployed and verified against the repo — SUCCESS.** Run `33096607300`, conclusion `success`,
+SHA `0c19c58`; deployment `6127361319`, `env=github-pages`, `state=success`, same SHA. The served
+assets were checked rather than assumed: `app.js`, `index.html` and `style.css` fetched from
+`https://shinyamadasan.github.io/Meal-Prep/` are **byte-identical** to `git show main:<file>` after
+line-ending normalization. The served bundle contains the P2-1 guard
+(`Object.prototype.hasOwnProperty.call(FLAVOR_PROTEIN_BY_ID, derived)`) and **zero** occurrences of
+the old unguarded `FLAVOR_PROTEIN_BY_ID[derived].label`.
+
+**Production smoke against the live build — 18/18 passed**, first run, no retries
+(`tests/production-smoke-ready-food.spec.js --project=prod`).
+
+**CI failed, recorded as-is and NOT re-run.** Run `33096608662`, workflow `Button tests`, event
+`push`, SHA `0c19c58`, conclusion `failure`. Step-level breakdown matters here:
+
+- Step 6, **"Run local suite (branch gate)" — PASSED.** This is the first landing in three where
+  the deterministic gate went green on CI (`8711a9c` and `9021a90` both failed at this step).
+- Step 8, "Run production smokes (post-deploy gate)" — **failed: 146 passed, 1 failed, 4 skipped**.
+  The single failure is
+  `tests/production-smoke-ready-food.spec.js:212 — the Landers workflow works on the deployed site
+  with no special-case code`, timing out on `locator.click` for
+  `#cooked-meals-list .cooked-use-one` after a fixed `waitForTimeout(600)`.
+
+**Classified as harness, not product.** That test is a pre-existing D-056 **portions** test from
+`f82be53`; it touches no protein-identity code, and `da75a7d` does not modify
+`tests/production-smoke-ready-food.spec.js` at all. The whole of that spec had passed **18/18
+against the same deployed SHA** minutes earlier from this machine. It is a fixed-sleep-then-click
+against the live site under parallel workers — the live-site contention class already recorded at
+the `9021a90` landing ("132 passed / 5 failed in parallel … every one of those six passed in
+isolation"). **The run was not re-run to manufacture green.**
+
+**Follow-ups — the three P3s stay OPEN. None was fixed, incidentally or otherwise.**
+
+- **P3-1 — OPEN.** An externally-authored `proteinType: null` survives `normalizeCookedMeal()`
+  untouched (the guard is `!= null`) and behaves correctly as "no pin", but leaves a null-valued key
+  where every other path represents no-pin as an absent key. Cosmetic normalization cleanup, no
+  behavioural defect.
+- **P3-2 — OPEN. Missing committed regression coverage — NOT a product bug.** The review traced
+  the whole-object last-write-wins invariant through the real `loadFromFirestore()` →
+  `unionByIdLWW()` path and found the **product logic correct**: a newer local record that has
+  *deleted* `proteinType` beats a stale cloud record still carrying an explicit pin, because the
+  newer object replaces the older one wholesale rather than being field-merged. What is missing is a
+  committed test pinning that invariant. The existing union tests cover newer-local-**pin** and
+  newer-cloud-**pin**; newer-local-**unpin** vs stale-cloud-**pin** is the case most likely to
+  surprise a future edit, and the one Meal Lego will lean on once pins matter across devices.
+- **P3-3 — OPEN.** The card protein `<select>` has no accessible name of its own (the `title` sits
+  on the wrapping `<label>`) and at `font-size: 0.8rem` its tap target is below the 44px guideline.
+
+**Next.** **The next task is the P3-2 regression test** — newer local unpin vs stale cloud explicit
+pin — as a tiny pre-Meal-Lego hardening patch. The expected behaviour is already correct, so it
+adds **coverage only** unless the test exposes a real defect. It must not be combined with Meal Lego,
+and P3-1 and P3-3 must not be fixed opportunistically alongside it.
+
+**Meal Lego is still NOT started.** The identity foundation is now judged clean enough to build on:
+the contract Meal Lego consumes has stable precedence, a shared vocabulary that cannot drift into a
+translation table, and no remaining path where reading it can crash a render. What remains are Meal
+Lego's own product decisions, unchanged: the fish compatibility hierarchy, a `mixed` matching rule
+(and, if that rule is anything other than "no suggestions", a way to pin `mixed`), a `none` matching
+rule, and a graceful answer for the large population of batches that will stay `unknown` because
+classification is deliberately never prompted for.
+
+---
+
 ## 2026-08-27 — Ready Food Protein Identity hardening landed: identity is correctable, pinnable and type-safe
 
 `wave-ready-food-protein-hardening` @ `c742f17` was independently reviewed, held under D-032,

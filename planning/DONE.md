@@ -40,4 +40,5 @@
 - ✅ Recipe favorites, buy-it button, global error handler, Mung Beans, text search, bug fixes (2026-06-22)
 - ✅ Password reset, expiry suggestions, grocery→pantry transfer, paste-parser confidence, Filipino nutrition entries (2026-06-22)
 - ✅ Phase C — pantry auto-deduction on cook (`markRecipeCooked()` → `deductIngredientsForRecipe()`) (2026-06-22)
+- ✅ Protein Identity **P2 finalization** — P2-1 closed (`cookedProteinAutoLabel()` can no longer throw inside `renderCookedMeals()` and blank the Fridge list; guarded lookup falls back to `Unknown`, mutation-proven) and P2-2 closed (`ARCHITECTURE`/`DATA_MODEL`/`FEATURES` now describe the landed protein identity). P3-1/P3-2/P3-3 deliberately left open (merge `0c19c58`, reviewed `da75a7d`, D-072) (2026-08-27)
 - ✅ Ready Food Protein Identity **hardening** — correctable/pinnable batch protein (`setCookedProteinType()`), Auto-clears-the-field semantics, generated selector vocabulary, category normalization and strict type validation (merge `9021a90`, reviewed `c742f17`, D-072) (2026-08-27)

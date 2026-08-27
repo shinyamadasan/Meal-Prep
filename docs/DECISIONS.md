@@ -2263,3 +2263,57 @@ Verify: index.html does not contain "<option value=\"chicken\">Chicken</option>"
 - **P3-2** — no committed regression test for newer-local-**unpin** versus stale-cloud-**pin**.
 - **P3-3** — the card protein `<select>` has no accessible name of its own and its tap target is below
   the 44px guideline at `font-size: 0.8rem`.
+
+### P2 finalization addendum — 2026-08-27
+
+`fix/protein-identity-p2-finalization` @ `da75a7d`, reviewed against base `main @ 8e2a541`, PASS with
+no P0/P1/P2 open, merged `--no-ff` to `main` @ `0c19c58` and pushed. Review record on `main` at
+`4534404`, written **before** the merge per D-040. The reviewed commit landed unrebased, unsquashed
+and unamended.
+
+**P2-1 — CLOSED.** The unguarded tail of `cookedProteinAutoLabel()` is gone. Characterization
+established the failure was not "a wrong label on one card": `renderCookedMeals()` assigns
+`list.innerHTML` last, so a throw inside `buildCookedCard()` wrote nothing and left the Fridge list
+displaying its previous content — the empty state — while real batches sat in `AppState`; and
+`showTab('fridge')` calls `renderCookedMeals()` directly, so the throw escaped the tab switch too.
+
+The decision the fix encodes: **a family we cannot NAME is answered with the non-answer we already
+have.** Falling back to `'Unknown'` reuses the vocabulary's existing "we do not know, and will not
+pretend" rather than inventing a label from the slug (which would be the name-parsing this feature
+exists to avoid, one level down) or widening `FLAVOR_PROTEINS` to fit whatever a future ingredient
+table happens to say (which would make the flavor vocabulary a dumping ground for protein families
+no flavor targets). Derivation itself is deliberately left alone — the batch still *resolves* to the
+unlabelled family, so `getCookedMealProteinType()` keeps telling the truth and only the display
+degrades. The guard is `Object.prototype.hasOwnProperty.call`, not truthiness, because truthiness
+alone still renders `'Auto · undefined'` for an id colliding with an `Object.prototype` key; it also
+matches the idiom already used in `proteinFamilyForIngredientName()` two functions away.
+
+**P2-2 — CLOSED.** `docs/ARCHITECTURE.md` gained "Protein identity for cooked food (D-072)" and
+`docs/DATA_MODEL.md` gained `cookedMeals[].proteinType` plus "Cooked-meal protein identity (D-072)".
+`docs/FEATURES.md`'s claim that Ready Food "Try with" is blocked on a classifier "which has no
+protein field" was corrected in the same commit. Verified by `Check-DocsConsistency.ps1` reporting
+**31 items on the branch and 31 on clean `main`** — every new anchor resolves in code and no new
+drift was introduced.
+
+**P3-2 is reclassified, not closed.** The whole-object last-write-wins invariant was traced through
+the real `loadFromFirestore()` → `unionByIdLWW()` path and the **product logic is correct**: a newer
+local record that deleted `proteinType` beats a stale cloud record still carrying an explicit pin,
+because the newer object replaces the older wholesale rather than being field-merged. P3-2 is
+therefore a **missing committed regression test for a currently-correct invariant**, not a defect.
+It is the recommended next task, before Meal Lego. P3-1 and P3-3 stay open and untouched.
+
+Verify: app.js contains "Object.prototype.hasOwnProperty.call(FLAVOR_PROTEIN_BY_ID, derived)"
+Verify: tests/ready-food-protein-hardening.spec.js contains "lambIsDerivable"
+
+Landing evidence: deterministic suite 473/473 on merged `main` (`npm run test:local` and `npm test`
+independently), focused protein/ready-food/flavor 134/134, `Verify-Decisions.ps1` 46/46,
+`git diff --check` clean, `node --check app.js` clean. Pages run `33096607300` succeeded and
+deployment `6127361319` (`state=success`) carries SHA `0c19c58`; the served `app.js`, `index.html`
+and `style.css` are byte-identical to landed `main` after line-ending normalization, the served
+bundle carries the guard, and the old unguarded lookup appears **zero** times in production. The
+Ready Food production smoke passed **18/18** against the live build. CI run `33096608662` failed and
+is recorded as-is: its local branch gate **passed** (the first of three landings to do so), and its
+post-deploy production gate failed on one pre-existing D-056 portions test
+(`production-smoke-ready-food.spec.js:212`) with a `locator.click` timeout — a spec `da75a7d` does
+not touch, which had passed 18/18 against the same deployed SHA locally. Known live-site contention
+class; **not re-run to manufacture green**.
