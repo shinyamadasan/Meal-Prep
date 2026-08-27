@@ -4717,7 +4717,8 @@ select.form-control {
   color: var(--color-text-secondary);
 }
 .pantry-fresh-field input,
-.cooked-field input {
+.cooked-field input,
+.cooked-field select {
   font: inherit;
   padding: 0.15rem 0.35rem;
   border: 1px solid var(--color-border);
@@ -7134,8 +7135,18 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   color: var(--color-text-secondary);
 }
 
+/* The protein correction control. Capped and allowed to shrink so a long option
+   ("Auto · No protein") wraps to the next line of the flex meta row rather than
+   pushing the card wider than the phone. */
+.cooked-protein-field select {
+  max-width: 10.5rem;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
 @media (max-width: 768px) {
   .cooked-use-one { padding: 0.35rem 0.7rem; font-size: 0.82rem; }
+  .cooked-protein-field select { max-width: 9rem; }
   .dash-ready-use { padding: 0.35rem 0.7rem; }
   .dash-ready-name { font-size: 0.9rem; }
 }

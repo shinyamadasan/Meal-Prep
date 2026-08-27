@@ -3286,6 +3286,7 @@ window.closeHelpModal = closeHelpModal;
 
 function initApp() {
   hydrateIcons(); // turn static data-icon placeholders into SVGs
+  populateManualCookedProteinSelect(); // the protein vocabulary lives in code, not markup
 
   // First-run: show the How-to-Use guide once — but not when the Kitchen Setup Wizard
   // will also auto-open (pantryOnboardingDone absent = wizard fires = Help skips).
@@ -11683,9 +11684,17 @@ function proteinFamilyForIngredientName(name) {
     : null;
 }
 
-// Is this a value a user is allowed to have stored on a batch?
+// Is this a value a user is allowed to have STORED on a batch?
+//
+// Strict on TYPE, deliberately. The earlier String(value) form accepted ['chicken']
+// and { toString: function() { return 'chicken'; } } as legal, because both stringify
+// to a real id — so a hand-edited record or a malformed import could persist a
+// non-string into the one field Meal Lego is going to trust. Numbers, booleans,
+// objects, arrays and String objects are all rejected now; only a primitive string
+// that IS one of the ids counts. 'mixed' and 'unknown' are not in the list, so they
+// are rejected here too, by the same rule and not by a special case.
 function isCookedProteinChoice(value) {
-  return value != null && COOKED_PROTEIN_CHOICE_IDS.indexOf(String(value)) >= 0;
+  return typeof value === 'string' && COOKED_PROTEIN_CHOICE_IDS.indexOf(value) >= 0;
 }
 
 // Deterministic protein identity of a RECIPE, from its structured ingredients only.
@@ -11715,7 +11724,11 @@ function recipeProteinType(recipe) {
       return;
     }
     // Declared a protein by the recipe, but not one we can name. Read, not ignored.
-    if (String(ing.category || '').toLowerCase() === 'protein') sawUnidentifiedProtein = true;
+    // Trimmed and lowercased so an imported ' Protein ' or 'PROTEIN' still reads as
+    // the canonical category. That is whitespace/case normalisation of a CATEGORY
+    // value only — it does not widen what counts as a protein NAME, which stays
+    // exact-match against PROTEIN_FAMILY_BY_INGREDIENT.
+    if (String(ing.category || '').trim().toLowerCase() === 'protein') sawUnidentifiedProtein = true;
   });
 
   if (sawUnidentifiedProtein) return COOKED_PROTEIN_UNKNOWN;
@@ -11739,17 +11752,20 @@ function recipeProteinType(recipe) {
 // which is exactly what precedence 1 is for.
 function getCookedMealProteinType(meal) {
   if (!meal) return COOKED_PROTEIN_UNKNOWN;
+  if (isCookedProteinChoice(meal.proteinType)) return meal.proteinType;
+  return derivedCookedProteinType(meal);
+}
 
-  if (isCookedProteinChoice(meal.proteinType)) return String(meal.proteinType);
-
-  if (meal.recipeId != null) {
-    var recipe = (AppState.recipes || []).find(function(r) {
-      return r && String(r.id) === String(meal.recipeId);
-    });
-    if (recipe) return recipeProteinType(recipe);   // deleted recipe -> falls through
-  }
-
-  return COOKED_PROTEIN_UNKNOWN;
+// Precedence step 2 on its own: what the batch's RECIPE says, ignoring any pin.
+// Split out because the correction control has to show the user what they would fall
+// back to if they cleared their pin, and that answer is unreachable through
+// getCookedMealProteinType() once a pin exists.
+function derivedCookedProteinType(meal) {
+  if (!meal || meal.recipeId == null) return COOKED_PROTEIN_UNKNOWN;
+  var recipe = (AppState.recipes || []).find(function(r) {
+    return r && String(r.id) === String(meal.recipeId);
+  });
+  return recipe ? recipeProteinType(recipe) : COOKED_PROTEIN_UNKNOWN;  // deleted recipe -> unknown
 }
 
 // Groundwork only — NOTHING renders this yet. Proves a flavor's worksWith[] can be
@@ -11762,6 +11778,70 @@ function flavorsForProteinType(proteinType) {
   return (AppState.flavors || []).filter(function(f) {
     return f && Array.isArray(f.worksWith) && f.worksWith.indexOf(String(proteinType)) >= 0;
   });
+}
+
+// ── Correcting a batch's identity ────────────────────────────────────────────
+// The selector on the add form was the only way to state a protein, which meant a
+// batch saved as Unknown, a mis-tap, or a batch whose recipe later changed could
+// only be fixed by deleting and re-creating it. These three functions make it an
+// in-place correction on the existing record.
+
+// The <option> list for ANY cooked-protein selector, built from COOKED_PROTEIN_CHOICES
+// so the vocabulary is written down once. `blankLabel` is what an empty value MEANS in
+// this context: "Unknown" on the add form, "Auto · Chicken" on a batch that has a
+// recipe to derive from.
+function cookedProteinOptionsHtml(blankLabel, selectedId) {
+  return [{ id: '', label: blankLabel }].concat(COOKED_PROTEIN_CHOICES).map(function(c) {
+    return '<option value="' + escapeHtml(c.id) + '"' +
+           (c.id === selectedId ? ' selected' : '') + '>' + escapeHtml(c.label) + '</option>';
+  }).join('');
+}
+
+// index.html ships the add-form selector EMPTY and it is filled from code at boot,
+// the same way hydrateIcons() fills in static icons. Before this, the nine ids and
+// their labels were written out a second time in the markup: the invariant test
+// caught a drift after the fact, but there is no drift to catch if the list only
+// exists in one place.
+function populateManualCookedProteinSelect() {
+  var el = document.getElementById('manual-cooked-protein');
+  if (el) el.innerHTML = cookedProteinOptionsHtml('Unknown', '');
+}
+
+// What clearing the pin would leave this batch reading as, spelled out on the empty
+// option instead of shown as a blank. A recipe-backed batch still has an answer when
+// nothing is pinned, so calling that option "Unknown" would be a lie; naming it
+// "Auto · Chicken" is also what makes PINNING discoverable, because the user can see
+// that Chicken-by-derivation and Chicken-by-choice are two different selections.
+function cookedProteinAutoLabel(meal) {
+  var derived = derivedCookedProteinType(meal);
+  if (derived === COOKED_PROTEIN_UNKNOWN) return 'Unknown';
+  if (derived === COOKED_PROTEIN_NONE) return 'Auto · No protein';
+  if (derived === COOKED_PROTEIN_MIXED) return 'Auto · Mixed';
+  return 'Auto · ' + FLAVOR_PROTEIN_BY_ID[derived].label;
+}
+
+// Correct or PIN one batch's identity. The only mutation is proteinType on the
+// existing cookedMeals[] record, stamped and saved through the same path every other
+// cooked-meal edit already uses (see setCookedStorage / updateCookedDate) — no new
+// collection, no sync change, and no snapshot of derived truth.
+//
+// The blank option DELETES the field rather than storing 'unknown'. That is what keeps
+// the precedence contract clean: an absent field means "ask the recipe", so a
+// recipe-backed batch returns to deriving instead of being frozen at a non-answer, and
+// there is still exactly one representation of "we do not know" rather than two.
+// Anything that is neither a vocabulary id nor the blank option is ignored outright —
+// a rejected value must not silently clear a pin the user already made.
+function setCookedProteinType(id, value) {
+  var meal = findCookedMeal(id);
+  if (!meal) return;
+
+  if (isCookedProteinChoice(value)) meal.proteinType = value;
+  else if (value === '') delete meal.proteinType;
+  else return;
+
+  stampUpdated(meal);
+  saveData();
+  renderCookedMeals();
 }
 
 // Idempotent. Only ever repairs an incoherent pair; never invents portions for a
@@ -12003,6 +12083,12 @@ function renderCookedMeals() {
     h += '<button class="' + (m.storage === 'fridge' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'fridge\')">' + icon('refrigerator') + ' Fridge ' + formatStorageLife(m.fridgeLife) + '</button>';
     h += '<button class="' + (m.storage === 'freezer' ? 'active' : '') + '" onclick="setCookedStorage(\'' + m.id + '\', \'freezer\')">' + icon('snowflake') + ' Freezer ' + formatStorageLife(m.freezerLife) + '</button>';
     h += '</div>';
+    // Occasional correction, not a logging chore: it sits with the other in-place
+    // card fields (date, storage) and is never prompted for. Blank stays blank.
+    h += '<label class="cooked-field cooked-protein-field" title="Protein — only used to match flavours later">' + icon('drumstick') +
+         ' <select onchange="setCookedProteinType(\'' + escJ(m.id) + '\', this.value)">' +
+         cookedProteinOptionsHtml(cookedProteinAutoLabel(m), isCookedProteinChoice(m.proteinType) ? m.proteinType : '') +
+         '</select></label>';
     if (cookedMealTracksPortions(m)) {
       h += '<button class="cooked-use-one" onclick="useCookedPortion(\'' + escJ(m.id) + '\')" title="Ate one portion">' + icon('utensils') + ' Used 1</button>';
     }
