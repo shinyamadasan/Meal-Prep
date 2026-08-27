@@ -1255,19 +1255,21 @@ test('P3-2 A: a newer local unpin beats a stale cloud pin through the real sign-
     await new Promise((r) => setTimeout(r, 400)); // let the reconciled cloud write settle
     const m = AppState.cookedMeals.find((x) => x.id === 'cm-unpin');
     const lastWrite = window.__writes[window.__writes.length - 1] || {};
-    const written = (lastWrite.cookedMeals || []).find((x) => x.id === 'cm-unpin') || {};
+    const written = (lastWrite.cookedMeals || []).find((x) => x.id === 'cm-unpin');
     return {
       hasField: 'proteinType' in m,
       resolved: getCookedMealProteinType(m),
       updatedAt: m.updatedAt,
       wroteBack: window.__writes.length > 0,
-      writtenHasField: 'proteinType' in written
+      writtenExists: !!written,
+      writtenHasField: written ? 'proteinType' in written : true
     };
   });
   expect(got.hasField).toBe(false);        // the whole newer local object won; the pin was not merged back in
   expect(got.resolved).toBe('unknown');    // no explicit pin, no recipe -> unknown, the unpinned object's normal behaviour
   expect(got.updatedAt).toBe(P3_NEW);      // it really is the newer record that survived, not the cloud one
   expect(got.wroteBack).toBe(true);        // the reconciled superset was pushed up
+  expect(got.writtenExists).toBe(true);    // the record is still IN the reconciled payload — not dropped, so the next assertion means something
   expect(got.writtenHasField).toBe(false); // and that merged cloud write does NOT restore the stale "chicken" pin
 });
 
