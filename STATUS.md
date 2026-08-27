@@ -5,6 +5,61 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — Meal Lego v1 LANDED (D-073) — truthful ready-food ↔ flavor pairing
+
+`wave-meal-lego-v1` was independently adversarially reviewed (verdict **PASS — safe to merge**;
+P0/P1/P2 **none**, five defer-safe P3s recorded and NOT fixed) and merged `--no-ff` into `main` at
+**`e2d3931`**. Reviewed commits landed **unchanged**: `e755fca` (feat) and `327cd0f` (docs — D-073).
+**Not yet pushed** at time of this entry — see Phase 5/6 below.
+
+**What Meal Lego v1 is.** One derived helper, `getCompatibleFlavorsForCookedMeal(meal)`, is the single
+compatibility + ranking layer for every "Try with" surface (the Fridge Ready Food card, and one
+`Try <flavor>` line on Home's "Eat this first" pick). It resolves identity through the unchanged,
+name-blind `getCookedMealProteinType()` and returns `{ protein, matchable, flavors: [{ flavor,
+specificity }] }` — ranked exact-family > generic-`fish` supertype, then lower `activeTime`, then
+`make-fresh`, then name/id; capped at 3 (Home shows 1). The fish supertype is **one-way**: cooked
+salmon/tuna accept a generic `fish` flavor; cooked generic `fish` never widens up to salmon/tuna.
+`mixed` / `none` / `unknown` get **no** automatic pairing (no family union, no `none → vegetables`,
+no name parsing); `unknown` gets one visually-secondary "Set protein to see flavor ideas" line that
+never blocks `[Used 1]`.
+
+**Zero persisted-state delta.** No new `AppState` key, no new `cookedMeal`/`flavor` field, no
+recommendation cache, no `saveData()` / Firestore / tombstone / `cloudReady` change. Rendering a
+suggestion writes nothing (mutation-proven). The Flavor Library stays **knowledge, not prepared
+inventory** — the UI says "Try with", never "Available".
+
+**D-032: `done` gate** — derived helpers + rendering + tests only; no red-zone persistence/sync/auth/
+SW change.
+
+**Merged-main verification, no retries:**
+
+| Check | Result |
+|---|---|
+| `node --check app.js` | OK |
+| targeted regression (meal-lego, ready-food ×3, flavor-library, what-should-we-eat, kitchen-truth, tombstone-namespace, cook-depletion-tombstones) | **251 / 251** |
+| `npm run test:local` | **506 / 506** |
+| `npm test` | **506 / 506** |
+| `tools/Verify-Decisions.ps1` | **50 / 50** |
+| `tools/Check-DocsConsistency.ps1` | 32 items — **== clean `main` baseline**, no new drift |
+| `git diff --check` | clean |
+
+Baseline was 476 local tests → **506** (+30 in the new `tests/meal-lego.spec.js`). Independent
+reviewer probe: 11/11. All four negative mutations (name guessing / reverse fish hierarchy / mixed
+union / `saveData()` on render) fail for the intended reason; candidate source restored byte-exact.
+
+**Flavor Bomb inventory: NOT STARTED** — prepared-sauce stock, portions, expiry, freezer cubes, thaw
+state, decrement all remain deferred to a later wave, after Meal Lego is dogfooded.
+
+**Five reviewer P3s remain DEFERRED (not fixed here):** (1) `flavorsForProteinType()` is now dead
+production groundwork; (2) the filtered-out-flavor notice uses `showSuccessMessage`; (3) the existing
+flavor-id `escJ`/selector house pattern could be hardened; (4) `FEATURES.md` says "Working" for a
+feature that was branch-only at write time; (5) many Fridge batches create cumulative "Try with"
+chip-row weight.
+
+`wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+**Next gate: dogfood Meal Lego, then design Flavor Bomb v1.**
+
 ## 2026-08-27 — P3-2 CLOSED: whole-object LWW unpin regression coverage landed (test-only)
 
 `test/protein-unpin-lww-regression` was independently reviewed (verdict **PASS**, D-032 **done**) and
