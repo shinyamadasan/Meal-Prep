@@ -1153,3 +1153,163 @@ test('27. a derived family with no FLAVOR_PROTEINS label degrades to Unknown and
   );
   expect(appErrors).toEqual([]);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// P3-2 · Whole-object LWW: a newer local UNPIN beats a stale cloud explicit pin
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// The identity contract Meal Lego consumes is cross-device. The union test above
+// ("4. the sign-in union merge keeps a corrected batch") covers newer-local-PIN
+// and newer-cloud-PIN. The case most likely to surprise a future edit — and the
+// one Meal Lego leans on once pins matter across devices — is newer-local-UNPIN
+// (proteinType deleted via Auto) racing a stale cloud copy that still carries a
+// pin.
+//
+// A prior independent review drove this through the real sign-in path and found
+// the PRODUCT LOGIC already correct: unionByIdLWW() replaces the losing record as
+// a WHOLE object rather than field-merging it, so a newer local object that has
+// deleted proteinType does not inherit the older cloud object's pin. These tests
+// pin that invariant so it cannot silently regress when Meal Lego begins
+// consuming protein identity. They add COVERAGE ONLY — no product source changes.
+//
+// Real path exercised (no hand-written merge function):
+//   loadFromFirestore()  ->  AppState.cookedMeals = cloud copy (normalizeCookedMeals)
+//   loadUserData()       ->  unionByIdLWW(cloud, localStorage copy) + normalizeCookedMeals()
+//   saveData()           ->  reconciled superset written back to the cloud mock
+
+// Same Firestore mock as loadSignedIn(), plus a seeded localStorage document so
+// loadUserData()'s real sign-in union runs over cookedMeals. Kept separate from
+// loadSignedIn() rather than parameterising it, so the specs already using that
+// helper are untouched.
+async function loadSignedInWithLocal(page, { cloudDoc, localDoc }) {
+  await page.route('**/firebasejs/**', (r) => r.abort());
+  await page.addInitScript((local) => {
+    try {
+      if (localStorage.getItem('__unpinLwwBootstrapped')) return;
+      localStorage.clear();
+      localStorage.setItem('__unpinLwwBootstrapped', '1');
+      localStorage.setItem('mealPrepHelpSeen', '1');
+      localStorage.setItem('mealPrepStartDone', '1');
+      localStorage.setItem('pantryOnboardingDone', '1');
+      localStorage.setItem('mealPrepInitialized', '1');
+      localStorage.setItem('mealPrepAppData', JSON.stringify(local));
+    } catch (e) {}
+  }, localDoc);
+  await page.addInitScript((cloud) => {
+    const st = { doc: JSON.parse(JSON.stringify(cloud)) };
+    const snap = () => ({ exists: () => st.doc !== null, data: () => JSON.parse(JSON.stringify(st.doc)) });
+    const write = (d) => { st.doc = JSON.parse(JSON.stringify(d)); window.__writes.push(JSON.parse(JSON.stringify(d))); };
+    window.__writes = [];
+    const user = { uid: 'u', email: 'a@b.c', emailVerified: true, reload: async () => {} };
+    window.firebase = {
+      db: {}, auth: { currentUser: user }, doc: () => ({}), collection: () => ({}),
+      getDoc: async () => snap(), getDocs: async () => ({ forEach: () => {} }),
+      setDoc: async (_r, d) => write(d), deleteDoc: async () => {},
+      runTransaction: async (_db, fn) => fn({ get: async () => snap(), set: (_r, d) => write(d) }),
+      onSnapshot: () => () => {},
+      onAuthStateChanged: (_a, f) => { setTimeout(() => f(user), 0); return () => {}; },
+      signOut: async () => {}, query: () => ({}), where: () => ({}), orderBy: () => ({}),
+      signInWithEmailAndPassword: async () => ({ user }),
+      createUserWithEmailAndPassword: async () => ({ user }),
+      sendEmailVerification: async () => {}, sendPasswordResetEmail: async () => {}
+    };
+  }, cloudDoc);
+  await page.goto(APP_URL(), { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
+  await page.waitForFunction(() => AppState.cloudReady === true, null, { timeout: 30000 });
+}
+
+const P3_OLD = '2026-08-25T08:00:00.000Z';
+const P3_NEW = '2026-08-26T09:00:00.000Z';
+
+// One cloud doc / one local doc carry BOTH directions, so a single merge run
+// proves this is genuinely last-write-wins and not "unpin always wins":
+//   cm-unpin : cloud pins chicken (older) · local has NO pin  (newer)  -> local wins, stays unpinned
+//   cm-pin   : cloud pins beef    (newer)  · local has NO pin  (older) -> cloud wins, stays pinned
+const P3_CLOUD_DOC = {
+  version: 3,
+  recipes: [], pantry: [], customIngredients: [], customHacks: [], flavors: [],
+  userIngredients: [], groceryList: [],
+  cookedMeals: [
+    batch({ id: 'cm-unpin', name: 'Chicken of the Sea', proteinType: 'chicken', updatedAt: P3_OLD }),
+    batch({ id: 'cm-pin', name: 'Beef Stew', proteinType: 'beef', updatedAt: P3_NEW })
+  ],
+  deletions: {},
+  lastSaved: P3_OLD
+};
+const P3_LOCAL_DOC = {
+  recipes: [], pantry: [], customIngredients: [], customHacks: [], flavors: [],
+  userIngredients: [], groceryList: [],
+  cookedMeals: [
+    // proteinType absent — the exact shape setCookedProteinType(id, '') leaves behind
+    // (proven by the "setup proof" test below).
+    batch({ id: 'cm-unpin', name: 'Chicken of the Sea', updatedAt: P3_NEW }),
+    batch({ id: 'cm-pin', name: 'Beef Stew', updatedAt: P3_OLD })
+  ],
+  deletions: {}
+};
+
+test('P3-2 A: a newer local unpin beats a stale cloud pin through the real sign-in merge', async ({ page }) => {
+  await loadSignedInWithLocal(page, { cloudDoc: P3_CLOUD_DOC, localDoc: P3_LOCAL_DOC });
+  const got = await page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, 400)); // let the reconciled cloud write settle
+    const m = AppState.cookedMeals.find((x) => x.id === 'cm-unpin');
+    const lastWrite = window.__writes[window.__writes.length - 1] || {};
+    const written = (lastWrite.cookedMeals || []).find((x) => x.id === 'cm-unpin');
+    return {
+      hasField: 'proteinType' in m,
+      resolved: getCookedMealProteinType(m),
+      updatedAt: m.updatedAt,
+      wroteBack: window.__writes.length > 0,
+      writtenExists: !!written,
+      writtenHasField: written ? 'proteinType' in written : true
+    };
+  });
+  expect(got.hasField).toBe(false);        // the whole newer local object won; the pin was not merged back in
+  expect(got.resolved).toBe('unknown');    // no explicit pin, no recipe -> unknown, the unpinned object's normal behaviour
+  expect(got.updatedAt).toBe(P3_NEW);      // it really is the newer record that survived, not the cloud one
+  expect(got.wroteBack).toBe(true);        // the reconciled superset was pushed up
+  expect(got.writtenExists).toBe(true);    // the record is still IN the reconciled payload — not dropped, so the next assertion means something
+  expect(got.writtenHasField).toBe(false); // and that merged cloud write does NOT restore the stale "chicken" pin
+});
+
+test('P3-2 B (reverse): a newer cloud pin beats a stale local unpin — proves the test is about LWW, not "unpin wins"', async ({ page }) => {
+  await loadSignedInWithLocal(page, { cloudDoc: P3_CLOUD_DOC, localDoc: P3_LOCAL_DOC });
+  const got = await page.evaluate(() => {
+    const m = AppState.cookedMeals.find((x) => x.id === 'cm-pin');
+    return { stored: m.proteinType, resolved: getCookedMealProteinType(m), updatedAt: m.updatedAt };
+  });
+  expect(got.stored).toBe('beef');   // the newer cloud object won whole; the stale local unpin did not clear it
+  expect(got.resolved).toBe('beef');
+  expect(got.updatedAt).toBe(P3_NEW);
+});
+
+test('P3-2 setup proof: setCookedProteinType(id, "") deletes the field and restamps — it never persists "unknown"', async ({ page }) => {
+  await loadOffline(page);
+  const got = await page.evaluate(async () => {
+    AppState.recipes = [];
+    AppState.cookedMeals = [{
+      id: 'cm_auto', recipeId: null, name: 'Chicken of the Sea', proteinType: 'chicken',
+      cookedDate: '2026-08-25', storage: 'fridge', fridgeLife: 3, freezerLife: 30,
+      initialPortions: 4, portionsRemaining: 4, updatedAt: '2026-01-01T00:00:00.000Z'
+    }];
+    saveData();
+    setCookedProteinType('cm_auto', '');       // the real Auto / unpin control path
+    await new Promise((r) => setTimeout(r, 50));
+    const m = AppState.cookedMeals[0];
+    const raw = localStorage.getItem('mealPrepAppData') || '';
+    const savedMeal = ((JSON.parse(raw).cookedMeals) || [])[0] || {};
+    return {
+      hasField: 'proteinType' in m,
+      resolved: getCookedMealProteinType(m),
+      restamped: m.updatedAt !== '2026-01-01T00:00:00.000Z',
+      savedHasField: 'proteinType' in savedMeal,
+      rawHasUnknownString: /"proteinType"\s*:\s*"unknown"/.test(raw)
+    };
+  });
+  expect(got.hasField).toBe(false);       // the property is DELETED, not set to a string
+  expect(got.resolved).toBe('unknown');
+  expect(got.restamped).toBe(true);       // stampUpdated() ran -> the unpinned object is the NEWER one in an LWW race
+  expect(got.savedHasField).toBe(false);  // saveData() persisted the absence
+  expect(got.rawHasUnknownString).toBe(false); // no second representation of "we don't know" was written
+});
