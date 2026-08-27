@@ -10,7 +10,25 @@ The top entry is the current **working memory** (where we are / next task / bloc
 `wave-meal-lego-v1` was independently adversarially reviewed (verdict **PASS — safe to merge**;
 P0/P1/P2 **none**, five defer-safe P3s recorded and NOT fixed) and merged `--no-ff` into `main` at
 **`e2d3931`**. Reviewed commits landed **unchanged**: `e755fca` (feat) and `327cd0f` (docs — D-073).
-**Not yet pushed** at time of this entry — see Phase 5/6 below.
+Landing record committed separately at `4847364` and pushed: `3197391..4847364 main -> main`;
+`origin/main` == `4847364`.
+
+**First push CI, recorded as-is (NOT re-run):** run `33124619544` (`Button tests`, SHA `4847364`,
+attempt 1) **failed** — branch gate `npm run test:local` reported **505 passed / 1 failed**, the one
+failure a `waitForRestored()` 30s `page.waitForFunction` timeout in
+**`tests/kitchen-truth.spec.js:712`** ("a grocery transfer survives a localStorage round-trip and
+reload"). Prod-smoke gate skipped as a consequence. This spec is **byte-identical on pre-landing
+`main` `3197391`**, is **not touched by this landing** (`git diff 3197391..4847364 --name-only` does
+not list it), and passes locally on merged `main` — `npm run test:local` and `npm test` 506/506
+twice with no retries, the spec 2/2 in isolation and 27/27 for the whole file. It is the documented
+**D-065 reload-race flake class** (CLAUDE.md Tooling Gotchas), which also hit the first CI run of the
+two previous landings (P3-2 `dd09a80`, D-070 `b219e20`). **Not re-run to manufacture green.**
+
+**Deployment succeeded and serves the landed code:** Pages run `33124618021` **success** (46s),
+deployment record SHA `4847364`. The served `https://shinyamadasan.github.io/Meal-Prep/app.js` is
+**byte-identical** to `HEAD:app.js` after line-ending normalization and carries
+`getCompatibleFlavorsForCookedMeal` / `COOKED_PROTEIN_SUPERTYPES` / `mealLegoTryWithHtml`; served
+`style.css` carries the `.meal-lego-chip` / `.wse-lego` rules.
 
 **What Meal Lego v1 is.** One derived helper, `getCompatibleFlavorsForCookedMeal(meal)`, is the single
 compatibility + ranking layer for every "Try with" surface (the Fridge Ready Food card, and one
