@@ -5,6 +5,123 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — Ready Food Protein Identity hardening landed: identity is correctable, pinnable and type-safe
+
+`wave-ready-food-protein-hardening` @ `c742f17` was independently reviewed, held under D-032,
+explicitly authorized by the owner, and merged `--no-ff` into `main` at `9021a90`, then pushed to
+`origin/main`. The authorization was recorded on `main` in its own commit `928943b` **before** the
+merge, per the D-040 convention. The reviewed commit landed **unrebased, unsquashed and unamended** —
+product files on merged `main` are byte-identical to the branch tip. `wave1-portion-truth` remains
+parked at `88b5598`, untouched.
+
+**What shipped.** The groundwork wave (`8711a9c`) gave a cooked batch a truthful protein identity but
+no way to change one. A batch saved as Unknown, a mis-tap on the add form, or a batch whose recipe was
+edited months later could only be fixed by delete-and-recreate — which loses the `id`, the
+`cookedDate` and the portion counts. `setCookedProteinType(id, value)` now edits the existing
+`cookedMeals[]` record in place through the same `stampUpdated()` → `saveData()` →
+`renderCookedMeals()` path `setCookedStorage()` and `updateCookedDate()` already use. The control is a
+compact `<select>` in the cooked card's meta row beside the date and storage toggle — no modal, no new
+screen, and **never prompted for**, so classification stays occasional setup rather than a recurring
+logging chore. Unknown remains a first-class resting state.
+
+**Precedence and the name rule are unchanged.** Explicit `cookedMeal.proteinType` → deterministic
+recipe-derived identity → `unknown`, and **a cooked meal's `name` is never read to infer its protein**.
+Fish hierarchy (`salmon`/`tuna` vs `fish`) and `mixed` matching stay deferred to Meal Lego.
+
+**Auto/unpin deletes the field rather than storing `'unknown'`.** Absence already *is* the
+representation of "we do not know"; storing the string would create a second representation of the
+same non-answer and would freeze a recipe-backed batch at a non-answer instead of returning it to
+derivation. On a recipe-backed batch the empty option is labelled with the derived answer
+(`Auto · Chicken`) instead of a blank — honest, and what makes pinning discoverable. A rejected value
+is ignored outright rather than treated as a clear, so bad input cannot silently wipe a real pin.
+
+**Recipe-edit temporal truth is unchanged and now characterized.** An **unpinned** recipe-backed batch
+still follows a later recipe edit; nothing is auto-snapshotted. Both halves are asserted, so a future
+silent snapshot fails a test rather than slipping through. Pinning is the user's remedy — that is what
+precedence step 1 was for.
+
+**Vocabulary drift closed at the source.** `index.html` had been a second, hand-written copy of the
+nine ids **and** their labels. It now ships the selector empty; `populateManualCookedProteinSelect()`
+fills it from `COOKED_PROTEIN_CHOICES` at boot, the way `hydrateIcons()` fills static icons. The exact
+cooked id set is **additionally** pinned by test, because the pre-existing subset invariant cannot
+catch a new id that is *already legal* Flavor Library vocabulary — `vegetables` and `rice` are exactly
+that hazard and stay excluded.
+
+**Two safety fixes.** Ingredient CATEGORY is now trimmed as well as lowercased, so an imported
+`' Protein '` reads as the canonical category (names stay exact-match only — this is category
+normalization, not inference). And `isCookedProteinChoice()` is strict on type: the old
+`String(value)` coercion had accepted `['chicken']` and an object with a matching `toString()` as
+valid on the one field Meal Lego is going to trust.
+
+**Verification on merged `main` was green:** `npm test` and `npm run test:local` 472/472, focused
+protein/ready-food/flavor/tombstone specs 223/223, `node --check app.js` clean,
+`Verify-Decisions.ps1` 41/41, `git diff --check` clean. Five mutations were applied to production code
+and each caught by the intended test, then reverted.
+
+**First push-triggered CI was recorded as-is, and it failed:** run `33049649912` attempt 1, workflow
+`Button tests`, event `push`, SHA `9021a90cc1cdde046d67cfe50a0d50bf234affed`. The local gate reported
+**470 passed, 2 failed** — `inventory-quantity-truth.spec.js:206` and
+`recipe-edit-preservation.spec.js:152`, both `page.waitForFunction: Test timeout of 30000ms exceeded`.
+The Pages wait and the production smoke step were skipped as a consequence. **Classified as harness,
+not product:** the immediately preceding baseline run on `8711a9c` (`33044331851`) had *already*
+failed with the same signature and a different pair of specs (2 failed / 434 passed), neither spec
+touches protein identity, both pass locally on merged `main` in isolation and in the full suite, and
+retries remain disabled (no `retries:` key in `playwright.config.js`). This is the known
+`waitForRestored()` CI reload-race class documented in `tests/app-ready.js` and listed as out of scope
+for this wave. **The run was not re-run to manufacture green.**
+
+**Pages deployed independently and succeeded** — run `33049648864`, conclusion `success`, same SHA.
+The served assets were checked against committed `main` rather than assumed: `app.js`, `index.html`
+and `style.css` fetched from `https://shinyamadasan.github.io/Meal-Prep/` are all **byte-identical**
+to `git show main:<file>`. The served bundle carries `setCookedProteinType`,
+`derivedCookedProteinType`, `cookedProteinAutoLabel`, `cookedProteinOptionsHtml`,
+`populateManualCookedProteinSelect`, the strict `typeof value === 'string'` validation, the
+`.trim().toLowerCase() === 'protein'` category normalization and the `.cooked-protein-field` control;
+the served `index.html` contains the empty generated selector and **zero** hand-written
+`<option value="chicken">` markup.
+
+**Production smoke extended, not forked.** Ten new live cases were appended to the existing
+`tests/production-smoke-ready-food.spec.js` rather than started as a second file — same deployed
+surface, same fixture bootstrap, same record. **18/18 passed against the live build**, covering all
+twelve required proofs: unknown→Chicken, Chicken→Beef, pinning a recipe-derived Chicken, explicit
+beating derivation, Auto removing the field and returning to derivation *or* unknown, invalid values
+never clearing a valid pin, `Landers Lechon Manok` and `Chicken of the Sea` staying unknown when
+unpinned, exact ingredient matching with no substring inference, no 390px horizontal overflow, Used 1
+/ Done / storage / cooked-date all still functional beside the new control, and no page or console
+errors.
+
+The wider `npm run test:prod` run showed **132 passed / 5 failed** in parallel, then **54 passed /
+1 failed** when the same specs were re-run serially — and **every** one of those six passed in
+isolation, with a *different* test failing on the serial pass than on the parallel one. Live-site
+contention under parallel workers, not a product regression; none of them is a protein spec.
+
+**Open follow-ups — deliberately NOT closed by this landing.**
+
+- **P2-1 — `cookedProteinAutoLabel()` has an unguarded `FLAVOR_PROTEIN_BY_ID` lookup.** Its final
+  branch does `FLAVOR_PROTEIN_BY_ID[derived].label` with no existence check. Safe **today** only
+  because the vocabulary invariant guarantees every derived family is a `FLAVOR_PROTEINS` id. If
+  `PROTEIN_FAMILY_BY_INGREDIENT` ever gains a family that is not one, this throws inside
+  `renderCookedMeals()` and blanks the whole Fridge list rather than showing a wrong label.
+- **P2-2 — protein-identity documentation is stale / incomplete.** `docs/ARCHITECTURE.md` and
+  `docs/DATA_MODEL.md` still describe `cookedMeals` as having no protein identity and Ready Food
+  "Try with" as blocked on a classifier that now exists. Neither `8711a9c` nor this wave wrote those
+  records; fixing them is its own docs pass.
+- **P3-1** — an externally-authored `proteinType: null` survives `normalizeCookedMeal()` untouched
+  (the guard is `!= null`) and behaves correctly as "no pin", but leaves a null-valued key where every
+  other path represents no-pin as an absent key.
+- **P3-2** — no committed regression test for newer-local-**unpin** versus stale-cloud-**pin**. The
+  union test covers newer-local-pin and newer-cloud-pin; a clear racing a stale pin is the case most
+  likely to surprise.
+- **P3-3** — the card protein `<select>` has no accessible name of its own (the `title` sits on the
+  wrapping `<label>`) and at `font-size: 0.8rem` its tap target is below the 44px guideline.
+
+**Next.** Meal Lego is **not** started. Its remaining prerequisites are unchanged: the fish
+compatibility hierarchy, a `mixed` matching rule (and, if that rule is anything other than "no
+suggestions", a way to pin `mixed`), a `none` matching rule, and a graceful answer for the large
+population of batches that will stay `unknown` because classification is deliberately never prompted.
+
+---
+
 ## 2026-08-26 — D-071 landed: deletion tombstones are collection-aware, verified in production
 
 `d-071-tombstone-namespace` @ `f73ce3c` was independently reviewed, held under D-032, explicitly

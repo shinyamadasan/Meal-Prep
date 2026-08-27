@@ -2142,3 +2142,124 @@ Verify: tests/flavor-library.spec.js contains "prefixed flavor ids survive a num
 Verify: app.js contains "totalVanished > MASS_DELETE_GUARD"
 Verify: app.js contains "function legacyDeletionCollectionForId"
 Verify: tests/tombstone-namespace.spec.js contains "MUTATION: bypassing the aggregate MASS_DELETE_GUARD writes phantom small-collection tombstones"
+
+## D-072 — A cooked batch's protein identity is user-correctable, and clearing it DELETES the field
+
+**Status:** **CLOSED — LANDED and verified in production, 2026-08-27.** Landed on `main` at merge
+`9021a90` (reviewed commit `c742f17`), owner-authorized under D-032 after the authorization record in
+`928943b`. Extends the identity contract shipped at `8711a9c`.
+
+### Context
+
+`8711a9c` gave a cooked batch a truthful protein identity with a fixed precedence — explicit
+`cookedMeal.proteinType`, then deterministic recipe-derived identity, then `unknown` — and one hard
+rule: **the meal's `name` is never read.** It shipped the selector on the manual-add form only.
+
+That left three states unreachable. A batch saved as Unknown could never become Chicken. A mis-tap on
+the add form could not be corrected. And a recipe-backed batch could not be frozen against a later
+recipe edit, because derived identity is read live and never copied onto the record — editing a recipe
+retroactively changes what last week's leftovers report. In all three cases the only remedy was delete
+and recreate, which loses the `id`, the `cookedDate` and the portion counts.
+
+### Decision
+
+**1. Correction is an in-place edit of the existing record, on the card.** `setCookedProteinType(id,
+value)` mutates `cookedMeal.proteinType` and nothing else, then `stampUpdated()` → `saveData()` →
+`renderCookedMeals()` — the same path `setCookedStorage()` and `updateCookedDate()` already use. The
+control is a compact `<select>` in the cooked card's meta row beside the date input and the storage
+toggle. No modal, no new screen, no new AppState key.
+
+Rejected: a dedicated edit modal. Protein correction is occasional setup, not a per-meal decision;
+giving it a modal would imply it deserves one and invite the recurring-classification-chore UX this
+feature exists to avoid. The control is **never prompted for** and Unknown stays an acceptable
+resting state.
+
+**2. Clearing the selection DELETES `proteinType`; it does not store `'unknown'`.**
+
+Absence already *is* the representation of "we do not know" — that is what `8711a9c` established.
+Storing the string would create a second representation of the same non-answer, and worse, would
+**freeze a recipe-backed batch at a non-answer** instead of returning it to derivation. Deleting keeps
+the precedence contract literal: an absent field means "ask the recipe."
+
+A value that is neither a vocabulary id nor the blank option is **ignored outright**, not treated as a
+clear — a rejected input must never silently wipe a pin the user made.
+
+**3. The empty option is labelled with the derived answer, not left blank.** `cookedProteinAutoLabel()`
+returns `Auto · Chicken`, `Auto · Mixed`, `Auto · No protein`, or plain `Unknown` when there is
+genuinely nothing to derive. Calling a recipe-backed batch's empty option "Unknown" would be a lie, and
+naming the derived answer is also what makes **pinning** discoverable: the user can see that
+Chicken-by-derivation and Chicken-by-choice are two different selections.
+
+**4. Recipe-edit temporal truth is left exactly as it was, and characterized by test.** An unpinned
+recipe-backed batch still follows a later recipe edit. Nothing is auto-snapshotted.
+
+Rejected: snapshotting derived identity at cook time, a `derivedAt` cache, or a recipe-version pointer.
+Every one of them duplicates a truth that already exists and then lets the copy rot — the same reason
+`readyFoodBalanceHint()` reads `recipe.mealBalance` live — or adds a migration for the batches already
+on `main`. The pinning control is the remedy, and it is what precedence step 1 was for.
+
+**5. The selector vocabulary lives in code only.** `index.html` had been a second, hand-written copy of
+the nine ids **and** their labels. It now ships the selector empty and
+`populateManualCookedProteinSelect()` fills it from `COOKED_PROTEIN_CHOICES` at boot, the way
+`hydrateIcons()` fills static icons. `cookedProteinOptionsHtml()` is shared by the add form and the
+card control, so the two surfaces cannot diverge.
+
+The exact cooked id set is **additionally** pinned by test. The pre-existing subset invariant
+(`COOKED_PROTEIN_IDS ⊆ FLAVOR_PROTEINS`) cannot catch a new id that is *already legal* Flavor Library
+vocabulary — `vegetables` and `rice` are exactly that hazard, and answering "what protein is this?"
+with "rice" is a category error. Mutating `COOKED_PROTEIN_IDS` to include `'rice'` fails only the new
+exact pin; 67 other protein tests pass.
+
+**6. A stored `proteinType` must be a primitive string in the vocabulary.** `isCookedProteinChoice()`
+no longer coerces with `String()`. The old form accepted `['chicken']` and any object with a matching
+`toString()`, because both stringify to a legal id — so a hand-edited record or a malformed import
+could persist a non-string into the one field Meal Lego is going to trust.
+
+**7. Ingredient CATEGORY is trimmed as well as lowercased.** An imported `' Protein '`, `'PROTEIN'` or
+`'\tProtein\n'` now reads as the canonical category. Category text that merely resembles it —
+`'Proteins'`, `'Protein-rich'` — does **not**, because that would be inference from category text.
+Ingredient **names** are untouched and still matched by exact case-insensitive equality against
+`PROTEIN_FAMILY_BY_INGREDIENT`; this decision changes nothing about what counts as a protein name.
+
+### Consequences
+
+- A user can correct or pin any batch without recreating it, from the card, in one interaction.
+- A historical batch can be frozen against future recipe edits — but only if the user pins it
+  **before** the edit. An unpinned batch still changes retroactively. That is a known, deliberate
+  trade, not a defect.
+- `unknown` and `mixed` are never persisted. `none` is persisted and is a real answer, but joins to no
+  flavor.
+- Adding a cooked protein id now requires a test change, by design.
+- Fish hierarchy (`salmon`/`tuna` vs `fish`) and `mixed` matching remain **deferred to Meal Lego**.
+  This wave only keeps identity stable.
+
+### Blast radius — outside the D-032 red zone
+
+One optional field on an existing `cookedMeals[]` record, which already round-trips through
+localStorage, Firestore, the sign-in union, realtime and export/import. **No new top-level `AppState`
+key. No `TOMBSTONE_KEYS` change.** Tombstone architecture, `mergeCloudConflict()`, `cloudReady` / the
+write guard, `saveData()` semantics, auth and the service worker are all untouched. Held under D-032
+and merged by hand anyway, at the owner's direction, because it is the foundation Meal Lego will build
+on.
+
+Verify: app.js contains "function setCookedProteinType(id, value)"
+Verify: app.js contains "typeof value === 'string' && COOKED_PROTEIN_CHOICE_IDS.indexOf(value) >= 0"
+Verify: app.js contains "else if (value === '') delete meal.proteinType;"
+Verify: app.js contains ".trim().toLowerCase() === 'protein'"
+Verify: index.html does not contain "<option value=\"chicken\">Chicken</option>"
+
+### Open follow-ups (recorded at landing, NOT fixed here)
+
+- **P2-1** — `cookedProteinAutoLabel()` ends in an unguarded `FLAVOR_PROTEIN_BY_ID[derived].label`.
+  Safe only while the vocabulary invariant holds; if `PROTEIN_FAMILY_BY_INGREDIENT` ever gains a family
+  that is not a `FLAVOR_PROTEINS` id, this throws inside `renderCookedMeals()` and blanks the Fridge
+  list rather than showing a wrong label.
+- **P2-2** — `docs/ARCHITECTURE.md` and `docs/DATA_MODEL.md` still say `cookedMeals` have no protein
+  identity and that Ready Food "Try with" is blocked on a classifier that now exists. Neither
+  `8711a9c` nor this wave wrote those records.
+- **P3-1** — an externally-authored `proteinType: null` survives `normalizeCookedMeal()` untouched (the
+  guard is `!= null`) and behaves correctly as "no pin", but leaves a null-valued key where every other
+  path represents no-pin as an absent key.
+- **P3-2** — no committed regression test for newer-local-**unpin** versus stale-cloud-**pin**.
+- **P3-3** — the card protein `<select>` has no accessible name of its own and its tap target is below
+  the 44px guideline at `font-size: 0.8rem`.
