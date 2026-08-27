@@ -1952,7 +1952,7 @@ Verify: app.js contains "var FLAVOR_ID_PREFIX = 'flv-'"
 Verify: app.js contains "function normalizeFlavor("
 Verify: app.js contains "function flavorStarterCandidates"
 Verify: app.js contains "const defaultFlavors"
-Verify: app.js contains "'customHacks', 'flavors', 'cookedMeals'"
+Verify: app.js contains "'customHacks', 'flavors', 'preparedFlavors', 'cookedMeals'"
 Verify: tests/flavor-library.spec.js contains "MUTATION: removing flavors from TOMBSTONE_KEYS"
 
 ### Landing addendum — 2026-08-26
@@ -2381,3 +2381,149 @@ gate** (reversible UI).
 
 Verify: app.js contains "function getCompatibleFlavorsForCookedMeal"
 Verify: tests/meal-lego.spec.js contains "cooked GENERIC fish never matches a salmon-only or tuna-only flavor"
+
+---
+
+## D-074 — Flavor Bomb v1: prepared physical stock is a new top-level collection, sibling to (never inside) the Flavor Library
+
+**Status:** Implemented on branch `design/flavor-bomb-v1` (from `main` @ `5199e44`). **Held for
+review under D-032 — NOT merged, NOT `done`.** `wave1-portion-truth` remains parked at `88b5598`,
+untouched.
+
+### Context
+
+D-070 deliberately kept the Flavor Library as knowledge only: "`prepared`, `portionsRemaining`,
+`batchSize`, freezer quantity, expiry, thaw state and nutrition are all deliberately absent... Flavor
+Bomb inventory comes after Meal Lego is dogfooded" (D-070, FEATURES.md). D-073 landed Meal Lego v1 —
+"Try with" — as a purely derived, non-persisting layer over that knowledge. The product gap this
+wave closes: the app can now suggest a flavor that *goes with* a cooked protein, but has no way to
+know whether a batch of that flavor has actually been made and is sitting in the freezer right now.
+The product goal, verbatim from the owner brief: "Let the app know which Flavor Library flavors I
+have ACTUALLY prepared... so ready protein can be paired with flavors that are genuinely ready to
+use." A full architecture characterization pass preceded this implementation (see the
+characterization record in session history; not duplicated here) and concluded, before any code was
+written, that a new top-level collection was the smallest coherent model. That conclusion is
+restated and finalized below because DECISIONS.md is the durable record; the characterization pass
+itself was scratch work.
+
+### Decision
+
+`AppState.preparedFlavors[]` is a new top-level synced collection: `id, flavorId, portionsInitial,
+portionsRemaining, storage, preparedAt, expiresAt, updatedAt`. It records physical stock — what has
+actually been batched and is currently available — as a record **separate from and never inside**
+either the Flavor Library (`AppState.flavors`, knowledge) or `cookedMeals` (ready protein). All three
+stay distinct truths: a flavor is a technique, a cooked meal is protein, a prepared flavor is a
+sauce/finish batch physically on hand.
+
+**Two alternatives were re-examined and rejected, same as D-070's own characterization of Flavor
+Library itself:**
+
+- **`flavor.preparedPortions`** — conflates "the Soy-Calamansi technique" (a knowledge edit: fixing a
+  typo in `instructions`) with "the 6 cubes in my freezer" (a stock edit: tapping Used 1). Both would
+  be the same record with the same `updatedAt`, so under this app's existing whole-object
+  `unionById`/tombstone LWW (D-004, D-020), a knowledge edit on one device and a stock decrement on
+  another would race as if they were the same kind of change. Rejected.
+- **A `cookedMeal` entry** (e.g. `{ name: "Soy-Calamansi cubes" }`) — `cookedMeals` is
+  protein-identity load-bearing: `getCookedMealProteinType()` → `getCompatibleFlavorsForCookedMeal()`
+  (D-073) treats every entry as ready-to-eat protein, ranked by `getReadyFoodSuggestions()` and shown
+  on Home's "Eat this first". A flavor cube injected here would appear as fake ready food and corrupt
+  that ranking. Rejected.
+
+**One active batch per `flavorId` in v1.** `findPreparedFlavorByFlavorId()` is the lookup every
+creation path goes through. Making a new batch of a flavor that already has an active record
+**replaces it in place** — same `id`, fresh `preparedAt`/counts — rather than creating a second
+record or silently discarding one. This is a deliberate v1 restriction, not an accident: `cookedMeals`
+portions (D-056) and pantry lot-tracking (D-057) both scoped multi-batch/FIFO tracking out for the
+same reason — "batch once, use many times" does not need warehouse-grade lot management, and
+replace-in-place keeps the record count trivially bounded (one row per flavor, never growing). The
+lookup is factored into its own function specifically so a later wave can widen it to "all active
+batches for a flavorId" without touching call sites — no schema migration, just a different query.
+
+**Portions are generic, not cube-specific.** `portionsInitial`/`portionsRemaining` mirror D-056's
+naming exactly (`cookedMeal.initialPortions`/`portionsRemaining`) and count whole units — never
+grams, never ml. The UI is free to say "cubes" in copy (freezer-friendly flavors) without a separate
+persisted unit field, the same way `preparationStyle` is a label and the UI composes sentences around
+it.
+
+**Storage reuses `cookedMeal.storage`'s `'fridge' | 'freezer'` vocabulary verbatim.** No new
+vocabulary was invented. Unknown/garbage storage on load defaults to `'fridge'` — the same neutral
+default this app already uses everywhere a storage location is missing.
+
+**`expiresAt` is optional, user-entered only, and never inferred.** The Flavor Library carries no
+shelf-life knowledge at all (no `fridgeLife`/`freezerLife` fields on a flavor, unlike a recipe or a
+cooked meal), so there is nothing truthful to compute an expiry from. `preparedAt` is always the
+local date the batch was recorded, which is truthful by construction (it is when the user tapped
+Save). Both rules match D-057's core discipline: an unknown fact stays unknown rather than becoming
+an invented number.
+
+**Deleting a Flavor Library flavor does NOT cascade-delete its prepared stock.** `deleteFlavor()` is
+unchanged in what it touches — it still only removes the flavor. A `preparedFlavors` record whose
+`flavorId` later stops resolving becomes an orphan and is displayed as "Unknown flavor (deleted)"
+rather than removed, following the same graceful-degradation precedent `getCookedMealProteinType()`
+already sets for a deleted recipe (D-072: "editing a recipe therefore changes what its existing
+batches report, and deleting a recipe drops them to `unknown`" — the record survives, only the label
+degrades). Physical food a person actually has does not disappear because a recipe card was deleted;
+the two are separate truths and this wave keeps them separate on purpose.
+
+### Persistence — every site D-070's own registry named, re-verified against current code rather
+### than assumed from the prior wave's list
+
+`AppState` default, `saveToLocalStorage()`, `loadFromLocalStorage()`, `snapshotData()`,
+`restoreBackup()`, `exportData()` (version bumped `1.2` → `1.3`), `importData()` (×4: `KNOWN`,
+tombstone-clear via `TOMBSTONE_KEYS`, union merge, re-stamp array), `TOMBSTONE_KEYS`,
+`buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`, `loadUserData()` (×2: UKEYS
+union, post-merge normalize), `setupRealtimeListeners()`. `clearLocalStorage()` and
+`collectSyncedIds()` needed **no** edit — both iterate `TOMBSTONE_KEYS`, exactly as D-070 found for
+`flavors`. `render*()` refresh calls were added alongside every one of the above so the Prepared
+Flavors card never shows stale data after a load/merge/import/restore.
+
+### Deletion at zero uses an EXPLICIT tombstone, unlike `removeCookedMeal()`
+
+`useOnePreparedFlavor()` mirrors `useCookedPortion()` (D-056) exactly for the decrement path. But the
+last-portion removal path deliberately diverges from `removeCookedMeal()`: `removePreparedFlavor()`
+calls `writeTombstone('preparedFlavors', id)` **before** dropping the record and re-baselining —
+the same explicit-tombstone → delete → re-baseline sequence D-057 established for
+`removeAllExpired()` — rather than relying solely on `recordLocalDeletions()`'s vanish-diff the way
+cookedMeals' "Done" button does. This was an explicit owner requirement for this collection, not
+a default: a batch reaching zero from a single "Used 1" tap must not depend on the
+`MASS_DELETE_GUARD`-gated vanish-diff to sync the deletion. A partial decrement (not reaching zero)
+writes no tombstone — only the terminal removal does.
+
+### Concurrent decrement — the whole-object LWW limitation is INHERITED, not new, and is knowingly accepted for v1
+
+Traced through the real merge code (not assumed): `saveToFirestore()`'s transaction-conflict branch
+calls `mergeCloudConflict()`, which unions `preparedFlavors` via `unionById()` — a flat
+local-overwrites-remote-on-matching-id merge with **no timestamp comparison at all** on that path
+(distinct from `unionByIdLWW()`, which IS timestamp-aware and is used only at sign-in). Two devices
+both starting from `portionsRemaining: 3` and both tapping Used 1 near-simultaneously can each
+compute `2` locally; whichever write loses the version race adopts the OTHER side's already-committed
+`portionsRemaining: 2` wholesale via `mergeCloudConflict()`, so the merged result is `2`, not the
+correct `1` — one decrement is silently lost. This is the exact mechanism `cookedMeals.portionsRemaining`
+already has under D-056, unfixed and unremarked there. **Owner decision: accepted for v1.** No
+`FieldValue.increment`, no CRDT, no per-field merge semantics, and no transactional inventory
+architecture were introduced. Fixing it would require Firestore document-level field increments,
+which conflicts with the whole-document-transaction/tombstone architecture this app uses everywhere
+else, and is out of scope for a personal/household app's v1. Recorded here as a known, accepted
+limitation rather than silently carried — the concurrent-decrement mutation risk was traced through
+real code before this decision was made, not assumed away.
+
+### Meal Lego is unchanged
+
+`getCompatibleFlavorsForCookedMeal()` (D-073) was not touched — verified both by inspection (the
+function body is untouched) and by test (`tests/prepared-flavors.spec.js` asserts its output is
+byte-identical before and after a `preparedFlavors` mutation). Ranking prepared stock ahead of
+knowledge-only flavors on the "Try with" chip row is the explicitly deferred next wave, not this one.
+
+### D-032 gate
+
+**RED ZONE — held, `approved` not `done`.** This wave touches every persistence/deletion/sync surface
+D-070 itself classified as red zone: `TOMBSTONE_KEYS`, `buildFirestorePayload()`,
+`mergeCloudConflict()`, `loadFromFirestore()`, the sign-in union, and `setupRealtimeListeners()`. Per
+D-032's own rule ("when torn, choose `approved`"), this lands `approved` and awaits an explicit human
+merge — never auto-shipped.
+
+Verify: app.js contains "var PREPARED_FLAVOR_ID_PREFIX = 'pfl-';"
+Verify: app.js contains "function normalizePreparedFlavor("
+Verify: app.js contains "function findPreparedFlavorByFlavorId("
+Verify: app.js contains "'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients'"
+Verify: tests/prepared-flavors.spec.js contains "MUTATION: bypassing the existing-batch lookup in savePreparedFlavor() duplicates instead of replacing"

@@ -95,9 +95,18 @@
   generic `fish` never widens up). `mixed` / `none` / `unknown` get no automatic pairing — `unknown`
   gets one secondary "Set protein to see flavor ideas" line, never a blocker on `[Used 1]`. No
   persisted-state change; rendering writes nothing. See D-073.
-- **Not built, deliberately:** prepared-flavor inventory (Flavor Bomb), portion counting, sauce
-  expiry, freezer stock, nutrition, `mixed` constituent-family reconstruction. Each would turn the
-  library into a daily logging job. Flavor Bomb inventory comes after Meal Lego is dogfooded.
+- **Not built, deliberately:** nutrition, `mixed` constituent-family reconstruction. Each would turn
+  the library into a daily logging job.
+- **Prepared Flavors (Flavor Bomb v1, D-074)** — Implemented · branch `design/flavor-bomb-v1`, held
+  for review, NOT merged · `openPrepareFlavorDialog()` / `savePreparedFlavor()` / `renderPreparedFlavors()`
+  · `AppState.preparedFlavors[]`, a new top-level collection separate from both Flavor Library
+  knowledge and `cookedMeals`. From a flavor card, "I made this" (or "Replace batch" if one is
+  already active) records portions + fridge/freezer + optional expiry; the Flavor Library tab shows a
+  compact "Prepared Flavors" card list above the flavor list with a one-tap **Used 1**. One active
+  batch per flavor in v1 — making a new batch replaces the existing record rather than stacking.
+  `expiresAt` is optional and user-entered only, never inferred. Meal Lego's "Try with" is
+  **unchanged** by this wave — ranking prepared stock ahead of knowledge-only flavors is the next,
+  separate wave. See DECISIONS D-074.
 
 ## Settings & Help
 - Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, **Food expiry alerts** opt-in, export/import, restore backup, clear all (snapshots first).

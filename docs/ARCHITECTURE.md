@@ -40,13 +40,18 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
   recipes are plain JSON missing fields added later (D-005).
 - **Always after loading flavors:** call `normalizeFlavors()`. It fills absent fields, drops unknown
   slugs, and enforces the mandatory `flv-` id prefix. It must never set `updatedAt` — see D-070.
+- **Always after loading prepared flavors:** call `normalizePreparedFlavors()`. Same discipline as
+  `normalizeFlavors()` — fills absent fields, repairs an incoherent portions pair, never sets
+  `updatedAt`. See D-074.
 - **Adding a synced collection touches 17 sites.** `AppState` default, `saveToLocalStorage()`,
   `loadFromLocalStorage()`, `snapshotData()`, `restoreBackup()`, `exportData()`, `importData()` (x4),
   `TOMBSTONE_KEYS`, `buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`,
   `loadUserData()` (x2), `setupRealtimeListeners()`. `clearLocalStorage()` and `collectSyncedIds()`
   need no edit — both iterate `TOMBSTONE_KEYS`. A partial implementation loses data: skip the
   sign-in union and local records are shadowed by the cloud copy; skip `TOMBSTONE_KEYS` and a
-  deletion is resurrected by the next union. See D-070 for the worked example.
+  deletion is resurrected by the next union. See D-070 for the worked example; D-074 (Flavor Bomb v1,
+  `AppState.preparedFlavors`) re-verified this exact list against current code rather than assuming
+  it from the prior wave.
 - **Write guard — never write before read:** `saveToFirestore()` no-ops until `AppState.cloudReady`
   is true (set only after the cloud doc is read, or on sign-up). This stops a load-window save (the
   30s auto-save, the `online` event, a render) from overwriting good cloud data with an un-loaded
@@ -102,6 +107,37 @@ FLAVOR_PROTEINS`, with labels taken from `FLAVOR_PROTEIN_BY_ID`. No new synced c
 `TOMBSTONE_KEYS` change — `proteinType` is one optional field on an existing `cookedMeals` record.
 See [DATA_MODEL.md](DATA_MODEL.md) for the shape, the full precedence table and the `none` / `mixed`
 / `unknown` semantics.
+
+## Prepared Flavors — physical prepared-flavor stock (Flavor Bomb v1, D-074)
+
+Answers "which Flavor Library flavors have I ACTUALLY made and still have on hand?" — a truth Meal
+Lego v1 (D-073) deliberately does not model: `getCompatibleFlavorsForCookedMeal()` only knows what
+*works with* a cooked protein, never what is *ready to use right now*. `AppState.preparedFlavors[]`
+is a new, separate top-level collection recording physical stock, kept apart from both the Flavor
+Library (knowledge — `AppState.flavors`) and `cookedMeals` (ready protein) on purpose; see DECISIONS
+D-074 for why both alternatives (a field on `flavor`, an entry in `cookedMeals`) were rejected.
+
+Entry points: `openPrepareFlavorDialog(flavorId)` (the Flavor Library card's "I made this" /
+"Replace batch" action) → `savePreparedFlavor()`, which looks up any existing active record for that
+`flavorId` via `findPreparedFlavorByFlavorId()` and REPLACES it in place — one active batch per
+flavor in v1, no lot/FIFO tracking. `useOnePreparedFlavor(id)` is the one-tap decrement, mirroring
+`useCookedPortion()` (D-056) exactly; the last portion routes into `removePreparedFlavor()`, which —
+unlike `removeCookedMeal()` — writes an EXPLICIT tombstone before dropping the record, rather than
+relying solely on the `recordLocalDeletions()` vanish-diff (an owner-directed requirement for this
+collection specifically). `renderPreparedFlavors()` draws a compact card list on the Flavor Library
+tab, above the flavor list itself.
+
+Persistence follows the exact 17-site registry above, with `preparedFlavors` added to
+`TOMBSTONE_KEYS`. A `flavorId` whose Flavor Library entry was later deleted is NOT cascade-deleted —
+`deleteFlavor()` does not touch `preparedFlavors` — and renders as "Unknown flavor (deleted)" instead,
+the same graceful-degradation precedent D-072 sets for a deleted recipe.
+
+**Not yet built, deliberately:** Meal Lego does not rank prepared stock ahead of knowledge-only
+flavors — `getCompatibleFlavorsForCookedMeal()` is untouched by this wave (verified both by
+inspection and by test). That integration is the explicitly deferred next wave. Also deferred:
+multi-batch/FIFO tracking, a dedicated Used-1 history log, and a fix for the inherited
+whole-object-LWW concurrent-decrement risk (see DECISIONS D-074) — all accepted v1 limitations, not
+oversights.
 
 ## Shop -> inventory loop
 `toggleGroceryItem()` is the only inbound path from shopping, and it is one tap (D-057):

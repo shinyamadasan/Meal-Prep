@@ -16,6 +16,7 @@ AppState.nutritionGoals     // { calories, protein, carbs, fat, fiber, sodium }
 AppState.customIngredients  // [] storage-guide items (feeds dead #storage tab)
 AppState.customHacks        // [] user cooking hacks
 AppState.flavors            // [] reusable finishing knowledge (see "Flavor object" below, D-070)
+AppState.preparedFlavors    // [] physical prepared-flavor stock (see "Prepared flavor object" below, D-074)
 AppState.userIngredients    // [] user-created INGREDIENT_DB-style entries
 AppState.ingredientPrices   // {} per-store price overrides
 AppState.myStores           // [] stores the user shops at (filter)
@@ -244,6 +245,7 @@ AppState.deletions = {
   customIngredients: { ... },
   customHacks:       { ... },
   flavors:           { "flv-x": "..." },
+  preparedFlavors:   { "pfl-x": "..." },
   cookedMeals:       { "cm_...": "..." },
   userIngredients:   { "ui_...": "..." }
 }
@@ -280,7 +282,57 @@ normalize pass hand a flavor a fresh timestamp that beats its own tombstone unde
 `setupRealtimeListeners()`, and after the `loadUserData()` sign-in union.
 
 Explicitly NOT in v1, and each would create a recurring logging job: `prepared`,
-`portionsRemaining`, `batchSize`, freezer quantity, expiry, thaw state, nutrition.
+`portionsRemaining`, `batchSize`, freezer quantity, expiry, thaw state, nutrition. **Those fields now
+live on a separate collection** — see "Prepared flavor object (D-074)" below — never on the flavor
+itself, so editing the recipe and editing the stock stay two different records with two different
+`updatedAt` timestamps.
+
+## Prepared flavor object (D-074)
+Physical prepared-flavor stock: what has actually been batched and is currently on hand. Deliberately
+a SEPARATE top-level collection from both the Flavor Library (knowledge) and `cookedMeals` (ready
+protein) — see DECISIONS D-074 for why `flavor.preparedPortions` and a `cookedMeals` entry were both
+rejected.
+
+```js
+{
+  id,                 // STRING, always prefixed 'pfl-'. Collision-safe against flv-/cm_/ui_/
+                      // buy_/ib_/staple_ — see legacyDeletionCollectionForId().
+  flavorId,           // FK into AppState.flavors (a 'flv-' id). NOT resolved/rewritten by the
+                      // normalizer — an id that stops resolving (its flavor was deleted) is an
+                      // ORPHAN, not an error; see "Unknown flavor (deleted)" below.
+  portionsInitial,    // whole units the batch started with. Never grams, never ml.
+  portionsRemaining,  // whole units left. Never exceeds portionsInitial (normalizer raises
+                      // initial rather than clamping remaining — same D-056 rule).
+  storage,            // 'fridge' | 'freezer' — reuses cookedMeal.storage's vocabulary verbatim.
+  preparedAt,         // 'YYYY-MM-DD' — the local date the batch was recorded. Always truthful:
+                      // it is when the user tapped Save, never inferred.
+  expiresAt,          // 'YYYY-MM-DD' or null. OPTIONAL, user-entered ONLY — never computed from
+                      // any shelf-life table. The Flavor Library carries no shelf-life knowledge
+                      // to infer from in the first place.
+  updatedAt           // set ONLY by stampUpdated() on a real user action — same discipline as
+                      // the Flavor object; normalizePreparedFlavor() never sets it.
+}
+```
+
+**One active record per `flavorId` in v1.** `findPreparedFlavorByFlavorId()` is the lookup every
+creation path uses; making a new batch of an already-stocked flavor REPLACES the existing record in
+place (same `id`, fresh `preparedAt`/counts) rather than creating a second row. No lot/FIFO tracking.
+
+**An orphan `flavorId` (its Flavor Library entry was deleted) is never cascade-deleted or repaired.**
+`deleteFlavor()` does not touch `preparedFlavors` at all. The record survives and renders as "Unknown
+flavor (deleted)" — physical food a person has does not disappear because a recipe card did. See
+DECISIONS D-074.
+
+`normalizePreparedFlavor()` / `normalizePreparedFlavors()` run at every point `preparedFlavors` is
+assigned from stored data: `loadFromLocalStorage()`, `loadFromFirestore()`, `restoreBackup()`,
+`importData()`, `setupRealtimeListeners()`, and after the `loadUserData()` sign-in union — the same
+six points `normalizeCookedMeals()` runs at.
+
+**Known, accepted limitation: concurrent decrement is not atomic.** `preparedFlavors` merges through
+the same whole-object `unionById()` conflict path as every other synced list. Two devices decrementing
+the same record near-simultaneously can lose one decrement — inherited from `cookedMeals.
+portionsRemaining` (D-056), not new here, and explicitly accepted for v1 rather than fixed. See
+DECISIONS D-074.
 
 ## Pantry item
 ```js
@@ -370,4 +422,5 @@ It is **not** a schema-migration system — backward-compat is handled by `patch
 and defensive `|| []` / `|| {}` defaults on load.
 
 The export payload carries its own `version` string: `1.1` predates the Flavor Library, `1.2`
-adds `flavors`. `importData()` accepts both - a `1.1` file simply has no `flavors` key.
+adds `flavors`, `1.3` adds `preparedFlavors`. `importData()` accepts all three - an older file
+simply has no `flavors`/`preparedFlavors` key.

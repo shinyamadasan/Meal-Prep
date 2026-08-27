@@ -796,11 +796,12 @@ test('export and the Firestore payload carry the new fields without new collecti
       'customHacks', 'pantry', 'userIngredients', 'ingredientPrices', 'myStores',
       'customStores', 'cookedMeals', 'cookHistory', 'recentRecipes', 'prepModeSession',
       'deletions', 'lastUpdated', 'lastSaved',
-      // 'flavors' is the Flavor Library collection (D-070) — a DELIBERATE, owner-
-      // approved new top-level collection, which is why it is listed rather than
-      // the check being loosened. The guard still fails on any key nobody decided
-      // on, which is the whole point of it.
-      'flavors'
+      // 'flavors' is the Flavor Library collection (D-070), and 'preparedFlavors'
+      // is Flavor Bomb v1's prepared-stock collection (D-074) — both DELIBERATE,
+      // owner-approved new top-level collections, which is why they are listed
+      // rather than the check being loosened. The guard still fails on any key
+      // nobody decided on, which is the whole point of it.
+      'flavors', 'preparedFlavors'
     ];
     return {
       unexpectedTopLevelKeys: Object.keys(payload).filter((k) => known.indexOf(k) < 0),

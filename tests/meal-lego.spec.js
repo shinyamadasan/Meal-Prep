@@ -552,6 +552,12 @@ test('no new AppState key and no new cookedMeal / flavor field is introduced by 
     'cloudReady', 'cookHistory', 'cookedMeals', 'currentEditingFlavor',
     'currentEditingHack', 'currentEditingIngredient', 'currentEditingRecipe', 'currentUser',
     'customHacks', 'customIngredients', 'customStores', 'dataVersion', 'deletions', 'flavors',
+    // 'preparedFlavors' is Flavor Bomb v1's prepared-stock collection (D-074) — a
+    // LATER, separately owner-approved wave, not something Meal Lego introduced.
+    // Listed here (rather than loosening the check) so this test keeps asserting
+    // that Meal Lego ITSELF adds no key, while staying accurate about AppState's
+    // current shape.
+    'preparedFlavors',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'

@@ -899,13 +899,17 @@ test('24. no new top-level AppState key and no TOMBSTONE_KEYS change', async ({ 
     'cloudReady', 'cookHistory', 'cookedMeals', 'currentEditingFlavor',
     'currentEditingHack', 'currentEditingIngredient', 'currentEditingRecipe', 'currentUser',
     'customHacks', 'customIngredients', 'customStores', 'dataVersion', 'deletions', 'flavors',
+    // 'preparedFlavors' is Flavor Bomb v1's prepared-stock collection (D-074), a
+    // LATER, separately owner-approved wave — not something this protein-identity
+    // correction introduces. Listed here rather than loosening the check.
+    'preparedFlavors',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'
   ].sort());
   expect(got.proteinKeys).toEqual([]);
   expect(got.tombstoneKeys).toEqual([
-    'recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'
+    'recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients'
   ]);
 });
 
