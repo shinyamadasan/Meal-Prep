@@ -136,8 +136,9 @@ portions for a batch that has none. Read portions through the helpers:
 
 ## Cooked-meal protein identity (D-072)
 
-What protein a cooked batch *is* — groundwork for Meal Lego. Nothing recommends anything yet;
-`flavorsForProteinType()` proves the join and is not rendered.
+What protein a cooked batch *is*. `getCookedMealProteinType()` is consumed by Meal Lego v1
+(`getCompatibleFlavorsForCookedMeal()`, D-073); `flavorsForProteinType()` remains the unrendered
+D-072 groundwork join.
 
 **The one rule: a cooked meal's NAME is never read.** "Landers Lechon Manok" and "Chicken of the
 Sea" are product names, not ingredient declarations. Identity comes from an explicit user choice or
@@ -171,14 +172,15 @@ Ingredient **category** is whitespace/case-normalised (`' Protein '` reads as `P
 
 | Helper | Returns |
 |---|---|
-| `getCookedMealProteinType(meal)` | the answer, full precedence — **the helper Meal Lego will consume** |
+| `getCookedMealProteinType(meal)` | the answer, full precedence — **consumed by Meal Lego v1 (D-073)** |
 | `derivedCookedProteinType(meal)` | precedence step 2 alone, ignoring any pin (what clearing would leave) |
 | `recipeProteinType(recipe)` | a recipe's identity from its ingredients |
 | `proteinFamilyForIngredientName(name)` | exact-name lookup, or `null` |
 | `isCookedProteinChoice(value)` | is this legal to STORE (primitive string, in vocabulary) |
 | `setCookedProteinType(id, value)` | pin, correct, or clear; anything else is ignored outright |
 | `cookedProteinAutoLabel(meal)` | the blank option's label: `'Auto · Chicken'`, `'Auto · Mixed'`, `'Auto · No protein'`, or `'Unknown'` |
-| `flavorsForProteinType(type)` | the Meal Lego join — `[]` for `none` / `mixed` / `unknown` |
+| `flavorsForProteinType(type)` | D-072 groundwork join (exact `worksWith` only) — `[]` for `none` / `mixed` / `unknown` |
+| `getCompatibleFlavorsForCookedMeal(meal)` | Meal Lego v1 (D-073): `{ protein, matchable, flavors: [{ flavor, specificity }] }`, ranked, ≤ 3, never mutates/persists. One-way fish supertype; `mixed`/`none`/`unknown` → `matchable: false` |
 
 **Correcting and un-pinning.** The card control writes through `setCookedProteinType()`, which
 mutates only `proteinType` on the existing record and saves through `saveData()` like every other

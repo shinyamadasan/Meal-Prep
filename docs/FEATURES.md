@@ -87,13 +87,17 @@
 - Starter set — Working · `flavorStarterCandidates()` / `addStarterFlavors()` · opt-in prompt using
   the D-063 pattern: an already-present id is a permanent skip (the user may have edited it), a
   tombstoned id is a permanent skip (deleting it was a decision). Never auto-seeded.
-- **Not built:** Ready Food -> "Try with" suggestions. Its prerequisite — a protein classifier for
-  `cookedMeals` — now exists (optional `proteinType`, explicit -> recipe-derived -> unknown; see
-  D-072 and `docs/ARCHITECTURE.md`), and `flavorsForProteinType()` proves the join. The pairing
-  itself is still unstarted: it needs a fish hierarchy, a `mixed` rule, a `none` rule and an answer
-  for batches that stay `unknown` because classification is never prompted for. See D-070, D-072.
-- **Not built, deliberately:** prepared-flavor inventory, portion counting, sauce expiry, freezer
-  stock, nutrition. Each would turn the library into a daily logging job.
+- Ready Food -> "Try with" (Meal Lego v1) — Working · `getCompatibleFlavorsForCookedMeal(meal)` ·
+  branch `wave-meal-lego-v1`, in review. One derived helper feeds a `Try with:` chip row on the
+  Fridge Ready Food card (up to 3, ranked exact-family > generic-fish supertype, then lower
+  `activeTime`, then `make-fresh`, then name/id) and one `Try <flavor>` line on Home's "Eat this
+  first" pick. Fish supertype is one-way (cooked salmon/tuna accept a generic `fish` flavor; cooked
+  generic `fish` never widens up). `mixed` / `none` / `unknown` get no automatic pairing — `unknown`
+  gets one secondary "Set protein to see flavor ideas" line, never a blocker on `[Used 1]`. No
+  persisted-state change; rendering writes nothing. See D-073.
+- **Not built, deliberately:** prepared-flavor inventory (Flavor Bomb), portion counting, sauce
+  expiry, freezer stock, nutrition, `mixed` constituent-family reconstruction. Each would turn the
+  library into a daily logging job. Flavor Bomb inventory comes after Meal Lego is dogfooded.
 
 ## Settings & Help
 - Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, **Food expiry alerts** opt-in, export/import, restore backup, clear all (snapshots first).
