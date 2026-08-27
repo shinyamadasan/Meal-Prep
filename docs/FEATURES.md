@@ -87,9 +87,11 @@
 - Starter set — Working · `flavorStarterCandidates()` / `addStarterFlavors()` · opt-in prompt using
   the D-063 pattern: an already-present id is a permanent skip (the user may have edited it), a
   tombstoned id is a permanent skip (deleting it was a decision). Never auto-seeded.
-- **Not built (deferred to Wave 2):** Ready Food -> "Try with" suggestions. Requires a protein
-  classifier for `cookedMeals`, which has no protein field; manually added batches carry
-  `recipeId: null` and only a free-text name. See D-070.
+- **Not built:** Ready Food -> "Try with" suggestions. Its prerequisite — a protein classifier for
+  `cookedMeals` — now exists (optional `proteinType`, explicit -> recipe-derived -> unknown; see
+  D-072 and `docs/ARCHITECTURE.md`), and `flavorsForProteinType()` proves the join. The pairing
+  itself is still unstarted: it needs a fish hierarchy, a `mixed` rule, a `none` rule and an answer
+  for batches that stay `unknown` because classification is never prompted for. See D-070, D-072.
 - **Not built, deliberately:** prepared-flavor inventory, portion counting, sauce expiry, freezer
   stock, nutrition. Each would turn the library into a daily logging job.
 

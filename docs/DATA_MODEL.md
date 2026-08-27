@@ -106,9 +106,16 @@ Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` 
 
   // ── Ready-food portions — OPTIONAL and additive (D-056) ──
   initialPortions,     // whole meal portions the batch started with, or null
-  portionsRemaining    // whole meal portions left, or null
+  portionsRemaining,   // whole meal portions left, or null
                        // BOTH null = an untracked batch, which behaves exactly as it
                        // did before portions existed. Never grams, never per-person.
+
+  // ── Protein identity — OPTIONAL and additive (D-072) ──
+  proteinType?         // an EXPLICIT pin by the user: one of COOKED_PROTEIN_IDS, or
+                       // 'none'. ABSENT is the normal state and means "no pin" — ask
+                       // the recipe. Clearing the control DELETES the key rather than
+                       // storing 'unknown', so there is exactly one representation of
+                       // "we do not know". 'mixed' and 'unknown' are NEVER stored.
 }
 ```
 
@@ -126,6 +133,69 @@ portions for a batch that has none. Read portions through the helpers:
 | `readyFoodBucket(meal)` | 0 = fridge expiring soon, 1 = fridge, 2 = freezer |
 | `readyFoodMetaLine(meal)` | "2 portions · fridge · use soon · 1d left" |
 | `readyFoodBalanceHint(meal)` | "add veg + rice" from the source recipe's `mealBalance` (D-055), or '' |
+
+## Cooked-meal protein identity (D-072)
+
+What protein a cooked batch *is* — groundwork for Meal Lego. Nothing recommends anything yet;
+`flavorsForProteinType()` proves the join and is not rendered.
+
+**The one rule: a cooked meal's NAME is never read.** "Landers Lechon Manok" and "Chicken of the
+Sea" are product names, not ingredient declarations. Identity comes from an explicit user choice or
+from structured recipe ingredients, and from nowhere else.
+
+**Precedence, highest first** — `getCookedMealProteinType(meal)`:
+
+1. `meal.proteinType`, if it passes `isCookedProteinChoice()` (a primitive string in the vocabulary).
+2. the batch's recipe, via `derivedCookedProteinType(meal)` → `recipeProteinType(recipe)`.
+3. `'unknown'`.
+
+There is no step 4. **Derived identity is never copied onto the batch** — same rule as
+`readyFoodBalanceHint()` reading `recipe.mealBalance` live. Editing a recipe therefore changes what
+its existing batches report, and deleting a recipe drops them to `unknown`; a user who wants a
+batch frozen pins it, which is what precedence 1 is for.
+
+Recipe derivation reads `baseIngredients` only, by **exact case-insensitive name** against the
+curated `PROTEIN_FAMILY_BY_INGREDIENT` table — never a substring, prefix or alias, the same way
+`ingredientShelfLife()` and `findIngredientPrice()` read `INGREDIENT_DB`. `recipeProteinType()`:
+
+| Recipe | Result |
+|---|---|
+| no ingredient list at all | `'unknown'` (we know nothing — not "no protein") |
+| any `category: 'Protein'` ingredient the table cannot name | `'unknown'` (read, not ignored) |
+| zero protein ingredients | `'none'` (ingredients are known and meatless) |
+| exactly one distinct family | that family |
+| two or more distinct families | `'mixed'` |
+
+Ingredient **category** is whitespace/case-normalised (`' Protein '` reads as `Protein`); ingredient
+**names** are not — that would widen what counts as a protein.
+
+| Helper | Returns |
+|---|---|
+| `getCookedMealProteinType(meal)` | the answer, full precedence — **the helper Meal Lego will consume** |
+| `derivedCookedProteinType(meal)` | precedence step 2 alone, ignoring any pin (what clearing would leave) |
+| `recipeProteinType(recipe)` | a recipe's identity from its ingredients |
+| `proteinFamilyForIngredientName(name)` | exact-name lookup, or `null` |
+| `isCookedProteinChoice(value)` | is this legal to STORE (primitive string, in vocabulary) |
+| `setCookedProteinType(id, value)` | pin, correct, or clear; anything else is ignored outright |
+| `cookedProteinAutoLabel(meal)` | the blank option's label: `'Auto · Chicken'`, `'Auto · Mixed'`, `'Auto · No protein'`, or `'Unknown'` |
+| `flavorsForProteinType(type)` | the Meal Lego join — `[]` for `none` / `mixed` / `unknown` |
+
+**Correcting and un-pinning.** The card control writes through `setCookedProteinType()`, which
+mutates only `proteinType` on the existing record and saves through `saveData()` like every other
+cooked-meal edit. Choosing the blank **Auto** option deletes the key, so a recipe-backed batch
+returns to deriving instead of being frozen at a non-answer. A value that is neither a vocabulary id
+nor `''` is rejected outright and must not clear a pin the user already made.
+
+**Shared vocabulary.** `COOKED_PROTEIN_IDS` is a strict subset of `FLAVOR_PROTEINS` ids, and
+`COOKED_PROTEIN_CHOICES` takes its labels from `FLAVOR_PROTEIN_BY_ID`, so a cooked batch's
+`proteinType` and a flavor's `worksWith[]` speak the same ids and the Meal Lego join is a direct
+lookup with no translation table to drift. `'vegetables'` and `'rice'` are deliberately excluded
+from the cooked side: they are things a flavor goes *with*, not answers to "what protein is this?".
+The reverse subset is not required, and `cookedProteinAutoLabel()` falls back to `'Unknown'` rather
+than throwing or inventing a name if a derived family ever lacks a `FLAVOR_PROTEINS` label.
+
+`'none'`, `'mixed'` and `'unknown'` are answers, not families: none of them joins to a flavor.
+`'none'` is the only one a user may store.
 
 ## Flavor object (D-070)
 Reusable finishing knowledge: how to make a protein you already cooked taste like a different meal.
@@ -145,7 +215,8 @@ and NOT a cooking hack (a hack is five prose fields).
                       // A LABEL, not a state: 'freezer-friendly' means it freezes well,
                       // never that any is currently frozen.
   worksWith: [],      // slugs from FLAVOR_PROTEINS (chicken, pork, beef, fish, salmon, tuna,
-                      // shrimp, egg, tofu, vegetables, rice)
+                      // shrimp, egg, tofu, vegetables, rice). The first nine are also
+                      // COOKED_PROTEIN_IDS — see "Cooked-meal protein identity" above.
   tags: [],           // slugs from FLAVOR_TAGS (= RECIPE_TAGS + spicy, sweet-savory, creamy,
                       // tangy, garlicky)
   updatedAt           // set ONLY by stampUpdated() on a real user edit - see below
