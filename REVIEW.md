@@ -4,6 +4,114 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review — Ready Food Protein Identity **Hardening** — PASS -> D-032 `approved` (HELD) -> OWNER-AUTHORIZED FOR LANDING
+branch: `wave-ready-food-protein-hardening` @ `c742f17` (base `main @ 8711a9c`) — held, then released by the owner
+verdict: **PASS** — no P0, no P1. Two P2 follow-ups and three P3 notes remain **OPEN**.
+date: 2026-08-27
+
+### Verdict
+Independent review of the hardening wave that sits on top of the protein-identity groundwork landed
+at `8711a9c`. One commit reviewed: **`c742f17`**, landing **unrebased, unsquashed and unamended**.
+
+The wave makes protein identity **correctable, stable and safer for Meal Lego to depend on** without
+redesigning it. The shipped precedence — explicit `cookedMeal.proteinType` -> deterministic
+recipe-derived identity -> `unknown` — is unchanged, and so is the rule the whole feature exists to
+protect: **a cooked meal's `name` is never read to infer its protein.** Fish hierarchy
+(`salmon`/`tuna` vs `fish`) and `mixed` matching stay deferred to Meal Lego, as scoped.
+
+Six things changed, all of them additive or restrictive:
+
+1. **Correction / pinning on an existing batch.** The selector previously existed only on the manual
+   add form, so a batch saved as Unknown, a mis-tap, or a batch whose recipe later changed could only
+   be fixed by delete-and-recreate — which loses `id`, `cookedDate` and the portion counts.
+   `setCookedProteinType(id, value)` now mutates the existing record in place through the same
+   `stampUpdated()` -> `saveData()` -> `renderCookedMeals()` path `setCookedStorage()` and
+   `updateCookedDate()` already use. The control is a compact `select` in the cooked card's meta
+   row beside the date and storage toggle — no modal, no new screen, and **never prompted for**, so
+   classification stays occasional setup rather than a recurring logging chore.
+2. **Auto / Unknown semantics.** Clearing the selection **deletes** `proteinType` rather than
+   persisting `'unknown'`. Absence already *is* the representation of "we do not know"; storing the
+   string would create a second representation of the same non-answer and would freeze a
+   recipe-backed batch at a non-answer instead of returning it to derivation. A rejected value is
+   ignored outright rather than treated as a clear, so bad input cannot silently wipe a real pin.
+3. **Recipe-edit temporal truth is unchanged and now characterized.** An **unpinned** recipe-backed
+   batch still follows a later recipe edit; nothing is auto-snapshotted. Both halves are asserted, so
+   a future silent snapshot fails a test rather than slipping through.
+4. **Vocabulary drift closed at the source.** `index.html` was a second, hand-written copy of the
+   nine ids **and** their labels. It now ships the selector empty and
+   `populateManualCookedProteinSelect()` fills it from `COOKED_PROTEIN_CHOICES` at boot, the same way
+   `hydrateIcons()` fills static icons. The exact cooked id set is **additionally** pinned by test,
+   because the pre-existing subset invariant cannot catch a new id that is *already legal* Flavor
+   Library vocabulary — `vegetables` and `rice` are exactly that hazard and remain excluded.
+5. **Ingredient CATEGORY is trimmed as well as lowercased**, so an imported `' Protein '` reads as
+   the canonical category. Ingredient **names** are untouched and still exact-match only. This is
+   category normalization, not name inference: `'Proteins'` and `'Protein-rich'` are *not* accepted.
+6. **Stored `proteinType` validation is strict on type.** `isCookedProteinChoice()` no longer coerces
+   with `String()`, which had accepted `['chicken']` and an object with a matching `toString()` as
+   valid on the one field Meal Lego is going to trust.
+
+### Evidence
+- **New spec** `tests/ready-food-protein-hardening.spec.js`, **36 cases**, covering all 27 required
+  proofs plus five extras (`updatedAt` stamping, no-op on a missing id, the full auto-label matrix,
+  both LWW directions, card-vs-form vocabulary equality).
+- **Deterministic suite: 472/472**, no skips, no flakes.
+- **Five mutations** applied to production code and each reverted:
+
+  | Mutation | Result |
+  |---|---|
+  | Derived identity overrides explicit | **4 failed**, including one pre-existing test in the identity spec |
+  | Restore `String()` coercion in validation | **3 failed** |
+  | Add `rice` (a *legal* flavor id) to `COOKED_PROTEIN_IDS` | **1 failed** — the new exact pin; 67 others passed, confirming the old subset invariant alone would have missed it |
+  | Remove `.trim()` from category | **1 failed** |
+  | Persist `unknown` instead of deleting | **3 failed** |
+
+### Persistence — verified, not assumed
+One optional field on an existing `cookedMeals[]` record. localStorage reload (set **and** cleared),
+Firestore payload plus the real `setDoc` write, a cloud load carrying an invalid value, the sign-in
+union via the real `unionByIdLWW()` in **both** directions, and export/import are each covered by a
+named test. **No new top-level `AppState` key and no `TOMBSTONE_KEYS` change** — both pinned.
+
+### D-032 gate — `approved` (HELD), then owner-authorized
+The change only edits an existing `cookedMeals[]` field, adds UI, and adds validation and tests. It
+touches **none** of the red-zone surfaces: tombstone architecture, `mergeCloudConflict()`,
+`cloudReady` / the write guard, `saveData()` semantics, auth, or the service worker — all verified
+untouched in the diff. On blast radius alone this is the `done` (auto-merge) tier.
+
+It is nonetheless recorded as **`approved` (HELD)** and merged by hand. Reason: it is the second
+consecutive wave on the `cookedMeals` record and it is the foundation Meal Lego will build on, so the
+owner chose to eyeball it rather than let it auto-ship. **Owner authorization for landing was granted
+on 2026-08-27**; this record is committed to `main` *before* the merge, per the D-040 convention.
+
+### P2 follow-ups — OPEN, deliberately NOT fixed in the landing commit
+**P2-1 — `cookedProteinAutoLabel()` has an unguarded `FLAVOR_PROTEIN_BY_ID` lookup.** Its final
+branch does `FLAVOR_PROTEIN_BY_ID[derived].label` with no existence check. Safe **today** only
+because the vocabulary invariant guarantees every derived family is in `FLAVOR_PROTEINS`. If
+`PROTEIN_FAMILY_BY_INGREDIENT` ever gains a family that is not a `FLAVOR_PROTEINS` id, this throws
+inside `renderCookedMeals()` and takes the whole Fridge list down. The invariant test would catch the
+drift, but the failure mode when it does slip through is a blank tab, not a wrong label.
+
+**P2-2 — protein-identity documentation is stale / incomplete.** `docs/ARCHITECTURE.md` and
+`docs/DATA_MODEL.md` still describe `cookedMeals` as having no protein identity, and still describe
+Ready Food "Try with" as blocked on a classifier that now exists. Neither the groundwork wave
+(`8711a9c`) nor this one wrote those records. Fixing them is its own docs pass and is **not** bundled
+into this landing.
+
+### P3 notes — recorded, not blocking
+1. An externally-authored `proteinType: null` survives `normalizeCookedMeal()` untouched (the guard
+   is `!= null`) and behaves correctly as "no pin", but leaves a null-valued key on the record where
+   every other path represents no-pin as an **absent** key.
+2. There is **no committed regression test** for the newer-local-**unpin** versus stale-cloud-**pin**
+   direction. The union test covers newer-local-pin and newer-cloud-pin; a clear racing a stale pin
+   is the case most likely to surprise.
+3. The card protein `select` has no accessible name of its own (the `title` sits on the wrapping
+   `label`, not the control), and at `font-size: 0.8rem` its tap target is below the 44px guideline.
+
+### Gate
+**Status: `approved` (HELD) -> owner-authorized -> landing.** Merge `--no-ff` into `main`, preserving
+`c742f17` unchanged. No squash, no amend, no rebase, no force push. `wave1-portion-truth` stays
+parked at `88b5598`.
+
+---
 ## Review TASK-057 / D-071 — PASS → D-032 `approved` (HELD) → OWNER-AUTHORIZED FOR LANDING
 branch: d-071-tombstone-namespace @ f73ce3c (base `main @ 98cf393`) — held, then released by the owner
 verdict: **PASS** — no P0, P1 or P2 findings remaining
