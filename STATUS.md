@@ -5,6 +5,79 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — P3-2 CLOSED: whole-object LWW unpin regression coverage landed (test-only)
+
+`test/protein-unpin-lww-regression` was independently reviewed (verdict **PASS**, D-032 **done**) and
+merged `--no-ff` into `main` at `dd09a80`, then pushed to `origin/main`. **Final main: `dd09a80`.**
+`wave1-portion-truth` remains parked at `88b5598`, untouched.
+
+**Test-only. Product source byte-identical to `4451965`** — `git diff 4451965 dd09a80` touches exactly
+one file, `tests/ready-food-protein-hardening.spec.js` (+160). No `app.js` / `index.html` / `style.css`
+/ `sw.js` / `manifest.json` change; no new spec file (so suite-classification is untouched).
+
+**What P3-2 was.** The prior review traced the whole-object last-write-wins invariant through the real
+`onAuthStateChanged` → `loadUserData()` → `loadFromFirestore()` → `unionByIdLWW()` path and found the
+**product logic already correct**. What was missing was committed coverage. The existing union test
+covered newer-local-**pin** and newer-cloud-**pin**; newer-local-**unpin** vs stale-cloud-**pin** —
+the case Meal Lego leans on once pins matter across devices — was uncovered.
+
+**The invariant now pinned:**
+
+> `unionByIdLWW()` selects the newer `cookedMeal` as a WHOLE object. A newer local unpin therefore
+> removes a stale older cloud `proteinType` rather than field-merging it back. Reverse ordering
+> preserves a newer cloud pin.
+
+**Three tests appended to `tests/ready-food-protein-hardening.spec.js`** (new `loadSignedInWithLocal`
+helper seeds `localStorage` so the real sign-in union runs — no hand-written merge):
+
+- **P3-2 A** — cloud `proteinType: chicken` (older) vs local no-pin (newer), driven through the real
+  signed-in merge. Local object wins whole: `proteinType` absent, `getCookedMealProteinType` →
+  `unknown`, `updatedAt` = the newer record, and the reconciled cloud write still **contains** the
+  `cm-unpin` record but with **no** `proteinType` — the stale `chicken` does not resurrect.
+- **P3-2 B (reverse)** — cloud `proteinType: beef` (newer) vs local no-pin (older). Cloud wins whole;
+  `beef` stays. Proves the test is about LWW, not "unpin always wins".
+- **P3-2 setup proof** — real `setCookedProteinType(id, '')` deletes the field, restamps `updatedAt`
+  via `stampUpdated()` (so the unpinned object is genuinely the newer one in a race), persists the
+  absence through `saveData()`, and never writes the string `"unknown"`.
+
+**Mutation-proven.** Field-merging the winner in `unionByIdLWW()`
+(`map[key] = Object.assign({}, cloud, it)`) fails P3-2 A on the resurrected pin; B and the setup proof
+stay green. Reverted; `app.js` byte-unchanged.
+
+**Reviewer nit addressed in its own commit `4961aec`** (on top of the reviewed `e5e3348`, which landed
+unchanged): P3-2 A now also asserts `cm-unpin` is still present in the reconciled cloud payload, so the
+"pin not restored" assertion cannot false-pass on a dropped record. Non-blocking, test-only.
+
+**Local verification on merged `main`, no retries:**
+
+| Check | Result |
+|---|---|
+| focused `ready-food-protein-hardening` + `-identity` + `flavor-library` | **119 / 119** |
+| `npm run test:local` | **476 / 476** |
+| `npm test` | **476 / 476** |
+| `tools/Verify-Decisions.ps1` | **48 / 48** pointers hold |
+| `git diff --check` | clean |
+
+Baseline was 473; +3 P3-2 tests = 476. `4961aec` added assertions to an existing test, not a new one,
+so the count is unchanged.
+
+**The three P3s — P3-2 now CLOSED, P3-1 and P3-3 stay OPEN.** Neither was touched.
+
+- **P3-1 — OPEN.** An externally-authored `proteinType: null` survives `normalizeCookedMeal()`
+  untouched (the guard is `!= null`) and behaves correctly as "no pin", but leaves a null-valued key
+  where every other path represents no-pin as an absent key. Cosmetic normalization cleanup.
+- **P3-3 — OPEN.** The card protein `<select>` has no accessible name of its own (the `title` sits on
+  the wrapping `<label>`) and at `font-size: 0.8rem` its tap target is below the 44px guideline.
+
+**Meal Lego is still NOT started.** The protein identity foundation is now judged **ready for Meal Lego
+dependency**: stable precedence, a shared vocabulary that cannot drift into a translation table, no
+render path that can crash on it, and now committed cross-device LWW coverage for the unpin race. What
+remains are Meal Lego's own product decisions, unchanged: the fish compatibility hierarchy, a `mixed`
+matching rule (and, if it is anything other than "no suggestions", a way to pin `mixed`), a `none`
+matching rule, and a graceful answer for the large population of batches that stay `unknown`.
+
+---
+
 ## 2026-08-27 — Protein Identity P2 finalization landed: P2-1 and P2-2 CLOSED, foundation clean for Meal Lego
 
 `fix/protein-identity-p2-finalization` @ `da75a7d` was reviewed, held under D-032, authorized, and
