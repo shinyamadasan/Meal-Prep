@@ -68,6 +68,39 @@ Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngred
    (staples are never deducted; depleted items are removed),
 3. prepends an entry to `AppState.cookHistory` (max 100, surfaced on the Dashboard).
 
+## Protein identity for cooked food (D-072)
+
+Answers "what protein is this batch?" so a future Meal Lego can match cooked food to a flavor.
+**Groundwork only — nothing recommends anything yet.** `flavorsForProteinType()` proves the join is a
+direct id lookup and is not rendered anywhere; flavor pairing and the "Try with" surface remain
+separate, unstarted work — see [DECISIONS.md](DECISIONS.md) D-070 and D-072 for what it still needs.
+
+**A cooked meal's name is never read.** Identity comes from an explicit user pin or from the source
+recipe's structured ingredients, and from nowhere else — `unknown` is a first-class answer rather
+than a failure to guess.
+
+Entry points, in precedence order:
+- `getCookedMealProteinType(meal)` — the answer. Explicit `meal.proteinType` → recipe-derived →
+  `'unknown'`. **The helper Meal Lego will consume.**
+- `derivedCookedProteinType(meal)` → `recipeProteinType(recipe)` — step 2 alone. Reads the recipe's
+  `baseIngredients` by **exact case-insensitive name** against `PROTEIN_FAMILY_BY_INGREDIENT`
+  (curated, never substring-matched — same discipline as `ingredientShelfLife()` over
+  `INGREDIENT_DB`), yielding a family, `none`, `mixed`, or `unknown`.
+- Derived identity is **read live, never copied onto the batch** — the same rule
+  `readyFoodBalanceHint()` follows for `recipe.mealBalance`. A recipe edit therefore moves its
+  batches; pinning is how a user opts out.
+
+Correction happens in place on the Fridge card (`renderCookedMeals()` → `cookedProteinOptionsHtml()`
++ `cookedProteinAutoLabel()`), writing through `setCookedProteinType()` → `saveData()`. The blank
+**Auto** option deletes `proteinType` rather than storing `'unknown'`. The add form's selector is
+filled from code by `populateManualCookedProteinSelect()` so the vocabulary is written down once.
+
+The cooked vocabulary is a strict subset of the Flavor Library's: `COOKED_PROTEIN_IDS ⊂
+FLAVOR_PROTEINS`, with labels taken from `FLAVOR_PROTEIN_BY_ID`. No new synced collection, no
+`TOMBSTONE_KEYS` change — `proteinType` is one optional field on an existing `cookedMeals` record.
+See [DATA_MODEL.md](DATA_MODEL.md) for the shape, the full precedence table and the `none` / `mixed`
+/ `unknown` semantics.
+
 ## Shop -> inventory loop
 `toggleGroceryItem()` is the only inbound path from shopping, and it is one tap (D-057):
 1. `stockPurchasedGroceryItem()` either MERGES into an existing pantry record or creates a new one.

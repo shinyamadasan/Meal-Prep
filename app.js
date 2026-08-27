@@ -11817,7 +11817,17 @@ function cookedProteinAutoLabel(meal) {
   if (derived === COOKED_PROTEIN_UNKNOWN) return 'Unknown';
   if (derived === COOKED_PROTEIN_NONE) return 'Auto · No protein';
   if (derived === COOKED_PROTEIN_MIXED) return 'Auto · Mixed';
-  return 'Auto · ' + FLAVOR_PROTEIN_BY_ID[derived].label;
+  // A derived family with no FLAVOR_PROTEINS entry is a family we cannot NAME. That
+  // cannot happen while the two vocabularies agree, but the unguarded lookup used to
+  // throw here instead of degrading, and this runs inside renderCookedMeals() — one
+  // such batch would have blanked the entire Fridge list. hasOwnProperty, not
+  // truthiness, so an id colliding with an Object.prototype key ('constructor') cannot
+  // reach '.label' either. Falling back to 'Unknown' reuses the existing non-answer
+  // rather than inventing a label from the slug or widening the vocabulary to fit.
+  var known = Object.prototype.hasOwnProperty.call(FLAVOR_PROTEIN_BY_ID, derived)
+    ? FLAVOR_PROTEIN_BY_ID[derived]
+    : null;
+  return known ? 'Auto · ' + known.label : 'Unknown';
 }
 
 // Correct or PIN one batch's identity. The only mutation is proteinType on the

@@ -1018,3 +1018,138 @@ test('26. correcting, clearing and re-correcting raises no page or console error
   );
   expect(appErrors).toEqual([]);
 });
+
+// ── 27. P2-1: a derived family with no FLAVOR_PROTEINS label ─────────────────
+//
+// cookedProteinAutoLabel() used to end in an unguarded FLAVOR_PROTEIN_BY_ID[derived]
+// .label. Every derived family is a FLAVOR_PROTEINS id TODAY, so it could not fire —
+// but the function is called from inside renderCookedMeals()'s card builder, so the
+// first batch deriving to an unlabelled family would throw mid-build and leave the
+// WHOLE Fridge list blank, unrelated batches included.
+//
+// This manufactures exactly that mismatch the way a future edit would: a new
+// PROTEIN_FAMILY_BY_INGREDIENT entry pointing at a family FLAVOR_PROTEINS has no id
+// for. The mismatch is asserted to be real first, so this cannot quietly stop testing
+// anything if the vocabularies change.
+test('27. a derived family with no FLAVOR_PROTEINS label degrades to Unknown and leaves the Fridge list usable', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+
+  await loadOffline(page);
+  const got = await page.evaluate(() => {
+    // Switch to the Fridge tab FIRST, while there is nothing to render. showTab('fridge')
+    // calls renderCookedMeals() itself, so doing this after the batches exist would move
+    // the throw out of the try/catch below and turn a precise assertion into an opaque
+    // evaluate failure.
+    showTab('fridge');
+
+    // The future change, simulated: a legitimately-derivable family with no label.
+    // 'constructor' is the same hole reached through an Object.prototype key, which a
+    // truthiness check alone would have rendered as 'Auto · undefined'.
+    PROTEIN_FAMILY_BY_INGREDIENT['lamb shoulder'] = 'lamb';
+    PROTEIN_FAMILY_BY_INGREDIENT['mystery meat'] = 'constructor';
+
+    const mk = (id, ingName) => ({
+      id: id, name: 'r' + id, category: 'Dinner', baseServings: 2, currentServings: 2,
+      basePrepTime: 5, baseCookTime: 5, fridgeLife: 3, freezerLife: 30, instructions: 'x',
+      baseIngredients: [{ name: ingName, baseQuantity: 1, unit: 'g', category: 'Protein' }]
+    });
+    AppState.recipes = [
+      mk(1000, 'Lamb Shoulder'), mk(1001, 'Mystery Meat'), mk(1002, 'Chicken Thigh')
+    ];
+    const batch = (id, recipeId, name) => ({
+      id: id, recipeId: recipeId, name: name, cookedDate: '2026-08-25',
+      storage: 'fridge', fridgeLife: 3, freezerLife: 30
+    });
+    AppState.cookedMeals = [
+      batch('cm_lamb', '1000', 'Lamb batch'),
+      batch('cm_proto', '1001', 'Mystery batch'),
+      batch('cm_ok', '1002', 'Adobo batch')          // the innocent bystander
+    ];
+
+    let threw = null;
+    try { renderCookedMeals(); } catch (e) { threw = String(e && e.message || e); }
+
+    const cards = Array.from(document.querySelectorAll('#cooked-meals-list .cooked-card'));
+    return {
+      // (a) The mismatch this test depends on is genuinely present.
+      mismatch: {
+        lambIsDerivable: Object.values(PROTEIN_FAMILY_BY_INGREDIENT).indexOf('lamb') >= 0,
+        lambHasNoLabel: !Object.prototype.hasOwnProperty.call(FLAVOR_PROTEIN_BY_ID, 'lamb')
+      },
+      // (b) Rendering completed.
+      threw: threw,
+      cardCount: cards.length,
+      // (c) Per-card: name -> the blank option's label (what cookedProteinAutoLabel returned).
+      autoLabels: cards.map((c) => [
+        c.querySelector('.cooked-name').textContent.trim(),
+        c.querySelector('.cooked-protein-field select option').textContent.trim()
+      ]),
+      // (d) Derivation itself is UNCHANGED — only the label degrades. The batch is not
+      //     silently reclassified as chicken, none, or anything else.
+      derived: AppState.cookedMeals.map((m) => [m.id, derivedCookedProteinType(m)]),
+      resolved: AppState.cookedMeals.map((m) => [m.id, getCookedMealProteinType(m)]),
+      // (e) Nothing was stored on any record as a side effect of rendering.
+      anyStored: AppState.cookedMeals.some((m) => 'proteinType' in m),
+      // (f) The vocabulary was NOT broadened to make the label fit.
+      choices: COOKED_PROTEIN_CHOICE_IDS.slice(),
+      lambSelectable: isCookedProteinChoice('lamb'),
+      lambFlavorJoin: flavorsForProteinType('lamb').length,
+      // Guarded so a THROWN render still returns assertable data: renderCookedMeals()
+      // assigns list.innerHTML last, so a mid-build throw leaves the list showing the
+      // previous content and cards[] empty. The assertions below must name that, not
+      // die reading a property of undefined.
+      optionValues: cards.length
+        ? Array.from(cards[0].querySelectorAll('.cooked-protein-field select option')).map((o) => o.value)
+        : [],
+      listText: document.getElementById('cooked-meals-list').textContent.trim().slice(0, 40)
+    };
+  });
+
+  expect(got.mismatch).toEqual({ lambIsDerivable: true, lambHasNoLabel: true });
+  expect(got.threw).toBeNull();
+  expect(got.cardCount).toBe(3);                       // NOT blanked
+  expect(got.listText).not.toContain('No stored meals yet');   // and not stuck on the empty state
+  expect(got.autoLabels).toEqual([
+    ['Lamb batch', 'Unknown'],                         // no label -> the existing non-answer
+    ['Mystery batch', 'Unknown'],                      // NOT 'Auto · undefined'
+    ['Adobo batch', 'Auto · Chicken']                  // unaffected neighbour still derives
+  ]);
+  expect(got.derived).toEqual([
+    ['cm_lamb', 'lamb'], ['cm_proto', 'constructor'], ['cm_ok', 'chicken']
+  ]);
+  expect(got.resolved).toEqual([
+    ['cm_lamb', 'lamb'], ['cm_proto', 'constructor'], ['cm_ok', 'chicken']
+  ]);
+  expect(got.anyStored).toBe(false);
+  expect(got.choices).toEqual(
+    ['chicken', 'pork', 'beef', 'fish', 'salmon', 'tuna', 'shrimp', 'egg', 'tofu', 'none']);
+  expect(got.lambSelectable).toBe(false);
+  expect(got.lambFlavorJoin).toBe(0);
+  expect(got.optionValues).toEqual([''].concat(got.choices));
+
+  // The card is still a working control, not just a rendered one: the user can correct
+  // the batch they can no longer see a derived name for.
+  const selects = page.locator('#cooked-meals-list .cooked-protein-field select');
+  await expect(selects).toHaveCount(3);
+  await selects.first().selectOption('beef');
+  const after = await page.evaluate(() => {
+    const m = AppState.cookedMeals.find((x) => x.id === 'cm_lamb');
+    return {
+      stored: m.proteinType,
+      resolved: getCookedMealProteinType(m),
+      label: document.querySelector('#cooked-meals-list .cooked-card .cooked-protein-field select option').textContent.trim(),
+      cardCount: document.querySelectorAll('#cooked-meals-list .cooked-card').length
+    };
+  });
+  expect(after.stored).toBe('beef');
+  expect(after.resolved).toBe('beef');   // the pin wins over the unlabelled derivation
+  expect(after.label).toBe('Unknown');   // clearing it would still fall back honestly
+  expect(after.cardCount).toBe(3);
+
+  const appErrors = errors.filter(
+    (e) => !/net::ERR|Failed to load resource|favicon|requestStorageAccess|frame-ancestors|google\.com/i.test(e)
+  );
+  expect(appErrors).toEqual([]);
+});
