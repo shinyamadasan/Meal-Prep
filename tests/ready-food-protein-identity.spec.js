@@ -438,6 +438,10 @@ test('20. no new top-level AppState collection was introduced', async ({ page })
     'cloudReady', 'cookHistory', 'cookedMeals', 'currentEditingFlavor',
     'currentEditingHack', 'currentEditingIngredient', 'currentEditingRecipe', 'currentUser',
     'customHacks', 'customIngredients', 'customStores', 'dataVersion', 'deletions', 'flavors',
+    // 'preparedFlavors' is Flavor Bomb v1's prepared-stock collection (D-074), a
+    // LATER, separately owner-approved wave — not something this protein-identity
+    // wave introduces. Listed here rather than loosening the check.
+    'preparedFlavors',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'
@@ -446,7 +450,7 @@ test('20. no new top-level AppState collection was introduced', async ({ page })
   expect(got.proteinKeys).toEqual([]); // identity lives INSIDE cookedMeals[], not beside it
   // Untouched: this wave is additive metadata, not deletion or sync work.
   expect(got.tombstoneKeys).toEqual([
-    'recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'
+    'recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients'
   ]);
 });
 

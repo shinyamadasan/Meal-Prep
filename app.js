@@ -27,6 +27,7 @@ const AppState = {
   customIngredients: [],
   customHacks: [],
   flavors: [],                // reusable finishing knowledge — see the Flavor Library section (D-070)
+  preparedFlavors: [],        // physical prepared-flavor stock — see Flavor Bomb v1 (D-074)
   pantry: [],
   userIngredients: [],
   ingredientPrices: {},
@@ -436,6 +437,7 @@ function saveToLocalStorage() {
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
       flavors: AppState.flavors,
+      preparedFlavors: AppState.preparedFlavors,
       pantry: AppState.pantry,
       userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
@@ -489,6 +491,9 @@ function loadFromLocalStorage() {
       // A record saved before flavors existed simply has no `flavors` key — it
       // loads as an empty library, exactly as an install that deleted them all.
       AppState.flavors = normalizeFlavors(data.flavors || []);
+      // A record saved before preparedFlavors existed simply has no key — loads as
+      // empty stock. See Flavor Bomb v1, D-074.
+      AppState.preparedFlavors = normalizePreparedFlavors(data.preparedFlavors || []);
       AppState.pantry = data.pantry || [];
       AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
@@ -1131,6 +1136,9 @@ function flavorCardHtml(f) {
       (f.instructions ? '<div class="flavor-sec-label">How</div><p class="flavor-instructions">' + escapeHtml(f.instructions) + '</p>' : '') +
       (tags ? '<div class="flavor-tags">' + tags + '</div>' : '') +
       '<div class="flavor-actions">' +
+        '<button type="button" class="btn btn--outline btn--sm flavor-prepare" onclick="openPrepareFlavorDialog(\'' + id + '\')">' +
+          (findPreparedFlavorByFlavorId(f.id) ? 'Replace batch' : 'I made this') +
+        '</button>' +
         '<button type="button" class="btn btn--outline btn--sm flavor-edit" onclick="openEditFlavorModal(\'' + id + '\')">Edit</button>' +
         '<button type="button" class="btn btn--outline btn--sm flavor-delete" onclick="deleteFlavor(\'' + id + '\')">Delete</button>' +
       '</div>' +
@@ -1280,7 +1288,14 @@ function deleteFlavor(flavorId) {
       // curated lists against the per-session baseline at save time and tombstones
       // whatever vanished — the same path every other collection uses. Writing one
       // by hand would be a second deletion concept to keep in sync.
+      //
+      // Any preparedFlavors record for this flavorId is DELIBERATELY left alone —
+      // deleting a recipe/knowledge entry must never silently claim physical food
+      // disappeared (Flavor Bomb v1, D-074). renderPreparedFlavors() below just
+      // repaints that card so it shows the "Unknown flavor" fallback immediately
+      // instead of on the next reload.
       renderFlavors();
+      renderPreparedFlavors();
       saveData();
       showSuccessMessage('Flavor deleted.');
     }
@@ -1293,6 +1308,263 @@ window.openAddFlavorModal = openAddFlavorModal;
 window.openEditFlavorModal = openEditFlavorModal;
 window.closeFlavorModal = closeFlavorModal;
 window.deleteFlavor = deleteFlavor;
+
+// ── Prepared Flavors — physical prepared-flavor stock (Flavor Bomb v1, D-074) ─
+//
+// The Flavor Library (above) is knowledge: a technique, never a claim about what
+// is currently in the fridge or freezer. This section is the opposite: a small,
+// separate top-level synced collection recording what has ACTUALLY been batched
+// and is physically available right now. The two are deliberately never merged —
+// see D-074 for why flavor.preparedPortions and cookedMeals were both rejected.
+//
+// One active preparedFlavors record per flavorId in v1 (no lot/FIFO tracking):
+// making a new batch of a flavor that already has one REPLACES it in place (same
+// id, fresh preparedAt/counts) rather than silently creating a second batch.
+
+// Collision-safe and visually distinct from every existing id prefix (flv-, cm_,
+// ui_, buy_/ib_/staple_) — see legacyDeletionCollectionForId(). A brand-new
+// collection has no legacy data to migrate, so (unlike normalizeFlavorId) a
+// missing/garbage id is simply dropped by the normalizer rather than re-minted.
+var PREPARED_FLAVOR_ID_PREFIX = 'pfl-';
+function newPreparedFlavorId() { return PREPARED_FLAVOR_ID_PREFIX + Date.now(); }
+
+// Idempotent. Repairs an incoherent pair exactly like normalizeCookedMeal() does
+// (D-056): never lets remaining exceed initial by CLAMPING remaining down (that
+// would silently delete food the user says they still have) — raises initial
+// instead. Unlike cookedMeals there is no "untracked" state here: every prepared
+// batch always has a definite count, so absent/garbage numbers fall back to a
+// safe minimum rather than staying null.
+//
+// A record with no id or no flavorId at all is genuinely malformed (there is no
+// legacy shape to preserve) and is dropped by normalizePreparedFlavors() below —
+// but a flavorId that no longer resolves to a live Flavor Library entry is NOT
+// touched or dropped here: that is an orphan (its flavor was deleted later), and
+// the physical stock it represents must not vanish because the knowledge did.
+// Display degrades gracefully instead — see preparedFlavorCardHtml().
+//
+// Never sets updatedAt — same reason normalizeFlavor() never does: stamping one
+// during normalization would let a normalize pass hand a record a fresh
+// timestamp that beats its own tombstone under applyTombstones()' LWW rule.
+function normalizePreparedFlavor(pf) {
+  if (!pf || typeof pf !== 'object' || Array.isArray(pf)) return null;
+  var id = String(pf.id == null ? '' : pf.id).trim();
+  if (!id) return null;
+  var flavorId = String(pf.flavorId == null ? '' : pf.flavorId).trim();
+  if (!flavorId) return null;
+
+  var initial = portionCountOrNull(pf.portionsInitial, 1);
+  var remaining = portionCountOrNull(pf.portionsRemaining, 0);
+  if (initial == null) initial = (remaining != null && remaining > 0) ? remaining : 1;
+  if (remaining == null) remaining = initial;
+  if (remaining > initial) initial = remaining;
+
+  pf.id = id;
+  pf.flavorId = flavorId;
+  pf.portionsInitial = initial;
+  pf.portionsRemaining = remaining;
+  // Unknown/garbage storage defaults to 'fridge' — the same neutral default this
+  // app already uses everywhere a storage location is missing (cookedMeal,
+  // manual-add form). Never fabricates 'freezer' out of nothing.
+  pf.storage = pf.storage === 'freezer' ? 'freezer' : 'fridge';
+  pf.preparedAt = /^\d{4}-\d{2}-\d{2}$/.test(pf.preparedAt) ? pf.preparedAt : todayISO();
+  // Truthful and optional ONLY — never inferred from any shelf-life table.
+  pf.expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(pf.expiresAt) ? pf.expiresAt : null;
+  return pf;
+}
+
+// Returns a NEW array, same discipline as normalizeFlavors(): a duplicate id
+// after normalization keeps the first copy, matching unionById's local-preferred
+// behaviour.
+function normalizePreparedFlavors(list) {
+  if (!Array.isArray(list)) return [];
+  var out = [], seen = {};
+  list.forEach(function(pf) {
+    var n = normalizePreparedFlavor(pf);
+    if (!n || seen[n.id]) return;
+    seen[n.id] = true;
+    out.push(n);
+  });
+  return out;
+}
+
+function findPreparedFlavor(id) {
+  return (AppState.preparedFlavors || []).find(function(x) { return String(x.id) === String(id); }) || null;
+}
+
+// The v1 one-active-batch-per-flavor lookup. Structured as its own function (not
+// inlined at call sites) so a later wave can change this to "all active batches
+// for a flavorId" without touching every caller — see D-074.
+function findPreparedFlavorByFlavorId(flavorId) {
+  return (AppState.preparedFlavors || []).find(function(x) { return String(x.flavorId) === String(flavorId); }) || null;
+}
+
+// "I made this" / "Replace batch" — the only creation entry point. Mirrors the
+// markRecipeCooked() portions dialog exactly: showConfirmDialog with plain inputs,
+// captured via document.getElementById() BEFORE the dialog can close (the overlay
+// is removed from the document on confirm, so a query made inside onConfirm itself
+// would find nothing — see showConfirmDialog()).
+function openPrepareFlavorDialog(flavorId) {
+  var flavor = findFlavor(flavorId);
+  if (!flavor) return;
+  var existing = findPreparedFlavorByFlavorId(flavorId);
+
+  var defaultStorage = existing ? existing.storage
+    : (flavor.preparationStyle === 'freezer-friendly' ? 'freezer' : 'fridge');
+  var defaultPortions = existing ? existing.portionsInitial : 6;
+
+  var title = existing ? ('Replace ' + escapeHtml(flavor.name) + ' batch?') : ('Made ' + escapeHtml(flavor.name) + '?');
+  var noteHtml = existing
+    ? '<p class="prepared-flavor-note">You have ' + formatPortions(existing.portionsRemaining) +
+      ' left (' + (existing.storage === 'freezer' ? 'Freezer' : 'Fridge') +
+      '). Saving replaces it with a new batch.</p>'
+    : '';
+
+  showConfirmDialog(
+    title,
+    noteHtml +
+      '<div class="prepared-flavor-field">' +
+        '<input id="prepared-flavor-portions" type="number" min="1" step="1" value="' + defaultPortions + '" class="form-control" style="max-width:6rem">' +
+        '<span>portions</span>' +
+      '</div>' +
+      '<div class="prepared-flavor-storage-toggle">' +
+        '<label><input type="radio" name="prepared-flavor-storage" value="fridge"' + (defaultStorage === 'fridge' ? ' checked' : '') + '> Fridge</label>' +
+        '<label><input type="radio" name="prepared-flavor-storage" value="freezer"' + (defaultStorage === 'freezer' ? ' checked' : '') + '> Freezer</label>' +
+      '</div>' +
+      '<div class="prepared-flavor-field prepared-flavor-field--stacked">' +
+        '<label class="form-label" for="prepared-flavor-expiry">Expiry (optional)</label>' +
+        '<input id="prepared-flavor-expiry" type="date" class="form-control">' +
+      '</div>',
+    existing ? 'Replace' : 'Save',
+    'Cancel',
+    function() {
+      var chosenStorage = defaultStorage;
+      for (var i = 0; i < storageRadios.length; i++) {
+        if (storageRadios[i].checked) { chosenStorage = storageRadios[i].value; break; }
+      }
+      savePreparedFlavor(
+        flavorId,
+        portionsInput ? portionsInput.value : defaultPortions,
+        chosenStorage,
+        expiryInput ? expiryInput.value : ''
+      );
+    }
+  );
+
+  // querySelectorAll returns a STATIC NodeList (unlike getElementsByName, which is
+  // live and would report zero elements once the overlay is detached) — see the
+  // comment above showConfirmDialog() usage.
+  var portionsInput = document.getElementById('prepared-flavor-portions');
+  var expiryInput = document.getElementById('prepared-flavor-expiry');
+  var storageRadios = document.querySelectorAll('input[name="prepared-flavor-storage"]');
+}
+
+function savePreparedFlavor(flavorId, portionsRaw, storage, expiryRaw) {
+  var flavor = findFlavor(flavorId);
+  if (!flavor) return;
+
+  var portions = portionCountOrNull(portionsRaw, 1);
+  if (portions == null) portions = 1; // never block on a bad number — same leniency as the cook-portions dialog
+
+  if (!Array.isArray(AppState.preparedFlavors)) AppState.preparedFlavors = [];
+  var existing = findPreparedFlavorByFlavorId(flavorId);
+
+  var record = {
+    id: existing ? existing.id : newPreparedFlavorId(),
+    flavorId: String(flavorId),
+    portionsInitial: portions,
+    portionsRemaining: portions,
+    storage: storage,
+    preparedAt: todayISO(),
+    expiresAt: /^\d{4}-\d{2}-\d{2}$/.test(expiryRaw) ? expiryRaw : null
+  };
+  normalizePreparedFlavor(record);
+  stampUpdated(record); // LWW: a real user action, must beat an older cloud copy
+
+  if (existing) {
+    var i = AppState.preparedFlavors.findIndex(function(x) { return String(x.id) === String(existing.id); });
+    AppState.preparedFlavors[i] = record;
+  } else {
+    AppState.preparedFlavors.push(record);
+  }
+
+  renderPreparedFlavors();
+  renderFlavors(); // the flavor card's "I made this" / "Replace batch" label depends on this state
+  saveData();
+  showSuccessMessage((existing ? 'Replaced ' : '') + escapeHtml(flavor.name) + ' — ' + formatPortions(portions) + (existing ? '.' : ' saved.'));
+}
+
+// One tap = one portion gone — the exact useCookedPortion() shape (D-056), so the
+// interaction means the same thing everywhere it appears in this app.
+function useOnePreparedFlavor(id) {
+  var pf = findPreparedFlavor(id);
+  if (!pf) return;
+
+  var next = pf.portionsRemaining - 1;
+  if (next <= 0) { finishPreparedFlavor(id); return; }
+
+  pf.portionsRemaining = next;
+  stampUpdated(pf);
+  saveData();
+  renderPreparedFlavors();
+  renderFlavors();
+  var flavor = findFlavor(pf.flavorId);
+  showSuccessMessage((flavor ? flavor.name : 'Prepared flavor') + ' — ' + formatPortions(next) + ' left.');
+}
+
+// The last portion. Unlike removeCookedMeal() (which relies solely on the
+// recordLocalDeletions() vanish-diff), this collection writes an EXPLICIT
+// tombstone before dropping the record — the owner-directed v1 requirement,
+// because a batch reaching zero from a single "Used 1" tap must never depend on
+// the MASS_DELETE_GUARD-gated vanish-diff to sync the deletion.
+function finishPreparedFlavor(id) {
+  var pf = findPreparedFlavor(id);
+  var flavor = pf ? findFlavor(pf.flavorId) : null;
+  var label = (flavor && flavor.name) || 'Prepared flavor';
+  removePreparedFlavor(id);
+  showSuccessMessage('Finished ' + escapeHtml(label) + ' — removed from Prepared Flavors.');
+}
+
+function removePreparedFlavor(id) {
+  writeTombstone('preparedFlavors', id);
+  AppState.preparedFlavors = (AppState.preparedFlavors || []).filter(function(x) { return String(x.id) !== String(id); });
+  snapshotIdBaseline();
+  saveData();
+  renderPreparedFlavors();
+  renderFlavors();
+}
+
+function preparedFlavorCardHtml(pf) {
+  var flavor = findFlavor(pf.flavorId);
+  var name = flavor ? flavor.name : 'Unknown flavor (deleted)';
+  var id = escJ(String(pf.id));
+  var meta = (pf.storage === 'freezer' ? (icon('snowflake') + ' Freezer') : (icon('refrigerator') + ' Fridge')) +
+    ' · ' + formatPortions(pf.portionsRemaining) +
+    (pf.expiresAt ? ' · exp ' + escapeHtml(pf.expiresAt) : '');
+  return '<div class="prepared-flavor-card" data-prepared-flavor-id="' + escapeHtml(String(pf.id)) + '">' +
+    '<div class="prepared-flavor-main">' +
+      '<span class="prepared-flavor-name">' + escapeHtml(name) + '</span>' +
+      '<span class="prepared-flavor-meta">' + meta + '</span>' +
+    '</div>' +
+    '<button type="button" class="prepared-flavor-use" onclick="useOnePreparedFlavor(\'' + id + '\')">' + icon('utensils') + ' Used 1</button>' +
+  '</div>';
+}
+
+function renderPreparedFlavors() {
+  var section = document.getElementById('prepared-flavors-section');
+  var list = document.getElementById('prepared-flavors-list');
+  if (!section || !list) return;
+  var items = AppState.preparedFlavors || [];
+  if (!items.length) { section.classList.add('hidden'); list.innerHTML = ''; return; }
+  section.classList.remove('hidden');
+  var sorted = items.slice().sort(function(a, b) {
+    var fa = findFlavor(a.flavorId), fb = findFlavor(b.flavorId);
+    return String(fa ? fa.name : '').localeCompare(String(fb ? fb.name : ''));
+  });
+  list.innerHTML = sorted.map(preparedFlavorCardHtml).join('');
+}
+
+window.openPrepareFlavorDialog = openPrepareFlavorDialog;
+window.useOnePreparedFlavor = useOnePreparedFlavor;
 window.filterFlavors = filterFlavors;
 
 // ── Recipe times ─────────────────────────────────────────────────────────────
@@ -1433,6 +1705,7 @@ function snapshotData() {
     customIngredients: AppState.customIngredients,
     customHacks: AppState.customHacks,
     flavors: AppState.flavors,
+    preparedFlavors: AppState.preparedFlavors,
     pantry: AppState.pantry,
     userIngredients: AppState.userIngredients,
     ingredientPrices: AppState.ingredientPrices,
@@ -1477,6 +1750,7 @@ function restoreBackup() {
       AppState.customIngredients = d.customIngredients || [];
       AppState.customHacks = d.customHacks || [];
       AppState.flavors = normalizeFlavors(d.flavors || []);
+      AppState.preparedFlavors = normalizePreparedFlavors(d.preparedFlavors || []);
       AppState.pantry = d.pantry || [];
       AppState.userIngredients = d.userIngredients || [];
       AppState.ingredientPrices = d.ingredientPrices || {};
@@ -1493,6 +1767,7 @@ function restoreBackup() {
       renderStorageGuide();
       renderCookingHacks();
       renderFlavors();
+      renderPreparedFlavors();
       renderCookedMeals();
       renderPantry();
       renderIngredientsTab();
@@ -3323,6 +3598,7 @@ function initApp() {
         renderStorageGuide();
         renderCookingHacks();
         renderFlavors();
+        renderPreparedFlavors();
         renderCookedMeals();
         renderPantry();
         renderDashboard();
@@ -3360,6 +3636,7 @@ function initApp() {
     renderStorageGuide();
     renderCookingHacks();
     renderFlavors();
+    renderPreparedFlavors();
     renderPantry();
     renderCookedMeals();
     renderDashboard();
@@ -3624,6 +3901,7 @@ function showTab(tabId) {
     renderCookingHacks();
   } else if (tabId === 'flavors') {
     renderFlavors();
+    renderPreparedFlavors();
   } else if (tabId === 'nutrition') {
     renderNutritionTab();
   } else if (tabId === 'ingredients') {
@@ -7507,6 +7785,7 @@ function exportData() {
       customIngredients: AppState.customIngredients,
       customHacks: AppState.customHacks,
       flavors: AppState.flavors,
+      preparedFlavors: AppState.preparedFlavors,
       pantry: AppState.pantry,
       userIngredients: AppState.userIngredients,
       ingredientPrices: AppState.ingredientPrices,
@@ -7515,9 +7794,10 @@ function exportData() {
       cookedMeals: AppState.cookedMeals,
       recentRecipes: AppState.recentRecipes,
       exportedAt: new Date().toISOString(),
-      // Bumped because the payload gained a field. Import accepts BOTH: an older
-      // 1.1 file simply has no `flavors` key and imports as it always did.
-      version: '1.2'
+      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3
+      // — an older file simply has no `flavors`/`preparedFlavors` key and imports as
+      // it always did.
+      version: '1.3'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -7574,7 +7854,7 @@ function importData() {
         const importedData = JSON.parse(e.target.result);
         
         // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'groceryList', 'cookedMeals'];
+        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals'];
         if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
           throw new Error('Invalid data format');
         }
@@ -7607,13 +7887,14 @@ function importData() {
             AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
             AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
             AppState.flavors = normalizeFlavors(unionById(AppState.flavors, importedData.flavors || []));
+            AppState.preparedFlavors = normalizePreparedFlavors(unionById(AppState.preparedFlavors, importedData.preparedFlavors || []));
             AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
             AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
             AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
-            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
+            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
               var importedIds = {};
               (importedData[key] || []).forEach(function(it) {
                 if (it && it.id != null) importedIds[String(it.id)] = true;
@@ -7640,6 +7921,7 @@ function importData() {
             renderStorageGuide();
             renderCookingHacks();
             renderFlavors();
+            renderPreparedFlavors();
             renderCookedMeals();
             renderPantry();
             renderIngredientsTab();
@@ -7901,7 +8183,7 @@ async function recheckVerification() {
 // in every merge. Deletions are detected by DIFFING the curated lists against a per-session baseline
 // (refreshed after each load/merge) — so no delete handler needs instrumenting. groceryList is
 // excluded: it's regenerated from the plan, so a "missing" grocery item isn't a real deletion.
-var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'];
+var TOMBSTONE_KEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients'];
 var _idBaseline = null; // map of collection -> ids present right after the last load/merge
 // recordLocalDeletions() treats a bigger simultaneous vanish than this as a transient
 // load-race artifact, not a real user delete — see the guard there.
@@ -8087,6 +8369,7 @@ function buildFirestorePayload() {
     customIngredients: AppState.customIngredients,
     customHacks: AppState.customHacks,
     flavors: AppState.flavors,
+    preparedFlavors: AppState.preparedFlavors,
     pantry: AppState.pantry,
     userIngredients: AppState.userIngredients,
     ingredientPrices: AppState.ingredientPrices,
@@ -8142,7 +8425,7 @@ function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(
 // elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
 function mergeCloudConflict(remote, local) {
   var out = Object.assign({}, local);
-  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors'].forEach(function(key) {
+  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
     out[key] = unionById(local[key] || [], remote[key] || []);
   });
   return out;
@@ -8272,6 +8555,10 @@ async function loadFromFirestore() {
       // auto-seeded, or an account that deliberately deleted every flavor would get
       // them all back on the next sign-in.
       AppState.flavors = normalizeFlavors(data.flavors || []);
+      // An account whose cloud doc predates Flavor Bomb has no `preparedFlavors`
+      // key. It loads as empty stock — never auto-fabricated from Flavor Library
+      // entries. See D-074.
+      AppState.preparedFlavors = normalizePreparedFlavors(data.preparedFlavors || []);
       AppState.pantry = data.pantry || [];
       AppState.userIngredients = data.userIngredients || [];
       AppState.ingredientPrices = data.ingredientPrices || {};
@@ -8365,7 +8652,7 @@ async function loadUserData() {
       if (raw) {
         const local = JSON.parse(raw) || {};
         const cloudDelN = tombstoneCount(AppState.deletions);
-        const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients', 'groceryList'];
+        const UKEYS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients', 'groceryList'];
         let before = 0;
         var localNow = new Date().toISOString();
         var mergeStats = { localWins: 0 };
@@ -8384,6 +8671,7 @@ async function loadUserData() {
         patchMissingNutrition(AppState.recipes);
         normalizeCookedMeals(AppState.cookedMeals); // portions may arrive from the other device
         AppState.flavors = normalizeFlavors(AppState.flavors); // flavors may arrive from the other device
+        AppState.preparedFlavors = normalizePreparedFlavors(AppState.preparedFlavors); // prepared stock may arrive from the other device
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
@@ -8416,6 +8704,7 @@ async function loadUserData() {
   renderStorageGuide();
   renderCookingHacks();
   renderFlavors();
+  renderPreparedFlavors();
   renderCookedMeals();
   renderPantry();
   renderDashboard();
@@ -8519,6 +8808,7 @@ function setupRealtimeListeners() {
         AppState.customIngredients = data.customIngredients || [];
         AppState.customHacks = data.customHacks || [];
         AppState.flavors = normalizeFlavors(data.flavors || []);
+        AppState.preparedFlavors = normalizePreparedFlavors(data.preparedFlavors || []);
         AppState.pantry = data.pantry || [];
         AppState.userIngredients = data.userIngredients || [];
         AppState.ingredientPrices = data.ingredientPrices || {};
@@ -8539,6 +8829,7 @@ function setupRealtimeListeners() {
         renderStorageGuide();
         renderCookingHacks();
         renderFlavors();
+        renderPreparedFlavors();
         renderCookedMeals();
         renderPantry();
         renderIngredientsTab();

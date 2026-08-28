@@ -5,6 +5,81 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — Flavor Bomb v1 IMPLEMENTED on `design/flavor-bomb-v1` (D-074) — HELD for review, NOT merged
+
+Characterized, then implemented directly by Claude on explicit owner authorization (D-032 red-zone
+work; the owner approved the characterized architecture and directed implementation to proceed on
+the branch, review package only — **do not merge, do not push to main**). Branch
+`design/flavor-bomb-v1` from `main` @ `5199e44`. `wave1-portion-truth` remains parked at `88b5598`,
+untouched.
+
+**What this is.** `AppState.preparedFlavors[]` — a new top-level synced collection recording
+physical prepared-flavor stock (what has actually been batched and is on hand right now), kept
+strictly separate from the Flavor Library (`AppState.flavors`, knowledge) and `cookedMeals` (ready
+protein). Full shape, rationale, and the two rejected alternatives (`flavor.preparedPortions` and a
+`cookedMeals` entry) are recorded in DECISIONS D-074.
+
+**Surface.** From a Flavor Library card: "I made this" (or "Replace batch" once one is active) opens
+a `showConfirmDialog()`-based form (portions, fridge/freezer, optional expiry) — the same lightweight
+pattern `markRecipeCooked()`'s portions dialog uses, not a new modal. A compact "Prepared Flavors"
+card list renders above the flavor list on the same tab, each with a one-tap **Used 1**. One active
+batch per `flavorId` in v1 — a second "I made this" replaces the existing record (same id, fresh
+counts/date) rather than stacking a second one.
+
+**Persistence — all 17 D-070-style sites wired and re-verified against current code**, not assumed
+from the prior wave's list: `AppState` default, `saveToLocalStorage()`, `loadFromLocalStorage()`,
+`snapshotData()`, `restoreBackup()`, `exportData()` (version `1.2` → `1.3`), `importData()` (×4),
+`TOMBSTONE_KEYS`, `buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`,
+`loadUserData()` (×2), `setupRealtimeListeners()`. `clearLocalStorage()` and `collectSyncedIds()`
+needed no edit (both iterate `TOMBSTONE_KEYS`), exactly as D-070 found.
+
+**Deletion at zero uses an EXPLICIT tombstone** (`removePreparedFlavor()` calls `writeTombstone()`
+before dropping the record) — an owner-directed divergence from `removeCookedMeal()`, which relies
+on the vanish-diff alone. A partial decrement writes no tombstone.
+
+**Concurrent-decrement limitation: inherited, traced, and knowingly accepted for v1.** Two devices
+tapping Used 1 near-simultaneously can lose one decrement under the existing whole-object
+`unionById()` conflict merge — the same mechanism `cookedMeals.portionsRemaining` already has,
+unfixed. No `FieldValue.increment`, CRDT, or transactional rework was introduced. See DECISIONS D-074
+for the traced mechanism.
+
+**Meal Lego is unchanged** — `getCompatibleFlavorsForCookedMeal()` untouched, verified by inspection
+and by test (byte-identical output before/after a `preparedFlavors` mutation). Ranking prepared stock
+ahead of knowledge-only flavors on "Try with" is the explicitly deferred next wave.
+
+**Verification, no retries:**
+
+| Check | Result |
+|---|---|
+| `node --check app.js` | clean |
+| `tests/prepared-flavors.spec.js` (new — 37 tests incl. 3 mutation proofs) | **37 / 37** |
+| `npm run test:local` (full suite, after updating 4 stale "no new AppState key" pins in kitchen-truth / meal-lego / ready-food-protein-hardening / ready-food-protein-identity specs to allowlist `preparedFlavors`, same pattern D-070 used for `flavors`) | **543 / 543** |
+| `tools/Verify-Decisions.ps1` | **55 / 55** (1 pre-existing D-070 pointer text updated for the new adjacent `TOMBSTONE_KEYS` entry) |
+| `tools/Check-DocsConsistency.ps1` | 31 items — **== clean `main` baseline**, zero new drift |
+| `git diff --check` | clean |
+
+One targeted full-suite flake observed (`ready-food-protein-identity.spec.js:453`, a `waitForRestored()`
+timeout under full-suite CPU load) — passed 1/1 in isolation immediately after; the known D-065
+reload-race class, unrelated to this change, not re-run to manufacture green on the full run (the
+full run was re-run once and came back 543/543 clean).
+
+**Docs updated in the same review package:** `docs/DATA_MODEL.md` (new "Prepared flavor object
+(D-074)" section, `AppState.preparedFlavors`, `deletions` example, export version note),
+`docs/ARCHITECTURE.md` (new "Prepared Flavors" section, 17-site note cross-referenced), `docs/FEATURES.md`
+(Flavor Library section corrected — Flavor Bomb is no longer "not built"), `docs/DECISIONS.md` (D-074,
+full record).
+
+**D-032: `approved` (HELD) gate** — red-zone: touches `TOMBSTONE_KEYS`, `buildFirestorePayload()`,
+`mergeCloudConflict()`, `loadFromFirestore()`, the sign-in union, `setupRealtimeListeners()`. Per
+D-032's own tie-break rule, this is `approved`, never `done`. **main is NOT touched. Awaiting owner/
+reviewer merge.**
+
+**Next: owner/reviewer decision on `design/flavor-bomb-v1`.** If approved, merge by hand (D-032/D-036
+`/merge` path). The next product wave after that is Meal Lego ranking prepared stock ahead of
+knowledge-only flavors on the "Try with" surface — explicitly not started here.
+
+---
+
 ## 2026-08-27 — Meal Lego v1 LANDED (D-073) — truthful ready-food ↔ flavor pairing
 
 `wave-meal-lego-v1` was independently adversarially reviewed (verdict **PASS — safe to merge**;
