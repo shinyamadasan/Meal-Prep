@@ -5,6 +5,55 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-27 — Flavor Bomb v1 LANDED (D-074) — preparedFlavors is now real physical stock, on `main`
+
+`design/flavor-bomb-v1` @ `99bbaa9` (base `main` @ `5199e44`) was independently adversarially
+reviewed — verdict **PASS**, no P0/P1, one non-blocking P2 UX nit deferred ("Replace batch?"
+confirmation does not restate the typed portions), the concurrent-decrement P3 explicitly accepted —
+and, on explicit owner D-032 authorization, merged `--no-ff` into `main` at **`6610ee3`**. Reviewed
+commit `99bbaa9` landed **unrebased, unsquashed, unamended** — confirmed a true ancestor of the merge
+with byte-identical content (`git cat-file`/`git rev-parse` identity check). `wave1-portion-truth`
+remains parked at `88b5598`, untouched. `main` had not advanced past the reviewed base at merge time
+(`origin/main` == local `main` == `5199e44` immediately before merging).
+
+**What is now real.** `AppState.preparedFlavors[]` — physical prepared-flavor stock (what has
+actually been batched and is on hand), a top-level collection strictly separate from both the
+**Flavor Library** (`AppState.flavors`, which remains reusable knowledge only — no stock field was
+added to it) and **`cookedMeals`** (ready protein, unchanged). **Meal Lego stays knowledge-based for
+now** — `getCompatibleFlavorsForCookedMeal()` is byte-unchanged and there is **no "Ready now" /
+prepared-stock ranking integration in this landing**; that is the explicitly deferred next wave.
+
+**Merged-main verification, no retries, nothing re-run for green:**
+
+| Check | Result |
+|---|---|
+| `node --check app.js` | clean |
+| targeted regression (prepared-flavors, flavor-library, meal-lego, tombstone-namespace, ready-food-protein-hardening, ready-food-protein-identity, kitchen-truth, cook-depletion-tombstones) | **244 / 244** |
+| `npm run test:local` | **543 / 543** |
+| `npm test` | **543 / 543** |
+| `tools/Verify-Decisions.ps1` | **55 / 55** |
+| `tools/Check-DocsConsistency.ps1` | 31 items — **== pre-merge baseline**, zero candidate-introduced drift |
+| `git diff --check` | clean |
+
+**D-032: `approved` → landed by explicit owner authorization**, not auto-merged (red-zone: touches
+`TOMBSTONE_KEYS`, `buildFirestorePayload()`, `mergeCloudConflict()`, `loadFromFirestore()`, the
+sign-in union, `setupRealtimeListeners()`). Full architecture/rationale in DECISIONS D-074.
+
+**Accepted, not fixed:** the whole-object `unionById()` concurrent-decrement race (inherited from
+`cookedMeals.portionsRemaining`, D-056) — two devices tapping Used 1 near-simultaneously can lose one
+decrement. **Deferred, not fixed:** the P2 UX nit above; multi-batch/FIFO per flavor; a dedicated
+Used-1 history log; Meal Lego "Ready now" ranking of prepared stock ahead of knowledge-only flavors.
+
+**First push-triggered CI and deployment result:** recorded in the next session-log entry once
+observed (this entry captures pre-push landing state only — push happens immediately after this
+record commits).
+
+**Next.** Push `main` to `origin`, observe the first CI run and Pages deployment exactly as they
+occur (no re-run to manufacture green), then stop. The next product wave — Meal Lego ranking prepared
+stock ahead of knowledge-only flavors on "Try with" — is explicitly NOT started.
+
+---
+
 ## 2026-08-27 — Flavor Bomb v1 IMPLEMENTED on `design/flavor-bomb-v1` (D-074) — HELD for review, NOT merged
 
 Characterized, then implemented directly by Claude on explicit owner authorization (D-032 red-zone
