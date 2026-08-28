@@ -12,8 +12,9 @@ const { pathToFileURL } = require('url');
 
 test.use({ viewport: { width: 1280, height: 1700 } });
 
-async function loadLocalApp(page) {
+async function loadLocalApp(page, { fixedTime = null } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__readyHomeBootstrapped')) return;
@@ -97,6 +98,33 @@ test('expired food is never suggested as something to eat', async ({ page }) => 
 
   expect(result.ids).toEqual(['m_ok']);
   expect(result.expiredAlerts).toBe(1);
+});
+
+// The two tests above prove fresh/use-soon/expired using dates computed relative
+// to whatever "today" really is, which is robust but never actually crosses a
+// boundary within a single run. This test pins the wall clock to the exact day a
+// batch expires, proves it, then advances the SAME clock by one day and proves
+// the SAME record now reads expired — the record and the code never change, only
+// the clock does. This is the regression proof for the 2026-08-28 CI break, where
+// a hardcoded cookedDate near "today" silently expired once the real calendar
+// rolled past it (see meal-lego.spec.js, ready-food-protein-hardening.spec.js,
+// ready-food-protein-identity.spec.js).
+test('advancing the clock across the exact expiry boundary changes the result — proves the fixture is date-relative, not date-lucky', async ({ page }) => {
+  await loadLocalApp(page, { fixedTime: '2026-08-27T12:00:00' });
+
+  const onExpiryDay = await page.evaluate(() => {
+    AppState.recipes = [];
+    AppState.cookedMeals = normalizeCookedMeals([
+      { id: 'b1', name: 'Boundary Batch', cookedDate: '2026-08-24', storage: 'fridge',
+        fridgeLife: 3, freezerLife: 60, initialPortions: 2, portionsRemaining: 2 }
+    ]);
+    return getReadyFoodSuggestions().map((m) => m.id);
+  });
+  expect(onExpiryDay).toEqual(['b1']); // daysLeft === 0 on its expiry day — still a valid suggestion
+
+  await page.clock.setFixedTime(new Date('2026-08-28T12:00:00')); // one day past expiry
+  const dayAfterExpiry = await page.evaluate(() => getReadyFoodSuggestions().map((m) => m.id));
+  expect(dayAfterExpiry).toEqual([]); // same cookedMeals array, same helper — only the clock moved
 });
 
 test('Home shows ready food ABOVE the cook suggestions, and keeps both', async ({ page }) => {

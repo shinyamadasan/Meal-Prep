@@ -27,8 +27,18 @@ const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
 
-async function loadOffline(page) {
+// Fixture cookedDates in this file sit near 2026-08-24/25 and the ranking
+// assertion (the r1/r2/r3 Ready Food order) depends on those dates still being
+// fresh/expiring relative to "today" — e.g. fridgeLife 3 on a 2026-08-24 batch
+// means "expires 2026-08-27". Left to the real wall clock, the fixture silently
+// expires once the calendar rolls past that window (it did, in CI, on 2026-08-28
+// UTC). Pinning the page clock to the fixtures' own era makes that relationship
+// explicit and immune to the machine's real current date.
+const FIXED_CLOCK = '2026-08-27T12:00:00';
+
+async function loadOffline(page, { fixedTime = FIXED_CLOCK } = {}) {
   await page.route('**/firebasejs/**', (r) => r.abort());
+  if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
   await page.addInitScript(() => {
     try {
       if (localStorage.getItem('__proteinBootstrapped')) return;
