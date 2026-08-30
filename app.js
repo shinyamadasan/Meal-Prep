@@ -10190,6 +10190,7 @@ function proceedToRecipeForm() {
   document.getElementById('fridge-life').value = 3;
   document.getElementById('freezer-life').value = 30;
   document.getElementById('instructions').value = parsed.instructions;
+  renderRecipeMetaFields(parsed); // equipment/effort/active-time/tags/meal-balance from the paste
 
   const ingredientsList = document.getElementById('ingredients-list');
   ingredientsList.innerHTML = '';
@@ -10450,15 +10451,50 @@ function parseRecipeText(text) {
   const prepTime = extractMins(/prep(?:aration)?\s*(?:time)?[:\s]+(\d+)\s*(hr|hour|min)/i) || 15;
   const cookTime = extractMins(/cook(?:ing)?\s*(?:time)?[:\s]+(\d+)\s*(hr|hour|min)/i) || 30;
 
+  // Recognized recipe metadata headings (Equipment/Effort/Active Time/Tags/Meal
+  // Balance). A heading requires a literal colon right after the label, so prose
+  // like "Effort is minimal" or "Use a pan" never gets mistaken for one — only
+  // "Effort:" (alone, or with an inline value) does.
+  const metaHeadingDefs = [
+    { key: 'equipment', re: /^equipment\s*:\s*(.*)$/i },
+    { key: 'effort', re: /^effort\s*:\s*(.*)$/i },
+    { key: 'activeTime', re: /^active\s*time\s*:\s*(.*)$/i },
+    { key: 'tags', re: /^tags?\s*:\s*(.*)$/i },
+    { key: 'mealBalance', re: /^meal\s*balance\s*:\s*(.*)$/i }
+  ];
+  function matchMetaHeading(line) {
+    for (let h = 0; h < metaHeadingDefs.length; h++) {
+      const m = line.match(metaHeadingDefs[h].re);
+      if (m) return { key: metaHeadingDefs[h].key, value: m[1].trim() };
+    }
+    return null;
+  }
+
   let mode = 'none';
   const ingredientLines = [];
   const instructionLines = [];
+  const metaLines = { equipment: [], effort: [], activeTime: [], tags: [], mealBalance: [] };
   let nutritionStartIndex = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    // A recognized metadata heading always terminates whatever section (including
+    // Instructions) came before it, so Equipment/Effort/Tags never become
+    // trailing "instructions" again.
+    const metaHeading = matchMetaHeading(line);
+    if (metaHeading) {
+      mode = 'meta:' + metaHeading.key;
+      if (metaHeading.value) metaLines[metaHeading.key].push(metaHeading.value);
+      continue;
+    }
     if (/^ingredients?[:\s]*$/i.test(line)) { mode = 'ingredients'; continue; }
     if (/^(?:instructions?|directions?|method|how to make|steps?|procedure)[:\s]*$/i.test(line)) { mode = 'instructions'; continue; }
+
+    if (mode.indexOf('meta:') === 0) {
+      metaLines[mode.slice(5)].push(line);
+      continue;
+    }
 
     if (mode === 'ingredients') {
       if (/^[A-Z][A-Z\s]{3,}[:\s]*$/.test(line) && line.length < 35) {
@@ -10498,6 +10534,33 @@ function parseRecipeText(text) {
   const parsed = { name, servings, prepTime, cookTime, category, ingredients, instructions };
   const nutritionPerServing = nutritionStartIndex >= 0 ? parseNutritionLines(lines.slice(nutritionStartIndex)) : null;
   if (nutritionPerServing && nutritionPerServing.calories) parsed.nutritionPerServing = nutritionPerServing;
+
+  // Map recognized metadata sections onto the existing recipe.equipment /
+  // .effort / .activeTime / .tags / .mealBalance fields, reusing the same
+  // canonical vocab + normalizers the manual recipe form and normalizeRecipeMeta()
+  // already use. Unrecognized tokens are dropped rather than invented as enums.
+  function looseSlug(text) {
+    return String(text == null ? '' : text).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  function metaTokens(rawLines) {
+    return rawLines.join(', ').split(',').map(function(s) { return looseSlug(s); }).filter(Boolean);
+  }
+
+  parsed.equipment = normalizeSlugList(metaTokens(metaLines.equipment), EQUIPMENT_BY_ID);
+  parsed.tags = normalizeSlugList(metaTokens(metaLines.tags), TAG_BY_ID);
+  parsed.effort = normalizeEffort(looseSlug(metaLines.effort.join(' ')));
+
+  const activeTimeMatch = metaLines.activeTime.join(' ').trim().match(/^(\d+(?:\.\d+)?)/);
+  parsed.activeTime = activeTimeMatch ? normalizeActiveTime(activeTimeMatch[1]) : null;
+
+  const mealBalanceTokens = metaTokens(metaLines.mealBalance);
+  parsed.mealBalance = {
+    protein: mealBalanceTokens.indexOf('protein') >= 0,
+    vegetables: mealBalanceTokens.indexOf('vegetable') >= 0 || mealBalanceTokens.indexOf('vegetables') >= 0 ||
+                mealBalanceTokens.indexOf('veggie') >= 0 || mealBalanceTokens.indexOf('veggies') >= 0,
+    carb: mealBalanceTokens.indexOf('carb') >= 0 || mealBalanceTokens.indexOf('carbs') >= 0 ||
+          mealBalanceTokens.indexOf('carbohydrate') >= 0 || mealBalanceTokens.indexOf('carbohydrates') >= 0
+  };
 
   return parsed;
 }
@@ -10585,9 +10648,12 @@ function parseIngredientLine(line) {
     return { quantity: parseFraction(m2[1]), unit: 'pieces', name: ingName, category: guessIngredientCategory(ingName) };
   }
 
+  // No clean leading quantity (a range like "1-1.5", "Juice of 1-2 lemons", or a
+  // bare ingredient name like "Salt"). Fabricating quantity=1/unit=pieces here
+  // used to poison nutrition math with a false amount; an unresolved amount must
+  // stay unresolved rather than becoming a confident lie.
   if (line.length > 1 && line.length < 80) {
-    const ingName = line.replace(/[,;(].*/, '').trim();
-    return { quantity: 1, unit: 'pieces', name: ingName, category: guessIngredientCategory(ingName) };
+    return { quantity: null, unit: '', name: line, category: guessIngredientCategory(line) };
   }
 
   return null;
