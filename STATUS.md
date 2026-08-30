@@ -5,6 +5,45 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-30 — Pasted-recipe metadata/range import repair LANDED (TASK-058), backfilled workflow record, on `main`
+
+Fixed a real user-observed paste-import bug: `parseRecipeText()` had no concept of the
+`Equipment:`/`Effort:`/`Active Time:`/`Tags:`/`Meal Balance:` sections the recipe model already
+supports, so those headings leaked into Instructions as bogus steps; `parseIngredientLine()`'s
+fallback fabricated `quantity: 1, unit: 'pieces'` for range-shaped ingredients like `1-1.5 lb
+chicken`, poisoning nutrition math. This work began from a direct owner instruction, not
+`planning/BUILD_QUEUE.md`, and was independently reviewed before any `TASKS.md`/`REVIEW.md` record
+existed for it — that record was backfilled truthfully (commit `bd84606`, matching the TASK-041
+precedent) before landing, per the reviewer's explicit process instruction.
+
+Branch `fix/paste-import-metadata-and-ranges` @ `100d4b4` (base `main @ b34f8f9`) — independent
+review: **PASS**, no P0/P1/P2, one non-blocking P3 parsing-format ambiguity deferred, D-032 **done**
+tier. Merged `--no-ff` into `main` at **`9408164`**; `100d4b4` landed unrebased, unsquashed,
+unamended. `wave1-portion-truth` untouched.
+
+**Merged-main verification:** `node --check` clean; targeted (paste-import + URL import + recipe
+editor + save/reload + low-effort/equipment) **61/61**; `npm run test:local` **556/556**; `npm test`
+**556/556**; `tools/Verify-Decisions.ps1` **55/55**; `git diff --check` clean.
+
+**First push-triggered CI: FAILED, attempt 1, recorded as-is.** Run `33299988637`: local gate 554
+passed, 2 failed in `tests/seed-isolation.spec.js` (reload/restore timing). Diagnosed as pre-existing
+harness flake, not a regression — the spec is byte-untouched by this merge, both failures pass 9/9 in
+isolation on the same merged commit, and three prior push-triggered runs on `main` each failed a
+different random subset of unrelated specs. Production gate skipped (local gate runs first).
+
+**Pages deployment: SUCCEEDED**, commit `9408164` (`gh api .../pages/builds/latest` → `built`).
+**Production proof, live browser against the deployed build:** equipment/effort/tags populate real
+metadata, no metadata pollution in instructions, `1-1.5 lb chicken`-style ranges and quantity-less
+ingredients render honest empty Qty (never fabricated `1 pieces ...`), zero unexpected console errors.
+
+**Left to another owner, explicitly:** `CHANGELOG.md`/`TEST_REPORT.md` are Codex-owned append-only
+logs; Codex never executed this task, so neither got an entry (see TASK-058 follow-ups). The one open
+P3 (non-blocking parsing-format ambiguity) is recorded in REVIEW.md and deferred, not fixed.
+
+**Next.** Nothing else started automatically from this landing.
+
+---
+
 ## 2026-08-27 — Flavor Bomb v1 LANDED (D-074) — preparedFlavors is now real physical stock, on `main`
 
 `design/flavor-bomb-v1` @ `99bbaa9` (base `main` @ `5199e44`) was independently adversarially

@@ -81,6 +81,86 @@ instruction in this same session.
 **Status: `done`.** Merge `--no-ff` into `main`, preserving `100d4b4` unchanged. No squash, no amend,
 no rebase, no force push. `wave1-portion-truth` stays untouched.
 
+### LANDED — 2026-08-30
+
+Docs backfill committed to `main` first, in its own commit **`bd84606`** (TASKS.md + REVIEW.md only —
+`git diff b34f8f9 bd84606 -- app.js index.html style.css sw.js manifest.json` empty), per the D-040
+convention that landing records never ride inside the reviewed branch's commits.
+
+Merged `--no-ff` into `main` at **`9408164`**, parents `bd84606` (workflow-record commit) and
+`100d4b4` (reviewed branch HEAD). `100d4b4` landed **unrebased, unsquashed and unamended** —
+confirmed a true ancestor of the merge (`git merge-base --is-ancestor 100d4b4 HEAD`) with a byte-
+identical `app.js`/spec diff against the reviewed commit (`git diff 100d4b4 HEAD -- app.js
+tests/paste-import-metadata-and-ranges.spec.js` empty). `wave1-portion-truth` untouched.
+
+**Merged-main verification, no retries, nothing re-run for green:**
+
+| Check | Result |
+|---|---|
+| `node --check app.js` | clean |
+| targeted (paste-import + URL import + recipe editor + save/reload + low-effort/equipment) | **61/61** |
+| `npm run test:local` | **556/556** |
+| `npm test` | **556/556** |
+| `tools/Verify-Decisions.ps1` | **55/55** |
+| `git diff --check` | clean |
+
+**First push-triggered CI: FAILED, attempt 1, recorded as-is and NOT re-run for green.** Run
+`33299988637`, workflow `Button tests`, event `push`, SHA `9408164`. Local gate: **554 passed, 2
+failed** — both in `tests/seed-isolation.spec.js` (`reload still restores the saved recipes and
+re-isolates them`, a `waitForRestored()` 30s timeout; `an existing install with a deliberately empty
+recipe list stays empty`, expected 0 recipes got 40). Production gate **skipped**, because the local
+gate runs first and failed (D-065's intended ordering, not a second defect).
+
+Diagnosed as **pre-existing test-harness flake (the documented D-065 reload-race /
+runner-contention class), not a TASK-058 product regression**, on evidence rather than assertion:
+- `tests/seed-isolation.spec.js` is byte-untouched by this merge's diff
+  (`git diff b34f8f9 9408164 --stat -- tests/seed-isolation.spec.js` empty).
+- The `app.js` diff touches none of seed/starter-pack/init code (`git diff b34f8f9 9408164 -- app.js
+  | grep -iE "seed|starterPack|initApp|loadFromLocalStorage"` returns nothing).
+- Both failing tests pass cleanly in isolation, run locally against this exact merged commit
+  (`9408164`): `npx playwright test tests/seed-isolation.spec.js` → 9/9.
+- The full local suite passed 556/556 twice on this same commit moments earlier (`npm run
+  test:local`, `npm test`), so the failure did not reproduce deterministically.
+- The prior three push-triggered `Button tests` runs on `main` that failed their local gate
+  (`7d5a3be`: `inventory-quantity-truth`, `meal-lego`, `ready-food-protein-hardening`,
+  `ready-food-protein-identity`; `4847364`: `kitchen-truth`; `8711a9c`: `flavor-library`,
+  `inventory-quantity-truth`) each failed a **different**, small, random subset of specs scattered
+  across the suite — never the same test twice, never touching whatever code actually changed in
+  that push. This run's two failures (`seed-isolation.spec.js`, a reload/restore-timing spec) fit the
+  same intermittent-runner-contention signature documented across the TASK-055/056/057 landings in
+  this file.
+
+**Pages deployment: SUCCEEDED.** `gh api repos/shinyamadasan/Meal-Prep/pages/builds/latest` reports
+`status: built`, `commit: 9408164a5a3a77399d0ab14251b95783974a4ab1` — the exact merge SHA. Separate
+workflow run `33299987975` (`pages build and deployment`) completed successfully.
+
+**Production paste-import proof, against the deployed build, live browser, not assumed:** ran
+`parseRecipeText()` in-page against `https://shinyamadasan.github.io/Meal-Prep/` with the Lemon
+Chicken input, then drove the full paste → form UI flow through `openPasteRecipeModal()` →
+`#parse-btn` → `.pf-proceed-btn`. All of the following held on the live deployed build:
+1. Equipment populated `recipe.equipment = ['oven', 'pan']` and the `#recipe-equipment-chips`
+   checkboxes for Oven/Pan were checked.
+2. Effort populated `recipe.effort = 'very-low'` and `#recipe-effort` showed "Very low".
+3. Tags populated `recipe.tags = ['freezer-friendly', 'batch-friendly', 'minimal-cleanup']` and the
+   matching `#recipe-tag-chips` checkboxes were checked.
+4. `#instructions` contained none of `Equipment`/`Effort`/`Tags` — exactly the five real cooking
+   steps.
+5. `1–1.5 lb chicken` rendered as ingredient name `1–1.5 lb chicken` with an **empty** Qty field, not
+   `1 pieces 1–1.5 lb chicken`. Same for `2–3 cloves garlic`, `Juice of 1–2 lemons`.
+6. Quantity-less ingredients (`Salt`, `Black pepper`) received `quantity: null, unit: ''`, never a
+   fabricated `1`/`pieces`.
+7. Zero console/page errors, beyond the established expected Firebase/App Check chatter on a
+   signed-out live visit (filtered by the same pattern `production-smoke-what-should-we-eat.spec.js`
+   uses).
+
+This ad hoc production test is **not committed** as a spec — matching TASK-057's precedent, pinning
+it as a `production-smoke-*.spec.js` file is recommended follow-up rather than unreviewed scope
+added during this landing.
+
+`TASKS.md` TASK-058 stays `status: done` — the D-032 gate was `done` tier from the start (no red-zone
+surface), and the one CI red was independently diagnosed as pre-existing harness flake, not a
+regression this change introduced.
+
 ---
 ## Review — Protein Identity **P2 Finalization** — PASS -> D-032 `approved` (HELD) -> AUTHORIZED FOR LANDING
 branch: `fix/protein-identity-p2-finalization` @ `da75a7d` (base `main @ 8e2a541`)
