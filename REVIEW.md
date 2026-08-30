@@ -4,6 +4,84 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-058 — Pasted-recipe metadata/range import repair — PASS -> D-032 `done`
+branch: `fix/paste-import-metadata-and-ranges` @ `100d4b4` (base `main @ b34f8f9`)
+verdict: **PASS** — no P0, no P1, no P2. One non-blocking P3 parsing-format ambiguity remains OPEN.
+date: 2026-08-30
+
+### Process note — this branch bypassed the normal task/review paper trail
+
+This work began from a direct owner instruction after observing a real pasted-recipe import failure,
+not from `planning/BUILD_QUEUE.md`. Implementation was done directly by Claude (not Codex) and the
+branch was independently reviewed and reported PASS **before** any `TASKS.md`/`REVIEW.md` record
+existed for it. `TASKS.md` TASK-058 and this entry are a truthful backfill, written after the fact,
+matching the precedent set by TASK-041. Nothing here claims an earlier status or timestamp that never
+existed.
+
+### Verdict
+
+Independent review of the paste-recipe importer repair. One commit reviewed: **`100d4b4`**, landing
+**unrebased, unsquashed and unamended**.
+
+`parseRecipeText()` (the deterministic paste importer) had no concept of the
+`Equipment:`/`Effort:`/`Active Time:`/`Tags:`/`Meal Balance:` sections the recipe model already
+supports, so those headings and their values fell into the Instructions list as bogus numbered
+steps — reproduced live with a "Lemon Chicken" paste whose Instructions ended with `Equipment:`,
+`Oven, Pan`, `Effort:`, `Very low`, `Tags:`, `Freezer-friendly, Batch-friendly, Minimal-cleanup` as
+trailing "steps". Fixed: the five headings are now recognized case-insensitively (colon required, so
+prose like "Effort is minimal" is never misclassified), terminate whatever section came before them,
+and map onto the existing canonical vocab (`RECIPE_EQUIPMENT`/`RECIPE_EFFORTS`/`RECIPE_TAGS`) via the
+existing `normalizeSlugList`/`normalizeEffort`/`normalizeActiveTime` normalizers. Unrecognized tokens
+are dropped, never turned into a new enum value.
+
+`parseIngredientLine()`'s final fallback fabricated `quantity: 1, unit: 'pieces'` for any ingredient
+line without a clean leading number — including digit-leading ranges like `1-1.5 lb chicken` that
+start with a digit but aren't a single parsed amount — reproduced the same way (`1-1.5 lb chicken`,
+`Juice of 1-2 lemons`, `2-3 cloves garlic`, and bare `Salt`/`Black pepper` all became a confident
+"1 piece"). Fixed: the fallback now returns `quantity: null, unit: ''` with the full raw line
+preserved as `name`. This is the same function `normalizeImportedIngredient()` (the URL-import path)
+calls, so the fix also hardens that path's existing `needsReview` safety net, which previously only
+checked for *a* leading digit rather than a *valid single* amount — **URL-importer behavior is
+improved, not regressed.**
+
+### Verification
+
+| Check | Result |
+|---|---|
+| targeted `tests/paste-import-metadata-and-ranges.spec.js` | **12/12** |
+| full deterministic suite (`npx playwright test --project=local`) | **556/556** |
+| `tools/Verify-Decisions.ps1` | **55/55** |
+| `git diff --check` | clean |
+| mutation A — metadata-heading recognition disabled | **7 tests correctly failed** (instructions polluted again, equipment/tags/effort empty), reverted |
+| mutation B — fabricated 1-piece fallback restored | **4 tests correctly failed** (`1`/`'pieces'` instead of `null`/`''`), reverted |
+
+### Blast radius
+
+Diff is exactly two files: `app.js` (70 lines, inside `parseIngredientLine`, `parseRecipeText`, and
+one added call in `proceedToRecipeForm`) and the new spec file. No new recipe/schema field, no
+`AppState` top-level shape change, no sync/Firestore/tombstone/nutrition-architecture change, no auth,
+no service worker. `wave1-portion-truth` untouched.
+
+### P3 — one non-blocking parsing-format ambiguity (OPEN, deferred)
+
+The independent review flagged one non-blocking P3: a parsing-format ambiguity in how metadata
+sections are delimited (not itemized further by the reviewer beyond "non-blocking"). Recorded here as
+open and deferred — not fixed in this landing.
+
+### D-032 gate — `done`
+
+Strictly on blast radius this is outside the red zone: no Firestore/sync/storage code, no
+`saveData()` call-site change, no `cloudReady` guard, no tombstone machinery, no auth, no automation
+surface — purely deterministic parsing into already-existing recipe fields, plus one UI wiring call
+into an existing render function. Qualifies for `done` (auto-merge tier); landed by explicit owner
+instruction in this same session.
+
+### Gate
+
+**Status: `done`.** Merge `--no-ff` into `main`, preserving `100d4b4` unchanged. No squash, no amend,
+no rebase, no force push. `wave1-portion-truth` stays untouched.
+
+---
 ## Review — Protein Identity **P2 Finalization** — PASS -> D-032 `approved` (HELD) -> AUTHORIZED FOR LANDING
 branch: `fix/protein-identity-p2-finalization` @ `da75a7d` (base `main @ 8e2a541`)
 verdict: **PASS** — no P0, no P1, **no P2 open**. Three P3 notes remain **OPEN and deferred**.

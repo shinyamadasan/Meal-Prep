@@ -3969,6 +3969,78 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-058 · Backfill: pasted-recipe metadata/range import repair landed outside the Claude→Codex pipeline
+status: done
+owner: claude
+source: none — recovery task. This did NOT originate from `planning/BUILD_QUEUE.md` and was never a
+  `TASKS.md` handoff before now. The task began from a direct owner instruction after observing a
+  real pasted-recipe import failure (a "Lemon Chicken" paste whose `Equipment:`/`Effort:`/`Tags:`
+  sections leaked into Instructions as bogus steps, and whose range-shaped ingredients like
+  `1-1.5 lb chicken` were fabricated to `quantity: 1, unit: 'pieces'`). It is recorded here after the
+  fact so the OS record matches the repo, per the same convention as TASK-041.
+priority: P2
+depends-on: none
+files: app.js, tests/paste-import-metadata-and-ranges.spec.js
+branch: fix/paste-import-metadata-and-ranges
+reviewed commit: 100d4b4 (base main @ b34f8f9)
+review verdict: PASS (independent review) — see REVIEW.md
+
+context:
+  - `parseRecipeText()` (the deterministic paste-recipe importer) had no concept of the
+    `Equipment:`/`Effort:`/`Active Time:`/`Tags:`/`Meal Balance:` sections the recipe model already
+    supports (`recipe.equipment`/`.effort`/`.activeTime`/`.tags`/`.mealBalance`), so those headings
+    and their values fell into the Instructions list as bogus numbered steps.
+  - `parseIngredientLine()`'s final fallback fabricated `quantity: 1, unit: 'pieces'` for any
+    ingredient line without a clean leading number, including digit-leading ranges like
+    `1-1.5 lb chicken` that aren't a single parsed amount — poisoning nutrition math with a false,
+    confident quantity. The same function is shared by the URL-importer's
+    `normalizeImportedIngredient()`, so the bug silently affected that path's `needsReview` safety
+    net too.
+
+acceptance:
+  - [x] `parseRecipeText()` recognizes the five metadata headings (case-insensitive, colon required
+        so prose like "Effort is minimal" is never misclassified), stops Instructions capture at
+        them, and maps their values onto the existing canonical vocab
+        (`RECIPE_EQUIPMENT`/`RECIPE_EFFORTS`/`RECIPE_TAGS`) via the existing
+        `normalizeSlugList`/`normalizeEffort`/`normalizeActiveTime` normalizers; unrecognized tokens
+        are dropped, never turned into new enum values
+  - [x] `proceedToRecipeForm()` calls the existing `renderRecipeMetaFields(parsed)` so parsed
+        metadata pre-fills the same equipment/effort/tags controls the manual recipe form already
+        uses; the existing save path (`readRecipeMetaFromForm`) picks them up with no changes
+  - [x] `parseIngredientLine()`'s catch-all fallback returns `quantity: null, unit: ''` with the full
+        raw line as `name` instead of fabricating 1 piece; deterministic forms (`2 lbs pork belly`,
+        `3 cloves garlic`, `2 eggs`) are unaffected
+  - [x] No new recipe/schema fields, no `AppState` shape change, no sync/Firestore/tombstone/
+        nutrition-architecture change
+  - [x] `tests/paste-import-metadata-and-ranges.spec.js` added: 12 tests covering metadata mapping,
+        instruction-boundary safety, ingredient-range safety, and the full paste → form → save →
+        reload → export/import path
+  - [x] Two mutations applied and reverted: disabling metadata-heading recognition fails 7 tests;
+        restoring the fabricated 1-piece fallback fails 4 tests
+  - [x] Full deterministic suite green: 556/556 on the reviewed branch
+
+constraints:
+  - No new product feature beyond the parser repair — recovery/repair only
+  - No AppState top-level shape change, no sync/Firestore/tombstone/auth/service-worker change
+  - `wave1-portion-truth` untouched
+
+verification:
+  - `npx playwright test tests/paste-import-metadata-and-ranges.spec.js --project=local` → 12/12 pass
+  - `npx playwright test --project=local` (full local suite) → 556/556 pass
+  - Independent review: PASS, no P0/P1/P2, one non-blocking P3 parsing-format ambiguity, D-032 done
+    tier — see REVIEW.md
+
+follow-ups:
+  - CHANGELOG.md / TEST_REPORT.md are Codex-owned append-only evidence logs (CLAUDE.md: "Reviewer...
+    Do not edit CHANGELOG.md or TEST_REPORT.md"). This task was implemented directly by Claude, not
+    Codex, so — matching TASK-041's precedent — no CHANGELOG.md/TEST_REPORT.md entry is added here.
+    If Codex ever needs Codex-format build/test evidence for this change, that entry remains owed and
+    is not backfilled by this record.
+  - The one open P3 (a non-blocking parsing-format ambiguity) is recorded in REVIEW.md and left
+    deferred, not fixed in this task.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
