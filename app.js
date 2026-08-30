@@ -542,7 +542,13 @@ function normalizeRecipes(recipes) {
     normalizeRecipeMeta(recipe);
     recipe.baseIngredients.forEach(function(ing) {
       if (ing.unit == null) ing.unit = 'g';
-      if (ing.baseQuantity == null) ing.baseQuantity = 0;
+      // A MISSING baseQuantity (field absent, from data saved before this field
+      // existed) defaults to 0. An explicit null means "genuinely unresolved" —
+      // e.g. a pasted range like "1-1.5 lb chicken" that parseIngredientLine()
+      // deliberately left unresolved rather than fabricate an amount — and must
+      // stay null, not get silently rewritten into a confident (and wrong) zero
+      // on the next load. See TASK-058.
+      if (ing.baseQuantity === undefined) ing.baseQuantity = 0;
       if (ing.category == null) ing.category = '';
     });
   });
@@ -3521,6 +3527,11 @@ const sampleRecipes = [
 
 // Utility functions for serving size calculations
 function formatQuantity(quantity) {
+  // A genuinely-unresolved ingredient (baseQuantity: null, e.g. a pasted range
+  // like "1-1.5 lb chicken" — see TASK-058) reaches here as null/undefined/NaN.
+  // Render it blank, the same convention the ingredient-review form already
+  // uses for an unresolved amount, rather than crashing on .toFixed().
+  if (quantity == null || !isFinite(quantity)) return '';
   if (quantity === Math.floor(quantity)) {
     return quantity.toString();
   }
@@ -14872,6 +14883,118 @@ function attachIngredientAutocomplete(nameInput, onSelect) {
   nameInput.addEventListener('keydown', function(e) {
     var suggestBox = wrap.querySelector('.ing-suggestions');
     if (e.key === 'Escape') suggestBox.classList.add('hidden');
+  });
+}
+
+// ── ONE-TIME DATA REPAIR (TASK-058 follow-up) ───────────────────────────────
+// Console-only, not wired to any button. Repairs exactly 5 named recipes that
+// were pasted through parseRecipeText() BEFORE the TASK-058 fix (100d4b4) —
+// their instructions still carry leaked "Equipment:/Effort:/Tags:" heading
+// text, and several ingredients were fabricated quantity:1/unit:'pieces' for
+// range inputs like "2-3 lb chicken". Every replacement value below was
+// produced by feeding each recipe's OWN currently-stored (still-polluted)
+// instructions back through the real, current parseRecipeText() — not
+// hand-derived. Buffalo Ranch Chicken's equipment is intentionally left
+// untouched: its stored ["instant-pot","oven"] does not match what the parser
+// derives (["oven"] — "Slow cooker" isn't a canonical equipment id) and its
+// effort/tags already match the parser's output, both consistent with a
+// manual correction made after import rather than parser damage. Delete this
+// whole block once run against production data; it is not a general facility.
+var ONE_TIME_RECIPE_REPAIR = [
+  {
+    id: '1788062745911',
+    name: 'Buffalo Ranch Chicken',
+    instructions: 'Add chicken, buffalo sauce, ranch, optional cream cheese, garlic powder, salt, and pepper to a freezer-safe bag. Mix well.\nFreeze.\nWhen ready to cook, thaw overnight in the refrigerator.\nCook in a crockpot on LOW for 5â€“6 hours for shredded chicken, or bake at 400Â°F (205Â°C) for 25â€“30 minutes.\nTop with green onion.\nServe over rice, in wraps, or with roasted potatoes.',
+    fixIngredientNames: ['2â€“3 lb chicken breasts or tenders', 'Salt', 'Black pepper', 'Green onion'],
+    equipment: null, // conflict — leave as stored
+    effort: null,    // already matches — leave as stored
+    tags: null        // already matches — leave as stored
+  },
+  {
+    id: 1788062988950,
+    name: 'Honey Mustard Chicken',
+    instructions: 'Add chicken, honey, Dijon mustard, olive oil, garlic powder, onion powder, salt, pepper, and herbs to a freezer-safe bag. Mix well.\nFreeze.\nWhen ready to cook, thaw overnight in the refrigerator.\nBake at 400Â°F (205Â°C) for 25â€“30 minutes or air fry at 375Â°F (190Â°C) for 15â€“18 minutes.\nServe with potatoes or green beans.',
+    fixIngredientNames: ['2â€“3 lb chicken breasts or tenders', 'Salt', 'Black pepper', 'Parsley or thyme'],
+    equipment: ['oven'],
+    effort: 'very-low',
+    tags: ['freezer-friendly', 'batch-friendly', 'minimal-cleanup']
+  },
+  {
+    id: 1788063014896,
+    name: 'Pineapple Teriyaki Chicken',
+    instructions: 'Add chicken, teriyaki sauce, pineapple juice, soy sauce, garlic, ginger, and pineapple chunks to a freezer-safe bag. Mix well.\nFreeze.\nWhen ready to cook, thaw overnight in the refrigerator.\nCook in a crockpot on LOW for 5â€“6 hours, or bake at 400Â°F (205Â°C) for 25â€“30 minutes.\nGarnish with green onion and sesame seeds.\nServe over rice with broccoli.',
+    fixIngredientNames: ['2â€“3 lb chicken breasts or thighs', 'Pineapple chunks', 'Green onion', 'Sesame seeds'],
+    equipment: ['oven'],
+    effort: 'very-low',
+    tags: ['freezer-friendly', 'batch-friendly', 'minimal-cleanup']
+  },
+  {
+    id: 1788063044644,
+    name: 'Honey Garlic Chicken',
+    instructions: 'Add chicken, honey, soy sauce, garlic, olive oil, and green onions to a freezer-safe bag. Mix well to coat the chicken.\nFreeze.\nWhen ready to cook, thaw overnight in the refrigerator.\nCook in a crockpot on LOW for 4â€“6 hours, or cook on the stovetop until the chicken is fully cooked.\nServe with rice and vegetables.',
+    fixIngredientNames: ['1â€“1.5 lb chicken', '3â€“4 cloves garlic', '1â€“2 tbsp olive oil', '1â€“2 green onions'],
+    equipment: ['pan'],
+    effort: 'very-low',
+    tags: ['freezer-friendly', 'batch-friendly', 'minimal-cleanup']
+  },
+  {
+    id: 1788063069099,
+    name: 'Lemon Chicken',
+    instructions: 'Add chicken, olive oil, lemon juice, garlic, Italian seasoning, salt, pepper, and lemon slices to a freezer-safe bag. Mix well to coat the chicken.\nFreeze.\nWhen ready to cook, thaw overnight in the refrigerator.\nBake at 375Â°F (190Â°C) or cook on the stovetop until the chicken is fully cooked.\nServe with rice, potatoes, or vegetables.',
+    fixIngredientNames: ['1â€“1.5 lb chicken', 'Juice of 1â€“2 lemons', '2â€“3 cloves garlic', 'Salt', 'Black pepper', '1â€“2 lemon slices'],
+    equipment: ['oven', 'pan'],
+    effort: 'very-low',
+    tags: ['freezer-friendly', 'batch-friendly', 'minimal-cleanup']
+  }
+];
+
+function oneTimeRepairEightPastedChickenRecipes() {
+  var report = { repaired: [], skipped: [] };
+
+  ONE_TIME_RECIPE_REPAIR.forEach(function(spec) {
+    var matches = AppState.recipes.filter(function(r) { return r.name === spec.name; });
+    if (matches.length !== 1) {
+      report.skipped.push({ name: spec.name, reason: matches.length + ' recipes with this exact name (expected 1)' });
+      return;
+    }
+    var recipe = matches[0];
+    if (String(recipe.id) !== String(spec.id)) {
+      report.skipped.push({ name: spec.name, reason: 'id mismatch: found ' + JSON.stringify(recipe.id) + ', expected ' + JSON.stringify(spec.id) });
+      return;
+    }
+
+    var ingredientsTouched = [];
+    (recipe.baseIngredients || []).forEach(function(ing) {
+      if (spec.fixIngredientNames.indexOf(ing.name) >= 0 && ing.baseQuantity === 1 && ing.unit === 'pieces') {
+        ing.baseQuantity = null;
+        ing.unit = '';
+        ingredientsTouched.push(ing.name);
+      }
+    });
+
+    recipe.instructions = spec.instructions;
+    if (spec.equipment) recipe.equipment = spec.equipment.slice();
+    if (spec.effort) recipe.effort = spec.effort;
+    if (spec.tags) recipe.tags = spec.tags.slice();
+    stampUpdated(recipe);
+
+    report.repaired.push({
+      id: recipe.id,
+      name: recipe.name,
+      ingredientsFixed: ingredientsTouched,
+      equipmentApplied: !!spec.equipment,
+      effortApplied: !!spec.effort,
+      tagsApplied: !!spec.tags
+    });
+  });
+
+  patchMissingNutrition(AppState.recipes);
+  var savePromise = saveData();
+  renderRecipes();
+  console.log('[oneTimeRepairEightPastedChickenRecipes] report:', JSON.stringify(report, null, 2));
+  return savePromise.then(function() {
+    console.log('[oneTimeRepairEightPastedChickenRecipes] saveData() resolved.');
+    return report;
   });
 }
 
