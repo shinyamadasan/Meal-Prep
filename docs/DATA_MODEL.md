@@ -34,6 +34,11 @@ AppState.prepModeSession    // null, or { active, recipeUsage, checked } for an 
                             // closePrepMode(). openPrepMode() filters out any recipe id no longer
                             // in AppState.recipes, so a deleted recipe degrades gracefully instead
                             // of crashing the restore.
+AppState.inventoryVerifiedAt // ISO string or null. A manual "I physically checked the whole
+                            // fridge/freezer/pantry" confidence stamp (D-075) — never an audit,
+                            // never household collaboration, no schedule/reminder. Follows the
+                            // exact nutritionGoals persistence template (see below): a top-level
+                            // scalar, not a collection, absent from TOMBSTONE_KEYS.
 ```
 
 ## Recipe object
@@ -422,5 +427,7 @@ It is **not** a schema-migration system — backward-compat is handled by `patch
 and defensive `|| []` / `|| {}` defaults on load.
 
 The export payload carries its own `version` string: `1.1` predates the Flavor Library, `1.2`
-adds `flavors`, `1.3` adds `preparedFlavors`. `importData()` accepts all three - an older file
-simply has no `flavors`/`preparedFlavors` key.
+adds `flavors`, `1.3` adds `preparedFlavors`, `1.4` adds `inventoryVerifiedAt` (D-075). `importData()`
+accepts all four - an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt` key.
+Unlike the list-type fields, an imported `inventoryVerifiedAt` only replaces the current one when it
+is textually newer (never regresses an existing verification with an older file's value).

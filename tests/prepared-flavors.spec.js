@@ -523,7 +523,10 @@ test('40. no console/page errors from load through Used 1', async ({ page }) => 
   await loadOffline(page, { flavors: [makeFlavor()], preparedFlavors: [makePrepared({ portionsInitial: 1, portionsRemaining: 1 })], version: 1 });
   await page.waitForFunction(() => AppState.preparedFlavors.length === 1);
   await openFlavorTab(page);
-  await page.click('.prepared-flavor-use');
+  // Scoped to the Flavor Library's own list — the Fridge mirror (D-075) renders the
+  // same card markup into a second container, so an unscoped `.prepared-flavor-use`
+  // now matches two elements.
+  await page.click('#prepared-flavors-list .prepared-flavor-use');
   await page.waitForTimeout(200);
   const appErrors = errors.filter((e) => !/net::ERR|Failed to load resource|favicon|frame-ancestors|google\.com/i.test(e));
   expect(appErrors).toEqual([]);

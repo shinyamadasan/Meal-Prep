@@ -20,7 +20,7 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
 |---|---|---|
 | Home / Dashboard | `#dashboard` | `renderDashboard()` |
 | Cook / My Recipes | `#recipes` | `renderRecipes()` |
-| Inventory / My Fridge | `#fridge` | `renderPantry()`, `renderCookedMeals()` |
+| Inventory / My Fridge | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |
 | Shop / Grocery | `#grocery` | `renderGroceryList()` |
 | Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` |
 | Nutrition | `#nutrition` | `renderNutritionTab()` → `renderWeeklyNutritionTotals()`, `renderWeeklyNutritionChart()`, `renderDailyNutritionBreakdown()`, `filterRecipesByNutrition()` |
@@ -52,6 +52,14 @@ Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibilit
   deletion is resurrected by the next union. See D-070 for the worked example; D-074 (Flavor Bomb v1,
   `AppState.preparedFlavors`) re-verified this exact list against current code rather than assuming
   it from the prior wave.
+- **Adding a top-level SCALAR field (not a collection) is a much shorter list — the
+  `nutritionGoals` template.** No `TOMBSTONE_KEYS` entry (nothing to per-record delete), no
+  `mergeCloudConflict()` edit (a scalar not named in its list-union loop simply survives via its
+  `Object.assign({}, local)` base), and no sign-in-union edit (the freshly-loaded cloud copy wins,
+  same as `nutritionGoals` already does). Only nine sites: `AppState` default,
+  `saveToLocalStorage()`, `loadFromLocalStorage()`, `snapshotData()`, `restoreBackup()`,
+  `exportData()`, `buildFirestorePayload()`, `loadFromFirestore()`, `setupRealtimeListeners()`. See
+  D-075 (`AppState.inventoryVerifiedAt`).
 - **Write guard — never write before read:** `saveToFirestore()` no-ops until `AppState.cloudReady`
   is true (set only after the cloud doc is read, or on sign-up). This stops a load-window save (the
   30s auto-save, the `online` event, a render) from overwriting good cloud data with an un-loaded
@@ -125,7 +133,12 @@ flavor in v1, no lot/FIFO tracking. `useOnePreparedFlavor(id)` is the one-tap de
 unlike `removeCookedMeal()` — writes an EXPLICIT tombstone before dropping the record, rather than
 relying solely on the `recordLocalDeletions()` vanish-diff (an owner-directed requirement for this
 collection specifically). `renderPreparedFlavors()` draws a compact card list on the Flavor Library
-tab, above the flavor list itself.
+tab, above the flavor list itself, using `preparedFlavorCardHtml()` — and, since D-075, ALSO calls
+`renderFridgePreparedFlavors()`, a second render into a "Prepared Flavors" block on the My Fridge tab
+(`#fridge-prepared-flavors-list`) that draws from the exact same `AppState.preparedFlavors` array via
+the exact same `preparedFlavorCardHtml()` — no new state, no second Used-1 handler. Only the sort
+differs: the Flavor Library orders by flavor name; the Fridge mirror orders fridge-before-freezer,
+then earlier truthful `expiresAt` first (nulls last), then flavor name.
 
 Persistence follows the exact 17-site registry above, with `preparedFlavors` added to
 `TOMBSTONE_KEYS`. A `flavorId` whose Flavor Library entry was later deleted is NOT cascade-deleted —
@@ -138,6 +151,16 @@ inspection and by test). That integration is the explicitly deferred next wave. 
 multi-batch/FIFO tracking, a dedicated Used-1 history log, and a fix for the inherited
 whole-object-LWW concurrent-decrement risk (see DECISIONS D-074) — all accepted v1 limitations, not
 oversights.
+
+## Last full inventory check — `AppState.inventoryVerifiedAt` (D-075)
+
+A manual confidence stamp, not an audit and not household collaboration: `verifyInventoryChecked()`
+sets `AppState.inventoryVerifiedAt = new Date().toISOString()` and re-renders the status line shown
+in the My Fridge tab (`renderInventoryVerifiedStatus()` — "Inventory checked N days ago" or
+"Inventory not yet verified"). It does not read or write any pantry, cooked-meal, or prepared-flavor
+record, schedule anything, or score confidence. Persists via the `nutritionGoals`-style nine-site
+scalar-field template (see the Save/load/sync pipeline section above) — deliberately NOT a new
+`TOMBSTONE_KEYS` entry, since there is nothing here to per-record delete.
 
 ## Shop -> inventory loop
 `toggleGroceryItem()` is the only inbound path from shopping, and it is one tap (D-057):

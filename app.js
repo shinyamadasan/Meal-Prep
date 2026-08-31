@@ -38,6 +38,7 @@ const AppState = {
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
   deletions: {},              // { collection: { id: deletedAtISO } } tombstones — sync deletes so a union can't resurrect them
+  inventoryVerifiedAt: null,  // ISO timestamp of the last "Inventory checked" tap — a manual confidence stamp, not an audit
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
@@ -448,6 +449,7 @@ function saveToLocalStorage() {
       recentRecipes: AppState.recentRecipes,
       prepModeSession: AppState.prepModeSession,
       deletions: normalizeDeletions(AppState.deletions),
+      inventoryVerifiedAt: AppState.inventoryVerifiedAt,
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
@@ -504,6 +506,9 @@ function loadFromLocalStorage() {
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
       AppState.deletions = normalizeDeletions(data.deletions);
+      // A record saved before this feature existed simply has no key — reads as
+      // "never verified", never fabricated from another field.
+      AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
       markInitialized();   // a saved record exists → not first run
@@ -1558,11 +1563,42 @@ function preparedFlavorCardHtml(pf) {
 function renderPreparedFlavors() {
   var section = document.getElementById('prepared-flavors-section');
   var list = document.getElementById('prepared-flavors-list');
+  if (section && list) {
+    var items = AppState.preparedFlavors || [];
+    if (!items.length) { section.classList.add('hidden'); list.innerHTML = ''; }
+    else {
+      section.classList.remove('hidden');
+      var sorted = items.slice().sort(function(a, b) {
+        var fa = findFlavor(a.flavorId), fb = findFlavor(b.flavorId);
+        return String(fa ? fa.name : '').localeCompare(String(fb ? fb.name : ''));
+      });
+      list.innerHTML = sorted.map(preparedFlavorCardHtml).join('');
+    }
+  }
+  renderFridgePreparedFlavors(); // same canonical AppState.preparedFlavors, mirrored into My Fridge — see D-075
+}
+
+// My Fridge should answer "what ready/prepared food do I physically have?" without a
+// tab switch to the Flavor Library. Reuses preparedFlavorCardHtml() (so Used 1 is the
+// SAME useOnePreparedFlavor() call, never a second implementation) — only the container
+// and sort order differ from the Flavor Library's rendering above.
+function renderFridgePreparedFlavors() {
+  var section = document.getElementById('fridge-prepared-flavors-section');
+  var list = document.getElementById('fridge-prepared-flavors-list');
   if (!section || !list) return;
   var items = AppState.preparedFlavors || [];
   if (!items.length) { section.classList.add('hidden'); list.innerHTML = ''; return; }
   section.classList.remove('hidden');
   var sorted = items.slice().sort(function(a, b) {
+    // fridge before freezer (matches the Cooked & Stored grouping above it)...
+    if (a.storage !== b.storage) return a.storage === 'freezer' ? 1 : -1;
+    // ...then use-soon first where a truthful expiry exists (nulls last)...
+    if (a.expiresAt !== b.expiresAt) {
+      if (!a.expiresAt) return 1;
+      if (!b.expiresAt) return -1;
+      return a.expiresAt < b.expiresAt ? -1 : 1;
+    }
+    // ...stable fallback: flavor name.
     var fa = findFlavor(a.flavorId), fb = findFlavor(b.flavorId);
     return String(fa ? fa.name : '').localeCompare(String(fb ? fb.name : ''));
   });
@@ -1719,7 +1755,8 @@ function snapshotData() {
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
     recentRecipes: AppState.recentRecipes,
-    deletions: normalizeDeletions(AppState.deletions)
+    deletions: normalizeDeletions(AppState.deletions),
+    inventoryVerifiedAt: AppState.inventoryVerifiedAt
   };
 }
 
@@ -1765,6 +1802,7 @@ function restoreBackup() {
       AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
+      AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
       cacheInlinePhotos();
       saveData();
 
@@ -1780,6 +1818,7 @@ function restoreBackup() {
       updateNutritionGoalsDisplay();
       updateFreshnessBadges();
       renderFreshnessBanner();
+      renderInventoryVerifiedStatus();
       showSuccessMessage('Data restored from backup (' + when + ').');
     }
   );
@@ -3623,6 +3662,7 @@ function initApp() {
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
+        renderInventoryVerifiedStatus();
         restorePrepModeSession();
         updateAppAttentionBadge();
         maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
@@ -3660,6 +3700,7 @@ function initApp() {
     renderDashboard();
     updateFreshnessBadges();
     renderFreshnessBanner();
+    renderInventoryVerifiedStatus();
     restorePrepModeSession();
     updateAppAttentionBadge();
     maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
@@ -3914,6 +3955,7 @@ function showTab(tabId) {
     renderGroceryList();
   } else if (tabId === 'fridge') {
     renderCookedMeals();
+    renderPreparedFlavors(); // keeps the Prepared Flavors mirror fresh on tab entry, same as 'flavors' below
     renderPantry();
   } else if (tabId === 'hacks') {
     renderCookingHacks();
@@ -7824,11 +7866,12 @@ function exportData() {
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
       recentRecipes: AppState.recentRecipes,
+      inventoryVerifiedAt: AppState.inventoryVerifiedAt,
       exportedAt: new Date().toISOString(),
-      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3
-      // — an older file simply has no `flavors`/`preparedFlavors` key and imports as
-      // it always did.
-      version: '1.3'
+      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3/1.4
+      // — an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt`
+      // key and imports as it always did.
+      version: '1.4'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -7942,6 +7985,11 @@ function importData() {
             AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
             AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
             AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
+            // A manual confidence stamp, not a list — "merge" means keep whichever is NEWER,
+            // never regress an existing verification with an older imported file.
+            if (importedData.inventoryVerifiedAt && importedData.inventoryVerifiedAt > (AppState.inventoryVerifiedAt || '')) {
+              AppState.inventoryVerifiedAt = importedData.inventoryVerifiedAt;
+            }
             cacheInlinePhotos();
 
             var savePromise = saveData();
@@ -7959,6 +8007,7 @@ function importData() {
             updateNutritionGoalsDisplay();
             updateFreshnessBadges();
             renderFreshnessBanner();
+            renderInventoryVerifiedStatus();
 
             // Wait for Firestore to commit before declaring success — closes the race
             // window where a refresh could land on the pre-import cloud version.
@@ -8411,6 +8460,7 @@ function buildFirestorePayload() {
     recentRecipes: AppState.recentRecipes,
     prepModeSession: AppState.prepModeSession,
     deletions: normalizeDeletions(AppState.deletions),
+    inventoryVerifiedAt: AppState.inventoryVerifiedAt,
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
   };
@@ -8600,6 +8650,9 @@ async function loadFromFirestore() {
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
       AppState.deletions = normalizeDeletions(data.deletions);
+      // An account whose cloud doc predates this feature has no key — reads as
+      // "never verified", never fabricated from another field.
+      AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
       purgeOldTombstones();
       // Stamp items that pre-date this feature with the document's save time.
       // applyTombstones() uses LWW: a tombstone only removes an item if the tombstone
@@ -8742,6 +8795,7 @@ async function loadUserData() {
   updateNutritionGoalsDisplay();
   updateFreshnessBadges();
   renderFreshnessBanner();
+  renderInventoryVerifiedStatus();
   restorePrepModeSession();
   updateAppAttentionBadge();
   maybeNotifyAttention(); // app-open attention alert (opt-in; silent otherwise)
@@ -8851,6 +8905,7 @@ function setupRealtimeListeners() {
         AppState.prepModeSession = data.prepModeSession || null;
         AppState.deletions = normalizeDeletions(data.deletions); // adopt the remote tombstones...
         applyTombstones();                          // ...so a delete made on another device lands here too
+        AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || AppState.inventoryVerifiedAt;
         snapshotIdBaseline();
 
         // Update UI
@@ -8867,6 +8922,7 @@ function setupRealtimeListeners() {
         updateNutritionGoalsDisplay();
         updateFreshnessBadges();
         renderFreshnessBanner();
+        renderInventoryVerifiedStatus();
         renderDashboard();
         // Silent — the ✓ Synced badge already conveys sync status.
       }
@@ -12584,6 +12640,46 @@ function openFlavorFromReadyFood(flavorId) {
   if (detail) detail.classList.remove('hidden');
   if (card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+
+// ── Last full inventory check ────────────────────────────────────────────────
+// A manual confidence stamp ("I physically reconciled the fridge/freezer/pantry
+// enough to trust the current app inventory"), not an audit and not household
+// collaboration. One scalar timestamp — see AppState.inventoryVerifiedAt and D-075.
+// Deliberately NOT called "accurate" or "guaranteed" anywhere in the UI: household
+// changes can happen after the tap, so only "checked"/"verified" language is used.
+
+// Whole-day granularity (matches todayISO()/daysLeftFrom()'s existing freshness
+// math elsewhere in this app) — "today", "yesterday", or "N days ago".
+function formatDaysAgo(iso) {
+  var then = new Date(iso);
+  if (isNaN(then)) return null;
+  var startOfThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  var startOfNow = new Date();
+  startOfNow = new Date(startOfNow.getFullYear(), startOfNow.getMonth(), startOfNow.getDate());
+  var days = Math.round((startOfNow - startOfThen) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return days + ' days ago';
+}
+
+function verifyInventoryChecked() {
+  AppState.inventoryVerifiedAt = new Date().toISOString();
+  saveData();
+  renderInventoryVerifiedStatus();
+  showSuccessMessage('Inventory checked.');
+}
+
+function renderInventoryVerifiedStatus() {
+  var el = document.getElementById('inventory-verify-status');
+  if (!el) return;
+  var at = AppState.inventoryVerifiedAt;
+  if (!at) { el.textContent = 'Inventory not yet verified'; return; }
+  var rel = formatDaysAgo(at);
+  el.textContent = 'Inventory checked ' + (rel || 'on ' + new Date(at).toLocaleDateString());
+  el.title = 'Last verified ' + new Date(at).toLocaleString();
+}
+
+window.verifyInventoryChecked = verifyInventoryChecked;
 
 function renderCookedMeals() {
   var list = document.getElementById('cooked-meals-list');

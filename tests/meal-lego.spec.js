@@ -568,7 +568,11 @@ test('no new AppState key and no new cookedMeal / flavor field is introduced by 
     // that Meal Lego ITSELF adds no key, while staying accurate about AppState's
     // current shape.
     'preparedFlavors',
-    'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
+    'groceryList', 'ingredientPrices',
+    // 'inventoryVerifiedAt' is a single scalar timestamp (D-075) — a LATER,
+    // separately owner-approved wave, not something Meal Lego introduced.
+    'inventoryVerifiedAt',
+    'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'
   ].sort();
