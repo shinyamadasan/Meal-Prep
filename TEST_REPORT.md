@@ -5,6 +5,37 @@
 
 ---
 
+## Owner-authorized freezer chicken repair landing · 2026-08-31
+suite: pre-landing Git integrity checks; `node --check app.js`; focused repair spec; paste-import
+  regression; `npm run test:local`; `npm test`; `Verify-Decisions.ps1`;
+  `Check-DocsConsistency.ps1`; `git diff --check`; first push-triggered GitHub Actions run; Pages
+  deploy/served-blob comparison; focused isolated live smoke against GitHub Pages.
+result: candidate `df59336` was exactly the head of `data-repair/8-pasted-chicken-recipes`, still
+  descended from reviewed base `71f4013`, and changed only `app.js` plus
+  `tests/task-058-followup-8-recipe-repair.spec.js`. Merged `--no-ff` at `1568cc7` with parents
+  `71f4013` and `df59336`; `git merge-base --is-ancestor df59336 HEAD` passed; `git diff df59336
+  HEAD -- app.js tests/task-058-followup-8-recipe-repair.spec.js` was empty.
+  Local gates on merged `main`: `node --check app.js` passed; repair spec 18/18; paste-import
+  metadata/range regression 12/12; `npm run test:local` 574/574; `npm test` 574/574;
+  `Verify-Decisions.ps1` 55/55; `git diff --check` clean.
+  `Check-DocsConsistency.ps1` exited 1 with 31 potential drift warnings; all reported identifiers
+  were already missing from the checked code scopes at `71f4013`, so this was recorded as
+  pre-existing docs drift, not landing fallout.
+  Push advanced `origin/main` to `1568cc7`, matching local `main`. First CI run `33347784678`,
+  attempt 1, workflow `Button tests`, SHA `1568cc7`: local gate passed; production-smoke gate
+  failed with 146 passed / 4 skipped / 1 failed. The single failure was
+  `production-smoke-ready-food.spec.js` waiting for `#cooked-meals-list .cooked-use-one`; no CI
+  re-run was started. Pages deployment run `33347783841` succeeded for SHA `1568cc7`; served
+  `app.js`, `index.html`, `style.css`, `sw.js`, and `manifest.json` matched Git `HEAD` blob hashes.
+  Focused live smoke against GitHub Pages passed in an isolated browser profile: five target recipe
+  cards rendered, `oneTimeRepairEightPastedChickenRecipes()` repaired all five with no skips or
+  conflicts, instructions no longer contained metadata headings, metadata fields populated, null
+  ingredients stayed null and rendered blank rather than as `0`, and no unexpected page/app errors
+  were observed.
+untested: no mutation was performed against real user recipe data; the one-time repair was exercised
+  only in an isolated localStorage fixture. The broader first CI production-smoke suite remains red
+  from the recorded ready-food timeout and was not re-run.
+
 ## TASK-057 / D-071 landing · 2026-08-26
 suite: post-merge deterministic local suite on merged `main`; focused deletion/sync specs; decision
   pointer verification; first push-triggered GitHub Actions run; GitHub Pages deploy and

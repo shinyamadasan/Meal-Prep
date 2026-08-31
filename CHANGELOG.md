@@ -5,6 +5,42 @@
 
 ---
 
+## Owner-authorized landing - freezer chicken recipe repair
+merged: reviewed candidate `df59336` from `data-repair/8-pasted-chicken-recipes` landed via
+  `--no-ff` merge `1568cc7` (parents `71f4013` + `df59336`). Candidate branch HEAD was exactly
+  `df59336`; `df59336..data-repair/8-pasted-chicken-recipes` was empty; `71f4013` was still both
+  local `main` and `origin/main` before merge.
+scope: only `app.js` and `tests/task-058-followup-8-recipe-repair.spec.js` entered `main`.
+  Post-merge `git diff df59336 HEAD -- app.js tests/task-058-followup-8-recipe-repair.spec.js`
+  was empty, proving the reviewed candidate landed unchanged.
+review: reviewer PASS, owner-authorized landing released from hold; no P0/P1 findings; P1-A runtime
+  derivation, P1-B general conflict protection, and P1-C null semantics confirmed closed.
+local gates: `node --check app.js` OK; focused repair spec 18/18; paste-import metadata/range
+  regression 12/12; `npm run test:local` 574/574; `npm test` 574/574; `Verify-Decisions.ps1`
+  55/55; `git diff --check` clean. `Check-DocsConsistency.ps1` reported 31 pre-existing drift
+  warnings; the same identifiers were already absent from the checked scopes at `71f4013`, so no
+  new landing drift was introduced.
+push/deploy: pushed `main` to `origin/main` at `1568cc7`; local and remote matched immediately
+  after push. Pages run `33347783841` succeeded for SHA `1568cc7`; deployed `app.js`,
+  `index.html`, `style.css`, `sw.js`, and `manifest.json` matched the Git `HEAD` blobs.
+first CI: Button tests run `33347784678`, attempt 1, SHA `1568cc7`, failed only in
+  `Run production smokes (post-deploy gate)`: 146 passed / 4 skipped / 1 failed. Local branch gate
+  passed. Failure was `production-smoke-ready-food.spec.js` waiting for
+  `#cooked-meals-list .cooked-use-one`; recorded as-is, not re-run for green.
+focused live smoke: isolated GitHub Pages profile loaded the deployed app, seeded only throwaway
+  localStorage data, executed `oneTimeRepairEightPastedChickenRecipes()`, and confirmed all five
+  target recipe cards rendered, instructions were clean, metadata remained usable, null quantities
+  stayed null/rendered blank, and no unexpected page/app errors occurred.
+carried forward, NOT fixed: intentional unresolved ingredients remain Lemon Chicken Salt/Black
+  pepper; Buffalo Ranch Chicken Salt/Black pepper/Green onion; Honey Mustard Chicken Salt/Black
+  pepper/Parsley or thyme; Pineapple Teriyaki Chicken Pineapple chunks/Green onion/Sesame seeds;
+  Honey Garlic Chicken none. P2 follow-up remains: `calculateRecipeCost()` can still produce `NaN`
+  for a legitimately priced ingredient with `baseQuantity: 0`. P3 observations preserved:
+  grocery aggregation internally collapses unresolved null to 0 though current UI does not show a
+  fabricated quantity, and unrelated-recipe protection uses Sinangag as the sole non-target
+  control.
+wave1-portion-truth: branch still contains `88b5598`; untouched.
+
 ## TASK-057 / D-071 — landed (branch: d-071-tombstone-namespace)
 merged: `--no-ff` into `main` at `bd89d5d` (parents `6e28903` owner-authorization record +
   `f73ce3c` reviewed branch HEAD). Reviewed commits `1f443ac` and `f73ce3c` landed unrebased,
