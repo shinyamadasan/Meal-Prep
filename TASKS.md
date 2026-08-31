@@ -4041,6 +4041,95 @@ follow-ups:
 
 ---
 
+### TASK-059 · Backfill: Prepared Flavors in My Fridge + last-inventory-check timestamp (D-075)
+status: done
+owner: claude
+source: none — recovery task. This did NOT originate from `planning/BUILD_QUEUE.md` and was never a
+  `TASKS.md` handoff before now. The work began from a direct owner brief (a small two-part UX wave)
+  and was implemented directly by Claude, not Codex, then held on-branch for review per D-032 —
+  exactly like TASK-058. It is recorded here after the fact so the OS record matches the repo, per
+  the same convention as TASK-041/TASK-058.
+priority: P2
+depends-on: none
+files: app.js, index.html, style.css, docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/FEATURES.md,
+  docs/DECISIONS.md, tests/fridge-prepared-flavors.spec.js, tests/inventory-verification.spec.js,
+  tests/kitchen-truth.spec.js, tests/meal-lego.spec.js, tests/prepared-flavors.spec.js,
+  tests/ready-food-protein-hardening.spec.js, tests/ready-food-protein-identity.spec.js
+branch: wave/fridge-prepared-flavors-and-inventory-check
+reviewed commit: 089d097 (base main @ 4b44ed9)
+review verdict: PASS (independent review) — see REVIEW.md
+
+context:
+  - Part A: prepared Flavor Bomb stock (D-074) was only visible from the Flavor Library tab, so
+    seeing "what ready food do I physically have" required a tab switch even though My Fridge already
+    answers that question for `cookedMeals`.
+  - Part B: multiple people use the physical fridge/freezer; the app had no way to record "I
+    physically reconciled everything against what's actually there right now."
+  - Explicitly out of scope per the brief and honored by the diff: household member accounts,
+    shelf/bin location architecture, Flavor Bomb inventory redesign, Meal Lego "Ready now" ranking,
+    reminders/schedules, confidence scoring.
+
+acceptance:
+  - [x] `renderFridgePreparedFlavors()` renders `AppState.preparedFlavors` into a new "Prepared
+        Flavors" block on My Fridge, reusing `preparedFlavorCardHtml()` and `useOnePreparedFlavor()`
+        verbatim — no new state, no second Used-1 path, confirmed by direct code read (the function
+        only reads `AppState.preparedFlavors`/`findFlavor()`, never writes `AppState`)
+  - [x] Sort: fridge before freezer, then earlier truthful `expiresAt` first (nulls last), then name
+  - [x] Empty state omits the section entirely (`classList.add('hidden')`) — no giant empty card
+  - [x] Zero-portion Used-1 preserves the existing `finishPreparedFlavor()`/tombstone path exactly
+        (same function, no fork)
+  - [x] `AppState.inventoryVerifiedAt`: single scalar ISO timestamp added at the same 9 sites as the
+        `nutritionGoals` template (default, save/load-localStorage, snapshot/restore, export/import,
+        Firestore payload/load/listener) — no new `TOMBSTONE_KEYS` entry, no `mergeCloudConflict()`
+        edit needed (verified by reading `mergeCloudConflict()`: it unions only 9 named collection
+        keys and otherwise keeps every field of its `local` argument via `Object.assign`)
+  - [x] `verifyInventoryChecked()` only stamps `new Date().toISOString()` + `saveData()` + a render —
+        no pantry/cookedMeals/preparedFlavors read or write, no schedule/notification/scoring
+  - [x] Old data with no `inventoryVerifiedAt` key loads as "Inventory not yet verified", no migration
+  - [x] `tests/fridge-prepared-flavors.spec.js` (23 tests) + `tests/inventory-verification.spec.js`
+        (13 tests) = 32 new/incl. tests (t1-16+sorting+mobile+console for Part A; t17-26+4 more for
+        Part B), covering the full 30-item acceptance checklist in the owner brief
+  - [x] 5 pre-existing "no new AppState key" pins updated to allowlist `inventoryVerifiedAt` (same
+        pattern D-070/D-074 used) — allowlisted, not loosened; one ambiguous `.prepared-flavor-use`
+        selector in `prepared-flavors.spec.js` scoped to `#prepared-flavors-list` since the Fridge
+        mirror now renders a second element matching that class
+
+constraints:
+  - No household/member tracking, no shelf/bin architecture, no Flavor Bomb inventory redesign, no
+    Meal Lego "Ready now" integration — none introduced (confirmed by diff read)
+  - No reminder/schedule/notification/confidence-scoring system — none introduced (confirmed by test
+    24/25 asserting no `Notification` construction and unchanged `getCompatibleFlavorsForCookedMeal()`
+    ranking)
+  - `wave1-portion-truth` untouched
+
+verification (independently re-run by the reviewer, not merely trusted from the commit message):
+  - `npx playwright test tests/fridge-prepared-flavors.spec.js tests/inventory-verification.spec.js
+    --project=local` → **32/32 pass**
+  - `npx playwright test --project=local` (full local suite) → **606/606 pass**
+  - `tools/Verify-Decisions.ps1` → **61/61**
+  - `tools/Check-DocsConsistency.ps1` → **31 drift items**, byte-identical to the same script run
+    against `main` — this commit introduces zero new doc/code drift
+  - Independent review: PASS, no P0/P1/P2, one non-blocking P3 (concurrent multi-device Firestore
+    merge keeps the local device's `inventoryVerifiedAt` rather than the textually newer one — an
+    inherited `nutritionGoals` limitation, not a new regression), D-032 `approved` tier — see
+    REVIEW.md
+
+follow-ups:
+  - Owner authorization on 2026-08-31 released the D-032 `approved` hold. Candidate `089d097`
+    landed unchanged via `--no-ff` merge `2259a4b`; local `main` and `origin/main` matched
+    immediately after push. CHANGELOG.md / TEST_REPORT.md landing evidence was added in the
+    documentation-only landing record.
+  - First Button tests CI run `33365117642`, attempt 1, SHA `2259a4b`, failed in the local branch
+    gate with 601 passed / 5 failed across unrelated restore/seed-isolation paths; CI production
+    smokes were skipped and no CI rerun was started. Pages run `33365116743` succeeded, and a
+    focused isolated live D-075 smoke against GitHub Pages passed.
+  - The one open P3 (concurrent-merge "local wins" on `inventoryVerifiedAt`) is recorded in REVIEW.md
+    and left deferred, not fixed in this task — it mirrors `nutritionGoals`' existing accepted
+    behavior and only matters in a genuine concurrent Firestore version-bump collision.
+  - `wave1-portion-truth` remained untouched at `88b5598`.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

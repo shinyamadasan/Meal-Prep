@@ -5,6 +5,40 @@
 
 ---
 
+## TASK-059 / D-075 landing · 2026-08-31
+suite: pre-landing Git integrity checks; `npx playwright test
+  tests/fridge-prepared-flavors.spec.js tests/inventory-verification.spec.js --project=local`;
+  `npx playwright test --project=local`; `node --check app.js`; `tools/Verify-Decisions.ps1`;
+  `tools/Check-DocsConsistency.ps1`; `git diff --check`; first push-triggered GitHub Actions run;
+  Pages deploy; focused isolated live smoke against GitHub Pages.
+result: candidate `089d097` was exactly the head of
+  `wave/fridge-prepared-flavors-and-inventory-check`, descended from merge-base
+  `4b44ed9a7d1970a5d3318f291acb2dce2aa40feb`, with local `main` and `origin/main` both at
+  `4b44ed9` before merge. Merged `--no-ff` at `2259a4b`; `089d097` was an ancestor of merged
+  `main`; `git diff 089d097 HEAD -- <reviewed files>` was empty after merge.
+  Local gates on the reviewed candidate passed: focused D-075 specs 32/32; full local suite
+  606/606; `node --check app.js` passed; `Verify-Decisions.ps1` passed 61/61; `git diff --check`
+  was clean. `Check-DocsConsistency.ps1` exited 1 with 31 known drift items already present on
+  `main`, so no new landing drift was introduced.
+  Push advanced `origin/main` to `2259a4b`, matching local `main`. Pages deployment run
+  `33365116743`, attempt 1, succeeded for SHA `2259a4b`. First CI run `33365117642`, attempt 1,
+  workflow `Button tests`, SHA `2259a4b`, failed in `Run local suite (branch gate)` with 601 passed
+  / 5 failed: `tests/flavor-library.spec.js` activeTime restore timeout,
+  `tests/inventory-quantity-truth.spec.js` eggs merge restore timeout, `tests/kitchen-truth.spec.js`
+  grocery transfer restore timeout, and two `tests/seed-isolation.spec.js` restore/empty-install
+  failures. Production-smoke workflow steps were skipped because the local gate failed first; no CI
+  re-run was started.
+  Focused live D-075 smoke against GitHub Pages passed in an isolated browser profile. It verified
+  deployed bundle helpers, Prepared Flavors in My Fridge, shared canonical `preparedFlavors` state,
+  Fridge `Used 1` decrement visible from Flavor Library, zero-portion tombstone removal, cooked-meal
+  state unaffected, `inventoryVerifiedAt` valid ISO persistence/reload/replacement, no pantry/cooked
+  mutation, no notification construction, no flavor-compatibility ranking change, old-data null
+  compatibility, mobile visibility, and zero unexpected console/page errors.
+untested: the built-in CI production-smoke suite did not run on the first Button tests attempt
+  because the local gate failed first. The focused live smoke used throwaway localStorage only and
+  did not touch a real signed-in user's Firestore data. The accepted P3 concurrent scalar
+  merge-order nuance remains deferred by owner-approved D-032 landing.
+
 ## Owner-authorized freezer chicken repair landing · 2026-08-31
 suite: pre-landing Git integrity checks; `node --check app.js`; focused repair spec; paste-import
   regression; `npm run test:local`; `npm test`; `Verify-Decisions.ps1`;

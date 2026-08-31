@@ -4,6 +4,117 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-059 — Prepared Flavors in My Fridge + last-inventory-check timestamp — PASS -> D-032 `approved`
+branch: `wave/fridge-prepared-flavors-and-inventory-check` @ `089d097` (base `main @ 4b44ed9`)
+verdict: **PASS** — no P0, no P1, no P2. One non-blocking P3 remains OPEN (concurrent-merge nuance).
+date: 2026-08-30
+
+### Process note — this branch bypassed the normal task/review paper trail
+
+This work began from a direct owner brief for a small, two-part UX wave, implemented directly by
+Claude (not Codex) in an earlier session on this same branch, then held on-branch marked "held for
+review per D-032" in the commit body. No `TASKS.md`/`REVIEW.md` record existed for it. A later
+session was asked to start a *fresh* branch for the identical brief; before doing so it verified
+`main` had not advanced and discovered this commit already sitting on the current branch, fully
+implemented and tested. The owner chose to have the existing commit reviewed rather than have the
+work duplicated. `TASKS.md` TASK-059 and this entry are a truthful backfill, written after the fact,
+matching the precedent set by TASK-041/TASK-058. Nothing here claims an earlier status or timestamp
+than actually existed, and nothing in this review was taken on faith from the commit message — every
+numeric claim below was independently re-run.
+
+### Verdict
+
+Independent review of one commit: **`089d097`**, landing **unrebased, unsquashed, unamended** on top
+of `main @ 4b44ed9` (confirmed identical to `origin/main`, no newer commit exists upstream).
+
+**Part A — Prepared Flavors in My Fridge.** `renderPreparedFlavors()` (the Flavor Library's existing
+renderer) gained one line, `renderFridgePreparedFlavors()`, a second render target for the exact same
+`AppState.preparedFlavors` array into a new `#fridge-prepared-flavors-list` block on the Fridge tab.
+Confirmed by direct read of both functions: `renderFridgePreparedFlavors()` only reads
+`AppState.preparedFlavors`/`findFlavor()` and calls the unmodified `preparedFlavorCardHtml()` — it
+never writes `AppState`, so there is no duplicated record and no second Used-1 implementation. The
+card's `onclick="useOnePreparedFlavor('...')"` is the identical handler already used by the Flavor
+Library card (verified at `app.js:1559`), and both `renderPreparedFlavors()` and
+`renderFridgePreparedFlavors()` re-render from the same mutation call chain, so a Fridge "Used 1"
+is visible on the Flavor Library card immediately (proved live: screenshot
+`03-after-used-1.png` shows Curry-Coconut going 2→1 portion with the same toast the Flavor Library
+uses). Zero-portion still routes through the existing `finishPreparedFlavor()` →
+`removePreparedFlavor()` → `writeTombstone('preparedFlavors', id)` path, unchanged. Sort (fridge
+before freezer, then earlier truthful `expiresAt`, then name) is a plain comparator, not a new
+ranking engine. Empty state hides the whole section, matching the Flavor Library's own convention.
+
+**Part B — Last full inventory check.** `AppState.inventoryVerifiedAt` (scalar ISO string or `null`)
+was added at the same 9 sites `nutritionGoals` already uses. Read `mergeCloudConflict()` directly
+(`app.js:8507`): it unions only 9 named collection keys and returns `Object.assign({}, local)` for
+everything else, so a scalar absent from that union list survives a concurrent-write merge with zero
+edits required — the claim in the commit message and in the D-075 decision doc is correct, not
+just asserted. `TOMBSTONE_KEYS` (`app.js:8266`) is unchanged, correctly, since there is no per-record
+collection here. `verifyInventoryChecked()` (`app.js:12662`) does exactly one thing: stamp the
+timestamp, `saveData()` (the correct Hard-Rule-5 path, not a bare `saveToLocalStorage()`), and
+re-render the status line — confirmed no pantry/cookedMeals/preparedFlavors touch by reading the
+function body and by the passing `tests/inventory-verification.spec.js` tests 23-25. Copy is
+"Inventory checked N days ago" / "Inventory not yet verified" — never "accurate" or "guaranteed",
+matching the brief's explicit wording constraint.
+
+### Verification — independently re-run, not trusted from the commit message
+
+| Check | Claimed | Re-run result |
+|---|---|---|
+| `tests/fridge-prepared-flavors.spec.js` + `tests/inventory-verification.spec.js` | 32/32 | **32/32 pass** |
+| full deterministic suite (`npx playwright test --project=local`) | 606/606 | **606/606 pass** |
+| `tools/Verify-Decisions.ps1` | 61/61 | **61/61 pass** |
+| `tools/Check-DocsConsistency.ps1` | 31 items, == clean main baseline | **31 items**, byte-identical set re-checked against `main` directly — zero new drift |
+| local `main` == `origin/main`, no newer upstream commit | — | confirmed, both at `4b44ed9a7d1970a5d3318f291acb2dce2aa40feb` |
+| `wave1-portion-truth` untouched | — | confirmed: not an ancestor of `main` or of this branch |
+
+### Blast radius
+
+`app.js` (+106/-4 lines across ~9 functions), `index.html` (+15, one status row + one section block),
+`style.css` (+11, one new rule), plus docs (`ARCHITECTURE.md`, `DATA_MODEL.md`, `FEATURES.md`,
+`DECISIONS.md` D-075) and two new + five touched-up test files. No new recipe/schema field, no new
+top-level AppState **collection** (one new top-level **scalar**, `inventoryVerifiedAt`), no auth, no
+service worker, no household/shelf/bin/reminder/scoring surface — confirmed absent by diff read
+against every item on the brief's explicit out-of-scope list.
+
+### P3 — one non-blocking concurrent-merge nuance (OPEN, deferred)
+
+`mergeCloudConflict()`'s `Object.assign({}, local)` base means that during a genuine concurrent-write
+collision (two devices both writing between the same load and the next transaction), the **local**
+device's `inventoryVerifiedAt` always wins, never the textually newer of the two — unlike
+`importData()`'s explicit newer-wins rule for the same field. This is not a new bug: it is the exact
+same behavior `nutritionGoals` already has today (also absent from the union list), and D-075's own
+decision doc names this explicitly as a deliberate consistency choice rather than an oversight. Given
+Part B's own premise is a multi-person household, a narrow race exists where Device B's fresher
+"inventory checked" tap could be silently superseded by Device A's stale write in a true concurrent
+version-bump collision. Non-blocking because: (a) it is pre-existing, accepted architecture, not
+introduced by this change, (b) the race window requires a genuine concurrent version conflict, which
+is already rare, and (c) the consequence is cosmetic (an honest confidence timestamp reads slightly
+stale) rather than data loss. Recorded here as open and deferred, not fixed in this landing.
+
+### D-032 gate — `approved`
+
+Part A alone is purely derived UI with no persistence change and would clear `done` on its own. Part
+B adds one line each to `buildFirestorePayload()`, `loadFromFirestore()`, and
+`setupRealtimeListeners()` — Firestore/sync surfaces are CLAUDE.md's own red-zone list by topic, even
+though every touch is a single additive line mirroring an existing scalar field, and needed zero
+edits to `TOMBSTONE_KEYS` or `mergeCloudConflict()`. Per D-032's tie-break rule ("when torn, choose
+`approved`"), this whole wave lands `approved`, matching the D-075 decision doc's own self-assessment.
+
+### Gate
+
+**Status: `approved`.** Held — **NOT merged, NOT pushed to `main`.** Awaiting an explicit human merge
+decision per the D-032 red-zone gate. `wave1-portion-truth` stays untouched.
+
+### Landing addendum — 2026-08-31
+
+Owner authorization later released the D-032 hold. Reviewed candidate `089d097` landed unchanged via
+`--no-ff` merge `2259a4b` on `main` and was pushed to `origin/main`; Pages run `33365116743`
+succeeded for that SHA. First Button tests CI run `33365117642` failed in the local branch gate
+(601 passed / 5 failed across unrelated restore/seed-isolation paths), so CI production smokes were
+skipped and no CI rerun was started. A focused isolated live D-075 smoke against GitHub Pages passed;
+the accepted P3 remains deferred. TASK-059 is now `done`.
+
+---
 ## Review TASK-058 — Pasted-recipe metadata/range import repair — PASS -> D-032 `done`
 branch: `fix/paste-import-metadata-and-ranges` @ `100d4b4` (base `main @ b34f8f9`)
 verdict: **PASS** — no P0, no P1, no P2. One non-blocking P3 parsing-format ambiguity remains OPEN.

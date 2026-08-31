@@ -5,6 +5,69 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-08-31 — Prepared Flavors in My Fridge + last-inventory-check timestamp LANDED (TASK-059 / D-075)
+
+Owner authorization released the D-032 `approved` hold for
+`wave/fridge-prepared-flavors-and-inventory-check` @ `089d097`. Local `main` and `origin/main` were
+verified at `4b44ed9a7d19` before merge; `089d097` descended from that exact merge-base and
+`wave1-portion-truth` remained untouched at `88b5598`. The candidate landed by `--no-ff` merge
+`2259a4bbb0f3` and was pushed to `origin/main`; `git diff 089d097 HEAD -- <reviewed files>` was
+empty immediately after the merge, so the reviewed product/docs/test files entered unchanged.
+
+Local verification on the reviewed candidate passed: focused D-075 specs **32/32**, full local suite
+**606/606**, `node --check app.js`, `Verify-Decisions.ps1` **61/61**, and clean `git diff --check`.
+`Check-DocsConsistency.ps1` still reports the known 31-item baseline drift already present on
+`main`. Pages run `33365116743` succeeded for merge SHA `2259a4b`.
+
+First Button tests CI run `33365117642` (attempt 1, SHA `2259a4b`) failed in the local branch gate:
+**601 passed / 5 failed** across unrelated restore/seed-isolation paths; CI production smokes were
+skipped by workflow order and no re-run was started for green. A separate focused live D-075 smoke
+against the deployed GitHub Pages build passed with throwaway localStorage: Fridge prepared-flavor
+rendering uses the same canonical `AppState.preparedFlavors`, Fridge `Used 1` is reflected in Flavor
+Library, zero remaining writes the existing prepared-flavor tombstone, cooked-meal state is
+unchanged, `inventoryVerifiedAt` persists/reloads/replaces correctly, no items/notifications/ranking
+change from verification, old data loads as null, mobile controls are visible, and no unexpected
+console/page errors occurred.
+
+The accepted P3 remains deferred: in a genuine concurrent Firestore write collision,
+`inventoryVerifiedAt` follows the existing scalar local-wins behavior rather than newer-timestamp
+comparison. TASK-059 is now recorded as `done` after owner-authorized landing.
+
+---
+
+## 2026-08-30 — Prepared Flavors in My Fridge + last-inventory-check timestamp: independently REVIEWED (TASK-059), PASS, D-032 `approved` — held, not merged
+
+A prior session on branch `wave/fridge-prepared-flavors-and-inventory-check` implemented a small,
+two-part UX wave directly (bypassing Codex, same pattern as TASK-058): (A) mirror `AppState.preparedFlavors`
+into a new "Prepared Flavors" block on the My Fridge tab, reusing the canonical `preparedFlavorCardHtml()`/
+`useOnePreparedFlavor()` verbatim; (B) `AppState.inventoryVerifiedAt`, a manual "last inventory check"
+scalar timestamp following the `nutritionGoals` 9-site persistence template. Committed as `089d097`
+(base `main @ 4b44ed9`) and left "held for review per D-032" — but no `TASKS.md`/`REVIEW.md` record
+existed for it yet.
+
+This session was asked to start a **fresh** branch from `main` for the identical brief. Before
+branching it verified `main`/`origin/main` match at `4b44ed9` (no upstream drift) and `wave1-portion-truth`
+remains untouched — then discovered `089d097` already sitting on the current branch, fully implemented
+and tested. Rather than duplicate the work, the owner chose to have the existing commit independently
+reviewed. Verdict: **PASS**, no P0/P1/P2. Every numeric claim in the commit message was independently
+re-run, not trusted: `tests/fridge-prepared-flavors.spec.js` + `tests/inventory-verification.spec.js`
+**32/32**, full deterministic suite **606/606**, `Verify-Decisions.ps1` **61/61**,
+`Check-DocsConsistency.ps1` **31 drift items** byte-identical to `main`'s own baseline (zero new
+drift). One non-blocking P3 recorded and deferred: `mergeCloudConflict()`'s `Object.assign` base means
+a genuine concurrent-device Firestore write collision keeps the *local* device's `inventoryVerifiedAt`
+rather than the textually newer one — an inherited `nutritionGoals` limitation, not a new regression.
+
+**D-032 gate: `approved`** (held, not `done`) — Part A is pure derived UI, but Part B's scalar touches
+`buildFirestorePayload()`/`loadFromFirestore()`/`setupRealtimeListeners()`, CLAUDE.md's own red-zone
+list by topic, even though additive-only. Branch **NOT merged, NOT pushed** — awaiting explicit human
+merge decision. See `REVIEW.md` TASK-059 and `TASKS.md` TASK-059 (both backfilled, per the TASK-041/
+TASK-058 convention, since this bypassed the normal Claude→Codex handoff). `docs/DECISIONS.md` D-075
+was already written by the implementing session and independently re-verified, not rewritten.
+
+**Left to the human:** merge decision for `wave/fridge-prepared-flavors-and-inventory-check` @ `089d097`.
+
+---
+
 ## 2026-08-30 — Pasted-recipe metadata/range import repair LANDED (TASK-058), backfilled workflow record, on `main`
 
 Fixed a real user-observed paste-import bug: `parseRecipeText()` had no concept of the

@@ -5,6 +5,41 @@
 
 ---
 
+## TASK-059 / D-075 — landed (branch: wave/fridge-prepared-flavors-and-inventory-check)
+merged: reviewed candidate `089d097` landed via `--no-ff` merge `2259a4b` (parents `4b44ed9`
+  + `089d097`). Pre-landing local `main` and `origin/main` both pointed at `4b44ed9`; merge-base
+  was `4b44ed9a7d1970a5d3318f291acb2dce2aa40feb`.
+scope: reviewed product/docs/test files from `089d097` entered unchanged: `app.js`, `index.html`,
+  `style.css`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`,
+  `docs/FEATURES.md`, `tests/fridge-prepared-flavors.spec.js`,
+  `tests/inventory-verification.spec.js`, `tests/kitchen-truth.spec.js`,
+  `tests/meal-lego.spec.js`, `tests/prepared-flavors.spec.js`,
+  `tests/ready-food-protein-hardening.spec.js`, and
+  `tests/ready-food-protein-identity.spec.js`. `git diff 089d097 HEAD -- <reviewed files>` was
+  empty immediately after the merge.
+review: independent review PASS, no P0/P1/P2. D-032 was `approved`; owner later authorized landing.
+  Accepted P3 remains deferred: in a genuine concurrent Firestore write collision,
+  `inventoryVerifiedAt` follows the existing scalar-field local-wins merge behavior rather than a
+  newer-timestamp comparison.
+local gates before merge: focused D-075 specs 32/32; full local suite 606/606; `node --check app.js`
+  OK; `Verify-Decisions.ps1` 61/61; `git diff --check` clean. `Check-DocsConsistency.ps1` reported
+  the known 31-item baseline drift already present on `main`.
+push/deploy: pushed product merge `2259a4b` to `origin/main`; local and remote matched immediately.
+  Pages run `33365116743`, attempt 1, succeeded for SHA `2259a4b`.
+first CI: Button tests run `33365117642`, attempt 1, SHA `2259a4b`, failed in
+  `Run local suite (branch gate)`: 601 passed / 5 failed. Failures were unrelated
+  `waitForRestored()` restore/seed-isolation paths; production-smoke steps were skipped by the
+  workflow and the run was not re-run for green.
+focused live smoke: isolated GitHub Pages profile passed D-075 checks against the deployed build:
+  Prepared Flavors render in My Fridge from the same canonical `AppState.preparedFlavors` records,
+  Fridge `Used 1` decrements the shared record and Flavor Library sees it, zero remaining writes the
+  existing `preparedFlavors` tombstone, cooked-meal state is unchanged, `inventoryVerifiedAt` stores
+  a valid ISO timestamp, persists through reload, replaces an older value, does not mutate inventory
+  items, does not construct notifications, does not change flavor compatibility ranking, old data
+  without the field loads as null, mobile controls remain visible, and no unexpected console/page
+  errors occurred.
+wave1-portion-truth: branch still contains `88b5598`; untouched.
+
 ## Owner-authorized landing - freezer chicken recipe repair
 merged: reviewed candidate `df59336` from `data-repair/8-pasted-chicken-recipes` landed via
   `--no-ff` merge `1568cc7` (parents `71f4013` + `df59336`). Candidate branch HEAD was exactly
