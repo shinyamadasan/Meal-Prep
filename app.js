@@ -542,7 +542,13 @@ function normalizeRecipes(recipes) {
     normalizeRecipeMeta(recipe);
     recipe.baseIngredients.forEach(function(ing) {
       if (ing.unit == null) ing.unit = 'g';
-      if (ing.baseQuantity == null) ing.baseQuantity = 0;
+      // A MISSING baseQuantity (field absent, from data saved before this field
+      // existed) defaults to 0. An explicit null means "genuinely unresolved" —
+      // e.g. a pasted range like "1-1.5 lb chicken" that parseIngredientLine()
+      // deliberately left unresolved rather than fabricate an amount — and must
+      // stay null, not get silently rewritten into a confident (and wrong) zero
+      // on the next load. See TASK-058.
+      if (ing.baseQuantity === undefined) ing.baseQuantity = 0;
       if (ing.category == null) ing.category = '';
     });
   });
@@ -3521,6 +3527,11 @@ const sampleRecipes = [
 
 // Utility functions for serving size calculations
 function formatQuantity(quantity) {
+  // A genuinely-unresolved ingredient (baseQuantity: null, e.g. a pasted range
+  // like "1-1.5 lb chicken" — see TASK-058) reaches here as null/undefined/NaN.
+  // Render it blank, the same convention the ingredient-review form already
+  // uses for an unresolved amount, rather than crashing on .toFixed().
+  if (quantity == null || !isFinite(quantity)) return '';
   if (quantity === Math.floor(quantity)) {
     return quantity.toString();
   }
@@ -3537,6 +3548,13 @@ function formatQuantity(quantity) {
 }
 
 function calculateScaledQuantity(recipe, ingredient) {
+  // Contract: null = genuinely unresolved (never fabricate an amount for it —
+  // see TASK-058), 0 = a real zero, a number > 0 = a known quantity. Multiplying
+  // null by scale would silently coerce "unknown" into a confident 0; every
+  // caller (grocery aggregation, costing, nutrition, pantry depletion) must see
+  // the unresolved state explicitly instead. A truly-missing (undefined) field
+  // keeps its pre-existing legacy behavior (NaN) unchanged.
+  if (ingredient.baseQuantity === null) return null;
   const scale = recipe.currentServings / recipe.baseServings;
   return ingredient.baseQuantity * scale;
 }
@@ -4222,8 +4240,11 @@ window.handleRecipeCardClick = handleRecipeCardClick;
 function buildDetailIngList(recipe, servings) {
   const scale = servings / recipe.baseServings;
   return (recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
-    const baseQty = ingredient.baseQuantity || ingredient.quantity;
-    const scaledQty = baseQty * scale;
+    // != null (not ||) so a genuine 0 quantity isn't mistaken for "absent" and
+    // doesn't fall through to ingredient.quantity. null stays null through the
+    // scale multiply — formatQuantity() renders it blank rather than crashing.
+    const baseQty = ingredient.baseQuantity != null ? ingredient.baseQuantity : ingredient.quantity;
+    const scaledQty = baseQty == null ? null : baseQty * scale;
     const showBoth = servings !== recipe.currentServings || recipe.currentServings !== recipe.baseServings;
     return `<li class="ingredient-quantity">${
       showBoth
@@ -6819,6 +6840,11 @@ function calculateRecipeCost(recipe) {
   
   return recipe.baseIngredients.reduce((total, ingredient) => {
     const scaledQty = calculateScaledQuantity(recipe, ingredient);
+    // An unresolved quantity is unpriceable, same as an ingredient with no
+    // pricePerUnit — contributes nothing rather than poisoning the whole
+    // total with NaN (0 * null / undefined would otherwise propagate NaN
+    // through every subsequent addition in this reduce).
+    if (scaledQty == null) return total;
     const price = ingredient.pricePerUnit || 0;
     return total + (price * scaledQty / (ingredient.baseQuantity || ingredient.quantity));
   }, 0);
@@ -7049,7 +7075,12 @@ function calculateRecipeNutrition(recipe) {
   const ingredients = recipe.baseIngredients || recipe.ingredients || [];
   return ingredients.reduce((total, ingredient) => {
     const scaledQty = calculateScaledQuantity(recipe, ingredient);
-    
+    // An unresolved quantity gets the same treatment as an ingredient with no
+    // nutrition-DB match below: it contributes nothing. Without this guard,
+    // toGrams(null, unit) would silently coerce to a computed 0g contribution
+    // instead of an explicit "we don't know" skip.
+    if (scaledQty == null) return total;
+
     // Find nutrition data for this ingredient
     const nutritionData = findIngredientNutrition(ingredient.name);
     if (nutritionData) {
@@ -14872,6 +14903,142 @@ function attachIngredientAutocomplete(nameInput, onSelect) {
   nameInput.addEventListener('keydown', function(e) {
     var suggestBox = wrap.querySelector('.ing-suggestions');
     if (e.key === 'Escape') suggestBox.classList.add('hidden');
+  });
+}
+
+// ── ONE-TIME DATA REPAIR (TASK-058 follow-up) ───────────────────────────────
+// Console-only, not wired to any button. Targets exactly 5 named recipes that
+// were pasted through parseRecipeText() BEFORE the TASK-058 fix (100d4b4) —
+// their instructions may still carry leaked "Equipment:/Effort:/Tags:" heading
+// text, and some ingredients may have been fabricated quantity:1/unit:'pieces'
+// for range inputs like "2-3 lb chicken". TARGET_RECIPES below is identity
+// ONLY (which 5 records are even eligible) — it holds no repair VALUES.
+// Every corrected value is derived at RUN TIME from each recipe's CURRENT
+// stored instructions, fed back through the real parseRecipeText(), and is
+// only ever applied where the current stored state doesn't already look like
+// a later, deliberate edit. Delete this whole block once run against
+// production data; it is not a general migration facility.
+var TARGET_RECIPES = [
+  { name: 'Buffalo Ranch Chicken', id: '1788062745911' },
+  { name: 'Honey Mustard Chicken', id: 1788062988950 },
+  { name: 'Pineapple Teriyaki Chicken', id: 1788063014896 },
+  { name: 'Honey Garlic Chicken', id: 1788063044644 },
+  { name: 'Lemon Chicken', id: 1788063069099 }
+];
+
+function sameSlugSet(a, b) {
+  var x = (a || []).slice().sort();
+  var y = (b || []).slice().sort();
+  return JSON.stringify(x) === JSON.stringify(y);
+}
+
+// Textually unambiguous proof of the old-parser fallback: a numeric range
+// (two numbers joined by a hyphen/en-dash, e.g. "2-3", "1-1.5") can never be
+// the `name` a SUCCESSFUL parseIngredientLine() resolution produces — a
+// resolved name always has its leading quantity stripped. A bare word with no
+// digits at all (e.g. "Salt") is NOT proof by itself: a legitimately-resolved
+// "1 piece Salt"-shaped ingredient would look identical in storage to a
+// never-resolved bare "Salt" line — that ambiguity is real and unrepairable
+// from stored data alone, so bare-word candidates are reported, not repaired.
+// The 'â€“' alternative matches this data's own pre-existing (and separately
+// out-of-scope) mojibake corruption of the en-dash — without it a real range
+// hides behind that corruption and would silently be missed.
+var INGREDIENT_RANGE_RE = /\d[\d.]*\s*(?:[-–—]|â€“)\s*\d/;
+
+function oneTimeRepairEightPastedChickenRecipes() {
+  var report = { repaired: [], skipped: [], conflicts: [] };
+  var anyMutated = false;
+
+  TARGET_RECIPES.forEach(function(target) {
+    var matches = AppState.recipes.filter(function(r) { return r.name === target.name; });
+    if (matches.length !== 1) {
+      report.skipped.push({ name: target.name, reason: matches.length + ' recipes with this exact name (expected 1)' });
+      return;
+    }
+    var recipe = matches[0];
+    if (String(recipe.id) !== String(target.id)) {
+      report.skipped.push({ name: target.name, reason: 'id mismatch: found ' + JSON.stringify(recipe.id) + ', expected ' + JSON.stringify(target.id) });
+      return;
+    }
+
+    var mutated = false;
+    var entry = { id: recipe.id, name: recipe.name, instructionsRepaired: false, fieldsApplied: [], conflicts: [], ingredientsFixed: [], ingredientsAmbiguous: [] };
+
+    // Derive from the recipe's OWN current stored (possibly still-polluted)
+    // instructions, using the real, current parser — never a hand-written
+    // reimplementation and never a hardcoded replacement string.
+    var currentInstructions = String(recipe.instructions || '');
+    var synthetic = recipe.name + '\n\nInstructions:\n' + currentInstructions;
+    var parsed = parseRecipeText(synthetic);
+    var pollutionPresent = parsed.instructions !== currentInstructions.trim();
+
+    if (pollutionPresent) {
+      recipe.instructions = parsed.instructions;
+      entry.instructionsRepaired = true;
+      mutated = true;
+
+      // equipment/tags: empty current -> apply derived. Non-empty and
+      // differing -> a plausible later manual edit, preserve + report.
+      // Matching -> nothing to do. General for all 5, no per-recipe name check.
+      ['equipment', 'tags'].forEach(function(field) {
+        var derived = parsed[field] || [];
+        var current = recipe[field] || [];
+        if (current.length === 0) {
+          if (derived.length) { recipe[field] = derived.slice(); entry.fieldsApplied.push(field); mutated = true; }
+        } else if (!sameSlugSet(current, derived)) {
+          entry.conflicts.push({ field: field, current: current, derived: derived });
+        }
+      });
+
+      // effort: same rule, scalar instead of a list.
+      if (!recipe.effort) {
+        if (parsed.effort) { recipe.effort = parsed.effort; entry.fieldsApplied.push('effort'); mutated = true; }
+      } else if (recipe.effort !== parsed.effort) {
+        entry.conflicts.push({ field: 'effort', current: recipe.effort, derived: parsed.effort });
+      }
+    } else {
+      entry.skippedReason = 'no known-pollution signature in current instructions — already clean or edited since import';
+    }
+
+    // Ingredients: only a textually-provable range gets repaired, regardless
+    // of the instructions-pollution gate above (the proof stands on its own).
+    // A bare-word qty:1/unit:pieces candidate is reported, never silently
+    // rewritten — see INGREDIENT_RANGE_RE's comment for why.
+    (recipe.baseIngredients || []).forEach(function(ing) {
+      if (ing.baseQuantity === 1 && ing.unit === 'pieces') {
+        if (INGREDIENT_RANGE_RE.test(ing.name || '')) {
+          ing.baseQuantity = null;
+          ing.unit = '';
+          entry.ingredientsFixed.push(ing.name);
+          mutated = true;
+        } else {
+          entry.ingredientsAmbiguous.push(ing.name);
+        }
+      }
+    });
+
+    if (mutated) {
+      stampUpdated(recipe);
+      anyMutated = true;
+      report.repaired.push(entry);
+    } else {
+      report.skipped.push({ name: target.name, reason: entry.skippedReason || 'already matches derived state — nothing to repair' });
+    }
+    if (entry.conflicts.length) report.conflicts.push({ name: recipe.name, id: recipe.id, conflicts: entry.conflicts });
+  });
+
+  if (!anyMutated) {
+    console.log('[oneTimeRepairEightPastedChickenRecipes] report (no mutation):', JSON.stringify(report, null, 2));
+    return Promise.resolve(report);
+  }
+
+  patchMissingNutrition(AppState.recipes);
+  var savePromise = saveData();
+  renderRecipes();
+  console.log('[oneTimeRepairEightPastedChickenRecipes] report:', JSON.stringify(report, null, 2));
+  return savePromise.then(function() {
+    console.log('[oneTimeRepairEightPastedChickenRecipes] saveData() resolved.');
+    return report;
   });
 }
 
