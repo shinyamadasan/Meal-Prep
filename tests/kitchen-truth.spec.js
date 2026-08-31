@@ -801,7 +801,10 @@ test('export and the Firestore payload carry the new fields without new collecti
       // owner-approved new top-level collections, which is why they are listed
       // rather than the check being loosened. The guard still fails on any key
       // nobody decided on, which is the whole point of it.
-      'flavors', 'preparedFlavors'
+      'flavors', 'preparedFlavors',
+      // 'inventoryVerifiedAt' is a single scalar timestamp (D-075), following the
+      // exact nutritionGoals persistence template — not a new collection.
+      'inventoryVerifiedAt'
     ];
     return {
       unexpectedTopLevelKeys: Object.keys(payload).filter((k) => known.indexOf(k) < 0),

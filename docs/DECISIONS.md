@@ -2527,3 +2527,99 @@ Verify: app.js contains "function normalizePreparedFlavor("
 Verify: app.js contains "function findPreparedFlavorByFlavorId("
 Verify: app.js contains "'flavors', 'preparedFlavors', 'cookedMeals', 'userIngredients'"
 Verify: tests/prepared-flavors.spec.js contains "MUTATION: bypassing the existing-batch lookup in savePreparedFlavor() duplicates instead of replacing"
+
+## D-075 — Prepared Flavors mirrored into My Fridge (derived UI only); a manual "last inventory check" timestamp joins nutritionGoals' scalar-field template
+
+**Status:** Implemented on branch `wave/fridge-prepared-flavors-and-inventory-check` (from `main` @
+`4b44ed9`). **Held for review — NOT merged.** A characterization pass (Phase 1 of the owner brief)
+preceded any code change and is restated here, not duplicated as scratch work.
+
+### Context
+
+Two small, unrelated UX gaps, deliberately bundled as one small wave (owner brief): (1) prepared
+Flavor Bomb stock (D-074) is only visible from the Flavor Library tab, so seeing "what ready food do
+I physically have" required a tab switch even though My Fridge already answers that question for
+`cookedMeals`; (2) multiple people use the physical fridge/freezer, and the app has no way to record
+"I physically reconciled everything I can see in the app against what's actually there right now."
+Explicitly out of scope, per the brief: household member accounts, shelf/bin location architecture,
+Flavor Bomb inventory redesign, Meal Lego "Ready now" ranking, reminders/schedules, and confidence
+scoring.
+
+### Decision — Part A: Prepared Flavors in Fridge is derived UI, zero new state
+
+`renderPreparedFlavors()` (the Flavor Library's existing renderer) gained one more line:
+`renderFridgePreparedFlavors()`, a second render target for the exact same
+`AppState.preparedFlavors` array. It reuses `preparedFlavorCardHtml()` verbatim — so a Fridge "Used 1"
+tap is the same `useOnePreparedFlavor()` onclick the Flavor Library card already had, never a second
+implementation — and only changes the container (`#fridge-prepared-flavors-list`, a new block in the
+Fridge tab reusing the existing `.cooked-meals-section`/`.cooked-meals-header`/`.prepared-flavor-card`
+CSS classes verbatim — no new CSS for the list itself) and the sort (fridge before freezer, then
+earlier truthful `expiresAt` first with nulls last, then flavor name — a simple comparator, not a new
+ranking architecture). Because `renderPreparedFlavors()` is already called at every mutation site
+(save/use/remove) and every full-render boot path, both surfaces update from one call with no new
+render wiring needed — except `showTab('fridge')` itself, which only called `renderCookedMeals()` and
+`renderPantry()` on tab entry; `renderPreparedFlavors()` was added there too (mirroring the `'flavors'`
+branch immediately below it) so switching into My Fridge after an out-of-band mutation (e.g. deleting
+the underlying flavor while on another tab) shows current data rather than a stale render.
+
+**No new AppState key, no new collection, no duplicated record.** Confirmed both by inspection (the
+Fridge renderer never writes to `AppState`, only reads `AppState.preparedFlavors` and calls the
+existing `findFlavor()`) and by test (`tests/fridge-prepared-flavors.spec.js` asserts the array length
+and id set are unchanged across repeated renders of both surfaces, and that a Fridge "Used 1" is
+visible from the Flavor Library card immediately after). Zero portions still routes through
+`useOnePreparedFlavor()` → `finishPreparedFlavor()` → `removePreparedFlavor()`, so the explicit
+tombstone write (D-074) is unchanged. Empty state omits the whole section (`classList.add('hidden')`),
+matching the Flavor Library's own empty behavior — no giant empty card.
+
+### Decision — Part B: `inventoryVerifiedAt` is a scalar field on the existing top-level-scalar template, not a new collection
+
+Characterization found no existing settings/meta/preferences bag, but found the exact right
+precedent already living in `AppState`: `nutritionGoals` is a top-level plain object (not a
+collection, no per-record deletion, absent from `TOMBSTONE_KEYS`) that already persists through eight
+sites — `saveToLocalStorage()`, `loadFromLocalStorage()`, `snapshotData()`, `restoreBackup()`,
+`exportData()`, `buildFirestorePayload()`, `loadFromFirestore()`, `setupRealtimeListeners()` — and is
+silently *not* re-merged during the `loadUserData()` sign-in union (the freshly-loaded cloud copy
+simply wins). `AppState.inventoryVerifiedAt` (a single ISO string or `null`) was added at the exact
+same eight sites, following that template line for line, specifically so this stays additive
+data-shape work rather than new sync/tombstone architecture. `mergeCloudConflict()` needed **no**
+edit: it already keeps every field of its `local` argument (via `Object.assign({}, local)`) that
+isn't in its explicit list-union loop, which is precisely how `nutritionGoals` already survives a
+concurrent-write merge — `inventoryVerifiedAt` gets the same treatment for free.
+
+**One deliberate divergence from the `nutritionGoals` precedent:** `importData()` never re-merges
+`nutritionGoals` at all (it exports the field but the import path has no corresponding assignment —
+a pre-existing asymmetry, not introduced here). For `inventoryVerifiedAt`, import instead adopts the
+imported value only if it is textually newer than the current one (`importedAt > current`) — a
+manual confidence stamp should never silently regress from importing an older file, but a genuinely
+newer verification from another export should not be lost either. `exportData()`'s version string
+bumped `1.3` → `1.4` for the same reason `1.2` → `1.3` was bumped for `preparedFlavors` — the payload
+gained a field; every prior version still imports exactly as it always did (no key = "never
+verified").
+
+`verifyInventoryChecked()` does exactly one thing: stamp `new Date().toISOString()` and call
+`saveData()` + a render. No item in `pantry`, `cookedMeals`, or `preparedFlavors` is read or written.
+No schedule, reminder, notification, or confidence score was introduced — confirmed by test
+(`tests/inventory-verification.spec.js` asserts pantry/cookedMeals are byte-identical before and
+after, that `Notification` is never constructed, and that `getCompatibleFlavorsForCookedMeal()`'s
+ranking is unchanged). The UI copy is deliberately "Inventory checked" / "Inventory not yet verified"
+— never "accurate" or "guaranteed" — because household changes after the tap are expected and the
+timestamp is honest about being a point-in-time confidence stamp, not a live guarantee.
+
+### D-032 gate
+
+**Held, `approved` not `done` — recommended, not `done`.** Part A (the Fridge rendering surface) is,
+by itself, purely derived UI with no persistence change and would clear `done` on its own. But Part B
+adds a field to `buildFirestorePayload()`, `loadFromFirestore()`, and `setupRealtimeListeners()` —
+Firestore/sync surfaces CLAUDE.md's own red-zone list names by topic, even though the change at each
+site is a single additive line mirroring an existing scalar field, touches no tombstone/mergeCloudConflict/
+cloudReady-guard logic, and needed zero edits to `TOMBSTONE_KEYS` or `mergeCloudConflict()`. Per
+D-032's own tie-break rule ("when torn, choose `approved`"), this whole wave lands `approved` and
+awaits an explicit human merge decision — never auto-shipped, and this branch was deliberately not
+merged or pushed as part of implementing it.
+
+Verify: app.js contains "function renderFridgePreparedFlavors("
+Verify: app.js contains "inventoryVerifiedAt: null,  // ISO timestamp of the last"
+Verify: app.js contains "function verifyInventoryChecked("
+Verify: app.js contains "renderPreparedFlavors(); // keeps the Prepared Flavors mirror fresh on tab entry, same as 'flavors' below"
+Verify: tests/fridge-prepared-flavors.spec.js contains "3+4. Fridge reads the SAME preparedFlavors record — rendering creates no duplicate"
+Verify: tests/inventory-verification.spec.js contains "MUTATION: removing inventoryVerifiedAt from buildFirestorePayload() loses it on save"

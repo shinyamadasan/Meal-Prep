@@ -913,6 +913,10 @@ test('24. no new top-level AppState key and no TOMBSTONE_KEYS change', async ({ 
     // LATER, separately owner-approved wave — not something this protein-identity
     // correction introduces. Listed here rather than loosening the check.
     'preparedFlavors',
+    // 'inventoryVerifiedAt' is a single scalar timestamp (D-075), a LATER,
+    // separately owner-approved wave — not something this protein-identity
+    // correction introduces.
+    'inventoryVerifiedAt',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'

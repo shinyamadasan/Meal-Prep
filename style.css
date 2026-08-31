@@ -4883,6 +4883,17 @@ select.form-control {
   margin: 0 0 1rem;
 }
 
+/* Last full inventory check — a manual confidence stamp beside the Fridge intro. */
+.inventory-verify-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
 /* Fridge / Freezer / Counter subsection headers within the My Fridge tab */
 .fridge-subsection-title {
   font-weight: 700;

@@ -359,6 +359,12 @@
                     </div>
                     <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> or add takeout/leftovers here.</p>
 
+                    <!-- Last full inventory check: a manual confidence stamp, not a schedule or audit. -->
+                    <div class="inventory-verify-row">
+                        <span id="inventory-verify-status" class="inventory-verify-status"></span>
+                        <button class="btn btn--secondary btn--sm" onclick="verifyInventoryChecked()">Inventory checked</button>
+                    </div>
+
                     <!-- Cooked / prepped meals -->
                     <div id="cooked-meals-section" class="cooked-meals-section">
                         <div class="cooked-meals-header">
@@ -366,6 +372,15 @@
                             <button class="btn btn--secondary btn--sm" onclick="openManualCookedModal()">+ Add meal</button>
                         </div>
                         <div id="cooked-meals-list"></div>
+                    </div>
+
+                    <!-- Prepared flavors (physical prepared-sauce stock) — same AppState.preparedFlavors
+                         the Flavor Library renders; see renderFridgePreparedFlavors() (D-075). -->
+                    <div id="fridge-prepared-flavors-section" class="cooked-meals-section hidden">
+                        <div class="cooked-meals-header">
+                            <span><span class="ic" data-icon="snowflake"></span> Prepared Flavors <span class="cooked-meals-hint">— sauces/marinades you've batched and have on hand</span></span>
+                        </div>
+                        <div id="fridge-prepared-flavors-list" class="prepared-flavors-list"></div>
                     </div>
 
                     <!-- Raw ingredients / pantry -->
