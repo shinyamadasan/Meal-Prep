@@ -504,9 +504,11 @@ function loadFromLocalStorage() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
-      // A record saved before this existed simply has no key — reads as no
-      // consumption history yet, never backfilled from portionsRemaining deltas.
-      AppState.mealConsumptions = data.mealConsumptions || [];
+      // A record saved before this existed simply has no key — reads as no consumption
+      // history yet, never backfilled from portionsRemaining deltas. Merged (not replaced):
+      // this can run while AppState already holds newer in-memory facts (e.g. sign-out right
+      // after a realtime update) that this device's own localStorage snapshot hasn't seen yet.
+      reconcileMealConsumptions(data.mealConsumptions || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -1806,7 +1808,13 @@ function restoreBackup() {
       AppState.myStores = d.myStores || [];
       AppState.customStores = d.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
-      AppState.mealConsumptions = d.mealConsumptions || [];
+      // A historical event log must not be silently destroyed because the user loads an
+      // older backup — merge (union) in the backup's consumption history rather than
+      // replacing current history with it. Exact duplicates dedupe; events missing from this
+      // backup simply remain; a same-id/different-facts collision is an explicit conflict,
+      // never a silent overwrite in either direction. "Restore" here intentionally means
+      // "this backup's consumption facts are unioned in", not "roll back to only this backup".
+      reconcileMealConsumptions(d.mealConsumptions || []);
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
       AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
@@ -7974,9 +7982,11 @@ function importData() {
             AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
             AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
             AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
-            // Append-only facts, never edited after creation — a plain id union is exact,
-            // no LWW/updatedAt reconciliation needed the way cookedMeals[] requires.
-            AppState.mealConsumptions = unionById(AppState.mealConsumptions || [], importedData.mealConsumptions || []);
+            // Append-only facts, never edited after creation — merged via the canonical
+            // id+content primitive (not unionById's array-order/precedence union): identical
+            // facts on a same id dedupe, a genuinely differing same-id record is an explicit
+            // conflict, never a silent overwrite.
+            reconcileMealConsumptions(importedData.mealConsumptions || []);
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
@@ -8514,14 +8524,117 @@ function unionByIdLWW(cloudArr, localArr, stats) {
 // every in-place mutator of a synced item (pantry, cooked meals) right before saveData().
 function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(); }
 
+// ── Consumption fact identity + canonical append-only merge ──────────────────
+// mealConsumptions is an append-only "ate one portion" fact log (see
+// recordMealConsumption()). There is no correction/deletion source action for it in V1, so
+// every record is treated as an IMMUTABLE fact once it exists. This is the ONE canonical
+// merge primitive for it — every sync/reconciliation/import/restore/realtime path below
+// calls this instead of a bespoke array merge (unionById's "local wins on collision" and
+// unionByIdLWW's updatedAt-based precedence are both wrong here: there is no legitimate
+// "newer" consumption fact, only the SAME fact restated or a genuine identity collision).
+//
+// Canonical content excludes nothing — every field the fact asserts is part of its identity.
+function consumptionCanonicalFacts(record) {
+  if (!record || typeof record !== 'object' || record.id == null) return null;
+  return JSON.stringify({
+    id: String(record.id),
+    cookedMealId: record.cookedMealId != null ? String(record.cookedMealId) : null,
+    recipeId: record.recipeId != null ? String(record.recipeId) : null,
+    mealName: record.mealName,
+    portionsConsumed: record.portionsConsumed,
+    consumedAt: record.consumedAt
+  });
+}
+
+// Merge `incoming` into `existing` (both arrays of consumption records) and return the
+// append-only union. Required invariants (see Life Ledger architectural review):
+//   same id + identical canonical facts  -> dedupe (kept once)
+//   same id + different canonical facts  -> explicit conflict; the ORIGINAL (first-known)
+//                                           record is kept, the incoming one is NEVER used to
+//                                           overwrite it, and the conflict is reported so it
+//                                           is never silently dropped either
+//   id present in only one side          -> both sides' unique ids survive (append-only)
+// Never decided by array order, by which side is "local" vs "remote", or by any timestamp —
+// only id + canonical content.
+function mergeMealConsumptions(existing, incoming) {
+  var byId = {};
+  var order = [];
+  var conflicts = [];
+  (existing || []).forEach(function(record) {
+    if (!record || record.id == null) return;
+    var id = String(record.id);
+    if (!(id in byId)) { byId[id] = record; order.push(id); }
+  });
+  (incoming || []).forEach(function(record) {
+    if (!record || record.id == null) return;
+    var id = String(record.id);
+    if (!(id in byId)) { byId[id] = record; order.push(id); return; }
+    if (consumptionCanonicalFacts(byId[id]) !== consumptionCanonicalFacts(record)) {
+      conflicts.push({ id: id, kept: byId[id], rejected: record });
+    }
+    // identical facts -> silently deduped (already present); different facts -> conflict
+    // recorded above, ORIGINAL kept — never overwritten by array order or source precedence.
+  });
+  return { merged: order.map(function(id) { return byId[id]; }), conflicts: conflicts };
+}
+
+// Apply mergeMealConsumptions() against AppState.mealConsumptions in place, logging (never
+// silently swallowing) any detected identity collision so it stays diagnosable. Returns true
+// when the merged result actually differs from what was there before, so callers can decide
+// whether a re-save/re-sync is warranted.
+function reconcileMealConsumptions(incoming) {
+  var before = AppState.mealConsumptions || [];
+  var result = mergeMealConsumptions(before, incoming);
+  if (result.conflicts.length) {
+    console.warn('mealConsumptions: ' + result.conflicts.length + ' id(s) had conflicting facts — original kept, conflicting record discarded (never applied):', result.conflicts);
+    reportError(new Error('mealConsumption id collision with differing facts'), 'reconcileMealConsumptions');
+  }
+  AppState.mealConsumptions = result.merged;
+  return result.merged.length !== before.length || result.conflicts.length > 0;
+}
+
+// Collision-resistant, source-owned identity for a mealConsumption fact. Prefers
+// crypto.randomUUID() (practically collision-proof); if the runtime lacks it, falls back to a
+// much larger random space than the old Date.now()+small-random-suffix scheme, THEN an
+// explicit collision check/retry against every id already known to this device — generation
+// must never intentionally reuse an id.
+function generateMealConsumptionId() {
+  function randomToken() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      var bytes = crypto.getRandomValues(new Uint8Array(16));
+      return Array.prototype.map.call(bytes, function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+    return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2) + '_' + Math.random().toString(36).slice(2);
+  }
+  var existingIds = {};
+  (AppState.mealConsumptions || []).forEach(function(record) { if (record && record.id != null) existingIds[String(record.id)] = true; });
+  var id, attempts = 0;
+  do {
+    id = 'mc_' + randomToken();
+    attempts++;
+  } while (existingIds[id] && attempts < 10);
+  if (existingIds[id]) {
+    // Practically unreachable with a real random source — fail loud rather than silently
+    // reuse an id that already identifies a different consumption fact.
+    throw new Error('Unable to generate a unique meal consumption id after ' + attempts + ' attempts');
+  }
+  return id;
+}
+
 // When the cloud changed since we loaded (another device wrote first), merge
 // instead of clobbering: union list-type fields by id so nothing added
 // elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
+// mealConsumptions is handled separately via mergeMealConsumptions() — see above — because
+// unionById's "local wins on id collision" precedence is wrong for immutable facts.
 function mergeCloudConflict(remote, local) {
   var out = Object.assign({}, local);
-  ['recipes', 'pantry', 'cookedMeals', 'mealConsumptions', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
+  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
     out[key] = unionById(local[key] || [], remote[key] || []);
   });
+  out.mealConsumptions = mergeMealConsumptions(local.mealConsumptions || [], remote.mealConsumptions || []).merged;
   return out;
 }
 
@@ -8659,9 +8772,10 @@ async function loadFromFirestore() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
-      // An account whose cloud doc predates this has no key — reads as no
-      // consumption history yet, never backfilled from portionsRemaining deltas.
-      AppState.mealConsumptions = data.mealConsumptions || [];
+      // An account whose cloud doc predates this has no key — reads as no consumption
+      // history yet, never backfilled from portionsRemaining deltas. Merged (not replaced) —
+      // see reconcileMealConsumptions().
+      reconcileMealConsumptions(data.mealConsumptions || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -8776,11 +8890,15 @@ async function loadUserData() {
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
         AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
+        // mealConsumptions is NOT a UKEYS/LWW field: it is an append-only immutable fact log,
+        // not an editable record, so it gets the canonical id+content merge instead — never
+        // dropped by sign-in reconciliation the way an omitted key previously would be.
+        var consumptionsChanged = reconcileMealConsumptions(local.mealConsumptions || []);
         mergeDeletions(local.deletions); // safe now: LWW in applyTombstones() means stale tombstones lose to newer items
         applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt (D-020)
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
-        if (after !== before || mergeStats.localWins > 0 || tombstoneCount(AppState.deletions) !== cloudDelN) {
+        if (after !== before || mergeStats.localWins > 0 || tombstoneCount(AppState.deletions) !== cloudDelN || consumptionsChanged) {
           console.log('loadUserData: reconciled local data/tombstones — syncing the merged set up');
           saveData(); // persist the reconciled superset to BOTH local + cloud so the account has everything
         }
@@ -8916,7 +9034,11 @@ function setupRealtimeListeners() {
         AppState.myStores = data.myStores || [];
         AppState.customStores = data.customStores || [];
         AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
-        AppState.mealConsumptions = data.mealConsumptions || [];
+        // A realtime snapshot must never wholesale-replace consumption history — an
+        // unrelated remote write (or a stale/reordered snapshot) could otherwise erase local
+        // facts this device recorded (e.g. offline) that haven't reached the cloud yet.
+        // Merged (not replaced) — see reconcileMealConsumptions().
+        reconcileMealConsumptions(data.mealConsumptions || []);
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
         AppState.prepModeSession = data.prepModeSession || null;
@@ -12462,7 +12584,11 @@ function formatPortions(n) {
 function recordMealConsumption(meal, portionsConsumed) {
   AppState.mealConsumptions = AppState.mealConsumptions || [];
   AppState.mealConsumptions.push({
-    id: 'mc_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+    // Collision-resistant, source-owned identity (crypto.randomUUID(), with an explicit
+    // collision-checked fallback) — see generateMealConsumptionId(). The prior
+    // Date.now()+small-random-suffix scheme could and did produce duplicate ids for two
+    // distinct consumptions.
+    id: generateMealConsumptionId(),
     cookedMealId: String(meal.id),
     recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
     mealName: meal.name,
