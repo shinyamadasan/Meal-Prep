@@ -921,6 +921,8 @@ test('24. no new top-level AppState key and no TOMBSTONE_KEYS change', async ({ 
     // adapter work), a LATER, separately owner-approved wave — not something
     // this protein-identity correction introduces.
     'mealConsumptions',
+    'mealConsumptionConflicts',
+    'lastLocalSaveSucceeded',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'

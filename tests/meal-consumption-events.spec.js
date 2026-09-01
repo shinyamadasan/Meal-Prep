@@ -180,6 +180,53 @@ test('a manual double-tap after a meal is already gone is a safe no-op', async (
   expect(result.count).toBe(0);
 });
 
+test('a quota/storage failure rolls back the Used 1 fact and portion decrement without success UI', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((meal) => {
+    AppState.cookedMeals = normalizeCookedMeals([JSON.parse(JSON.stringify(meal))]);
+    AppState.mealConsumptions = [];
+    const beforeStored = localStorage.getItem('mealPrepAppData');
+    const beforeSuccesses = document.querySelectorAll('.success-message').length;
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'mealPrepAppData') throw new DOMException('Quota exceeded', 'QuotaExceededError');
+      return originalSetItem.call(this, key, value);
+    };
+    try { useCookedPortion('cm_track_1'); } finally { Storage.prototype.setItem = originalSetItem; }
+    return {
+      facts: AppState.mealConsumptions.length,
+      remaining: AppState.cookedMeals[0].portionsRemaining,
+      storedUnchanged: localStorage.getItem('mealPrepAppData') === beforeStored,
+      successCount: document.querySelectorAll('.success-message').length - beforeSuccesses
+    };
+  }, trackedMeal());
+  expect(result).toEqual({ facts: 0, remaining: 3, storedUnchanged: true, successCount: 0 });
+});
+
+test('a serialization failure rolls back the Used 1 fact and last-portion removal', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((meal) => {
+    AppState.cookedMeals = normalizeCookedMeals([JSON.parse(JSON.stringify(meal))]);
+    AppState.mealConsumptions = [];
+    const beforeStored = localStorage.getItem('mealPrepAppData');
+    const beforeSuccesses = document.querySelectorAll('.success-message').length;
+    const originalStringify = JSON.stringify;
+    JSON.stringify = function(value) {
+      if (value && value.mealConsumptions) throw new Error('serialization failed');
+      return originalStringify.apply(JSON, arguments);
+    };
+    try { useCookedPortion('cm_track_1'); } finally { JSON.stringify = originalStringify; }
+    return {
+      facts: AppState.mealConsumptions.length,
+      meals: AppState.cookedMeals.length,
+      remaining: AppState.cookedMeals[0].portionsRemaining,
+      storedUnchanged: localStorage.getItem('mealPrepAppData') === beforeStored,
+      successCount: document.querySelectorAll('.success-message').length - beforeSuccesses
+    };
+  }, trackedMeal({ initialPortions: 1, portionsRemaining: 1 }));
+  expect(result).toEqual({ facts: 0, meals: 1, remaining: 1, storedUnchanged: true, successCount: 0 });
+});
+
 test('consumption facts survive save, reload, export, import merge and the Firestore payload', async ({ page }) => {
   await loadLocalApp(page);
 

@@ -35,6 +35,7 @@ const AppState = {
   customStores: [],
   cookedMeals: [],
   mealConsumptions: [],       // append-only "ate one portion" facts — see recordMealConsumption()
+  mealConsumptionConflicts: [], // durable evidence of same-id, different-fact collisions; never source facts
   cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
@@ -46,9 +47,11 @@ const AppState = {
   profile: null,              // { displayName } — public identity for the community feed
   currentUser: null,
   isOnline: navigator.onLine,
-  cloudReady: false           // true once THIS account's cloud doc has been read.
+  cloudReady: false,          // true once THIS account's cloud doc has been read.
                               // Gates Firestore WRITES so we never overwrite good
                               // cloud data with a default/empty, not-yet-loaded AppState.
+  lastLocalSaveSucceeded: null // outcome of the most recent saveToLocalStorage() call — see
+                              // saveData()/useCookedPortion(); null until a save has run
 };
 
 // Header badge showing whether data made it to the cloud. Hidden when logged out
@@ -446,7 +449,8 @@ function saveToLocalStorage() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
-      mealConsumptions: AppState.mealConsumptions,
+      mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
+      mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
       cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
       prepModeSession: AppState.prepModeSession,
@@ -455,13 +459,15 @@ function saveToLocalStorage() {
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
-    AppState.localSavedAt = dataToSave.lastSaved;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    AppState.localSavedAt = dataToSave.lastSaved;
     markInitialized(); // a save means we're past first run — never auto-seed samples again
     console.log('Data saved to local storage');
+    return true;
   } catch (error) {
     console.error('Error saving to local storage:', error);
     showErrorMessage('Failed to save data. Please check your browser storage settings.');
+    return false;
   }
 }
 
@@ -509,6 +515,7 @@ function loadFromLocalStorage() {
       // this can run while AppState already holds newer in-memory facts (e.g. sign-out right
       // after a realtime update) that this device's own localStorage snapshot hasn't seen yet.
       reconcileMealConsumptions(data.mealConsumptions || []);
+      reconcileMealConsumptionConflicts(data.mealConsumptionConflicts || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -1761,7 +1768,8 @@ function snapshotData() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
-    mealConsumptions: AppState.mealConsumptions,
+    mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
+    mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
     recentRecipes: AppState.recentRecipes,
     deletions: normalizeDeletions(AppState.deletions),
     inventoryVerifiedAt: AppState.inventoryVerifiedAt
@@ -1815,6 +1823,7 @@ function restoreBackup() {
       // never a silent overwrite in either direction. "Restore" here intentionally means
       // "this backup's consumption facts are unioned in", not "roll back to only this backup".
       reconcileMealConsumptions(d.mealConsumptions || []);
+      reconcileMealConsumptionConflicts(d.mealConsumptionConflicts || []);
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
       AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
@@ -7880,7 +7889,8 @@ function exportData() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
-      mealConsumptions: AppState.mealConsumptions,
+      mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
+      mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
       recentRecipes: AppState.recentRecipes,
       deletions: normalizeDeletions(AppState.deletions),
       inventoryVerifiedAt: AppState.inventoryVerifiedAt,
@@ -7945,7 +7955,7 @@ function importData() {
         const importedData = JSON.parse(e.target.result);
         
         // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals', 'mealConsumptions'];
+        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals', 'mealConsumptions', 'mealConsumptionConflicts'];
         if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
           throw new Error('Invalid data format');
         }
@@ -7987,6 +7997,7 @@ function importData() {
             // facts on a same id dedupe, a genuinely differing same-id record is an explicit
             // conflict, never a silent overwrite.
             reconcileMealConsumptions(importedData.mealConsumptions || []);
+            reconcileMealConsumptionConflicts(importedData.mealConsumptionConflicts || []);
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
@@ -8478,7 +8489,8 @@ function buildFirestorePayload() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
-    mealConsumptions: AppState.mealConsumptions,
+    mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
+    mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
     cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
     prepModeSession: AppState.prepModeSession,
@@ -8533,26 +8545,86 @@ function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(
 // unionByIdLWW's updatedAt-based precedence are both wrong here: there is no legitimate
 // "newer" consumption fact, only the SAME fact restated or a genuine identity collision).
 //
-// Canonical content excludes nothing — every field the fact asserts is part of its identity.
-function consumptionCanonicalFacts(record) {
-  if (!record || typeof record !== 'object' || record.id == null) return null;
-  return JSON.stringify({
-    id: String(record.id),
-    cookedMealId: record.cookedMealId != null ? String(record.cookedMealId) : null,
-    recipeId: record.recipeId != null ? String(record.recipeId) : null,
+// This is a CLOSED source schema. Unknown fields are rejected rather than being
+// accidentally ignored by comparison code and then resurfacing in a saved fact.
+var MEAL_CONSUMPTION_KEYS = ['id', 'cookedMealId', 'recipeId', 'mealName', 'portionsConsumed', 'consumedAt'];
+function canonicalizeMealConsumption(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  if (Object.keys(record).some(function(key) { return MEAL_CONSUMPTION_KEYS.indexOf(key) < 0; })) return null;
+  if (typeof record.id !== 'string' || !record.id || typeof record.cookedMealId !== 'string' || !record.cookedMealId ||
+      !(record.recipeId === null || typeof record.recipeId === 'string') || typeof record.mealName !== 'string' ||
+      !Number.isInteger(record.portionsConsumed) || record.portionsConsumed < 1 || typeof record.consumedAt !== 'string') return null;
+  var parsed = new Date(record.consumedAt);
+  if (isNaN(parsed.getTime()) || parsed.toISOString() !== record.consumedAt) return null;
+  return {
+    id: record.id,
+    cookedMealId: record.cookedMealId,
+    recipeId: record.recipeId,
     mealName: record.mealName,
     portionsConsumed: record.portionsConsumed,
     consumedAt: record.consumedAt
+  };
+}
+
+function consumptionCanonicalFacts(record) {
+  var canonical = canonicalizeMealConsumption(record);
+  return canonical ? JSON.stringify(canonical) : null;
+}
+
+function mealConsumptionConflictId(sourceConsumptionId, variants) {
+  // The complete evidence is deliberately embedded, not compressed to a hash: the
+  // identifier is collision-free exactly when the two canonical variants differ.
+  return 'mcc:' + sourceConsumptionId + ':' + JSON.stringify(variants);
+}
+
+function canonicalizeMealConsumptionConflict(conflict) {
+  if (!conflict || typeof conflict !== 'object' || Array.isArray(conflict) ||
+      Object.keys(conflict).some(function(key) { return key !== 'id' && key !== 'sourceConsumptionId' && key !== 'canonicalVariants'; }) ||
+      typeof conflict.id !== 'string' ||
+      typeof conflict.sourceConsumptionId !== 'string' || !Array.isArray(conflict.canonicalVariants) || conflict.canonicalVariants.length !== 2) return null;
+  var variants = conflict.canonicalVariants.map(canonicalizeMealConsumption);
+  if (!variants[0] || !variants[1] || variants[0].id !== conflict.sourceConsumptionId || variants[1].id !== conflict.sourceConsumptionId) return null;
+  variants.sort(function(a, b) { return JSON.stringify(a).localeCompare(JSON.stringify(b)); });
+  if (JSON.stringify(variants[0]) === JSON.stringify(variants[1])) return null;
+  var id = mealConsumptionConflictId(conflict.sourceConsumptionId, variants);
+  if (conflict.id !== id) return null;
+  return { id: id, sourceConsumptionId: conflict.sourceConsumptionId, canonicalVariants: variants };
+}
+
+function mealConsumptionConflictFor(first, second) {
+  var a = canonicalizeMealConsumption(first), b = canonicalizeMealConsumption(second);
+  if (!a || !b || a.id !== b.id || JSON.stringify(a) === JSON.stringify(b)) return null;
+  var variants = [a, b].sort(function(x, y) { return JSON.stringify(x).localeCompare(JSON.stringify(y)); });
+  return canonicalizeMealConsumptionConflict({
+    id: mealConsumptionConflictId(a.id, variants),
+    sourceConsumptionId: a.id,
+    canonicalVariants: variants
   });
+}
+
+function mergeMealConsumptionConflicts(existing, incoming) {
+  var byEvidence = {};
+  (existing || []).concat(incoming || []).forEach(function(conflict) {
+    var canonical = canonicalizeMealConsumptionConflict(conflict);
+    if (canonical) byEvidence[JSON.stringify(canonical)] = canonical;
+  });
+  return Object.keys(byEvidence).sort().map(function(key) { return byEvidence[key]; });
+}
+
+function serializableMealConsumptions(records) {
+  return mergeMealConsumptions([], records || []).merged;
+}
+
+function serializableMealConsumptionConflicts(records) {
+  return mergeMealConsumptionConflicts([], records || []);
 }
 
 // Merge `incoming` into `existing` (both arrays of consumption records) and return the
 // append-only union. Required invariants (see Life Ledger architectural review):
 //   same id + identical canonical facts  -> dedupe (kept once)
-//   same id + different canonical facts  -> explicit conflict; the ORIGINAL (first-known)
-//                                           record is kept, the incoming one is NEVER used to
-//                                           overwrite it, and the conflict is reported so it
-//                                           is never silently dropped either
+//   same id + different canonical facts  -> the already-accepted record is kept and neutral,
+//                                           exact conflict evidence retains BOTH claims; callers
+//                                           pass accepted cloud facts first when cloud is present
 //   id present in only one side          -> both sides' unique ids survive (append-only)
 // Never decided by array order, by which side is "local" vs "remote", or by any timestamp —
 // only id + canonical content.
@@ -8560,37 +8632,48 @@ function mergeMealConsumptions(existing, incoming) {
   var byId = {};
   var order = [];
   var conflicts = [];
-  (existing || []).forEach(function(record) {
-    if (!record || record.id == null) return;
-    var id = String(record.id);
-    if (!(id in byId)) { byId[id] = record; order.push(id); }
-  });
-  (incoming || []).forEach(function(record) {
-    if (!record || record.id == null) return;
-    var id = String(record.id);
+  var rejected = [];
+  function add(record, fromIncoming) {
+    var canonical = canonicalizeMealConsumption(record);
+    if (!canonical) { rejected.push(record); return; }
+    var id = canonical.id;
     if (!(id in byId)) { byId[id] = record; order.push(id); return; }
-    if (consumptionCanonicalFacts(byId[id]) !== consumptionCanonicalFacts(record)) {
-      conflicts.push({ id: id, kept: byId[id], rejected: record });
+    if (consumptionCanonicalFacts(byId[id]) !== consumptionCanonicalFacts(canonical)) {
+      var conflict = mealConsumptionConflictFor(byId[id], canonical);
+      if (conflict) conflicts.push(conflict);
     }
-    // identical facts -> silently deduped (already present); different facts -> conflict
-    // recorded above, ORIGINAL kept — never overwritten by array order or source precedence.
-  });
-  return { merged: order.map(function(id) { return byId[id]; }), conflicts: conflicts };
+    // The first argument is authoritative for a collision. Callers pass the accepted
+    // remote document first when reconciling cloud state.
+  }
+  (existing || []).forEach(function(record) { add(record, false); });
+  (incoming || []).forEach(function(record) { add(record, true); });
+  return { merged: order.map(function(id) { return byId[id]; }), conflicts: mergeMealConsumptionConflicts(conflicts, []), rejected: rejected };
 }
 
 // Apply mergeMealConsumptions() against AppState.mealConsumptions in place, logging (never
 // silently swallowing) any detected identity collision so it stays diagnosable. Returns true
 // when the merged result actually differs from what was there before, so callers can decide
 // whether a re-save/re-sync is warranted.
-function reconcileMealConsumptions(incoming) {
+function reconcileMealConsumptionConflicts(incoming) {
+  var before = AppState.mealConsumptionConflicts || [];
+  AppState.mealConsumptionConflicts = mergeMealConsumptionConflicts(before, incoming);
+  return AppState.mealConsumptionConflicts.length !== before.length;
+}
+
+function reconcileMealConsumptions(incoming, incomingIsAuthoritative) {
   var before = AppState.mealConsumptions || [];
-  var result = mergeMealConsumptions(before, incoming);
+  var result = incomingIsAuthoritative ? mergeMealConsumptions(incoming, before) : mergeMealConsumptions(before, incoming);
   if (result.conflicts.length) {
-    console.warn('mealConsumptions: ' + result.conflicts.length + ' id(s) had conflicting facts — original kept, conflicting record discarded (never applied):', result.conflicts);
+    console.warn('mealConsumptions: ' + result.conflicts.length + ' id(s) had conflicting facts — accepted fact kept, collision evidence retained:', result.conflicts);
     reportError(new Error('mealConsumption id collision with differing facts'), 'reconcileMealConsumptions');
   }
+  if (result.rejected.length) {
+    console.warn('mealConsumptions: rejected ' + result.rejected.length + ' record(s) outside the closed source schema.');
+    reportError(new Error('invalid mealConsumption source schema'), 'reconcileMealConsumptions');
+  }
   AppState.mealConsumptions = result.merged;
-  return result.merged.length !== before.length || result.conflicts.length > 0;
+  var conflictsChanged = reconcileMealConsumptionConflicts(result.conflicts);
+  return result.merged.length !== before.length || conflictsChanged || result.conflicts.length > 0 || result.rejected.length > 0;
 }
 
 // Collision-resistant, source-owned identity for a mealConsumption fact. Prefers
@@ -8634,7 +8717,12 @@ function mergeCloudConflict(remote, local) {
   ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
     out[key] = unionById(local[key] || [], remote[key] || []);
   });
-  out.mealConsumptions = mergeMealConsumptions(local.mealConsumptions || [], remote.mealConsumptions || []).merged;
+  var consumptionResult = mergeMealConsumptions(remote.mealConsumptions || [], local.mealConsumptions || []);
+  out.mealConsumptions = consumptionResult.merged;
+  out.mealConsumptionConflicts = mergeMealConsumptionConflicts(
+    mergeMealConsumptionConflicts(remote.mealConsumptionConflicts || [], local.mealConsumptionConflicts || []),
+    consumptionResult.conflicts
+  );
   return out;
 }
 
@@ -8650,43 +8738,49 @@ function reportError(err, context) {
 }
 
 async function saveToFirestore() {
-  if (!AppState.currentUser || !window.firebase) return;
-  if (!AppState.isOnline) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
+  if (!AppState.currentUser || !window.firebase) return false;
+  if (!AppState.isOnline) { AppState.syncStatus = 'local'; updateSyncIndicator(); return false; }
   // WRITE GUARD: never push to the cloud until we've read the cloud baseline. Otherwise a
   // save fired during the load window (30s auto-save, the 'online' event, a render) would
   // overwrite good cloud data with a default/empty AppState — the deploy/reload data-loss bug.
   // localStorage still has everything; the cloud syncs once cloudReady flips true.
-  if (!AppState.cloudReady) { AppState.syncStatus = 'local'; updateSyncIndicator(); return; }
+  if (!AppState.cloudReady) { AppState.syncStatus = 'local'; updateSyncIndicator(); return false; }
   recordLocalDeletions(); // tombstone anything the user removed on this device since the last sync
   AppState.syncStatus = 'saving'; updateSyncIndicator();
 
   const userDocRef = window.firebase.doc(window.firebase.db, 'users', AppState.currentUser.uid);
+  const loadedVersion = AppState.dataVersion || 0;
 
   try {
-    // Fallback if the transaction API isn't loaded (e.g. an old cached HTML):
-    // plain write, no concurrency guard, but data still saves.
+    // A plain root setDoc can overwrite a fact that this client never read. Immutable
+    // facts therefore fail closed when an old cached SDK lacks transactions; local data
+    // remains intact and the normal retry paths (autosave/online) will try again later.
     if (!window.firebase.runTransaction) {
-      var payload = buildFirestorePayload();
-      payload.version = (AppState.dataVersion || 0) + 1;
-      // Full-document write (see the transaction branch below) — the `deletions` map must be
-      // replaced, not merged, or a cleared tombstone persists in the cloud. See DECISIONS D-031.
-      await window.firebase.setDoc(userDocRef, JSON.parse(JSON.stringify(payload)));
-      AppState.dataVersion = payload.version;
-      AppState.syncStatus = 'synced'; updateSyncIndicator();
-      return;
+      var unavailable = new Error('Firestore transaction API unavailable; retained meal consumption facts locally for retry.');
+      console.error(unavailable.message);
+      reportError(unavailable, 'saveToFirestore transaction unavailable');
+      AppState.syncStatus = 'local'; updateSyncIndicator();
+      return false;
     }
 
-    // Optimistic concurrency: read the cloud version inside a transaction. If it
-    // advanced past what we loaded, another device wrote first → merge so we
-    // don't silently overwrite their changes. Firestore auto-retries on contention.
+    var committed = null;
+    // Read the latest cloud document on EVERY transaction attempt. Meal facts and
+    // collision evidence are unioned even when the root version is not advanced,
+    // because Firestore may retry after another writer races this transaction.
     await window.firebase.runTransaction(window.firebase.db, async function(tx) {
       const snap = await tx.get(userDocRef);
       let payload = buildFirestorePayload();
+      var remote = snap.exists() ? snap.data() : {};
+      var remoteVersion = remote.version || 0;
+      var consumptionResult = mergeMealConsumptions(remote.mealConsumptions || [], payload.mealConsumptions || []);
+      payload.mealConsumptions = consumptionResult.merged;
+      payload.mealConsumptionConflicts = mergeMealConsumptionConflicts(
+        mergeMealConsumptionConflicts(remote.mealConsumptionConflicts || [], payload.mealConsumptionConflicts || []),
+        consumptionResult.conflicts
+      );
 
       if (snap.exists()) {
-        const remote = snap.data();
-        const remoteVersion = remote.version || 0;
-        if (remoteVersion > (AppState.dataVersion || 0)) {
+        if (remoteVersion > loadedVersion) {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
           payload.deletions = normalizeDeletions(AppState.deletions); // carry the merged tombstones
@@ -8695,10 +8789,8 @@ async function saveToFirestore() {
           });
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
-        payload.version = remoteVersion + 1;
-      } else {
-        payload.version = 1;
       }
+      payload.version = remoteVersion + 1;
 
       // Firestore rejects `undefined`; round-trip strips undefined + functions.
       // FULL-DOCUMENT write (NOT merge:true): the `deletions` map must be REPLACED so clearing a
@@ -8706,15 +8798,28 @@ async function saveToFirestore() {
       // deep-merges maps and never drops absent keys, so a cleared tombstone would silently persist
       // and re-delete the re-imported item on the next sync. See DECISIONS D-031 (reverses D-030).
       tx.set(userDocRef, JSON.parse(JSON.stringify(payload)));
-      AppState.dataVersion = payload.version;
+      committed = payload;
     });
+    // Only a successful transaction advances the client version. Reconcile rather
+    // than assign so an action that occurred while the transaction awaited remains local.
+    AppState.dataVersion = committed.version;
+    var factsChanged = reconcileMealConsumptions(committed.mealConsumptions || [], true);
+    var conflictsChanged = reconcileMealConsumptionConflicts(committed.mealConsumptionConflicts || []);
+    // A transaction can discover collision evidence that was not present in the
+    // pre-transaction local snapshot. Persist that neutral ledger immediately.
+    if ((factsChanged || conflictsChanged) && !saveToLocalStorage()) {
+      AppState.syncStatus = 'local'; updateSyncIndicator();
+      return false;
+    }
     console.log('Data saved to Firestore (v' + AppState.dataVersion + ')');
     AppState.syncStatus = 'synced'; updateSyncIndicator();
+    return true;
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     reportError(error, 'saveToFirestore');
     showErrorMessage('Failed to sync data to cloud. Changes saved locally.');
     AppState.syncStatus = 'local'; updateSyncIndicator();
+    return false;
   }
 }
 
@@ -8775,7 +8880,8 @@ async function loadFromFirestore() {
       // An account whose cloud doc predates this has no key — reads as no consumption
       // history yet, never backfilled from portionsRemaining deltas. Merged (not replaced) —
       // see reconcileMealConsumptions().
-      reconcileMealConsumptions(data.mealConsumptions || []);
+      reconcileMealConsumptions(data.mealConsumptions || [], true);
+      reconcileMealConsumptionConflicts(data.mealConsumptionConflicts || []);
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -8894,11 +9000,12 @@ async function loadUserData() {
         // not an editable record, so it gets the canonical id+content merge instead — never
         // dropped by sign-in reconciliation the way an omitted key previously would be.
         var consumptionsChanged = reconcileMealConsumptions(local.mealConsumptions || []);
+        var consumptionConflictsChanged = reconcileMealConsumptionConflicts(local.mealConsumptionConflicts || []);
         mergeDeletions(local.deletions); // safe now: LWW in applyTombstones() means stale tombstones lose to newer items
         applyTombstones(); // LWW: tombstone wins only if newer than item's updatedAt (D-020)
         let after = 0;
         UKEYS.forEach(function (key) { after += (AppState[key] || []).length; });
-        if (after !== before || mergeStats.localWins > 0 || tombstoneCount(AppState.deletions) !== cloudDelN || consumptionsChanged) {
+        if (after !== before || mergeStats.localWins > 0 || tombstoneCount(AppState.deletions) !== cloudDelN || consumptionsChanged || consumptionConflictsChanged) {
           console.log('loadUserData: reconciled local data/tombstones — syncing the merged set up');
           saveData(); // persist the reconciled superset to BOTH local + cloud so the account has everything
         }
@@ -8992,10 +9099,19 @@ function closeUsernameModal() {
 // posting to the community feed so we never share as a raw email.
 // Enhanced save function that saves to both local storage and Firestore
 function saveData() {
-  saveToLocalStorage();
+  var localSaved = saveToLocalStorage();
+  AppState.lastLocalSaveSucceeded = localSaved;
+  if (!localSaved) {
+    AppState.syncStatus = 'local'; updateSyncIndicator();
+    return Promise.resolve(false);
+  }
   const p = saveToFirestore(); // async — callers that need cloud durability can await the returned Promise
   updateFreshnessBadges();
-  return p;
+  return Promise.resolve(p).catch(function(error) {
+    console.error('Unexpected cloud save failure:', error);
+    AppState.syncStatus = 'local'; updateSyncIndicator();
+    return false;
+  });
 }
 
 // Setup real-time listeners
@@ -9038,7 +9154,8 @@ function setupRealtimeListeners() {
         // unrelated remote write (or a stale/reordered snapshot) could otherwise erase local
         // facts this device recorded (e.g. offline) that haven't reached the cloud yet.
         // Merged (not replaced) — see reconcileMealConsumptions().
-        reconcileMealConsumptions(data.mealConsumptions || []);
+        reconcileMealConsumptions(data.mealConsumptions || [], true);
+        reconcileMealConsumptionConflicts(data.mealConsumptionConflicts || []);
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
         AppState.prepModeSession = data.prepModeSession || null;
@@ -12583,7 +12700,7 @@ function formatPortions(n) {
 // consumption so the fact reads correctly even if the batch is later removed.
 function recordMealConsumption(meal, portionsConsumed) {
   AppState.mealConsumptions = AppState.mealConsumptions || [];
-  AppState.mealConsumptions.push({
+  var record = canonicalizeMealConsumption({
     // Collision-resistant, source-owned identity (crypto.randomUUID(), with an explicit
     // collision-checked fallback) — see generateMealConsumptionId(). The prior
     // Date.now()+small-random-suffix scheme could and did produce duplicate ids for two
@@ -12595,6 +12712,9 @@ function recordMealConsumption(meal, portionsConsumed) {
     portionsConsumed: portionsConsumed,
     consumedAt: new Date().toISOString()
   });
+  if (!record) throw new Error('Refused to record an invalid meal consumption fact');
+  AppState.mealConsumptions.push(record);
+  return record;
 }
 
 // One tap = one portion gone. No modal, no fields, no per-person logging.
@@ -12612,20 +12732,45 @@ function useCookedPortion(id) {
     return;
   }
 
-  // Recorded BEFORE the branch below, in the same synchronous call, so the
-  // consumption fact and the portionsRemaining/removal mutation it describes
-  // are always written together — never one without the other.
-  recordMealConsumption(meal, 1);
-
-  var next = meal.portionsRemaining - 1;
-  if (next <= 0) {
-    finishCookedMeal(id, meal.name);
+  // Generate and append before changing the batch. If local durable storage
+  // rejects the combined state, restore BOTH facts and batch exactly as they were.
+  var mealIndex = AppState.cookedMeals.indexOf(meal);
+  var beforeMeal = Object.assign({}, meal);
+  var beforeFacts = AppState.mealConsumptions.slice();
+  var next;
+  try {
+    recordMealConsumption(meal, 1);
+    next = meal.portionsRemaining - 1;
+    if (next <= 0) AppState.cookedMeals.splice(mealIndex, 1);
+    else {
+      meal.portionsRemaining = next;
+      stampUpdated(meal);
+    }
+  } catch (error) {
+    console.error('Could not record meal consumption:', error);
+    showErrorMessage('Could not record that portion. Nothing was changed.');
     return;
   }
 
-  meal.portionsRemaining = next;
-  stampUpdated(meal);
   saveData();
+  if (!AppState.lastLocalSaveSucceeded) {
+    AppState.mealConsumptions = beforeFacts;
+    if (next <= 0) AppState.cookedMeals.splice(mealIndex, 0, beforeMeal);
+    else Object.assign(meal, beforeMeal);
+    renderCookedMeals();
+    renderDashboard();
+    refreshFreshnessAlerts();
+    return;
+  }
+
+  if (next <= 0) {
+    renderCookedMeals();
+    renderDashboard();
+    refreshFreshnessAlerts();
+    showSuccessMessage('Finished ' + escapeHtml(beforeMeal.name) + ' — removed from your fridge.');
+    return;
+  }
+
   renderCookedMeals();
   renderDashboard();
   refreshFreshnessAlerts();

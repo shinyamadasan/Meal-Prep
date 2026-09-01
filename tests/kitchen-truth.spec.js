@@ -808,7 +808,10 @@ test('export and the Firestore payload carry the new fields without new collecti
       // 'mealConsumptions' is the append-only "ate one portion" fact log written by
       // recordMealConsumption() — a DELIBERATE, owner-approved new top-level
       // collection for durable consumption history (Life Ledger adapter work).
-      'mealConsumptions'
+      'mealConsumptions',
+      // Collision evidence is durable metadata, explicitly separate from the
+      // immutable source facts so no conflict becomes a consumption claim.
+      'mealConsumptionConflicts'
     ];
     return {
       unexpectedTopLevelKeys: Object.keys(payload).filter((k) => known.indexOf(k) < 0),

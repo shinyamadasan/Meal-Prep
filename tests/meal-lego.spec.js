@@ -576,6 +576,8 @@ test('no new AppState key and no new cookedMeal / flavor field is introduced by 
     // adapter work) — a LATER, separately owner-approved wave, not something
     // Meal Lego introduced.
     'mealConsumptions',
+    'mealConsumptionConflicts',
+    'lastLocalSaveSucceeded',
     'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'
