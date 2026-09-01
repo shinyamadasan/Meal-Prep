@@ -917,6 +917,10 @@ test('24. no new top-level AppState key and no TOMBSTONE_KEYS change', async ({ 
     // separately owner-approved wave — not something this protein-identity
     // correction introduces.
     'inventoryVerifiedAt',
+    // 'mealConsumptions' is the append-only consumption fact log (Life Ledger
+    // adapter work), a LATER, separately owner-approved wave — not something
+    // this protein-identity correction introduces.
+    'mealConsumptions',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'

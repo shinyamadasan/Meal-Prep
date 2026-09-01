@@ -572,6 +572,10 @@ test('no new AppState key and no new cookedMeal / flavor field is introduced by 
     // 'inventoryVerifiedAt' is a single scalar timestamp (D-075) — a LATER,
     // separately owner-approved wave, not something Meal Lego introduced.
     'inventoryVerifiedAt',
+    // 'mealConsumptions' is the append-only consumption fact log (Life Ledger
+    // adapter work) — a LATER, separately owner-approved wave, not something
+    // Meal Lego introduced.
+    'mealConsumptions',
     'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'

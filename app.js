@@ -34,6 +34,7 @@ const AppState = {
   myStores: [],
   customStores: [],
   cookedMeals: [],
+  mealConsumptions: [],       // append-only "ate one portion" facts — see recordMealConsumption()
   cookHistory: [],            // [{ recipeId, recipeName, date, servings }] newest-first
   recentRecipes: [],          // recipe ids, most-recently planned first (device-local)
   prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
@@ -445,6 +446,7 @@ function saveToLocalStorage() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
+      mealConsumptions: AppState.mealConsumptions,
       cookHistory: AppState.cookHistory,
       recentRecipes: AppState.recentRecipes,
       prepModeSession: AppState.prepModeSession,
@@ -502,6 +504,9 @@ function loadFromLocalStorage() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
+      // A record saved before this existed simply has no key — reads as no
+      // consumption history yet, never backfilled from portionsRemaining deltas.
+      AppState.mealConsumptions = data.mealConsumptions || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -1754,6 +1759,7 @@ function snapshotData() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
+    mealConsumptions: AppState.mealConsumptions,
     recentRecipes: AppState.recentRecipes,
     deletions: normalizeDeletions(AppState.deletions),
     inventoryVerifiedAt: AppState.inventoryVerifiedAt
@@ -1800,6 +1806,7 @@ function restoreBackup() {
       AppState.myStores = d.myStores || [];
       AppState.customStores = d.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
+      AppState.mealConsumptions = d.mealConsumptions || [];
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
       AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
@@ -7865,13 +7872,15 @@ function exportData() {
       myStores: AppState.myStores,
       customStores: AppState.customStores,
       cookedMeals: AppState.cookedMeals,
+      mealConsumptions: AppState.mealConsumptions,
       recentRecipes: AppState.recentRecipes,
+      deletions: normalizeDeletions(AppState.deletions),
       inventoryVerifiedAt: AppState.inventoryVerifiedAt,
       exportedAt: new Date().toISOString(),
-      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3/1.4
-      // — an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt`
-      // key and imports as it always did.
-      version: '1.4'
+      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3/1.4/1.5
+      // — an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt`/
+      // `mealConsumptions`/`deletions` key and imports as it always did.
+      version: '1.5'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -7928,7 +7937,7 @@ function importData() {
         const importedData = JSON.parse(e.target.result);
         
         // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals'];
+        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals', 'mealConsumptions'];
         if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
           throw new Error('Invalid data format');
         }
@@ -7965,6 +7974,9 @@ function importData() {
             AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
             AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
             AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
+            // Append-only facts, never edited after creation — a plain id union is exact,
+            // no LWW/updatedAt reconciliation needed the way cookedMeals[] requires.
+            AppState.mealConsumptions = unionById(AppState.mealConsumptions || [], importedData.mealConsumptions || []);
             AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
 
             var importStampedAt = new Date().toISOString();
@@ -8456,6 +8468,7 @@ function buildFirestorePayload() {
     myStores: AppState.myStores,
     customStores: AppState.customStores,
     cookedMeals: AppState.cookedMeals,
+    mealConsumptions: AppState.mealConsumptions,
     cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
     prepModeSession: AppState.prepModeSession,
@@ -8506,7 +8519,7 @@ function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(
 // elsewhere is lost; scalar/object fields keep the local (being-saved) copy.
 function mergeCloudConflict(remote, local) {
   var out = Object.assign({}, local);
-  ['recipes', 'pantry', 'cookedMeals', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
+  ['recipes', 'pantry', 'cookedMeals', 'mealConsumptions', 'userIngredients', 'groceryList', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors'].forEach(function(key) {
     out[key] = unionById(local[key] || [], remote[key] || []);
   });
   return out;
@@ -8646,6 +8659,9 @@ async function loadFromFirestore() {
       AppState.myStores = data.myStores || [];
       AppState.customStores = data.customStores || [];
       AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
+      // An account whose cloud doc predates this has no key — reads as no
+      // consumption history yet, never backfilled from portionsRemaining deltas.
+      AppState.mealConsumptions = data.mealConsumptions || [];
       AppState.cookHistory = data.cookHistory || [];
       AppState.recentRecipes = data.recentRecipes || [];
       AppState.prepModeSession = data.prepModeSession || null;
@@ -8900,6 +8916,7 @@ function setupRealtimeListeners() {
         AppState.myStores = data.myStores || [];
         AppState.customStores = data.customStores || [];
         AppState.cookedMeals = normalizeCookedMeals(data.cookedMeals || []);
+        AppState.mealConsumptions = data.mealConsumptions || [];
         AppState.cookHistory = data.cookHistory || [];
         AppState.recentRecipes = data.recentRecipes || [];
         AppState.prepModeSession = data.prepModeSession || null;
@@ -12435,6 +12452,25 @@ function formatPortions(n) {
 
 // ── Consuming a portion ──────────────────────────────────────────────────────
 
+// Append-only "ate one portion" fact. Written only from the "Used 1" tap below —
+// NOT from the "Done" button (removeCookedMeal), whose own label ("Ate it all /
+// remove") admits it also covers discarding food, so it is not a trustworthy
+// consumption signal on its own. Never edited or removed afterward: there is no
+// undo affordance for a single tap, matching this action's existing no-modal,
+// no-confirmation design. recipeId/mealName are snapshotted at the moment of
+// consumption so the fact reads correctly even if the batch is later removed.
+function recordMealConsumption(meal, portionsConsumed) {
+  AppState.mealConsumptions = AppState.mealConsumptions || [];
+  AppState.mealConsumptions.push({
+    id: 'mc_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+    cookedMealId: String(meal.id),
+    recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
+    mealName: meal.name,
+    portionsConsumed: portionsConsumed,
+    consumedAt: new Date().toISOString()
+  });
+}
+
 // One tap = one portion gone. No modal, no fields, no per-person logging.
 // The last portion finishes the batch through the SAME removal path the existing
 // "Done" button uses, so there is no second deletion concept to keep in sync.
@@ -12444,10 +12480,16 @@ function useCookedPortion(id) {
 
   if (!cookedMealTracksPortions(meal)) {
     // Untracked batch — nothing to count down. Treat it as finished, which is
-    // what "Done" already meant for these.
+    // what "Done" already meant for these. No portion count exists to attribute
+    // a consumption fact to, so none is recorded here (see recordMealConsumption).
     finishCookedMeal(id);
     return;
   }
+
+  // Recorded BEFORE the branch below, in the same synchronous call, so the
+  // consumption fact and the portionsRemaining/removal mutation it describes
+  // are always written together — never one without the other.
+  recordMealConsumption(meal, 1);
 
   var next = meal.portionsRemaining - 1;
   if (next <= 0) {

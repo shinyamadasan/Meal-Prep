@@ -456,6 +456,10 @@ test('20. no new top-level AppState collection was introduced', async ({ page })
     // separately owner-approved wave — not something this protein-identity wave
     // introduces.
     'inventoryVerifiedAt',
+    // 'mealConsumptions' is the append-only consumption fact log (Life Ledger
+    // adapter work), a LATER, separately owner-approved wave — not something
+    // this protein-identity wave introduces.
+    'mealConsumptions',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',
     'selectedRecipeForPlanning', 'syncStatus', 'userIngredients', 'weeklyPlan'
