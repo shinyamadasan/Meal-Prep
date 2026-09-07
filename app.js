@@ -8547,13 +8547,17 @@ function stampUpdated(item) { if (item) item.updatedAt = new Date().toISOString(
 //
 // This is a CLOSED source schema. Unknown fields are rejected rather than being
 // accidentally ignored by comparison code and then resurfacing in a saved fact.
+// portionsConsumed is an integer 1..PORTION_COUNT_MAX inclusive — the same bound the
+// downstream Life Ledger meal_consumed contract enforces (portionCount 1-99). A malformed
+// external/imported/restored record outside that range must not become a durable fact.
 var MEAL_CONSUMPTION_KEYS = ['id', 'cookedMealId', 'recipeId', 'mealName', 'portionsConsumed', 'consumedAt'];
 function canonicalizeMealConsumption(record) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
   if (Object.keys(record).some(function(key) { return MEAL_CONSUMPTION_KEYS.indexOf(key) < 0; })) return null;
   if (typeof record.id !== 'string' || !record.id || typeof record.cookedMealId !== 'string' || !record.cookedMealId ||
       !(record.recipeId === null || typeof record.recipeId === 'string') || typeof record.mealName !== 'string' ||
-      !Number.isInteger(record.portionsConsumed) || record.portionsConsumed < 1 || typeof record.consumedAt !== 'string') return null;
+      !Number.isInteger(record.portionsConsumed) || record.portionsConsumed < 1 || record.portionsConsumed > PORTION_COUNT_MAX ||
+      typeof record.consumedAt !== 'string') return null;
   var parsed = new Date(record.consumedAt);
   if (isNaN(parsed.getTime()) || parsed.toISOString() !== record.consumedAt) return null;
   return {

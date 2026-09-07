@@ -152,6 +152,92 @@ test('closed source schema rejects unknown meal-consumption fields instead of si
   expect(result.rejected).toHaveLength(1);
 });
 
+// ── portionsConsumed bounds: source must agree with the Life Ledger contract ──
+// The downstream ChronaSense meal_consumed contract requires portionCount to be an integer
+// 1..99 inclusive. The canonical source validator must enforce the SAME bound so a malformed
+// external / imported / restored record outside that range can never become a durable fact.
+// PORTION_COUNT_MAX is the single shared source constant (app.js) — no divergent literal here.
+
+test('mergeMealConsumptions canonicalization: portionsConsumed 1 and 99 are valid, everything else is rejected', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((f) => {
+    const max = PORTION_COUNT_MAX;
+    const check = (portionsConsumed) => {
+      const r = mergeMealConsumptions([Object.assign({}, f, { portionsConsumed })], []);
+      return { accepted: r.merged.length === 1, rejected: r.rejected.length === 1 };
+    };
+    return {
+      max,
+      one: check(1),
+      max99: check(max),
+      zero: check(0),
+      negative: check(-1),
+      fraction: check(1.5),
+      hundred: check(100),
+      hundredOne: check(101),
+      huge: check(100000),
+      stringOne: check('1')
+    };
+  }, fact());
+  expect(result.max).toBe(99);
+  expect(result.one).toEqual({ accepted: true, rejected: false });
+  expect(result.max99).toEqual({ accepted: true, rejected: false });
+  for (const key of ['zero', 'negative', 'fraction', 'hundred', 'hundredOne', 'huge', 'stringOne']) {
+    expect(result[key], key).toEqual({ accepted: false, rejected: true });
+  }
+});
+
+test('an import / backup-restore snapshot carrying portionsConsumed 100 is rejected, existing facts preserved', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((f) => {
+    AppState.mealConsumptions = [f]; // an already-accepted, in-range fact
+    // A restored backup / imported file contains a malformed record — reconcileMealConsumptions
+    // is the shared entry point for restoreBackup(), importData(), and cloud reconciliation.
+    const changed = reconcileMealConsumptions([
+      Object.assign({}, f, { id: 'mc_from_bad_backup', portionsConsumed: 100 })
+    ]);
+    return { changed, ids: AppState.mealConsumptions.map((r) => r.id), count: AppState.mealConsumptions.length };
+  }, fact());
+  expect(result.ids).toEqual(['mc_a']); // the bad record never entered the durable log
+  expect(result.count).toBe(1);
+});
+
+test('a same-id candidate with an out-of-range portion count is rejected outright, not stored as conflict evidence', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate((f) => {
+    AppState.mealConsumptions = [f]; // accepted fact, portionsConsumed 1
+    AppState.mealConsumptionConflicts = [];
+    // Same logical id, but the competing "fact" is malformed (portionsConsumed 100). It must
+    // be rejected by canonicalization BEFORE any conflict-evidence path — a malformed record
+    // is not a legitimate competing claim.
+    reconcileMealConsumptions([Object.assign({}, f, { portionsConsumed: 100 })]);
+    return {
+      kept: AppState.mealConsumptions[0].portionsConsumed,
+      count: AppState.mealConsumptions.length,
+      conflicts: AppState.mealConsumptionConflicts.length
+    };
+  }, fact());
+  expect(result.kept).toBe(1);
+  expect(result.count).toBe(1);
+  expect(result.conflicts).toBe(0);
+});
+
+test('normal useCookedPortion() still records exactly one portion per tap', async ({ page }) => {
+  await loadLocalApp(page);
+  const result = await page.evaluate(() => {
+    AppState.cookedMeals = normalizeCookedMeals([{
+      id: 'cm_portion_bound_regression', recipeId: 'r_1', name: 'Bound Regression Bowls',
+      cookedDate: '2026-08-28', storage: 'fridge', fridgeLife: 4, freezerLife: 90,
+      initialPortions: 3, portionsRemaining: 3
+    }]);
+    AppState.mealConsumptions = [];
+    useCookedPortion('cm_portion_bound_regression');
+    useCookedPortion('cm_portion_bound_regression');
+    return AppState.mealConsumptions.map((r) => r.portionsConsumed);
+  });
+  expect(result).toEqual([1, 1]);
+});
+
 // ── reconcileMealConsumptions: stale/adversarial snapshot protection ─────────
 
 test('a stale/older snapshot with fewer facts cannot erase a local consumption already recorded', async ({ page }) => {
