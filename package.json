@@ -12,7 +12,8 @@
     "test:smoke": "playwright test tests/button-smoke.spec.js",
     "test:functional": "playwright test tests/buttons-functional.spec.js",
     "test:smoke:notifications": "playwright test tests/production-smoke-attention-notifications.spec.js --headed",
-    "fixture:update": "node scripts/update-cross-repo-life-ledger-fixture.js"
+    "fixture:update": "node scripts/update-cross-repo-life-ledger-fixture.js",
+    "test:ledger-contract": "playwright test tests/ledger-source-contract.spec.js tests/cross-repo-life-ledger-fixture.spec.js --project=local"
   },
   "repository": {
     "type": "git",
