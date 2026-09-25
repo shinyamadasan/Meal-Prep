@@ -16,13 +16,16 @@ re-rendered imperatively by `render*()` functions that read `AppState` and write
 ## Tabs and their render entry points
 Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibility.
 
+Nav order follows the meal-prep flow (D-076): Home · Plan · Shop · Prep · Fridge · Recipes · More.
+
 | Tab | Section id | Entry render fn |
 |---|---|---|
-| Home / Dashboard | `#dashboard` | `renderDashboard()` |
-| Cook / My Recipes | `#recipes` | `renderRecipes()` |
-| Inventory / My Fridge | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |
+| Home / Dashboard | `#dashboard` | `renderDashboard()` → `renderMealPrepFlowCard()` first; the "what to cook/eat" cards sit in the collapsed `#dash-ideas` |
+| Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` (ends with `renderPlannedBatches()`), `renderBatchSearchResults()` |
 | Shop / Grocery | `#grocery` | `renderGroceryList()` |
-| Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` |
+| Prep | `#prep` | `renderPrepTab()` |
+| Fridge (was "Inventory") | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |
+| Recipes (was "Cook") | `#recipes` | `renderRecipes()` |
 | Nutrition | `#nutrition` | `renderNutritionTab()` → `renderWeeklyNutritionTotals()`, `renderWeeklyNutritionChart()`, `renderDailyNutritionBreakdown()`, `filterRecipesByNutrition()` |
 | Price Book | `#ingredients` | `renderIngredientsTab()` |
 | Cooking Hacks | `#hacks` | `renderCookingHacks()` |
@@ -176,6 +179,36 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
    `unstockPurchasedGroceryItem()` and reverses exactly that change.
 4. `checkAndReplenishLowStock()` + `saveData()` close the loop; `groceryItemChecked()` decides how
    the row renders (a user tap outranks the "already at home" auto-tick).
+5. A purchase lands in `AppState.pantry` (raw ingredients) ONLY. It never creates a `cookedMeals`
+   record — that happens only through prep (see "Meal-prep flow" below). D-076.
+6. **Correcting a stale "In stock"** — `pantryMatchesForShop()` names the kitchen records behind a
+   row's claim (the same loose match `isInPantry()` always used, minus staples marked `empty`). The
+   row's **Not anymore?** button opens `openNotInKitchenDialog()`, which lists each matched record;
+   `correctKitchenStock()` acts on the ONE record tapped: a staple is set `stockLevel: 'empty'`,
+   anything else is removed with an explicit `writeTombstone('pantry', …)`. Any grocery row whose
+   `stocked` receipt pointed at that record is reset to unbought. Tapping the row itself keeps its
+   D-069 meaning ("bought more"). D-076.
+
+## Meal-prep flow: Plan -> Shop -> Prep -> Fridge (D-076)
+- **Plan** — `AppState.plannedBatches` holds "N servings of recipe X this week" with no day.
+  `addPlannedBatch()`, `changePlannedBatchServings()`, `removePlannedBatch()` all end in
+  `afterPlannedBatchesChange()` (save, regenerate Shop, re-render). Low-effort discovery is
+  `getBatchSearchResults()`, ordered by the existing `recipeEffortScore()` /
+  `recipeActiveMinutes()` signals. Day slots in `weeklyPlan` remain, optional.
+- **Shop** — `generateGroceryList()` adds each batch through `addRecipeIngredients(…, servings)`,
+  scaled by `batchScaledQuantity()` (same null-means-unresolved contract as
+  `calculateScaledQuantity()`). A rebuild carries `checked` / `userSet` / `stocked` over from
+  the previous row with the same exact category + name, so a batch +/- never un-buys anything.
+- **Prep** — `completePlannedBatch()` → `completePlannedBatchNow()` calls the existing
+  `_doMarkCooked()` (which creates the `cookedMeals` record with `initialPortions` =
+  servings and deducts raw ingredients), then drops the batch from the plan. This is the only
+  way a planned batch reaches the Fridge. `getPlannedRecipeUsage()` includes batches, so the
+  existing Prep Mode checklist covers them.
+- **AI Prep Brief** — three pure steps, no model call: `getPrepSessionEntries()` (batches, then
+  day-plan meals Monday → Sunday, one entry per recipe) → `buildPrepBriefModel()` (normalized
+  facts; a missing value is `null`, never 0) → `formatPrepBrief()` (deterministic text).
+  `copyPrepBrief()` copies it via `copyTextToClipboard()` and mirrors it into `#prep-brief-text`.
+  Times use `statedMinutes()`, NOT `recipePrepMinutes()` (which returns 0 for "missing").
 
 ## Attention loop
 `collectAttentionItems()` is the single classifier behind Home's "What needs attention?" card. It

@@ -5,6 +5,44 @@
 
 ---
 
+## TASK-060 / D-076 — review fix 1 (branch: wave/meal-prep-first, on top of e1c9f1c)
+review: FIX FIRST on candidate e1c9f1c (preserved; this is a new commit, not an amend).
+changes:
+  - `generateGroceryList()`: before rebuilding, index the previous non-custom rows by the
+    generator's own identity (exact category + exact name) and carry over `checked`, `userSet`,
+    and the `stocked` receipt. No fuzzy or positional matching; removed ingredients leave no row;
+    new ingredients start unchecked; custom rows unchanged.
+  - Home "What can I do?" empty state: "Add items to Inventory" -> "Add items to Fridge".
+  - Built-in cooking hack #14 text: "add it under Inventory" -> "add it under Fridge" (seed
+    constant only; users' already-stored copies are not rewritten).
+  - docs: D-076 addendum (removes the now-false "resets checked state" limitation), ARCHITECTURE.
+  - tests: 5 new cases in tests/meal-prep-first.spec.js.
+
+---
+
+## TASK-060 / D-076 — implemented, held for review (branch: wave/meal-prep-first)
+base: `main` @ e7c3777 (= `origin/main`, 0/0 divergence at start). Uncommitted working tree on the
+  branch at time of writing; implemented directly by Claude from an owner brief, not via Codex.
+scope: `app.js`, `index.html`, `style.css`; docs `ARCHITECTURE.md`, `DATA_MODEL.md`, `FEATURES.md`,
+  `DECISIONS.md` (D-076); `TASKS.md` (TASK-060, status review); new specs
+  `tests/scroll-no-reload.spec.js`, `tests/meal-prep-first.spec.js`; allowlist/placement updates in
+  seven existing specs (intended behavior changes only; see D-076 Consequences).
+changes:
+  - removed the custom pull-to-refresh in `setupMobileEnhancements()` (root cause of scroll reloads)
+  - Shop: `pantryMatchesForShop()`, "Not anymore?" (`openNotInKitchenDialog()` /
+    `correctKitchenStock()` / `fixNotInKitchen()`); empty staples no longer count as In stock;
+    tapped rows no longer show the In-stock badge
+  - `AppState.plannedBatches` (+ normalizer/merge) at every persistence site; export `1.6`
+  - Plan: `#batch-plan` search + Low effort chip + batch list; Shop reads batches
+  - Prep tab `#prep`: Prepped → Fridge (`completePlannedBatch()`), Prep checklist, Copy AI Prep Brief
+    (`buildPrepBriefModel()` / `formatPrepBrief()` / `copyPrepBrief()`)
+  - Home: `renderMealPrepFlowCard()` first; ideas cards in collapsed `#dash-ideas`; nav reordered,
+    Inventory → Fridge, Cook → Recipes
+reverted during build: making a tap on an auto-ticked row mean "don't have it" — it broke the
+  D-057/D-069 top-up contract (6 tests); replaced by the explicit button.
+
+---
+
 ## TASK-059 / D-075 — landed (branch: wave/fridge-prepared-flavors-and-inventory-check)
 merged: reviewed candidate `089d097` landed via `--no-ff` merge `2259a4b` (parents `4b44ed9`
   + `089d097`). Pre-landing local `main` and `origin/main` both pointed at `4b44ed9`; merge-base

@@ -5,6 +5,28 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-24 — Meal-prep first (TASK-060 / D-076): implemented on `wave/meal-prep-first`, UNCOMMITTED, awaiting independent review
+
+Owner brief: refocus on PLAN -> SHOP -> PREP -> FRIDGE. Built directly by Claude on a new branch from
+`main` @ e7c3777 (= `origin/main`). **Nothing committed, merged, pushed or deployed.**
+
+Shipped on the branch: scroll-reload root cause removed (custom pull-to-refresh called
+`location.reload()` on any downward drag starting at `scrollY === 0`, including inside modals);
+"Not anymore?" correction on Shop In-stock rows (acts on one named kitchen record: staple → empty,
+else tombstoned removal); `AppState.plannedBatches` (unscheduled weekly batches, all persistence
+sites, export 1.6); Plan batch search with a Low effort filter; new Prep tab with Prepped → Fridge and a
+deterministic Copy AI Prep Brief; Home leads with the flow, and the "what to cook/eat" cards are
+collapsed under "Need ideas?"; nav order Home · Plan · Shop · Prep · Fridge · Recipes.
+Purchased ≠ prepared already held in the data model (a purchase only writes `pantry`), so no migration.
+
+Gates: full local suite 670/670; new specs 4/4 + 13/13; `Verify-Decisions.ps1` 68/68; docs drift =
+31-item baseline; `git diff --check` clean. Expected D-032 gate: `approved` (red-zone: Firestore
+payload/load/listener + tombstone writes).
+
+**Left to the human:** commit decision, then independent review of TASK-060 → merge decision.
+
+---
+
 ## 2026-08-31 — Prepared Flavors in My Fridge + last-inventory-check timestamp LANDED (TASK-059 / D-075)
 
 Owner authorization released the D-032 `approved` hold for

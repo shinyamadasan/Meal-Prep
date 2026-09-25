@@ -41,6 +41,7 @@ const AppState = {
   prepModeSession: null,      // { active, recipeUsage, checked } for an in-progress Prep Mode checklist
   deletions: {},              // { collection: { id: deletedAtISO } } tombstones — sync deletes so a union can't resurrect them
   inventoryVerifiedAt: null,  // ISO timestamp of the last "Inventory checked" tap — a manual confidence stamp, not an audit
+  plannedBatches: [],         // [{ id, recipeId, servings, addedAt }] this week's meal-prep batches — no day required (normalizePlannedBatches)
   selectedPlannerDays: [],    // transient: days the picker will assign to
   dataVersion: 0,             // cloud-doc version we last loaded (optimistic concurrency)
   syncStatus: 'idle',         // 'saving' | 'synced' | 'local' — drives the header badge
@@ -456,6 +457,7 @@ function saveToLocalStorage() {
       prepModeSession: AppState.prepModeSession,
       deletions: normalizeDeletions(AppState.deletions),
       inventoryVerifiedAt: AppState.inventoryVerifiedAt,
+      plannedBatches: normalizePlannedBatches(AppState.plannedBatches),
       version: AppState.dataVersion,
       lastSaved: new Date().toISOString()
     };
@@ -523,6 +525,7 @@ function loadFromLocalStorage() {
       // A record saved before this feature existed simply has no key — reads as
       // "never verified", never fabricated from another field.
       AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
+      AppState.plannedBatches = normalizePlannedBatches(data.plannedBatches); // absent key = no batches
       AppState.dataVersion = data.version || 0;
       cacheInlinePhotos(); // localStorage keeps photos inline; cache them
       markInitialized();   // a saved record exists → not first run
@@ -1772,7 +1775,8 @@ function snapshotData() {
     mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
     recentRecipes: AppState.recentRecipes,
     deletions: normalizeDeletions(AppState.deletions),
-    inventoryVerifiedAt: AppState.inventoryVerifiedAt
+    inventoryVerifiedAt: AppState.inventoryVerifiedAt,
+    plannedBatches: normalizePlannedBatches(AppState.plannedBatches)
   };
 }
 
@@ -1827,6 +1831,8 @@ function restoreBackup() {
       AppState.recentRecipes = d.recentRecipes || [];
       AppState.prepModeSession = d.prepModeSession || null;
       AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
+      // Same rule as weeklyPlan above: an older backup without the key keeps the current plan.
+      if (d.plannedBatches) AppState.plannedBatches = normalizePlannedBatches(d.plannedBatches);
       cacheInlinePhotos();
       saveData();
 
@@ -1875,6 +1881,7 @@ async function clearLocalStorage() {
       AppState.customStores = [];
       AppState.cookHistory = [];
       AppState.prepModeSession = null;
+      AppState.plannedBatches = [];
       AppState.weeklyPlan = {
         Monday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
         Tuesday: { breakfast: null, lunch: null, dinner: null, snacks: [] },
@@ -2028,7 +2035,7 @@ const defaultCookingHacks = [
     id: 14,
     category: "Storage",
     title: "Count Portions When You Store It",
-    description: "When you put cooked food away, add it under Inventory with a portion count — e.g. Landers lechon manok, 6 portions, fridge. Then tap \"Used 1\" each time you eat some. Home shows what is already cooked before it suggests cooking anything new, so ready food gets eaten before it is wasted.",
+    description: "When you put cooked food away, add it under Fridge with a portion count — e.g. Landers lechon manok, 6 portions, fridge. Then tap \"Used 1\" each time you eat some. Home shows what is already cooked before it suggests cooking anything new, so ready food gets eaten before it is wasted.",
     timeSaved: "A whole cook session per week",
     costSavings: ""
   }
@@ -3971,6 +3978,10 @@ function showTab(tabId) {
     renderDashboard();
   } else if (tabId === 'planner') {
     updateWeeklyStats();
+    renderPlannedBatches();
+    renderBatchSearchResults();
+  } else if (tabId === 'prep') {
+    renderPrepTab();
   } else if (tabId === 'grocery') {
     if (checkAndReplenishLowStock()) saveData();
     updateGrocerySummary();
@@ -5655,6 +5666,7 @@ function renderWeeklyPlanner() {
   updateMobileDayNav();
   renderStorageAlerts();
   renderWeeklyNutritionTotals();
+  renderPlannedBatches(); // this week's unscheduled batches sit above the day grid
 }
 
 function renderWeeklyNutritionTotals() {
@@ -6128,7 +6140,7 @@ function renderDashboard() {
       useSoonItemSection = '<div class="dash-l1-block' + (hasExpired ? ' dash-l1-block--sep' : '') + '">' +
         '<div class="dash-l1-sublabel">' + icon('hourglass') + ' Use soon</div>' +
         soonRows +
-        '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'fridge\')">View in Inventory →</button>' +
+        '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'fridge\')">View in Fridge →</button>' +
         '</div>';
     }
     var expirySection = expiredSection + useSoonItemSection;
@@ -6181,9 +6193,9 @@ function renderDashboard() {
   var cookable = getCookableRecipes();
   var cookPane;
   if (totalPantryItems === 0) {
-    cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Inventory</button> to see what you can make.</div>';
+    cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Fridge</button> to see what you can make.</div>';
   } else if (cookable.length === 0) {
-    cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Cook →</button></div>';
+    cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Recipes →</button></div>';
   } else {
     var cookTiers = [
       { key: 0, label: 'Can cook now', cls: 'dash-cook-tier--ready' },
@@ -6300,16 +6312,64 @@ function renderDashboard() {
       '</div>';
   }
 
-  el.innerHTML = '<div class="dashboard">' +
-    '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
-    leftoverPromptCard +
-    level1Card +
+  // Meal-prep first: the week's Plan -> Shop -> Prep -> Fridge flow and the food that
+  // is ready now lead. The "what should I cook/eat today?" cards are still here, one
+  // tap away, but no longer the primary path.
+  // Keep it open across re-renders (e.g. after Used 1 inside it). View state only.
+  var prevIdeas = document.getElementById('dash-ideas');
+  var ideasOpen = !!(prevIdeas && prevIdeas.open);
+  var ideasCard = '<details class="dash-card dash-ideas" id="dash-ideas"' + (ideasOpen ? ' open' : '') + '>' +
+    '<summary class="dash-level-header">' + icon('lightbulb') + ' Need ideas? What to cook or eat</summary>' +
     renderWhatShouldWeEatCard() +
-    renderReadyFoodCard() +
     renderCookSuggestionCard() +
     level2Card +
+    '</details>';
+
+  el.innerHTML = '<div class="dashboard">' +
+    '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
+    renderMealPrepFlowCard() +
+    level1Card +
+    renderReadyFoodCard() +
+    leftoverPromptCard +
     level3Card +
+    ideasCard +
     historyCard +
+    '</div>';
+}
+
+// This week at a glance, in flow order. Every number is derived from existing state:
+// planned batches, the Shop list's own checked/in-stock view, and stored ready food.
+function renderMealPrepFlowCard() {
+  var batches = normalizePlannedBatches(AppState.plannedBatches);
+  var servings = batches.reduce(function(s, b) { return s + (b.servings || 0); }, 0);
+  var toBuy = (AppState.groceryList || []).filter(function(g) { return !groceryItemChecked(g); }).length;
+  var ready = getReadyFoodSuggestions(1000);
+  var readyPortions = ready.reduce(function(s, m) { return s + (cookedMealTracksPortions(m) ? (m.portionsRemaining || 0) : 0); }, 0);
+  var untracked = ready.filter(function(m) { return !cookedMealTracksPortions(m); }).length;
+
+  function step(n, label, value, tab) {
+    return '<button type="button" class="dash-flow-step" onclick="showTab(\'' + tab + '\')">' +
+      '<span class="dash-flow-num">' + n + '</span>' +
+      '<span class="dash-flow-label">' + label + '</span>' +
+      '<span class="dash-flow-value">' + value + '</span></button>';
+  }
+  var planVal = batches.length
+    ? batches.length + ' batch' + (batches.length === 1 ? '' : 'es') + (servings ? ' · ' + servings + ' servings' : '')
+    : 'Nothing yet';
+  var shopVal = toBuy ? toBuy + ' to buy' : ((AppState.groceryList || []).length ? 'All set' : 'Empty');
+  var prepVal = batches.length ? batches.length + ' to prep' : 'Nothing to prep';
+  var fridgeVal = readyPortions
+    ? readyPortions + ' serving' + (readyPortions === 1 ? '' : 's') + ' ready' + (untracked ? ' +' + untracked + ' more' : '')
+    : (ready.length ? ready.length + ' meal' + (ready.length === 1 ? '' : 's') + ' ready' : 'Empty');
+
+  return '<div class="dash-card dash-card--prepflow">' +
+    '<div class="dash-level-header">' + icon('chef-hat') + ' This week\'s meal prep</div>' +
+    '<div class="dash-flow">' +
+      step(1, 'Plan', planVal, 'planner') +
+      step(2, 'Shop', shopVal, 'grocery') +
+      step(3, 'Prep', prepVal, 'prep') +
+      step(4, 'Fridge', fridgeVal, 'fridge') +
+    '</div>' +
     '</div>';
 }
 
@@ -6392,14 +6452,30 @@ function generateGroceryList() {
       }
     });
   });
-  
+
+  // This week's batches need no day — they shop exactly like a planned meal, scaled
+  // to the batch's own servings.
+  normalizePlannedBatches(AppState.plannedBatches).forEach(batch => {
+    addRecipeIngredients(batch.recipeId, ingredients, batch.servings);
+  });
+
+  // A rebuild must not un-buy what the user already ticked (a batch +/- regenerates
+  // this list). Carry the user's state over by the SAME identity rows are built with
+  // above: exact category + exact name. Never fuzzy, never by position — "Rice" and
+  // "Rice Vinegar" stay separate. A row whose ingredient left the plan is not kept.
+  const rowKey = (category, name) => String(category) + '\u0000' + String(name);
+  const previous = {};
+  AppState.groceryList.forEach(item => {
+    if (!item.custom) previous[rowKey(item.category, item.name)] = item;
+  });
+
   // Convert to grocery list format. Keep manually-added custom items — only the
   // meal-plan-generated items are rebuilt from the weekly plan.
   AppState.groceryList = AppState.groceryList.filter(item => item.custom);
   Object.keys(ingredients).forEach(category => {
     Object.keys(ingredients[category]).forEach(name => {
       const item = ingredients[category][name];
-      AppState.groceryList.push({
+      const row = {
         id: Date.now() + Math.random(),
         category,
         name,
@@ -6407,22 +6483,29 @@ function generateGroceryList() {
         unit: item.unit,
         sources: item.sources || [],
         checked: false
-      });
+      };
+      const prev = previous[rowKey(category, name)];
+      if (prev) {
+        row.checked = !!prev.checked;
+        if (prev.userSet) row.userSet = true;
+        if (prev.stocked) row.stocked = prev.stocked; // keeps "uncheck" able to undo the purchase
+      }
+      AppState.groceryList.push(row);
     });
   });
   
   renderGroceryList();
 }
 
-function addRecipeIngredients(recipeId, ingredients) {
+function addRecipeIngredients(recipeId, ingredients, servings) {
   const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
-  
+
   const recipeIngredients = recipe.baseIngredients || recipe.ingredients;
   recipeIngredients.forEach(ingredient => {
     const category = ingredient.category;
     const name = ingredient.name;
-    const scaledQty = calculateScaledQuantity(recipe, ingredient);
+    const scaledQty = servings ? batchScaledQuantity(recipe, ingredient, servings) : calculateScaledQuantity(recipe, ingredient);
     
     if (!ingredients[category]) {
       ingredients[category] = {};
@@ -6437,8 +6520,16 @@ function addRecipeIngredients(recipeId, ingredients) {
     }
     
     ingredients[category][name].quantity += scaledQty;
-    ingredients[category][name].sources.push(`${recipe.name} (${recipe.currentServings} servings)`);
+    ingredients[category][name].sources.push(`${recipe.name} (${servings || recipe.currentServings} servings)`);
   });
+}
+
+// Same contract as calculateScaledQuantity() (null = unresolved, never a fabricated
+// amount), but scaled to an explicit batch size instead of the recipe's currentServings.
+function batchScaledQuantity(recipe, ingredient, servings) {
+  if (ingredient.baseQuantity === null) return null;
+  const base = Number(recipe.baseServings) || Number(recipe.currentServings) || 1;
+  return ingredient.baseQuantity * (servings / base);
 }
 
 // Collapses repeated source strings into "Name ×N" so an ingredient used on
@@ -6482,7 +6573,7 @@ function renderGroceryList() {
 
   // ── Stock summary bar: show what's already at home ─────────────
   const totalItems = AppState.groceryList.length;
-  const inStockItems = AppState.groceryList.filter(item => !item.fromStaple && isInPantry(item.name)).length;
+  const inStockItems = AppState.groceryList.filter(item => !item.fromStaple && !item.userSet && isInPantry(item.name)).length;
   const needToBuyCount = totalItems - inStockItems;
   const stockBar = inStockItems > 0
     ? `<div class="grocery-stock-bar">
@@ -6515,7 +6606,9 @@ function renderGroceryList() {
 
         // "Running low" staples are in the pantry by definition — don't let the
         // in-stock check hide them; the whole point is that you need to rebuy.
-        const inPantry = item.fromStaple ? false : isInPantry(item.name);
+        // Once the user has tapped the row it is theirs; only an untouched row still
+        // claims "In stock" from the kitchen.
+        const inPantry = (item.fromStaple || item.userSet) ? false : isInPantry(item.name);
         const isChecked = groceryItemChecked(item);
         return `
         <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${item.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${item.id})}">
@@ -6524,7 +6617,7 @@ function renderGroceryList() {
           <div class="grocery-item-info">
             <div class="grocery-item-name">
               ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
-              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span>' : ''}
+              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + item.id + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
               ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${item.id})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
@@ -6577,6 +6670,102 @@ function dismissSuggestedGroceryItem(itemId) {
   renderGroceryList();
 }
 window.dismissSuggestedGroceryItem = dismissSuggestedGroceryItem;
+
+// ── "Not anymore?" — correcting what the kitchen thinks it has ──────────────
+// The Shop list says "In stock" when a kitchen record matches. When that record is
+// stale, the user needs to say so explicitly. The correction acts on ONE named kitchen
+// record at a time: the Shop match is loose ("Rice" matches "Rice vinegar"), so
+// deleting every match would throw away real stock. A staple is marked empty (it stays
+// a staple, and the existing Running-low row appears); anything else is removed with
+// an explicit tombstone so a synced copy cannot bring it back.
+function correctKitchenStock(pantryId) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(pantryId); });
+  if (!p) return null;
+  var result;
+  if (isStaple(p)) {
+    p.stockLevel = 'empty';
+    syncStapleToGrocery(p);
+    stampUpdated(p);
+    result = 'empty';
+  } else {
+    writeTombstone('pantry', p.id, new Date().toISOString());
+    AppState.pantry = AppState.pantry.filter(function(x) { return String(x.id) !== String(pantryId); });
+    result = 'removed';
+  }
+  // A shopping row whose "bought" receipt points at this record is no longer bought.
+  (AppState.groceryList || []).forEach(function(g) {
+    if (g.stocked && String(g.stocked.pantryId) === String(pantryId)) {
+      delete g.stocked;
+      g.checked = false;
+      g.userSet = true;
+    }
+  });
+  saveData();
+  renderGroceryList();
+  renderPantry();
+  renderDashboard();
+  refreshFreshnessAlerts();
+  return result;
+}
+window.correctKitchenStock = correctKitchenStock;
+
+function describeKitchenRecord(p) {
+  var parts = [];
+  if (isStaple(p)) parts.push('staple · ' + (p.stockLevel || 'stocked'));
+  else if (p.quantity != null && !isNaN(p.quantity)) parts.push(formatQuantity(p.quantity) + (p.unit ? ' ' + p.unit : ''));
+  var storage = p.storage || inferStorage(p.name, p.category);
+  if (storage) parts.push(storage);
+  return parts.join(' · ');
+}
+
+function closeNotInKitchenDialog() {
+  document.querySelectorAll('.not-in-kitchen-overlay').forEach(function(o) { o.remove(); });
+}
+window.closeNotInKitchenDialog = closeNotInKitchenDialog;
+
+function openNotInKitchenDialog(groceryId) {
+  closeNotInKitchenDialog();
+  var item = (AppState.groceryList || []).find(function(g) { return g.id === groceryId; });
+  if (!item) return;
+  var matches = pantryMatchesForShop(item.name);
+  if (!matches.length) return;
+  var rows = matches.map(function(p) {
+    var staple = isStaple(p);
+    var idArg = escapeHtml(escJ(String(p.id)));
+    return '<div class="nik-row">' +
+      '<div class="nik-info"><span class="nik-name">' + escapeHtml(p.name) + '</span>' +
+      '<span class="nik-meta">' + escapeHtml(describeKitchenRecord(p)) + '</span></div>' +
+      '<button type="button" class="btn btn--secondary btn--sm nik-fix-btn" ' +
+        'onclick="fixNotInKitchen(\'' + idArg + '\', ' + item.id + ')">' +
+        (staple ? 'Mark empty' : 'Used up — remove') + '</button>' +
+      '</div>';
+  }).join('');
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay not-in-kitchen-overlay';
+  overlay.innerHTML =
+    '<div class="confirm-dialog" role="dialog" aria-modal="true" aria-label="Not in kitchen">' +
+      '<h3 class="confirm-title">Don\'t have ' + escapeHtml(item.name) + '?</h3>' +
+      '<div class="confirm-body">' +
+        '<p>Shop marked it in stock because your kitchen lists:</p>' + rows +
+        '<p class="nik-note">Only the item you tap changes. If that\'s a different ingredient, close this and tap the row to put it back on your list.</p>' +
+      '</div>' +
+      '<div class="confirm-btns"><button class="btn btn--ghost" onclick="closeNotInKitchenDialog()">Close</button></div>' +
+    '</div>';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeNotInKitchenDialog(); });
+  document.body.appendChild(overlay);
+}
+window.openNotInKitchenDialog = openNotInKitchenDialog;
+
+function fixNotInKitchen(pantryId, groceryId) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(pantryId); });
+  var name = p ? p.name : '';
+  var result = correctKitchenStock(pantryId);
+  if (!result) return;
+  showSuccessMessage(result === 'empty' ? name + ' marked empty.' : name + ' removed from your kitchen.');
+  // Re-open with what is left; closes itself once nothing matches any more.
+  openNotInKitchenDialog(groceryId);
+}
+window.fixNotInKitchen = fixNotInKitchen;
 
 function clearGroceryList() {
   showConfirmDialog(
@@ -7894,11 +8083,12 @@ function exportData() {
       recentRecipes: AppState.recentRecipes,
       deletions: normalizeDeletions(AppState.deletions),
       inventoryVerifiedAt: AppState.inventoryVerifiedAt,
+      plannedBatches: normalizePlannedBatches(AppState.plannedBatches),
       exportedAt: new Date().toISOString(),
-      // Bumped because the payload gained a field. Import accepts ALL of 1.1/1.2/1.3/1.4/1.5
+      // Bumped because the payload gained a field. Import accepts ALL of 1.1-1.6
       // — an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt`/
-      // `mealConsumptions`/`deletions` key and imports as it always did.
-      version: '1.5'
+      // `mealConsumptions`/`deletions`/`plannedBatches` key and imports as it always did.
+      version: '1.6'
     };
     
     const dataStr = JSON.stringify(dataToExport, null, 2);
@@ -7939,6 +8129,49 @@ function mergeWeeklyPlan(imported) {
     (imported[day].snacks || []).forEach(function(id) { if (cur.indexOf(id) < 0) cur.push(id); });
     AppState.weeklyPlan[day].snacks = cur;
   });
+}
+
+// ── Planned batches (meal-prep plan with no day required) ───────────────────
+// A batch is "make N servings of this recipe this week". It is plan state, like
+// weeklyPlan: a whole top-level field, local-wins in mergeCloudConflict(), NOT a
+// TOMBSTONE_KEYS collection (a union merge without tombstones would resurrect a batch
+// the user removed). Prepping a batch turns it into a cookedMeals record and removes it
+// from the plan — see completePlannedBatch().
+function normalizePlannedBatch(b) {
+  if (!b || typeof b !== 'object') return null;
+  var recipeId = b.recipeId == null ? '' : String(b.recipeId).trim();
+  if (!recipeId) return null;
+  var servings = Number(b.servings);
+  servings = (Number.isFinite(servings) && servings >= 1) ? Math.min(99, Math.round(servings)) : null;
+  return {
+    id: (b.id != null && String(b.id).trim()) ? String(b.id) : ('pb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
+    recipeId: recipeId,
+    servings: servings,
+    addedAt: typeof b.addedAt === 'string' ? b.addedAt : null
+  };
+}
+
+function normalizePlannedBatches(list) {
+  if (!Array.isArray(list)) return [];
+  var seen = {};
+  var out = [];
+  list.forEach(function(b) {
+    var n = normalizePlannedBatch(b);
+    if (!n || seen[n.id]) return;
+    seen[n.id] = true;
+    out.push(n);
+  });
+  return out;
+}
+
+// Fill-only, same rule as mergeWeeklyPlan(): add batches whose id is missing, never
+// overwrite or drop one already planned.
+function mergePlannedBatches(incoming) {
+  var cur = normalizePlannedBatches(AppState.plannedBatches);
+  var have = {};
+  cur.forEach(function(b) { have[b.id] = true; });
+  normalizePlannedBatches(incoming).forEach(function(b) { if (!have[b.id]) cur.push(b); });
+  AppState.plannedBatches = cur;
 }
 
 function importData() {
@@ -8013,6 +8246,7 @@ function importData() {
 
             // Plan: fill empty slots only (never wipe a planned meal).
             if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
+            if (importedData.plannedBatches) mergePlannedBatches(importedData.plannedBatches);
 
             // Maps + store lists: combine; current values win on conflicts.
             AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
@@ -8495,6 +8729,7 @@ function buildFirestorePayload() {
     recentRecipes: AppState.recentRecipes,
     prepModeSession: AppState.prepModeSession,
     deletions: normalizeDeletions(AppState.deletions),
+    plannedBatches: normalizePlannedBatches(AppState.plannedBatches),
     inventoryVerifiedAt: AppState.inventoryVerifiedAt,
     lastUpdated: new Date().toISOString(),
     lastSaved: new Date().toISOString()
@@ -8893,6 +9128,9 @@ async function loadFromFirestore() {
       // An account whose cloud doc predates this feature has no key — reads as
       // "never verified", never fabricated from another field.
       AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
+      // Absent key (doc written by an app version that predates batches) keeps what this
+      // device has, rather than reading as "plan cleared". A real clear arrives as [].
+      if (Array.isArray(data.plannedBatches)) AppState.plannedBatches = normalizePlannedBatches(data.plannedBatches);
       purgeOldTombstones();
       // Stamp items that pre-date this feature with the document's save time.
       // applyTombstones() uses LWW: a tombstone only removes an item if the tombstone
@@ -8997,6 +9235,7 @@ async function loadUserData() {
         AppState.flavors = normalizeFlavors(AppState.flavors); // flavors may arrive from the other device
         AppState.preparedFlavors = normalizePreparedFlavors(AppState.preparedFlavors); // prepared stock may arrive from the other device
         if (local.weeklyPlan) mergeWeeklyPlan(local.weeklyPlan); // fill empty slots only — never wipe a planned meal
+        if (local.plannedBatches) mergePlannedBatches(local.plannedBatches); // add missing ids only — never wipe a planned batch
         AppState.ingredientPrices = Object.assign({}, local.ingredientPrices || {}, AppState.ingredientPrices);
         AppState.myStores = unionStrings(AppState.myStores || [], local.myStores || []);
         AppState.customStores = unionStrings(AppState.customStores || [], local.customStores || []);
@@ -9166,6 +9405,10 @@ function setupRealtimeListeners() {
         AppState.deletions = normalizeDeletions(data.deletions); // adopt the remote tombstones...
         applyTombstones();                          // ...so a delete made on another device lands here too
         AppState.inventoryVerifiedAt = data.inventoryVerifiedAt || AppState.inventoryVerifiedAt;
+        // Whole-field like weeklyPlan: the remote doc's plan is the plan — but only when the
+        // remote doc HAS the key. A save from an older app version (no plannedBatches in its
+        // payload) must not read as "the user cleared the plan". A real clear arrives as [].
+        if (Array.isArray(data.plannedBatches)) AppState.plannedBatches = normalizePlannedBatches(data.plannedBatches);
         snapshotIdBaseline();
 
         // Update UI
@@ -9349,35 +9592,12 @@ function setupMobileEnhancements() {
   
   // Improve scroll behavior for mobile
   document.body.style.webkitOverflowScrolling = 'touch';
-  
-  // Add pull-to-refresh functionality
-  let startY = 0;
-  let currentY = 0;
-  let isPulling = false;
-  
-  document.addEventListener('touchstart', function(e) {
-    if (window.scrollY === 0) {
-      startY = e.touches[0].clientY;
-      isPulling = true;
-    }
-  });
-  
-  document.addEventListener('touchmove', function(e) {
-    if (isPulling) {
-      currentY = e.touches[0].clientY;
-      const pullDistance = currentY - startY;
-      
-      if (pullDistance > 100) {
-        // Trigger refresh
-        location.reload();
-        isPulling = false;
-      }
-    }
-  });
-  
-  document.addEventListener('touchend', function() {
-    isPulling = false;
-  });
+
+  // No custom pull-to-refresh. One used to live here: any touch that started while
+  // window.scrollY === 0 and moved 100px down called location.reload(). The window's
+  // scroll position says nothing about what the finger is scrolling (a modal's list,
+  // Prep Mode), so ordinary scrolling reloaded the app and threw away unsaved input.
+  // Sync already refreshes data live; see tests/scroll-no-reload.spec.js.
 }
 
 // Initialize mobile enhancements when DOM is loaded
@@ -9635,6 +9855,10 @@ function getPlannedRecipeUsage() {
       recipeUsage[id] = (recipeUsage[id] || 0) + 1;
     });
   });
+  // Unscheduled batches are prep work too.
+  normalizePlannedBatches(AppState.plannedBatches).forEach(b => {
+    recipeUsage[b.recipeId] = (recipeUsage[b.recipeId] || 0) + 1;
+  });
   return recipeUsage;
 }
 
@@ -9643,7 +9867,7 @@ function openPrepMode(session) {
   const recipeUsage = restoring ? (session.recipeUsage || {}) : getPlannedRecipeUsage();
   const ids = Object.keys(recipeUsage);
   if (ids.length === 0) {
-    if (!restoring) showErrorMessage('Your week is empty — add some meals to the planner first.');
+    if (!restoring) showErrorMessage('Nothing to prep yet — add a batch in Plan first.');
     return;
   }
 
@@ -9748,6 +9972,399 @@ function closePrepMode() {
   AppState.prepModeSession = null;
   saveData();
 }
+
+// ── Planned batches: PLAN -> SHOP -> PREP -> FRIDGE ──────────────────────────
+// A batch is "N servings of this recipe this week", with no day attached. Shopping
+// reads it through generateGroceryList(); Prep turns it into a cookedMeals record
+// through the existing _doMarkCooked() path (which also deducts raw ingredients) and
+// only then does anything enter the Fridge. Buying never does.
+
+function findRecipeById(id) {
+  return AppState.recipes.find(function(r) { return String(r.id) === String(id); }) || null;
+}
+
+function defaultBatchServings(recipe) {
+  var s = Number(recipe && recipe.baseServings) || Number(recipe && recipe.currentServings);
+  return Number.isFinite(s) && s >= 1 ? Math.round(s) : null;
+}
+
+function afterPlannedBatchesChange() {
+  saveData();
+  generateGroceryList();
+  renderPlannedBatches();
+  renderDashboard();
+}
+
+function addPlannedBatch(recipeId) {
+  var recipe = findRecipeById(recipeId);
+  if (!recipe) { showErrorMessage('Recipe not found'); return null; }
+  var batch = normalizePlannedBatch({
+    recipeId: String(recipe.id),
+    servings: defaultBatchServings(recipe),
+    addedAt: new Date().toISOString()
+  });
+  AppState.plannedBatches = normalizePlannedBatches(AppState.plannedBatches).concat([batch]);
+  afterPlannedBatchesChange();
+  showSuccessMessage('Added ' + recipe.name + (batch.servings ? ' — ' + batch.servings + ' servings' : '') + ' to this week.');
+  return batch.id;
+}
+window.addPlannedBatch = addPlannedBatch;
+
+function changePlannedBatchServings(batchId, delta) {
+  var list = normalizePlannedBatches(AppState.plannedBatches);
+  var b = list.find(function(x) { return x.id === String(batchId); });
+  if (!b) return;
+  var cur = b.servings || defaultBatchServings(findRecipeById(b.recipeId)) || 1;
+  b.servings = Math.max(1, Math.min(99, cur + delta));
+  AppState.plannedBatches = list;
+  afterPlannedBatchesChange();
+}
+window.changePlannedBatchServings = changePlannedBatchServings;
+
+function removePlannedBatch(batchId) {
+  AppState.plannedBatches = normalizePlannedBatches(AppState.plannedBatches)
+    .filter(function(x) { return x.id !== String(batchId); });
+  afterPlannedBatchesChange();
+}
+window.removePlannedBatch = removePlannedBatch;
+
+// The one PREP -> FRIDGE transition for a batch: creates the cooked batch with its
+// servings as tracked portions, deducts raw ingredients, and leaves the plan.
+function completePlannedBatchNow(batchId) {
+  var list = normalizePlannedBatches(AppState.plannedBatches);
+  var b = list.find(function(x) { return x.id === String(batchId); });
+  if (!b) return false;
+  var recipe = findRecipeById(b.recipeId);
+  if (!recipe) { showErrorMessage('That recipe no longer exists.'); return false; }
+  var base = Number(recipe.currentServings) || 1;
+  var multiplier = b.servings ? b.servings / base : 1;
+  _doMarkCooked(recipe, null, multiplier, b.servings);
+  AppState.plannedBatches = list.filter(function(x) { return x.id !== b.id; });
+  afterPlannedBatchesChange();
+  return true;
+}
+
+function completePlannedBatch(batchId) {
+  var b = normalizePlannedBatches(AppState.plannedBatches).find(function(x) { return x.id === String(batchId); });
+  var recipe = b && findRecipeById(b.recipeId);
+  if (!recipe) return;
+  showConfirmDialog(
+    'Move to Fridge?',
+    '<p><strong>' + escapeHtml(recipe.name) + '</strong>' + (b.servings ? ' — ' + b.servings + ' servings' : '') +
+      ' goes into your Fridge as ready food.</p><p>Its ingredients are deducted from what you have on hand.</p>',
+    'Prepped — add to Fridge',
+    'Cancel',
+    function() { completePlannedBatchNow(batchId); }
+  );
+}
+window.completePlannedBatch = completePlannedBatch;
+
+// Low-effort discovery for planning. Ordering reuses the app's own effort signals
+// (recipeEffortScore / recipeActiveMinutes) — nothing new is inferred.
+var batchSearchLowEffort = true;
+
+function getBatchSearchResults(query, lowEffort, limit) {
+  var q = String(query || '').trim().toLowerCase();
+  if (!q && !lowEffort) return [];
+  return (AppState.recipes || []).filter(function(r) {
+    if (q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
+    if (lowEffort && recipeEffortScore(r) > 2) return false;
+    return true;
+  }).sort(function(a, b) {
+    return (recipeEffortScore(a) - recipeEffortScore(b)) ||
+      ((recipeHasTag(a, 'batch-friendly') ? 0 : 1) - (recipeHasTag(b, 'batch-friendly') ? 0 : 1)) ||
+      (recipeActiveMinutes(a) - recipeActiveMinutes(b)) ||
+      String(a.name).localeCompare(String(b.name));
+  }).slice(0, limit || 6);
+}
+
+function toggleBatchLowEffort() {
+  batchSearchLowEffort = !batchSearchLowEffort;
+  renderBatchSearchResults();
+}
+window.toggleBatchLowEffort = toggleBatchLowEffort;
+
+function renderBatchSearchResults() {
+  var el = document.getElementById('batch-search-results');
+  if (!el) return;
+  var chip = document.getElementById('batch-low-effort-chip');
+  if (chip) {
+    chip.classList.toggle('active', batchSearchLowEffort);
+    chip.setAttribute('aria-pressed', String(batchSearchLowEffort));
+  }
+  var input = document.getElementById('batch-search');
+  var results = getBatchSearchResults(input ? input.value : '', batchSearchLowEffort, 6);
+  if (!results.length) {
+    el.innerHTML = (input && input.value.trim())
+      ? '<div class="batch-empty">No matching recipes' + (batchSearchLowEffort ? ' at low effort — tap <b>Low effort</b> to see all' : '') + '.</div>'
+      : '';
+    return;
+  }
+  el.innerHTML = results.map(function(r) {
+    var meta = [];
+    var eff = effortLabel(r);
+    if (eff) meta.push(eff);
+    var active = normalizeActiveTime(r.activeTime);
+    if (active != null) meta.push(active + ' min hands-on');
+    if (recipeHasTag(r, 'batch-friendly')) meta.push('batch-friendly');
+    var s = defaultBatchServings(r);
+    if (s) meta.push(s + ' servings');
+    return '<div class="batch-result">' +
+      '<div class="batch-info"><span class="batch-name">' + escapeHtml(r.name) + '</span>' +
+      (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
+      '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\')">+ Add</button>' +
+      '</div>';
+  }).join('');
+}
+window.renderBatchSearchResults = renderBatchSearchResults;
+
+function plannedBatchRowHtml(b, mode) {
+  var recipe = findRecipeById(b.recipeId);
+  var name = recipe ? recipe.name : 'Unknown recipe (deleted)';
+  var idArg = escJ(b.id);
+  var servingsText = b.servings ? b.servings + ' servings' : 'servings not set';
+  var controls;
+  if (mode === 'prep') {
+    controls = recipe
+      ? '<button type="button" class="btn btn--primary btn--sm batch-done-btn" onclick="completePlannedBatch(\'' + idArg + '\')">Prepped → Fridge</button>'
+      : '<button type="button" class="btn btn--ghost btn--sm" onclick="removePlannedBatch(\'' + idArg + '\')">Remove</button>';
+  } else {
+    controls = '<div class="batch-stepper">' +
+      '<button type="button" class="batch-step-btn" aria-label="Fewer servings" onclick="changePlannedBatchServings(\'' + idArg + '\', -1)">−</button>' +
+      '<span class="batch-servings">' + (b.servings || '—') + '</span>' +
+      '<button type="button" class="batch-step-btn" aria-label="More servings" onclick="changePlannedBatchServings(\'' + idArg + '\', 1)">+</button>' +
+      '</div>' +
+      '<button type="button" class="batch-remove-btn" aria-label="Remove ' + escapeHtml(name) + '" onclick="removePlannedBatch(\'' + idArg + '\')">×</button>';
+  }
+  return '<div class="batch-row" data-batch-id="' + escapeHtml(b.id) + '">' +
+    '<div class="batch-info"><span class="batch-name">' + escapeHtml(name) + '</span>' +
+    '<span class="batch-meta">' + escapeHtml(servingsText) + '</span></div>' +
+    controls + '</div>';
+}
+
+function renderPlannedBatches() {
+  var batches = normalizePlannedBatches(AppState.plannedBatches);
+  var planEl = document.getElementById('planned-batches-list');
+  if (planEl) {
+    planEl.innerHTML = batches.length
+      ? batches.map(function(b) { return plannedBatchRowHtml(b, 'plan'); }).join('')
+      : '<div class="batch-empty">No batches yet. Search above and tap <b>+ Add</b> — no days needed.</div>';
+  }
+  renderPrepTab();
+}
+window.renderPlannedBatches = renderPlannedBatches;
+
+// ── Prep session + AI Prep Brief ─────────────────────────────────────────────
+// Facts only: recipe data -> normalized prep model -> deterministic text. The brief
+// is something the user pastes into an external AI; the app itself never sequences
+// steps or invents a value. Anything the recipe does not record is "not stated".
+
+var PLAN_WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// Everything planned this week, one entry per recipe, in a stable order: batches in
+// the order added, then day-scheduled meals Monday -> Sunday.
+function getPrepSessionEntries() {
+  var byId = {};
+  var order = [];
+  function add(recipeId, servings, source) {
+    var recipe = findRecipeById(recipeId);
+    if (!recipe) return;
+    var key = String(recipe.id);
+    if (!byId[key]) { byId[key] = { recipe: recipe, servings: 0, unknown: false, sources: [] }; order.push(key); }
+    if (servings == null) byId[key].unknown = true; else byId[key].servings += servings;
+    byId[key].sources.push(source);
+  }
+  normalizePlannedBatches(AppState.plannedBatches).forEach(function(b) {
+    var r = findRecipeById(b.recipeId);
+    add(b.recipeId, b.servings || (r && Number(r.currentServings)) || null, 'batch');
+  });
+  PLAN_WEEK_DAYS.forEach(function(day) {
+    var plan = (AppState.weeklyPlan || {})[day] || {};
+    var ids = [plan.breakfast, plan.lunch, plan.dinner].filter(Boolean).concat(plan.snacks || []);
+    ids.forEach(function(id) {
+      var r = findRecipeById(id);
+      add(id, (r && Number(r.currentServings)) || null, day);
+    });
+  });
+  return order.map(function(k) {
+    var e = byId[k];
+    return { recipe: e.recipe, servings: e.unknown ? null : e.servings, sources: e.sources };
+  });
+}
+
+// A stated number of minutes, or null. Deliberately NOT recipePrepMinutes(): that
+// returns 0 for a missing time, and "0 min" in a brief would be an invented fact.
+function statedMinutes(primary, legacy) {
+  var vals = [primary, legacy];
+  for (var i = 0; i < vals.length; i++) {
+    var v = vals[i];
+    if (v == null || String(v).trim() === '') continue;
+    var n = Number(v);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+function statedPositive(v) {
+  var n = Number(v);
+  return (v != null && String(v).trim() !== '' && Number.isFinite(n) && n > 0) ? n : null;
+}
+
+function buildPrepBriefModel(entries) {
+  var recipes = (entries || []).map(function(e) {
+    var r = e.recipe;
+    var base = statedPositive(r.baseServings);
+    var scale = (e.servings != null && base) ? e.servings / base : null;
+    var ings = (r.baseIngredients || r.ingredients || []).map(function(ing) {
+      var q = ing.baseQuantity;
+      var known = q != null && String(q).trim() !== '' && Number.isFinite(Number(q));
+      return {
+        name: String(ing.name || '').trim(),
+        quantity: known ? (scale != null ? Number(q) * scale : Number(q)) : null,
+        unit: String(ing.unit || '').trim()
+      };
+    }).filter(function(i) { return i.name; });
+    return {
+      id: String(r.id),
+      name: String(r.name || 'Untitled recipe'),
+      servings: e.servings,
+      baseServings: base,
+      scale: scale,
+      plannedAs: e.sources.slice(),
+      prepMinutes: statedMinutes(r.basePrepTime, r.prepTime),
+      cookMinutes: statedMinutes(r.baseCookTime, r.cookTime),
+      activeMinutes: normalizeActiveTime(r.activeTime),
+      effort: effortLabel(r) || null,
+      equipment: (r.equipment || []).map(function(id) { var e2 = EQUIPMENT_BY_ID[id]; return e2 ? e2.label : null; }).filter(Boolean),
+      fridgeDays: statedPositive(r.fridgeLife),
+      freezerDays: statedPositive(r.freezerLife),
+      storageNotes: String(r.storageNotes || '').trim() || null,
+      ingredients: ings,
+      steps: parseInstructionSteps(r.instructions || '')
+    };
+  });
+
+  // Ingredients used by two or more recipes — the "chop all the onions at once" list.
+  var shared = {};
+  recipes.forEach(function(rec) {
+    rec.ingredients.forEach(function(ing) {
+      var key = ing.name.toLowerCase();
+      if (!shared[key]) shared[key] = { name: ing.name, uses: [] };
+      shared[key].uses.push({ recipe: rec.name, quantity: ing.quantity, unit: ing.unit });
+    });
+  });
+  var sharedList = Object.keys(shared).map(function(k) { return shared[k]; })
+    .filter(function(s) {
+      var names = {};
+      s.uses.forEach(function(u) { names[u.recipe] = true; });
+      return Object.keys(names).length >= 2;
+    })
+    .sort(function(a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
+
+  return { recipes: recipes, sharedIngredients: sharedList };
+}
+
+function briefQty(quantity, unit) {
+  if (quantity == null) return 'amount not stated';
+  var q = Math.round(quantity * 100) / 100;
+  return formatQuantity(q) + (unit ? ' ' + unit : '');
+}
+
+function briefMinutes(m) { return m == null ? 'not stated' : m + ' min'; }
+
+function formatPrepBrief(model) {
+  var L = [];
+  var recipes = (model && model.recipes) || [];
+  var totalKnown = recipes.every(function(r) { return r.servings != null; });
+  var total = recipes.reduce(function(s, r) { return s + (r.servings || 0); }, 0);
+  L.push('MEAL PREP BRIEF');
+  L.push('Recipes: ' + recipes.length + ' · Total servings: ' + (totalKnown ? total : 'not fully stated'));
+  L.push('');
+  L.push('These are facts copied from my recipe app. "not stated" means the recipe does not record it — do not assume a value.');
+  L.push('Oven temperatures and per-step timings are not stored as separate fields; they appear only where the instructions below state them.');
+  if (!recipes.length) {
+    L.push('');
+    L.push('(Nothing planned yet.)');
+    return L.join('\n');
+  }
+  recipes.forEach(function(r, i) {
+    L.push('');
+    L.push('== ' + (i + 1) + '. ' + r.name + ' — ' + (r.servings != null ? r.servings + ' servings' : 'servings not stated'));
+    L.push('Recipe base: ' + (r.baseServings != null ? r.baseServings + ' servings' : 'not stated') +
+      (r.scale != null && Math.abs(r.scale - 1) > 1e-9 ? ' (amounts below scaled ×' + (Math.round(r.scale * 100) / 100) + ')' : ''));
+    L.push('Prep time: ' + briefMinutes(r.prepMinutes) + ' · Cook time: ' + briefMinutes(r.cookMinutes) +
+      ' · Hands-on time: ' + briefMinutes(r.activeMinutes));
+    L.push('Equipment: ' + (r.equipment.length ? r.equipment.join(', ') : 'not stated'));
+    L.push('Effort: ' + (r.effort || 'not stated'));
+    L.push('Keeps: fridge ' + (r.fridgeDays != null ? r.fridgeDays + ' days' : 'not stated') +
+      ' · freezer ' + (r.freezerDays != null ? r.freezerDays + ' days' : 'not stated'));
+    L.push('Ingredients:');
+    if (r.ingredients.length) r.ingredients.forEach(function(ing) { L.push('- ' + ing.name + ' — ' + briefQty(ing.quantity, ing.unit)); });
+    else L.push('- not stated');
+    L.push('Instructions (as written in the recipe):');
+    if (r.steps.length) r.steps.forEach(function(step, k) { L.push((k + 1) + '. ' + step); });
+    else L.push('not stated');
+    if (r.storageNotes) L.push('Storage notes: ' + r.storageNotes);
+  });
+  if (model.sharedIngredients.length) {
+    L.push('');
+    L.push('== Ingredients shared by more than one recipe');
+    model.sharedIngredients.forEach(function(s) {
+      L.push('- ' + s.name + ': ' + s.uses.map(function(u) { return u.recipe + ' (' + briefQty(u.quantity, u.unit) + ')'; }).join('; '));
+    });
+  }
+  L.push('');
+  L.push('== Request');
+  L.push('Give me the most efficient order to prep all of these recipes in one session: long-running and oven items first, batch the shared chopping, use passive cooking time, sequence equipment, and portion everything at the end. Use only the facts above; tell me if something you need is not stated.');
+  return L.join('\n');
+}
+
+function getPrepBriefText() {
+  return formatPrepBrief(buildPrepBriefModel(getPrepSessionEntries()));
+}
+window.getPrepBriefText = getPrepBriefText;
+
+function copyPrepBrief() {
+  var text = getPrepBriefText();
+  var preview = document.getElementById('prep-brief-text');
+  if (preview) preview.value = text;
+  copyTextToClipboard(text,
+    function() { showSuccessMessage('Prep brief copied — paste it into your AI chat.'); },
+    function() {
+      var d = document.getElementById('prep-brief-details');
+      if (d) d.open = true;
+      showErrorMessage('Could not copy automatically — the brief is shown below to copy by hand.');
+    });
+}
+window.copyPrepBrief = copyPrepBrief;
+
+function renderPrepTab() {
+  var listEl = document.getElementById('prep-batches');
+  if (!listEl) return;
+  var batches = normalizePlannedBatches(AppState.plannedBatches);
+  var html = batches.length
+    ? batches.map(function(b) { return plannedBatchRowHtml(b, 'prep'); }).join('')
+    : '<div class="batch-empty">No batches to prep. <button type="button" class="dash-inline-btn" onclick="showTab(\'planner\')">Plan some →</button></div>';
+
+  // Meals scheduled on specific days are prep work too; they keep their existing
+  // per-recipe Cooked flow.
+  var scheduled = getPrepSessionEntries().filter(function(e) {
+    return e.sources.some(function(s) { return s !== 'batch'; });
+  });
+  if (scheduled.length) {
+    html += '<div class="prep-scheduled"><div class="prep-scheduled-label">Also on your day plan</div>' +
+      scheduled.map(function(e) {
+        var days = e.sources.filter(function(s) { return s !== 'batch'; });
+        return '<div class="batch-row"><div class="batch-info"><span class="batch-name">' + escapeHtml(e.recipe.name) + '</span>' +
+          '<span class="batch-meta">' + escapeHtml(days.join(', ')) + '</span></div>' +
+          '<button type="button" class="btn btn--secondary btn--sm" onclick="markRecipeCooked(\'' + escJ(String(e.recipe.id)) + '\', this)">Cooked → Fridge</button></div>';
+      }).join('') + '</div>';
+  }
+  listEl.innerHTML = html;
+  var preview = document.getElementById('prep-brief-text');
+  if (preview) preview.value = getPrepBriefText();
+}
+window.renderPrepTab = renderPrepTab;
 
 // ── CSV Import ────────────────────────────────────────────────────────────────
 
@@ -11008,12 +11625,21 @@ function parseIngredientLine(line) {
 
 // â”€â”€ Pantry Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function isInPantry(name) {
-  const n = name.toLowerCase();
-  return AppState.pantry.some(p => {
-    const pn = p.name.toLowerCase();
-    return n.includes(pn) || pn.includes(n);
+// The kitchen records that make the Shop list say "In stock" for `name`. Same loose
+// two-way name match the Shop list has always used; a staple the user marked EMPTY is
+// not stock — it is the very thing they need to buy.
+function pantryMatchesForShop(name) {
+  const n = (name || '').toLowerCase();
+  if (!n) return [];
+  return AppState.pantry.filter(p => {
+    const pn = (p.name || '').toLowerCase();
+    if (!pn || !(n.includes(pn) || pn.includes(n))) return false;
+    return !(isStaple(p) && p.stockLevel === 'empty');
   });
+}
+
+function isInPantry(name) {
+  return pantryMatchesForShop(name).length > 0;
 }
 
 // Common household staples for one-tap pantry adding (PH context).

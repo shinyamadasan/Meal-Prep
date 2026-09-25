@@ -811,7 +811,10 @@ test('export and the Firestore payload carry the new fields without new collecti
       'mealConsumptions',
       // Collision evidence is durable metadata, explicitly separate from the
       // immutable source facts so no conflict becomes a consumption claim.
-      'mealConsumptionConflicts'
+      'mealConsumptionConflicts',
+      // 'plannedBatches' is this week's unscheduled meal-prep plan (meal-prep-first
+      // wave) — plan state persisted whole like weeklyPlan, not a tombstoned collection.
+      'plannedBatches'
     ];
     return {
       unexpectedTopLevelKeys: Object.keys(payload).filter((k) => known.indexOf(k) < 0),

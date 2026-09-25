@@ -4130,6 +4130,53 @@ follow-ups:
 
 ---
 
+### TASK-060 · Backfill: Meal-prep first — unscheduled batches, Prep tab + AI Prep Brief, "Not anymore?" stock correction, scroll-reload fix (D-076)
+status: review
+owner: claude
+source: none — direct owner brief ("You are the BUILDER"), implemented directly by Claude, not Codex,
+  and NOT from `planning/BUILD_QUEUE.md`. Recorded here so the OS record matches the repo, the
+  same convention as TASK-041/058/059. Awaiting INDEPENDENT review; not self-approved.
+priority: P1
+risk: High (touches `buildFirestorePayload()`, `loadFromFirestore()`, `setupRealtimeListeners()`,
+  and pantry tombstone writes). Expected D-032 gate: `approved` (held), never `done`.
+depends-on: none
+files: app.js, index.html, style.css, docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/FEATURES.md,
+  docs/DECISIONS.md, tests/scroll-no-reload.spec.js (new), tests/meal-prep-first.spec.js (new),
+  tests/kitchen-truth.spec.js, tests/meal-consumption-events.spec.js, tests/meal-lego.spec.js,
+  tests/ready-food-protein-hardening.spec.js, tests/ready-food-protein-identity.spec.js,
+  tests/what-should-we-eat.spec.js, tests/cook-method-discovery.spec.js
+branch: wave/meal-prep-first (base main @ e7c3777)
+
+acceptance:
+  - [x] Scrolling never reloads: custom pull-to-refresh removed from `setupMobileEnhancements()`;
+        reproduced first (3 failing gesture tests under a phone UA), now passing
+  - [x] Buying never creates a `cookedMeals` record (verified in code; tested)
+  - [x] "Not anymore?" on an untouched In-stock Shop row lists the matched kitchen record(s) and
+        corrects only the tapped one: staple → `stockLevel: 'empty'`, else tombstoned removal;
+        stays gone after reload; loosely matched other stock is untouched
+  - [x] D-069 "tap an in-stock row = bought more" preserved (6 existing tests pin it)
+  - [x] `AppState.plannedBatches`: add/adjust/remove a batch with no day; Shop scales to batch
+        servings; persists across reload; export `1.6`; fill-only import/sign-in merge; listener and
+        cloud load adopt only a PRESENT key
+  - [x] Prep tab: Prepped → Fridge via existing `_doMarkCooked()` (portions = servings); batch leaves plan
+  - [x] Copy AI Prep Brief: deterministic, scaled, instructions as written, shared ingredients,
+        "not stated" for missing data, identical on repeated calls; copy == preview == generator
+  - [x] Home leads with Plan/Shop/Prep/Fridge; "what to cook/eat" cards in collapsed `#dash-ideas`
+  - [x] No horizontal overflow at 390px on Home/Plan/Prep; existing mobile-layout test passes
+
+review 1 (candidate e1c9f1c): FIX FIRST — two bounded blockers, both fixed in a new commit on top
+  (e1c9f1c preserved, not amended):
+  - [x] `generateGroceryList()` reset every plan-generated row to unchecked, so a batch +/- un-bought
+        unrelated items. Now carries `checked`/`userSet`/`stocked` over by exact category + name.
+  - [x] stale user-facing "Inventory" text on Home (and in built-in hack #14) now says "Fridge".
+
+not covered by automated tests (reviewer attention):
+  - the present-key guards in `loadFromFirestore()` / the realtime listener (Firebase-only paths;
+    the offline suite cannot reach them) — reviewed by reading only
+  - real-device touch scrolling (tests use synthetic TouchEvents)
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

@@ -49,11 +49,13 @@
                     </div>
                 </div>
                 <nav class="tab-nav">
+                    <!-- Meal-prep flow order: Plan -> Shop -> Prep -> Fridge. -->
                     <button class="tab-btn active" data-tab="dashboard">Home</button>
-                    <button class="tab-btn" data-tab="fridge">Inventory</button>
-                    <button class="tab-btn" data-tab="grocery">Shop</button>
                     <button class="tab-btn" data-tab="planner">Plan</button>
-                    <button class="tab-btn" data-tab="recipes">Cook</button>
+                    <button class="tab-btn" data-tab="grocery">Shop</button>
+                    <button class="tab-btn" data-tab="prep">Prep</button>
+                    <button class="tab-btn" data-tab="fridge">Fridge</button>
+                    <button class="tab-btn" data-tab="recipes">Recipes</button>
                     <div class="tab-more">
                         <button type="button" class="tab-btn tab-more-btn" aria-haspopup="true" aria-expanded="false">⋯ More</button>
                         <div class="tab-more-menu hidden">
@@ -80,7 +82,7 @@
                 <!-- Recipes Tab -->
                 <section id="recipes" class="tab-content">
                     <div class="section-header">
-                        <h2>Cook</h2>
+                        <h2>Recipes</h2>
                         <div class="header-actions">
                             <div class="recipe-io-btns">
                                 <button class="btn btn--outline btn--sm" onclick="importData()"><span class="ic" data-icon="upload"></span> Import</button>
@@ -305,6 +307,22 @@
 
                     <div id="storage-alerts"></div>
 
+                    <!-- This week's batches: the primary plan. No day needed (plannedBatches). -->
+                    <div class="batch-plan" id="batch-plan">
+                        <div class="batch-plan-header">
+                            <h3>This week's batches</h3>
+                            <span class="batch-plan-hint">No days needed</span>
+                        </div>
+                        <div class="batch-search-row">
+                            <input type="search" id="batch-search" class="form-control" placeholder="Search recipes to prep…" autocomplete="off" aria-label="Search recipes to add as a batch" oninput="renderBatchSearchResults()">
+                            <button type="button" id="batch-low-effort-chip" class="batch-chip active" aria-pressed="true" onclick="toggleBatchLowEffort()">Low effort</button>
+                        </div>
+                        <div id="batch-search-results" class="batch-list"></div>
+                        <div id="planned-batches-list" class="batch-list batch-list--planned"></div>
+                    </div>
+
+                    <h3 class="plan-by-day-title">By day <span class="batch-plan-hint">optional</span></h3>
+
                     <div class="mobile-day-nav" id="mobile-day-nav">
                         <button class="mobile-day-btn" onclick="prevPlannerDay()">&#8249;</button>
                         <span id="mobile-day-label">Monday</span>
@@ -352,12 +370,30 @@
                     <div id="grocery-price-panel" class="hidden"></div>
                 </section>
 
-                <!-- My Fridge / Freezer Tab -->
+                <!-- Prep Tab: cook this week's batches in one session -->
+                <section id="prep" class="tab-content">
+                    <div class="section-header">
+                        <h2>Prep</h2>
+                        <div class="planner-controls">
+                            <button class="btn btn--secondary" onclick="openPrepMode()"><span class="ic" data-icon="clipboard-list"></span> Prep checklist</button>
+                            <button class="btn btn--primary" id="copy-prep-brief-btn" onclick="copyPrepBrief()"><span class="ic" data-icon="copy"></span> Copy AI Prep Brief</button>
+                        </div>
+                    </div>
+                    <p class="fridge-intro">Cook this week's batches in one session. When a batch is done, move it to the Fridge — that's when it becomes ready food.</p>
+                    <div id="prep-batches" class="batch-list"></div>
+                    <details id="prep-brief-details" class="prep-brief-details">
+                        <summary>Preview the AI Prep Brief</summary>
+                        <p class="batch-plan-hint">Paste it into ChatGPT or another AI and ask for the most efficient prep order. It only contains facts from your recipes.</p>
+                        <textarea id="prep-brief-text" class="form-control prep-brief-text" readonly rows="14" aria-label="AI Prep Brief text"></textarea>
+                    </details>
+                </section>
+
+                <!-- Fridge Tab: prepared food first, raw ingredients separate -->
                 <section id="fridge" class="tab-content">
                     <div class="section-header">
-                        <h2>Inventory</h2>
+                        <h2>Fridge</h2>
                     </div>
-                    <p class="fridge-intro">Everything you currently have stored, with days left before it goes bad. Mark a recipe <strong><span class="ic" data-icon="check"></span> Cooked</strong> or add takeout/leftovers here.</p>
+                    <p class="fridge-intro">Ready food you've prepped, with servings left and days before it goes bad. Groceries you buy go to <strong>Ingredients on hand</strong> below — they aren't meals until you prep them.</p>
 
                     <!-- Last full inventory check: a manual confidence stamp, not a schedule or audit. -->
                     <div class="inventory-verify-row">
@@ -386,7 +422,7 @@
                     <!-- Raw ingredients / pantry -->
                     <div id="pantry-section">
                         <div class="pantry-header" onclick="togglePantrySection()">
-                            <span><span class="ic" data-icon="package"></span> My Ingredients / Pantry <span id="pantry-count"></span></span>
+                            <span><span class="ic" data-icon="package"></span> Ingredients on hand <span class="cooked-meals-hint">— raw, not meals</span> <span id="pantry-count"></span></span>
                             <span id="pantry-toggle-icon">▼</span>
                         </div>
                         <div id="pantry-body">

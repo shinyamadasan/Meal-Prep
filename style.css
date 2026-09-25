@@ -4126,6 +4126,32 @@ select.form-control {
   font-weight: 600;
 }
 
+/* "Not anymore?" — correct a stale In-stock claim (openNotInKitchenDialog) */
+.grocery-not-have-btn {
+  margin-left: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  min-height: 28px;
+  font-size: 0.72rem;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.nik-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.nik-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nik-name { font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.nik-meta { font-size: 0.75rem; color: var(--color-text-secondary); }
+.nik-fix-btn { flex-shrink: 0; }
+.nik-note { margin-top: 0.6rem !important; font-size: 0.78rem; }
+
 .grocery-suggested-badge {
   display: inline-block;
   font-size: 0.7rem;
@@ -7580,3 +7606,97 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .fsp-card { padding: 0.55rem 0.7rem; gap: 0.5rem; }
   .flavor-sp-add { width: 100%; min-height: 36px; }
 }
+
+/* ── Meal-prep-first flow: planned batches, Prep tab, Home flow card ─────────── */
+.batch-plan {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.batch-plan-header { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.batch-plan-header h3 { margin: 0; font-size: 1.05rem; }
+.batch-plan-hint { font-size: 0.78rem; color: var(--color-text-secondary); font-weight: 400; }
+.plan-by-day-title { font-size: 1rem; margin: 0.5rem 0 0.75rem; }
+.batch-search-row { display: flex; gap: 0.5rem; align-items: center; }
+.batch-search-row .form-control { flex: 1; min-width: 0; }
+.batch-chip {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.batch-chip.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-btn-primary-text); }
+.batch-list { display: flex; flex-direction: column; }
+.batch-list:not(:empty) { margin-top: 0.5rem; }
+.batch-list--planned:not(:empty) { border-top: 1px solid var(--color-border); padding-top: 0.25rem; }
+.batch-result, .batch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.batch-result:last-child, .batch-row:last-child { border-bottom: none; }
+.batch-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.batch-name { font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.batch-meta { font-size: 0.78rem; color: var(--color-text-secondary); }
+.batch-add-btn, .batch-done-btn { flex-shrink: 0; min-height: 36px; }
+.batch-stepper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+.batch-step-btn, .batch-remove-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-base);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.batch-remove-btn { flex-shrink: 0; border-color: transparent; color: var(--color-text-secondary); }
+.batch-servings { min-width: 1.6rem; text-align: center; font-weight: 600; }
+.batch-empty { font-size: 0.85rem; color: var(--color-text-secondary); padding: 0.4rem 0; }
+.prep-scheduled { margin-top: 1rem; }
+.prep-scheduled-label { font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+.prep-brief-details { margin-top: 1.25rem; }
+.prep-brief-details summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
+.prep-brief-text { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; font-family: var(--font-family-mono, monospace); font-size: 0.78rem; white-space: pre; margin-top: 0.5rem; }
+
+.dash-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+.dash-flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text);
+}
+.dash-flow-num {
+  width: 1.4rem; height: 1.4rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+  font-size: 0.72rem; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dash-flow-label { font-weight: 600; font-size: 0.9rem; }
+.dash-flow-value { font-size: 0.75rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .dash-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.dash-ideas > summary { cursor: pointer; list-style: revert; }
+.dash-ideas[open] > summary { margin-bottom: 0.75rem; }
+.dash-ideas .dash-card { box-shadow: none; }

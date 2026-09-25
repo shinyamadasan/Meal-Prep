@@ -264,7 +264,7 @@ test('consumption facts survive save, reload, export, import merge and the Fires
   expect(exported.wireCount).toBe(1);
   expect(exported.wireRecord).toMatchObject({ cookedMealId: 'cm_track_1', portionsConsumed: 1 });
   expect(exported.exportedCount).toBe(1);
-  expect(exported.exportVersion).toBe('1.5');
+  expect(exported.exportVersion).toBe('1.6');
 
   // Real reload from localStorage — the fact must survive exactly as saved.
   await page.reload({ waitUntil: 'domcontentloaded' });
