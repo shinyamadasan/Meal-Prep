@@ -197,7 +197,8 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
   `recipeActiveMinutes()` signals. Day slots in `weeklyPlan` remain, optional.
 - **Shop** — `generateGroceryList()` adds each batch through `addRecipeIngredients(…, servings)`,
   scaled by `batchScaledQuantity()` (same null-means-unresolved contract as
-  `calculateScaledQuantity()`).
+  `calculateScaledQuantity()`). A rebuild carries `checked` / `userSet` / `stocked` over from
+  the previous row with the same exact category + name, so a batch +/- never un-buys anything.
 - **Prep** — `completePlannedBatch()` → `completePlannedBatchNow()` calls the existing
   `_doMarkCooked()` (which creates the `cookedMeals` record with `initialPortions` =
   servings and deducts raw ingredients), then drops the batch from the plan. This is the only

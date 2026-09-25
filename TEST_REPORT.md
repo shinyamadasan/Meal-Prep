@@ -5,6 +5,26 @@
 
 ---
 
+## TASK-060 / D-076 review fix 1 · 2026-09-24
+suite: new regression cases in tests/meal-prep-first.spec.js, run against the reviewed candidate's
+  product code (app.js/index.html byte-identical to e1c9f1c, only the spec changed) and again after
+  the fix; targeted specs; full `npx playwright test --project=local`; `node --check app.js`;
+  `Verify-Decisions.ps1`; `Check-DocsConsistency.ps1`; `git diff --check`.
+result:
+  - on e1c9f1c product code: 4 failed / 1 passed. Failed: both REGRESSION checkmark cases
+    (`checked` false after a batch +/-), the exact-identity Rice case (checked Rice lost), and the
+    Fridge empty-state label. Passed as designed: the ghost-row/new-row/custom-row guard (it
+    protects against OVER-preserving). An earlier run had 3 harness errors
+    (`seedPlanRecipe` not defined in page), fixed before this count.
+  - after fix: targeted meal-prep-first + scroll-no-reload + kitchen-truth +
+    inventory-quantity-truth 76/76; full local suite 675/675 (3.5m), started after the last code
+    change.
+  - `node --check app.js` OK; `Verify-Decisions.ps1` 70/70; `Check-DocsConsistency.ps1` 31 items
+    (= `main` baseline); `git diff --check` clean.
+not run: production specs, CI, real-device testing.
+
+---
+
 ## TASK-060 / D-076 build · 2026-09-24
 suite: `npx playwright test tests/scroll-no-reload.spec.js --project=local` (before and after fix);
   `npx playwright test tests/meal-prep-first.spec.js --project=local`; full `npx playwright test

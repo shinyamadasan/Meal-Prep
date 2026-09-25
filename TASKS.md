@@ -4164,6 +4164,12 @@ acceptance:
   - [x] Home leads with Plan/Shop/Prep/Fridge; "what to cook/eat" cards in collapsed `#dash-ideas`
   - [x] No horizontal overflow at 390px on Home/Plan/Prep; existing mobile-layout test passes
 
+review 1 (candidate e1c9f1c): FIX FIRST — two bounded blockers, both fixed in a new commit on top
+  (e1c9f1c preserved, not amended):
+  - [x] `generateGroceryList()` reset every plan-generated row to unchecked, so a batch +/- un-bought
+        unrelated items. Now carries `checked`/`userSet`/`stocked` over by exact category + name.
+  - [x] stale user-facing "Inventory" text on Home (and in built-in hack #14) now says "Fridge".
+
 not covered by automated tests (reviewer attention):
   - the present-key guards in `loadFromFirestore()` / the realtime listener (Firebase-only paths;
     the offline suite cannot reach them) — reviewed by reading only

@@ -382,3 +382,124 @@ test('390px: Plan batches, Prep and the Home flow card do not scroll sideways', 
   expect(done.x + done.width).toBeLessThanOrEqual(390);
   expect(done.height).toBeGreaterThanOrEqual(30);
 });
+
+// ── Review fix: regenerating the Shop list must not wipe checkmarks ─────────
+// changePlannedBatchServings() -> afterPlannedBatchesChange() -> generateGroceryList()
+// used to rebuild every plan-generated row with checked: false, so tapping +/- on one
+// batch silently un-bought everything else. State now carries over by the generator's
+// OWN row identity: exact category + exact name.
+
+function seedPlanRecipe() {
+  AppState.recipes.push({
+    id: 'r_plan', name: 'Test Garlic Rice Plate', category: 'Main Dish',
+    baseServings: 2, currentServings: 2,
+    baseIngredients: [
+      { name: 'Test Garlic Only', baseQuantity: 3, unit: 'cloves', category: 'Vegetable' },
+      { name: 'Rice', baseQuantity: 1, unit: 'cup', category: 'Grain' }
+    ],
+    instructions: '',
+    nutritionPerServing: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0 }
+  });
+  AppState.weeklyPlan.Monday.dinner = 'r_plan';
+}
+
+test('REGRESSION: changing an unrelated batch\'s servings keeps a checked weekly-plan row checked (and its undo receipt)', async ({ page }) => {
+  await loadWithRecipes(page);
+  await page.evaluate(seedPlanRecipe);
+  const r = await page.evaluate(() => {
+    generateGroceryList();
+    const rowA = AppState.groceryList.find((g) => g.name === 'Test Garlic Only');
+    toggleGroceryItem(rowA.id);                         // bought
+    const createdPantryId = rowA.stocked && rowA.stocked.pantryId;
+
+    const batchId = addPlannedBatch('r_curry');          // independent batch
+    changePlannedBatchServings(batchId, 1);              // the new +/- control
+
+    const after = AppState.groceryList.find((g) => g.name === 'Test Garlic Only');
+    const kept = { checked: after.checked, userSet: after.userSet, receipt: after.stocked && after.stocked.pantryId };
+    toggleGroceryItem(after.id);                         // un-buy after regeneration
+    return {
+      createdPantryId, kept,
+      undoWorked: !AppState.pantry.some((p) => String(p.id) === String(createdPantryId))
+    };
+  }, null);
+  expect(r.kept.checked).toBe(true);
+  expect(r.kept.userSet).toBe(true);
+  expect(r.kept.receipt).toBe(r.createdPantryId);        // receipt survives, so...
+  expect(r.undoWorked).toBe(true);                       // ...unchecking still undoes exactly
+});
+
+test('REGRESSION: a checked batch ingredient stays checked when that batch\'s servings change; quantity updates', async ({ page }) => {
+  await loadWithRecipes(page);
+  const r = await page.evaluate(() => {
+    const batchId = addPlannedBatch('r_curry');          // 4 servings -> 500 g chicken
+    const row = AppState.groceryList.find((g) => g.name === 'Chicken Thigh');
+    const before = row.quantity;
+    toggleGroceryItem(row.id);
+    changePlannedBatchServings(batchId, 2);              // 6 servings -> 750 g
+    const after = AppState.groceryList.find((g) => g.name === 'Chicken Thigh');
+    return { before, qty: after.quantity, checked: after.checked };
+  });
+  expect(r.before).toBe(500);
+  expect(r.qty).toBe(750);
+  expect(r.checked).toBe(true);
+});
+
+test('regeneration: a removed ingredient leaves no ghost row, a new one starts unchecked, custom rows are untouched', async ({ page }) => {
+  await loadWithRecipes(page);
+  await page.evaluate(seedPlanRecipe);
+  const r = await page.evaluate(() => {
+    AppState.groceryList.push({ id: 920001, name: 'Paper Towels', category: 'Other', quantity: null, unit: '',
+      sources: [], checked: true, userSet: true, custom: true });
+    const batchId = addPlannedBatch('r_curry');
+    const chicken = AppState.groceryList.find((g) => g.name === 'Chicken Thigh');
+    toggleGroceryItem(chicken.id);
+    removePlannedBatch(batchId);                         // Chicken Thigh genuinely disappears
+    const ghost = AppState.groceryList.some((g) => g.name === 'Chicken Thigh');
+    addPlannedBatch('r_bare');                           // brings a genuinely new row: 'onion'
+    const onion = AppState.groceryList.find((g) => g.name === 'onion');
+    const custom = AppState.groceryList.find((g) => g.id === 920001);
+    return {
+      ghost,
+      onionChecked: onion.checked, onionUserSet: !!onion.userSet, onionReceipt: onion.stocked || null,
+      custom: custom && { checked: custom.checked, userSet: custom.userSet, custom: custom.custom }
+    };
+  });
+  expect(r.ghost).toBe(false);
+  expect(r.onionChecked).toBe(false);
+  expect(r.onionUserSet).toBe(false);
+  expect(r.onionReceipt).toBeNull();
+  expect(r.custom).toEqual({ checked: true, userSet: true, custom: true });
+});
+
+test('regeneration identity is exact: a checked "Rice" never lends its state to "Rice Vinegar"', async ({ page }) => {
+  await loadWithRecipes(page);
+  await page.evaluate(seedPlanRecipe);
+  const r = await page.evaluate(() => {                                    // plan brings 'Rice' (Grain)
+    generateGroceryList();
+    const rice = AppState.groceryList.find((g) => g.name === 'Rice');
+    toggleGroceryItem(rice.id);
+    AppState.recipes.push({ id: 'r_vin', name: 'Test Pickle', baseServings: 1, currentServings: 1,
+      baseIngredients: [{ name: 'Rice Vinegar', baseQuantity: 2, unit: 'tbsp', category: 'Grain' }],
+      instructions: '' });
+    addPlannedBatch('r_vin');
+    const vin = AppState.groceryList.find((g) => g.name === 'Rice Vinegar');
+    const rice2 = AppState.groceryList.find((g) => g.name === 'Rice');
+    return { vinChecked: vin.checked, vinUserSet: !!vin.userSet, vinReceipt: vin.stocked || null, riceChecked: rice2.checked };
+  });
+  expect(r.riceChecked).toBe(true);
+  expect(r.vinChecked).toBe(false);
+  expect(r.vinUserSet).toBe(false);
+  expect(r.vinReceipt).toBeNull();
+});
+
+test('Home empty state points to the Fridge, not a tab named Inventory', async ({ page }) => {
+  await loadLocalApp(page);
+  const text = await page.evaluate(() => {
+    AppState.pantry = [];
+    showTab('dashboard');
+    return document.getElementById('dash-ideas').textContent;
+  });
+  expect(text).toContain('Add items to Fridge to see what you can make.');
+  expect(text).not.toMatch(/\bInventory\b/);
+});

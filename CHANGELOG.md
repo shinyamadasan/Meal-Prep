@@ -5,6 +5,21 @@
 
 ---
 
+## TASK-060 / D-076 — review fix 1 (branch: wave/meal-prep-first, on top of e1c9f1c)
+review: FIX FIRST on candidate e1c9f1c (preserved; this is a new commit, not an amend).
+changes:
+  - `generateGroceryList()`: before rebuilding, index the previous non-custom rows by the
+    generator's own identity (exact category + exact name) and carry over `checked`, `userSet`,
+    and the `stocked` receipt. No fuzzy or positional matching; removed ingredients leave no row;
+    new ingredients start unchecked; custom rows unchanged.
+  - Home "What can I do?" empty state: "Add items to Inventory" -> "Add items to Fridge".
+  - Built-in cooking hack #14 text: "add it under Inventory" -> "add it under Fridge" (seed
+    constant only; users' already-stored copies are not rewritten).
+  - docs: D-076 addendum (removes the now-false "resets checked state" limitation), ARCHITECTURE.
+  - tests: 5 new cases in tests/meal-prep-first.spec.js.
+
+---
+
 ## TASK-060 / D-076 — implemented, held for review (branch: wave/meal-prep-first)
 base: `main` @ e7c3777 (= `origin/main`, 0/0 divergence at start). Uncommitted working tree on the
   branch at time of writing; implemented directly by Claude from an owner brief, not via Codex.

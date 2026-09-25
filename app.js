@@ -2035,7 +2035,7 @@ const defaultCookingHacks = [
     id: 14,
     category: "Storage",
     title: "Count Portions When You Store It",
-    description: "When you put cooked food away, add it under Inventory with a portion count — e.g. Landers lechon manok, 6 portions, fridge. Then tap \"Used 1\" each time you eat some. Home shows what is already cooked before it suggests cooking anything new, so ready food gets eaten before it is wasted.",
+    description: "When you put cooked food away, add it under Fridge with a portion count — e.g. Landers lechon manok, 6 portions, fridge. Then tap \"Used 1\" each time you eat some. Home shows what is already cooked before it suggests cooking anything new, so ready food gets eaten before it is wasted.",
     timeSaved: "A whole cook session per week",
     costSavings: ""
   }
@@ -6193,7 +6193,7 @@ function renderDashboard() {
   var cookable = getCookableRecipes();
   var cookPane;
   if (totalPantryItems === 0) {
-    cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Inventory</button> to see what you can make.</div>';
+    cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Fridge</button> to see what you can make.</div>';
   } else if (cookable.length === 0) {
     cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Recipes →</button></div>';
   } else {
@@ -6459,13 +6459,23 @@ function generateGroceryList() {
     addRecipeIngredients(batch.recipeId, ingredients, batch.servings);
   });
 
+  // A rebuild must not un-buy what the user already ticked (a batch +/- regenerates
+  // this list). Carry the user's state over by the SAME identity rows are built with
+  // above: exact category + exact name. Never fuzzy, never by position — "Rice" and
+  // "Rice Vinegar" stay separate. A row whose ingredient left the plan is not kept.
+  const rowKey = (category, name) => String(category) + '\u0000' + String(name);
+  const previous = {};
+  AppState.groceryList.forEach(item => {
+    if (!item.custom) previous[rowKey(item.category, item.name)] = item;
+  });
+
   // Convert to grocery list format. Keep manually-added custom items — only the
   // meal-plan-generated items are rebuilt from the weekly plan.
   AppState.groceryList = AppState.groceryList.filter(item => item.custom);
   Object.keys(ingredients).forEach(category => {
     Object.keys(ingredients[category]).forEach(name => {
       const item = ingredients[category][name];
-      AppState.groceryList.push({
+      const row = {
         id: Date.now() + Math.random(),
         category,
         name,
@@ -6473,7 +6483,14 @@ function generateGroceryList() {
         unit: item.unit,
         sources: item.sources || [],
         checked: false
-      });
+      };
+      const prev = previous[rowKey(category, name)];
+      if (prev) {
+        row.checked = !!prev.checked;
+        if (prev.userSet) row.userSet = true;
+        if (prev.stocked) row.stocked = prev.stocked; // keeps "uncheck" able to undo the purchase
+      }
+      AppState.groceryList.push(row);
     });
   });
   

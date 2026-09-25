@@ -2699,8 +2699,19 @@ Characterization before any change, from the code rather than the docs:
   convention); the export version assertion moved to `1.6`; four "What should we eat?" placement
   assertions now open `#dash-ideas` first. Their content assertions are unchanged.
 - Accepted limitations: whole-field last-save-wins for concurrent offline plan edits (same as
-  `weeklyPlan`). Any plan change still regenerates the Shop list, which resets plan-derived rows'
-  checked state (pre-existing behavior, not changed here).
+  `weeklyPlan`).
+
+### Addendum — review fix: regenerating the Shop list keeps checkmarks
+
+Independent review of candidate e1c9f1c found that `generateGroceryList()` rebuilt every
+plan-generated row with `checked: false`. That was pre-existing, but this wave's batch servings
++/- control calls it on every tap, so one tap silently un-bought unrelated items. Fix:
+before rebuilding, `generateGroceryList()` indexes the previous non-custom rows by the identity it
+already builds rows with (exact `category` + exact `name`) and carries over `checked`, `userSet` and
+the `stocked` receipt, so unchecking still undoes the purchase exactly. Not fuzzy, not positional:
+"Rice" and "Rice Vinegar" never share state. An ingredient that left the plan leaves no ghost row,
+a genuinely new one starts unchecked, and custom rows are untouched, as before. The same review
+fix also relabels the leftover "Inventory" user-facing text to "Fridge".
 
 ### D-032 gate
 
@@ -2715,3 +2726,5 @@ Verify: app.js contains "if (Array.isArray(data.plannedBatches)) AppState.planne
 Verify: app.js does not contain "Add pull-to-refresh functionality"
 Verify: tests/scroll-no-reload.spec.js contains "scrolling back up inside an open modal does not reload the app"
 Verify: tests/meal-prep-first.spec.js contains "a loose match never deletes unrelated stock: only the tapped record changes"
+Verify: app.js contains "const rowKey = (category, name) => String(category) + '\u0000' + String(name);"
+Verify: tests/meal-prep-first.spec.js contains "REGRESSION: changing an unrelated batch"
