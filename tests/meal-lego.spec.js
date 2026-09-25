@@ -577,6 +577,9 @@ test('no new AppState key and no new cookedMeal / flavor field is introduced by 
     // Meal Lego introduced.
     'mealConsumptions',
     'mealConsumptionConflicts',
+    // 'plannedBatches' is the meal-prep-first wave's unscheduled weekly plan, a LATER,
+    // separately owner-approved wave — not something this wave introduces.
+    'plannedBatches',
     'lastLocalSaveSucceeded',
     'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',

@@ -597,8 +597,10 @@ test('Home renders the card above the existing ones, with reasons and no scores'
       chips: Array.from(document.querySelectorAll('.dash-card--eat .wse-chip')).map((e) => e.textContent.trim()),
       actions: Array.from(document.querySelectorAll('.dash-card--eat .wse-action')).map((e) => e.textContent.trim()),
       hints: Array.from(document.querySelectorAll('.dash-card--eat .wse-hint')).map((e) => e.textContent.trim()),
-      // Position relative to the cards that already existed.
-      eatBeforeReady: html.indexOf('dash-card--eat') < html.indexOf('dash-card--ready'),
+      // Meal-prep-first wave: the card moved into the collapsed "Need ideas?" section
+      // BELOW Ready to eat. Its content is unchanged; only its placement is.
+      readyBeforeEat: html.indexOf('dash-card--ready') < html.indexOf('dash-card--eat'),
+      eatInsideIdeas: !!document.querySelector('#dash-ideas .dash-card--eat'),
       readyStillThere: document.querySelectorAll('.dash-card--ready').length,
       suggestStillThere: document.querySelectorAll('.dash-card--suggest').length
     };
@@ -620,8 +622,9 @@ test('Home renders the card above the existing ones, with reasons and no scores'
     expect(chip).not.toMatch(/score|points?\b|^-?\d+(\.\d+)?$/i);
   }
 
-  // The pre-existing Home cards are untouched and still below it.
-  expect(result.eatBeforeReady).toBe(true);
+  // Demoted, not deleted: ready food leads, this card sits in "Need ideas?".
+  expect(result.readyBeforeEat).toBe(true);
+  expect(result.eatInsideIdeas).toBe(true);
   expect(result.readyStillThere).toBe(1);
   expect(result.suggestStillThere).toBe(1);
 });
@@ -639,6 +642,7 @@ test('Used 1 works straight from the recommendation card', async ({ page }) => {
     }];
     renderDashboard();
   });
+  await page.locator('#dash-ideas > summary').click(); // the card lives in "Need ideas?" now
 
   await expect(page.locator('.dash-card--eat .wse-chip')).toContainText(['3 portions']);
   await page.locator('.dash-card--eat .wse-action').click();
@@ -967,6 +971,7 @@ test('the card stays compact on a phone with no horizontal overflow', async ({ p
     renderDashboard();
   });
 
+  await page.locator('#dash-ideas > summary').click(); // the card lives in "Need ideas?" now
   const card = page.locator('.dash-card--eat');
   await expect(card).toBeVisible();
 

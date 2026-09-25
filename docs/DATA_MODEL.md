@@ -39,6 +39,9 @@ AppState.inventoryVerifiedAt // ISO string or null. A manual "I physically check
                             // never household collaboration, no schedule/reminder. Follows the
                             // exact nutritionGoals persistence template (see below): a top-level
                             // scalar, not a collection, absent from TOMBSTONE_KEYS.
+AppState.plannedBatches     // [] this week's meal-prep batches, NO day required (D-076). See
+                            // "Planned batch" below. Plan state persisted whole like weeklyPlan:
+                            // NOT in TOMBSTONE_KEYS, local-wins in mergeCloudConflict().
 ```
 
 ## Recipe object
@@ -95,6 +98,40 @@ cookTime` turns a legitimate `0` into `undefined` and then `NaN`:
 See DECISIONS D-055.
 Meal-planner slots store **recipe ids** (not objects): `breakfast/lunch/dinner` hold one id or
 `null`; `snacks` is an array of ids.
+
+## Planned batch (D-076)
+"Make N servings of this recipe this week." Deliberately separate from `weeklyPlan`, whose keys are
+iterated as days by nutrition, planned-meal counts and Prep Mode; an "Unscheduled" pseudo-day
+there would have been averaged in as an eighth day.
+
+```js
+{
+  id,          // STRING 'pb_<timestamp>_<rand>'
+  recipeId,    // STRING id of a recipe. Not rewritten if the recipe is deleted — the row then
+               //   renders "Unknown recipe (deleted)" with a Remove button and is skipped by
+               //   Shop and the Prep Brief.
+  servings,    // whole servings 1..99, or null = not set. Defaults to recipe.baseServings.
+  addedAt      // ISO string or null. Informational only; nothing orders by it.
+}
+```
+
+`normalizePlannedBatches()` runs on every inbound path (`loadFromLocalStorage()`,
+`loadFromFirestore()`, `restoreBackup()`, the realtime listener) and on every outbound one
+(`saveToLocalStorage()`, `buildFirestorePayload()`, `snapshotData()`, `exportData()`). It drops
+entries with no `recipeId` and de-duplicates by id. It never sets `updatedAt`.
+
+**Merge rules.** Import and sign-in use `mergePlannedBatches()`: fill-only by id, the same
+"never wipe a planned meal" rule as `mergeWeeklyPlan()`. The realtime listener and
+`loadFromFirestore()` adopt the remote array only when the remote doc HAS the key: a doc
+written by an app version that predates batches must not read as "the user cleared the plan".
+A real clear arrives as `[]`.
+
+**Lifecycle.** Planned → (Shop reads it) → prepped via `completePlannedBatchNow()`, which
+creates a normal `cookedMeals` record through `_doMarkCooked()` and removes the batch. There is
+no "prepared" state on the batch itself: once prepped, the Fridge record is the only truth.
+
+**Known, accepted limitation:** whole-field, local-wins. Two devices editing the plan offline at
+the same time: the last save wins for the whole plan (the same behavior as `weeklyPlan`).
 
 ## Cooked meal object
 ```js
@@ -427,7 +464,8 @@ It is **not** a schema-migration system — backward-compat is handled by `patch
 and defensive `|| []` / `|| {}` defaults on load.
 
 The export payload carries its own `version` string: `1.1` predates the Flavor Library, `1.2`
-adds `flavors`, `1.3` adds `preparedFlavors`, `1.4` adds `inventoryVerifiedAt` (D-075). `importData()`
-accepts all four - an older file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt` key.
+adds `flavors`, `1.3` adds `preparedFlavors`, `1.4` adds `inventoryVerifiedAt` (D-075), `1.5` adds
+`mealConsumptions`, `1.6` adds `plannedBatches` (D-076). `importData()` accepts all of them - an older
+file simply has no `flavors`/`preparedFlavors`/`inventoryVerifiedAt`/`plannedBatches` key.
 Unlike the list-type fields, an imported `inventoryVerifiedAt` only replaces the current one when it
 is textually newer (never regresses an existing verification with an older file's value).

@@ -5,6 +5,29 @@
 
 ---
 
+## TASK-060 / D-076 build · 2026-09-24
+suite: `npx playwright test tests/scroll-no-reload.spec.js --project=local` (before and after fix);
+  `npx playwright test tests/meal-prep-first.spec.js --project=local`; full `npx playwright test
+  --project=local`; `node --check app.js`; `tools/Verify-Decisions.ps1`;
+  `tools/Check-DocsConsistency.ps1` (branch vs stashed `main`); `git diff --check`.
+result:
+  - scroll-no-reload BEFORE the fix: 3 failed / 1 passed (reload reproduced: sentinel lost, typed
+    input lost, including a drag inside an open modal). AFTER: 4/4.
+  - meal-prep-first: 13/13.
+  - full local suite, first run: 659 passed / 10 failed. All 10 were intended-change collisions:
+    5 AppState/payload key allowlists + 1 regex-based payload mutation test (fixed in CODE by
+    keeping `inventoryVerifiedAt` adjacent to `lastUpdated`), and 4 "What should we eat?"
+    placement/visibility assertions. Updated per D-076; content assertions unchanged.
+  - full local suite, final run: 670/670 passed (2.8m), started after the last code/CSS change;
+    only docs/TASKS/CHANGELOG/TEST_REPORT changed afterwards.
+  - `node --check app.js` OK; `Verify-Decisions.ps1` 68/68; `git diff --check` clean;
+    `Check-DocsConsistency.ps1` 31 items = the known `main` baseline (one new item from D-076 was
+    found and fixed).
+not run: production (`--project=prod`) specs — they test the deployed site, not this unmerged
+  branch. No CI run (nothing pushed). No real-device touch test.
+
+---
+
 ## TASK-059 / D-075 landing · 2026-08-31
 suite: pre-landing Git integrity checks; `npx playwright test
   tests/fridge-prepared-flavors.spec.js tests/inventory-verification.spec.js --project=local`;

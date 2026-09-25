@@ -4,7 +4,33 @@
 > Status: **Working** · **Partial** · **Broken** · **Hidden** (built, no nav entry).
 > Anchors are function names + DOM ids (stable). No line numbers.
 
+## Meal-prep flow (D-076) — Plan -> Shop -> Prep -> Fridge
+- **Nav order** — Implemented · branch `wave/meal-prep-first`, held for review, NOT merged ·
+  `Home · Plan · Shop · Prep · Fridge · Recipes · More`. "Inventory" is now **Fridge** and "Cook" is **Recipes**; the
+  `data-tab` ids (`fridge`, `recipes`) are unchanged.
+- **This week's batches (Plan)** — Implemented · `#batch-plan`, `renderPlannedBatches()`,
+  `getBatchSearchResults()` · search recipes with a **Low effort** chip (on by default), one-tap
+  **+ Add** creates a batch at the recipe's base servings, stepper for servings, × to remove. No
+  day is required. The day grid is below it, labelled optional.
+- **Shop from batches** — Implemented · `generateGroceryList()` includes batches scaled to their servings.
+- **Not anymore? (Shop)** — Implemented · `openNotInKitchenDialog()` / `correctKitchenStock()` ·
+  on an auto-ticked "In stock" row, shows WHICH kitchen record matched and corrects that one
+  record: a staple is marked empty, anything else is removed with a tombstone. It never deletes
+  other records that happened to match loosely.
+- **Prep tab** — Implemented · `#prep`, `renderPrepTab()` · batches with **Prepped → Fridge**
+  (`completePlannedBatch()`), the day-plan meals with the existing Cooked flow, **Prep
+  checklist** (existing Prep Mode, now including batches), and **Copy AI Prep Brief**.
+- **AI Prep Brief** — Implemented · `copyPrepBrief()` / `getPrepBriefText()` · deterministic text:
+  recipes, servings, scaled ingredient amounts, stated prep/cook/hands-on time, equipment,
+  effort, keeping time, instructions as written, storage notes, shared ingredients, and a
+  closing request line. Missing data reads "not stated" / "amount not stated", never a guess.
+  No AI call inside the app.
+- **Purchased is not prepared** — bought groceries go to Fridge → **Ingredients on hand** (raw,
+  `AppState.pantry`); only prep creates ready food (`cookedMeals`).
+
 ## Dashboard (Home)
+- **Meal-prep flow card** — Implemented (D-076) · `renderMealPrepFlowCard()` · first card: Plan / Shop / Prep / Fridge counts, each a tap into its tab.
+- **"Need ideas?"** — Implemented (D-076) · `#dash-ideas`, collapsed `<details>` holding "What should we eat?", "What should I cook?" and "What can I do?". Demoted from the primary path, not removed. Its open state survives re-renders (view state only).
 - **3-level prioritized home** — Status: Working · `renderDashboard()`
   - L1 Attention: **Expired** (pantry + cooked food, each with one-tap `Keep` / `Remove`, plus a bulk **Remove expired (N)**), **Use soon** (≤2d, informational only — never bulk-removable), low-staple alerts, and **"Use soon"** recipe suggestions. Sourced from `collectAttentionItems()`. See DECISIONS D-057.
   - L2 Action split: cook suggestions (3 tiers) with **"Buy [ingredient]"** (`buyMissingIngredient()`); buy suggestions.
@@ -61,10 +87,11 @@
 - **Edit preserves unowned properties** — Working · `saveRecipe()` starts an edit from the existing recipe and overlays only form-owned fields, so `favorite`, `highlights`, import provenance, `updatedAt`, and the input-less `fiber`/`sodium` nutrition values survive an unrelated edit. The form stays authoritative for what it does own. See DECISIONS D-055.
 
 ## Plan (Weekly Planner)
+- **This week's batches** — see "Meal-prep flow" above. The grid below is optional.
 - **7-day grid** — Working · `renderWeeklyPlanner()` · click slot → recipe selection modal; multi-day assign; expiry warnings; week stats; mobile day navigator.
 - **Weekly nutrition totals** — Working · `renderWeeklyNutritionTotals()` → `#weekly-nutrition-totals`.
 - Save/Load week template (fills empty slots only); Day copy/paste/clear; Clear week.
-- **Prep Mode** — Working · `openPrepMode()` · checklist of week's recipes + progress bar.
+- **Prep Mode** — Working · `openPrepMode()` · checklist of the week's recipes (day plan + planned batches) + progress bar. Opened from the Plan header and the Prep tab.
 
 ## Nutrition
 - Goals (cal/protein/carbs/fat/fiber/sodium) — Working.

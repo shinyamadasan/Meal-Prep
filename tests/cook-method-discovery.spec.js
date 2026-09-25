@@ -669,6 +669,7 @@ test.describe('Home "Easiest" after the backfill', () => {
     await loadLocalApp(page);
     await page.evaluate(() => showTab('dashboard'));
     await page.waitForTimeout(500);
+    await page.locator('#dash-ideas > summary').click(); // "What should we eat?" lives in "Need ideas?"
     const row = page.locator('.wse-row', { hasText: 'Easiest' });
     await expect(row).toBeVisible();
     const chips = await row.locator('.wse-chip').allInnerTexts();
@@ -709,6 +710,7 @@ test.describe('Home "Easiest" after the backfill', () => {
     await loadLocalApp(page);
     await page.evaluate(() => showTab('dashboard'));
     await page.waitForTimeout(500);
+    await page.locator('#dash-ideas > summary').click(); // "What should we eat?" lives in "Need ideas?"
     // The wave must not introduce a competing "low effort meals" surface.
     const text = (await page.locator('#dashboard').innerText()).toLowerCase();
     expect(text).not.toContain('low effort meals');

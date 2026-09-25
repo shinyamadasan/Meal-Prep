@@ -461,6 +461,9 @@ test('20. no new top-level AppState collection was introduced', async ({ page })
     // this protein-identity wave introduces.
     'mealConsumptions',
     'mealConsumptionConflicts',
+    // 'plannedBatches' is the meal-prep-first wave's unscheduled weekly plan, a LATER,
+    // separately owner-approved wave — not something this wave introduces.
+    'plannedBatches',
     'lastLocalSaveSucceeded',
     'groceryList', 'ingredientPrices', 'isOnline', 'myStores', 'nutritionGoals', 'pantry',
     'prepModeSession', 'profile', 'recentRecipes', 'recipes', 'selectedPlannerDays',

@@ -2623,3 +2623,95 @@ Verify: app.js contains "function verifyInventoryChecked("
 Verify: app.js contains "renderPreparedFlavors(); // keeps the Prepared Flavors mirror fresh on tab entry, same as 'flavors' below"
 Verify: tests/fridge-prepared-flavors.spec.js contains "3+4. Fridge reads the SAME preparedFlavors record — rendering creates no duplicate"
 Verify: tests/inventory-verification.spec.js contains "MUTATION: removing inventoryVerifiedAt from buildFirestorePayload() loses it on save"
+
+## D-076 — Meal-prep first: unscheduled batches, Prep → Fridge as the only way food becomes "ready", explicit "Not anymore?" stock corrections, and no custom pull-to-refresh
+
+**Status:** Implemented on branch `wave/meal-prep-first` (from `main` @ e7c3777). **Held for
+review — NOT merged.** Built directly by Claude from an owner brief ("You are the BUILDER"),
+outside the Claude→Codex handoff, like TASK-058/059; recorded as TASK-060 with `status: review`.
+
+### Context
+
+The app's primary surfaces pushed daily "what should I cook?" decisions and day-by-day slot
+scheduling. The owner's workflow is weekly meal prep: **Plan → Shop → Prep → Fridge**. The owner
+reported four concrete problems: (1) the app reloads while scrolling; (2) Shop claims an
+ingredient is in stock when it isn't, with no obvious correction; (3) buying must never put
+"meals" in the Fridge; (4) planning requires assigning days.
+
+Characterization before any change, from the code rather than the docs:
+- **Purchased ≠ prepared already held at the data level.** `toggleGroceryItem()` →
+  `stockPurchasedGroceryItem()` writes only `AppState.pantry`; `cookedMeals` is created only by
+  `_doMarkCooked()` and the manual leftovers modal. The confusion was presentation: the tab was
+  called "Inventory", it mixed raw pantry and cooked food, and it grouped pantry items under a
+  "Fridge" storage heading. **No migration was needed or done.**
+- **The reload was a hand-rolled pull-to-refresh** in `setupMobileEnhancements()` (mobile user agents
+  only): any touch that began while `window.scrollY === 0` and moved 100px down called
+  `location.reload()`. `window.scrollY` says nothing about what the finger scrolls. Modals scroll
+  internally (`.modal-content { overflow-y: auto }`) with no body scroll-lock, so scrolling a modal
+  list back up (or any downward drag at the top of a page) reloaded the app and discarded unsaved
+  input. Reproduced first: 3 failing tests in `tests/scroll-no-reload.spec.js`.
+- **"In stock" is a loose two-way substring match** (`isInPantry()`, used ONLY by the Shop list):
+  pantry "Rice" makes "Rice Vinegar" read In stock, and a staple at `stockLevel: 'empty'` still
+  counted.
+
+### Decision
+
+1. **Remove the custom pull-to-refresh entirely.** Sync already refreshes live. No replacement
+   handler, no `overscroll-behavior` change (the proven trigger was the app's own code).
+2. **"Not anymore?" acts on one named record, never on "whatever matched".** `pantryMatchesForShop()`
+   returns the records behind the claim; `openNotInKitchenDialog()` lists them;
+   `correctKitchenStock()` changes only the tapped one. A staple → `stockLevel: 'empty'` (it stays a
+   staple). Anything else → explicit `writeTombstone('pantry', id, now)` + removal, so a synced
+   copy cannot resurrect it. A grocery row whose `stocked` receipt pointed at that record is reset
+   to unbought. `pantryMatchesForShop()` excludes empty staples, which is the only change to what
+   "In stock" means. The loose match itself was **not** tightened: `findPantryMatch()` (used by the
+   cook deduction path) shares that style, and changing it silently would hide legitimate stock.
+   **Conflict surfaced and resolved:** I first made tapping an auto-ticked row mean "I don't have
+   it". That contradicts D-057/D-069, where that tap means "I bought more" (top-up merge), and 6
+   kitchen-truth / inventory-quantity-truth tests pin it. I reverted to the tested D-069 behavior
+   and made the explicit button the unambiguous correction.
+3. **`AppState.plannedBatches` is a new top-level field, NOT a `weeklyPlan` pseudo-day.** At least
+   eight sites iterate `Object.keys(weeklyPlan)` as days (nutrition averages, planned-meal counts,
+   Prep Mode), so an "Unscheduled" key would have been counted as an eighth day. It is persisted
+   whole, like `weeklyPlan`: not in `TOMBSTONE_KEYS` (a union without tombstones would resurrect
+   removed batches), local-wins in `mergeCloudConflict()`, fill-only on import/sign-in
+   (`mergePlannedBatches()`). The listener and `loadFromFirestore()` adopt the remote value only when
+   the key is **present**, so an older cached app version saving without the key cannot wipe the
+   plan (the same concern `inventoryVerifiedAt`'s listener line handles).
+4. **Prep is the only path from plan to Fridge.** `completePlannedBatchNow()` reuses
+   `_doMarkCooked()` (portions = servings, raw ingredients deducted, cook history logged) and then
+   removes the batch. No second cooked-food model.
+5. **The AI Prep Brief is facts → normalized model → deterministic text, with no AI inside the app.**
+   `buildPrepBriefModel()` keeps missing values as `null`, rendered "not stated". It deliberately
+   avoids `recipePrepMinutes()`, which returns 0 for a missing time. Temperatures are not a
+   recipe field, so the brief says so and quotes the instructions as written instead of
+   extracting or guessing. The text contains no dates, so identical plans copy identically.
+6. **Home demotes rather than deletes.** `renderMealPrepFlowCard()` leads; "What should we eat?",
+   "What should I cook?" and "What can I do?" move into the collapsed `#dash-ideas`. Nav reorders to
+   the flow and relabels Inventory → Fridge and Cook → Recipes; `data-tab` ids are unchanged.
+
+### Consequences
+
+- Existing data needs no migration: an absent `plannedBatches` key loads as `[]`, and export
+  becomes `1.6` (all older versions still import).
+- Tests updated for intended behavior changes only: five AppState/payload key allowlists gained
+  `plannedBatches` with a comment (the established "listed rather than loosening the check"
+  convention); the export version assertion moved to `1.6`; four "What should we eat?" placement
+  assertions now open `#dash-ideas` first. Their content assertions are unchanged.
+- Accepted limitations: whole-field last-save-wins for concurrent offline plan edits (same as
+  `weeklyPlan`). Any plan change still regenerates the Shop list, which resets plan-derived rows'
+  checked state (pre-existing behavior, not changed here).
+
+### D-032 gate
+
+**`approved` (held), not `done`.** `plannedBatches` touches `buildFirestorePayload()`,
+`loadFromFirestore()`, `setupRealtimeListeners()`; `correctKitchenStock()` writes tombstones. Both
+are red-zone by topic.
+
+Verify: app.js contains "function correctKitchenStock("
+Verify: app.js contains "function normalizePlannedBatches("
+Verify: app.js contains "function buildPrepBriefModel("
+Verify: app.js contains "if (Array.isArray(data.plannedBatches)) AppState.plannedBatches = normalizePlannedBatches(data.plannedBatches);"
+Verify: app.js does not contain "Add pull-to-refresh functionality"
+Verify: tests/scroll-no-reload.spec.js contains "scrolling back up inside an open modal does not reload the app"
+Verify: tests/meal-prep-first.spec.js contains "a loose match never deletes unrelated stock: only the tapped record changes"
