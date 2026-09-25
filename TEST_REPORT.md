@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-060 / D-076 local landing · 2026-09-25
+suite: on merged local `main` 9ba4c25: full `npx playwright test --project=local`; `node --check
+  app.js`; `Verify-Decisions.ps1`; `Check-DocsConsistency.ps1`; `git diff --check e7c3777 HEAD`.
+result: 675/675 passed (1.7m); `node --check` OK; Verify-Decisions 70/70; docs drift 31 (= baseline);
+  diff-check clean. Tree identical to approved candidate 288fd58.
+not run: production specs, CI, Pages deploy, live smoke — nothing was pushed.
+
+---
+
 ## TASK-060 / D-076 review fix 1 · 2026-09-24
 suite: new regression cases in tests/meal-prep-first.spec.js, run against the reviewed candidate's
   product code (app.js/index.html byte-identical to e1c9f1c, only the spec changed) and again after

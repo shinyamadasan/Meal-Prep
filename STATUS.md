@@ -5,6 +5,20 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-25 — TASK-060 / D-076 merged into LOCAL main (9ba4c25), NOT pushed or deployed
+
+Owner approved candidate 288fd58 (after FIX FIRST on e1c9f1c and a targeted re-review). Merged
+`--no-ff` into local `main` as 9ba4c25; the tree is identical to 288fd58. Gates on merged `main`:
+675/675, Verify-Decisions 70/70, docs drift 31 (baseline), diff-check clean. `origin/main` is still
+e7c3777.
+
+**Left to the human:** authorize `git push origin main`. That push deploys to GitHub Pages and
+triggers CI; after it, run the usual Pages/CI/live-smoke checks. Non-blocking review observations
+remain open (see REVIEW.md TASK-060).
+
+
+---
+
 ## 2026-09-24 — Meal-prep first (TASK-060 / D-076): implemented on `wave/meal-prep-first`, UNCOMMITTED, awaiting independent review
 
 Owner brief: refocus on PLAN -> SHOP -> PREP -> FRIDGE. Built directly by Claude on a new branch from

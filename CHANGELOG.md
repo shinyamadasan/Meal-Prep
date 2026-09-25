@@ -5,6 +5,16 @@
 
 ---
 
+## TASK-060 / D-076 — landed locally, NOT pushed (branch: wave/meal-prep-first)
+merged: owner-approved candidate 288fd58 landed via `--no-ff` merge 9ba4c25 into LOCAL `main`
+  (parents e7c3777 + 288fd58). Pre-merge local `main` = `origin/main` = e7c3777; main was an
+  ancestor of the candidate. `git diff 288fd58 9ba4c25` is empty.
+procedure: followed the TASK-059 manual-landing precedent. Did NOT use `tools/Run-Merge.ps1`,
+  because it pushes and pushing `main` deploys (not authorized).
+push/deploy: NONE. `origin/main` still e7c3777.
+
+---
+
 ## TASK-060 / D-076 — review fix 1 (branch: wave/meal-prep-first, on top of e1c9f1c)
 review: FIX FIRST on candidate e1c9f1c (preserved; this is a new commit, not an amend).
 changes:

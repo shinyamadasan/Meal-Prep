@@ -4,6 +4,30 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-060 — Meal-prep first (D-076) — FIX FIRST -> fixed -> APPROVED FOR INTEGRATION (D-032 held gate)
+branch: `wave/meal-prep-first`; reviewed e1c9f1c, then fix candidate 288fd58 (base `main @ e7c3777`)
+date: 2026-09-25
+
+### Provenance — recorded from owner relays, not written by the reviewer
+The independent reviews ran outside this repository. Their reports were NOT committed here; this
+entry records only what the owner relayed to the builder session, verbatim in substance:
+- Review 1 on e1c9f1c: **FIX FIRST**, two bounded blockers:
+  (1) `generateGroceryList()` reset every plan-generated row to `checked: false`, so a planned-batch
+      servings +/- silently un-bought unrelated items;
+  (2) stale user-facing "Inventory" text on Home after the tab was renamed Fridge.
+  The relay listed other observations as non-blocking or out of scope (Firestore conflict
+  resolution, plannedBatches device-wins semantics, mergePlannedBatches id behavior, loose Shop
+  matching, nested grocery accessibility, staple low-vs-empty, `clearGroceryList()`, Firebase test
+  infrastructure). They remain OPEN and unaddressed.
+- Both blockers were fixed in 288fd58 on top of e1c9f1c (not amended). A targeted re-review
+  followed; the owner then relayed **APPROVE INTEGRATION** for 288fd58.
+
+### D-032 gate
+`approved` (held): red-zone by topic, since it touches Firestore payload/load/listener and pantry
+tombstone writes. The owner explicitly authorized integration. Landed as a local `--no-ff` merge
+only; **not pushed**, because pushing `main` deploys (GitHub Pages) and deploy was not authorized.
+
+---
 ## Review TASK-059 — Prepared Flavors in My Fridge + last-inventory-check timestamp — PASS -> D-032 `approved`
 branch: `wave/fridge-prepared-flavors-and-inventory-check` @ `089d097` (base `main @ 4b44ed9`)
 verdict: **PASS** — no P0, no P1, no P2. One non-blocking P3 remains OPEN (concurrent-merge nuance).

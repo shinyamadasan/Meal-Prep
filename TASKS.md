@@ -4131,7 +4131,7 @@ follow-ups:
 ---
 
 ### TASK-060 · Backfill: Meal-prep first — unscheduled batches, Prep tab + AI Prep Brief, "Not anymore?" stock correction, scroll-reload fix (D-076)
-status: review
+status: done
 owner: claude
 source: none — direct owner brief ("You are the BUILDER"), implemented directly by Claude, not Codex,
   and NOT from `planning/BUILD_QUEUE.md`. Recorded here so the OS record matches the repo, the
@@ -4164,6 +4164,8 @@ acceptance:
   - [x] Home leads with Plan/Shop/Prep/Fridge; "what to cook/eat" cards in collapsed `#dash-ideas`
   - [x] No horizontal overflow at 390px on Home/Plan/Prep; existing mobile-layout test passes
 
+landing: owner-approved candidate 288fd58 merged `--no-ff` into LOCAL `main` as 9ba4c25 (2026-09-25).
+  NOT pushed, NOT deployed — pushing `main` deploys and needs separate authorization. See REVIEW.md.
 review 1 (candidate e1c9f1c): FIX FIRST — two bounded blockers, both fixed in a new commit on top
   (e1c9f1c preserved, not amended):
   - [x] `generateGroceryList()` reset every plan-generated row to unchecked, so a batch +/- un-bought
