@@ -304,7 +304,9 @@ test('Home produces a meaningful Easiest recommendation with reason chips', asyn
   expect(pick.reasons.join(' · ')).toMatch(/Rice cooker|Oven|Instant Pot|Pressure cooker|Pan|No cook/);
   expect(pick.reasons.join(' · ')).toMatch(/min active/);
 
-  // It renders, with chips, and is honestly easy.
+  // It renders, with chips, and is honestly easy. Since TASK-060 / D-076 the card lives
+  // in the collapsed "Need ideas?" section, so open it the way a user does.
+  await page.locator('#dash-ideas > summary').click();
   const row = page.locator('.wse-row', { hasText: 'Easiest' });
   await expect(row).toBeVisible();
   expect((await row.locator('.wse-chip').allInnerTexts()).length).toBeGreaterThan(0);

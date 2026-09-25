@@ -5,6 +5,23 @@
 
 ---
 
+## TASK-060 / D-076 — follow-up: production smokes aligned with the meal-prep Home (branch: wave/meal-prep-first-prod-smokes)
+base: deployed `main` @ e6f7650 (= `origin/main`). Test-only follow-up; no product file changed.
+changes:
+  - tests/production-smoke-cook-method.spec.js: "Home produces a meaningful Easiest
+    recommendation…" opens "Need ideas?" (clicks `#dash-ideas > summary`) before asserting the
+    Easiest row is visible. All chip/effort/"no competing card" assertions are unchanged.
+  - tests/production-smoke-what-should-we-eat.spec.js:
+    - "Used 1 still works…" opens "Need ideas?" first; the portions and chip assertions are unchanged.
+    - "…surfaces remain intact…": `eatBeforeReady` replaced by `readyBeforeEat` +
+      `eatInsideIdeas`, mirroring the reviewed local what-should-we-eat spec. The other 7
+      assertions are unchanged.
+    - "mobile Home has no horizontal overflow and no console errors" opens "Need ideas?" first, so
+      its width, tap-size and console-error checks now actually run.
+  - TASKS.md: TASK-060 corrected from a premature `done` to `review`, with a release checklist.
+
+---
+
 ## TASK-060 / D-076 — landed locally, NOT pushed (branch: wave/meal-prep-first)
 merged: owner-approved candidate 288fd58 landed via `--no-ff` merge 9ba4c25 into LOCAL `main`
   (parents e7c3777 + 288fd58). Pre-merge local `main` = `origin/main` = e7c3777; main was an

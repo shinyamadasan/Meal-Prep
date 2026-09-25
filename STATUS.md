@@ -5,6 +5,18 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-25 — TASK-060 / D-076 DEPLOYED (e6f7650); release gates not yet green
+
+Owner-authorized push: `origin/main` = e6f7650, Pages deploy succeeded, the served files match Git, and
+the live smoke of every TASK-060 outcome passed. **Not DONE:** (1) 4 production smokes asserted
+the pre-TASK-060 Home layout. They are fixed test-only on `wave/meal-prep-first-prod-smokes`
+(`test:prod` now 147/0/4-skipped) and await targeted re-review plus a push. (2) CI run 36153457263
+failed its local gate on the known cook-depletion-tombstones restore-timeout flake (not modified).
+TASK-060 is back to `review`.
+
+
+---
+
 ## 2026-09-25 — TASK-060 / D-076 merged into LOCAL main (9ba4c25), NOT pushed or deployed
 
 Owner approved candidate 288fd58 (after FIX FIRST on e1c9f1c and a targeted re-review). Merged

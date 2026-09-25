@@ -305,6 +305,7 @@ test('Used 1 still works from the live recommendation card', async ({ page }) =>
       storage: 'fridge', fridgeLife: 4, freezerLife: 60, portionsRemaining: 3 }];
     renderDashboard();
   });
+  await page.locator('#dash-ideas > summary').click(); // the card lives in "Need ideas?" (TASK-060 / D-076)
 
   await expect(page.locator('.dash-card--eat .wse-chip')).toContainText(['3 portions']);
   await page.locator('.dash-card--eat .wse-action').first().click();
@@ -348,7 +349,10 @@ test('Ready Food and cook-suggestion surfaces remain intact below the new card',
       readyRows: document.querySelectorAll('.dash-card--ready .dash-ready-row').length,
       readyUseBtns: document.querySelectorAll('.dash-card--ready .dash-ready-use').length,
       suggestCard: document.querySelectorAll('.dash-card--suggest').length,
-      eatBeforeReady: html.indexOf('dash-card--eat') < html.indexOf('dash-card--ready'),
+      // TASK-060 / D-076: ready food leads; the recommendation card moved into the
+      // collapsed "Need ideas?" section below it. Demoted, not deleted.
+      readyBeforeEat: html.indexOf('dash-card--ready') < html.indexOf('dash-card--eat'),
+      eatInsideIdeas: !!document.querySelector('#dash-ideas .dash-card--eat'),
       readyBeforeSuggest: html.indexOf('dash-card--ready') < html.indexOf('dash-card--suggest'),
       quickChips: document.querySelectorAll('#recipe-quick-filters .rq-chip').length
     };
@@ -359,7 +363,8 @@ test('Ready Food and cook-suggestion surfaces remain intact below the new card',
   expect(result.readyRows).toBeGreaterThan(0);
   expect(result.readyUseBtns).toBeGreaterThan(0);
   expect(result.suggestCard).toBe(1);
-  expect(result.eatBeforeReady).toBe(true);
+  expect(result.readyBeforeEat).toBe(true);
+  expect(result.eatInsideIdeas).toBe(true);
   expect(result.readyBeforeSuggest).toBe(true);   // pre-existing order preserved
   expect(result.quickChips).toBeGreaterThan(0);   // equipment filters still there
 });
@@ -445,6 +450,7 @@ test('mobile Home has no horizontal overflow and no console errors', async ({ pa
     renderDashboard();
   });
 
+  await page.locator('#dash-ideas > summary').click(); // the card lives in "Need ideas?" (TASK-060 / D-076)
   const card = page.locator('.dash-card--eat');
   await expect(card).toBeVisible();
   const box = await card.boundingBox();

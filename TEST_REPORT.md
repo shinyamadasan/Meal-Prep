@@ -5,6 +5,30 @@
 
 ---
 
+## TASK-060 / D-076 production release verification + smoke follow-up · 2026-09-25
+suite: post-push checks on deployed e6f7650; then `npm run test:prod` against the live site before and
+  after the test-only follow-up on `wave/meal-prep-first-prod-smokes`.
+result:
+  - push: `origin/main` e7c3777 -> e6f7650 (fast-forward, no force). Pages run 36153456540:
+    success. The served app.js/index.html/style.css/sw.js/manifest.json blob hashes match Git.
+  - CI "Button tests" 36153457263 (SHA e6f7650): local branch gate 674 passed / 1 failed —
+    `tests/cook-depletion-tombstones.spec.js` (restore timeout after reload). The
+    production-smoke step was SKIPPED. Locally the same test passed 15/15 under
+    `--repeat-each=15`. Not modified. Not re-run.
+  - live functional smoke (temporary, uncommitted spec; throwaway profile; no sign-in;
+    Firebase/Google requests blocked): 2/2. Covered scroll no-reload (page top + modal), nav
+    labels, the Home flow and Fridge wording, an unscheduled batch, batch ingredients in Shop,
+    purchase != Fridge meal, checkmarks surviving a servings "+", "Not anymore?", brief copy, and
+    Prep -> Fridge.
+  - `npm run test:prod` on e6f7650 with the ORIGINAL specs: 143 passed / 4 failed / 4 skipped. All 4
+    failures are stale Home-layout expectations.
+  - after the follow-up: the 4 affected tests 4/4; full `npm run test:prod` 147 passed / 0 failed /
+    4 skipped. The skips are the pre-existing conditional notification-permission `test.skip`s in
+    production-smoke-attention-notifications.spec.js; the same 4 skipped before.
+not run: a green CI run (requires another push); real-device testing.
+
+---
+
 ## TASK-060 / D-076 local landing · 2026-09-25
 suite: on merged local `main` 9ba4c25: full `npx playwright test --project=local`; `node --check
   app.js`; `Verify-Decisions.ps1`; `Check-DocsConsistency.ps1`; `git diff --check e7c3777 HEAD`.
