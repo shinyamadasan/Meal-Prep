@@ -5,6 +5,18 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-061 / D-077: CI restore flake root-caused and fixed on a branch, NOT pushed
+
+The recurring "restore wait timed out after reload" CI failures were never slow restoration.
+Chromium drops a fresh context's whole `file://` localStorage across its first reload
+(8/2200 measured; 0/2300 over http). The local Playwright project is now served over
+http://127.0.0.1 through `tests/static-server.js`. It is test/config only, and product source is
+byte-unchanged. It is on branch `task-061-ci-restore-reliability`, with the full local suite at
+679/679 and ×3 at 16 workers 2037/2037. **Next:** independent review of TASK-061, then an
+authorized push. TASK-060 stays `review` until a green CI run.
+
+---
+
 ## 2026-09-25 — TASK-060 / D-076 DEPLOYED (e6f7650); release gates not yet green
 
 Owner-authorized push: `origin/main` = e6f7650, Pages deploy succeeded, the served files match Git, and

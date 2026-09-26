@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady } = require('./app-ready');
 
 // Exercises real recipe CARDS — the blind spot of the other suites. The live
@@ -23,7 +21,7 @@ async function loadWithSamples(page) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
 

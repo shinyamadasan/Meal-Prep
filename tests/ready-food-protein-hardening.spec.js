@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -25,7 +23,7 @@ const { waitForAppReady, waitForRestored } = require('./app-ready');
  *   A cooked meal's NAME is never read to determine its protein.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 // Fixture cookedDates in this file sit near 2026-08-24/25 and the ranking
 // assertion (the r1/r2/r3 Ready Food order) depends on those dates still being

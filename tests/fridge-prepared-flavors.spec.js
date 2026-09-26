@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady } = require('./app-ready');
 
 /**
@@ -15,7 +13,7 @@ const { waitForAppReady } = require('./app-ready');
  * only covers the additional Fridge rendering surface.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 const SOY_ID = 'flv-soy-calamansi';
 const SOY_NAME = 'Soy-Calamansi';

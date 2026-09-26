@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 
 // Mobile layout guard: at phone width, no tab should scroll sideways (horizontal
 // overflow is the #1 "looks broken on mobile" bug). Runs against the local files
@@ -13,7 +11,7 @@ test('no horizontal overflow on any tab (mobile)', async ({ page }) => {
     try { localStorage.setItem('mealPrepHelpSeen', '1'); } catch (e) {}
     try { localStorage.setItem('pantryOnboardingDone', '1'); } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   await page.evaluate(() => {
     document.querySelectorAll('.modal:not(.hidden)').forEach((m) => m.classList.add('hidden'));

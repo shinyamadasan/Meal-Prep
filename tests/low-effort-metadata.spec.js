@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -27,7 +25,7 @@ async function loadLocalApp(page) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
 

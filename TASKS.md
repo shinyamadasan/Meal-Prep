@@ -4194,6 +4194,54 @@ not covered by automated tests (reviewer attention):
 
 ---
 
+### TASK-061 · CI restore reliability: serve the local suite over http, not file:// (D-077)
+status: review
+owner: claude
+source: owner brief ("NEW BUILDER for a separate CI reliability task"). Not from
+  `planning/BUILD_QUEUE.md`. Deliberately SEPARATE from TASK-060, which stays `review` until its
+  required CI gate is rerun green.
+risk: Medium. Test harness and config only; no product file. Touches no Hard Rule surface.
+  Expected D-032 gate: `done` is defensible (reversible, outside the product), but the owner asked
+  for an independent reviewer first.
+depends-on: none. Relates to TASK-055/056, whose "runner condition remains inferred" open item
+  this resolves.
+files: playwright.config.js, tests/static-server.js (new), tests/local-harness-origin.spec.js (new),
+  tests/app-ready.js (comment only), 41 local specs (navigation URL only), docs/DECISIONS.md (D-077)
+branch: task-061-ci-restore-reliability (base main @ 207d262)
+
+acceptance:
+  - [x] Root cause measured, not assumed. On `file://`, a fresh context's first reload loses the
+        ENTIRE localStorage in 8/2200 runs (sessionStorage survives; a second reload does not
+        recover it). Over http: 0/2300. The same save→reload 25× in a warm context: 0/1200.
+        No renderer swap on reload (CDP). CI logs confirm `waitForAppReady()` passed and only
+        the restored-state predicate never came true.
+  - [x] One shared fix: the local project uses `baseURL` http://127.0.0.1:47813 via `webServer`
+        (`tests/static-server.js`), `serviceWorkers: 'block'`, and `reuseExistingServer: false`
+  - [x] 45 navigations in 41 local specs changed to `page.goto('/index.html')`. Only imports
+        orphaned by that change were removed.
+  - [x] No assertion, predicate, timeout, retry, skip or fixme changed. `waitForRestored()` is
+        unchanged.
+  - [x] Regression spec `tests/local-harness-origin.spec.js` (4 tests): a no-`file://` guard
+        (flags all 41 pre-fix specs), the http origin with no SW controller, a fresh test
+        starting with empty storage, and the last of 3 rapid saves restored by the first reload
+  - [x] Product source byte-unchanged vs 207d262 (app.js, index.html, style.css, sw.js,
+        manifest.json). `prod` project unchanged (151 tests listed).
+  - [ ] Independent review
+  - [ ] Green CI run on push (not pushed; needs authorization)
+
+verification: see TEST_REPORT.md "TASK-061".
+
+open items (recorded, deliberately NOT fixed):
+  - A ~0.3% browser race cannot be forced to fail inside one test. The static guard is the
+    deterministic protection.
+  - The Chromium-internal cause of the `file://` loss is unidentified. Not needed for the fix.
+  - Run 33128957608's meal-lego / ready-food ranking failures are a different class: hard-coded
+    2026-08-2x cooked dates against the real clock, with no reload involved. Out of scope.
+  - `seed-isolation`'s Class-D fixed 1500ms wait is kept as it was. Its CI failure (40 recipes)
+    was this storage loss, not the wait.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -22,7 +20,7 @@ const { waitForAppReady, waitForRestored } = require('./app-ready');
  *                    A test that simulates the merge cannot catch a bug in the merge.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 const SEED_NAMES = [
   'Soy-Calamansi', 'Honey Garlic', 'Teriyaki-style', 'Japanese Spicy Mayo',

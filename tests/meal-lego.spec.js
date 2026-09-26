@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady } = require('./app-ready');
 
 /**
@@ -23,7 +21,7 @@ const { waitForAppReady } = require('./app-ready');
  * change.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 // Fixture cookedDates in this file sit near 2026-08-24/25 and several assertions
 // (the r1/r2/r3 Ready Food ordering, the Home "Eat this first" pick) depend on

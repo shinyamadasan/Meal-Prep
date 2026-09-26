@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -87,7 +85,7 @@ async function loadLocalApp(page, { fixedTime = null } = {}) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
 
@@ -665,7 +663,7 @@ test('the two-digit-year path raises no console or page errors', async ({ page }
                        'Butter 250 g Feb 31 26'].join('\n'));
   await page.evaluate(() => { showTab('fridge'); renderPantry(); });
   await page.waitForTimeout(200);
-  // file:// blocks the Firebase CDN in this harness; that network error is the harness.
+  // The harness aborts the Firebase CDN; that network error is the harness.
   expect(errors.filter((e) => !/ERR_FAILED|Failed to load resource|firebasejs/i.test(e)))
     .toEqual([]);
 });

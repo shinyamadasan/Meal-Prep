@@ -5,6 +5,23 @@
 
 ---
 
+## TASK-061 / D-077 — local suite served over http; CI restore flake removed (branch: task-061-ci-restore-reliability)
+base: `main` @ 207d262. Test harness and config only; no product file changed.
+changes:
+  - playwright.config.js: `webServer` runs `node tests/static-server.js` on 127.0.0.1:47813 with
+    `reuseExistingServer: false`. The `local` project gets `baseURL` and `serviceWorkers: 'block'`.
+    The header comment is updated to say why.
+  - tests/static-server.js (new): a dependency-free static server for the repo root, with
+    `Cache-Control: no-store` and paths outside the root refused.
+  - 41 local specs: `pathToFileURL(path.resolve('index.html')).href` changed to `'/index.html'`
+    (45 sites). The `url`/`path` imports that this orphaned are removed. Two comments that
+    credited `file://` with blocking Firebase now credit the route abort, which is what does it.
+  - tests/app-ready.js: header comment only.
+  - tests/local-harness-origin.spec.js (new): 4 tests (see TASKS.md TASK-061).
+  - docs/DECISIONS.md: D-077. TASKS.md: TASK-061 (review). STATUS.md: new top entry.
+
+---
+
 ## TASK-060 / D-076 — follow-up: production smokes aligned with the meal-prep Home (branch: wave/meal-prep-first-prod-smokes)
 base: deployed `main` @ e6f7650 (= `origin/main`). Test-only follow-up; no product file changed.
 changes:

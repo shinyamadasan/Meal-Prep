@@ -1,8 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 
-const APP_FILE = pathToFileURL(path.resolve('index.html')).href;
+const APP_FILE = '/index.html';
 
 const cleanEnvelope = {
   ok: true,

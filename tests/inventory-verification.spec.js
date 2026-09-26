@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady } = require('./app-ready');
 
 /**
@@ -15,7 +13,7 @@ const { waitForAppReady } = require('./app-ready');
  * ever writes the current timestamp and re-renders the status line.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 function bootstrapStorage() {
   return (doc) => {

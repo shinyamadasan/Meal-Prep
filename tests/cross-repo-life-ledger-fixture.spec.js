@@ -1,7 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
-const { pathToFileURL } = require('url');
 
 const FIXTURE_UPDATE_ENV = 'MEAL_CROSS_REPO_LIFE_LEDGER_FIXTURE_UPDATE';
 const FIXTURE_UPDATE_ENABLED = process.env[FIXTURE_UPDATE_ENV] === '1';
@@ -56,7 +55,7 @@ async function loadLocalApp(page) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => typeof AppState !== 'undefined' && Array.isArray(AppState.cookedMeals) &&
           typeof saveData === 'function' && typeof useCookedPortion === 'function' &&

@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -39,7 +37,7 @@ async function loadLocalApp(page, { fixedTime = null } = {}) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
 
@@ -670,7 +668,7 @@ test('the whole quantity-truth loop raises no console or page errors', async ({ 
   await page.keyboard.type('4');
   await page.keyboard.press('Tab');
   await page.waitForTimeout(300);
-  // file:// blocks the Firebase CDN in this harness; that network error is the harness.
+  // The harness aborts the Firebase CDN; that network error is the harness.
   expect(errors.filter((e) => !/ERR_FAILED|Failed to load resource|firebasejs/i.test(e))).toEqual([]);
 });
 

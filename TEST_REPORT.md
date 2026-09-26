@@ -5,6 +5,37 @@
 
 ---
 
+## TASK-061 / D-077 CI restore reliability · 2026-09-26
+suite: local Windows machine (12 cores), Playwright 1.61 Chromium. Probes were throwaway specs
+  outside the repo.
+result:
+  - CI evidence: run 36205338469 timed out at `waitForRestored` line 69 (the predicate), after
+    `waitForAppReady` passed. Across 12 local-gate failed runs since 2026-08-25, the same shape
+    appeared in 8 distinct specs. `seed-isolation` got 40 re-seeded recipes after verifying that its empty
+    list was saved.
+  - root-cause probe (fresh context, real app, Firebase aborted, `saveData()`, then immediate
+    `page.reload()`, 16 workers):
+    - `file://` single-shot: 2/400, 3/800 and 3/1000 lost the whole localStorage. Every loss
+      showed `sawBoot:false`; the diagnostic run showed sessionStorage intact and no recovery on a
+      second reload.
+    - http://127.0.0.1 single-shot: 0/800 and 0/1500.
+    - `file://` warm-context cycles: 0/1200.
+    - Renderer PID identical across reload for both origins and for page.reload,
+      location.reload and goto.
+  - new spec alone plus suite-classification: 10/10.
+  - guard negative proof: the check applied to HEAD 207d262 flags 41/41 local specs.
+  - stress: 9 historically failing specs plus the new spec, ×10 at `--workers=16`: 1670/1670.
+  - `npm test` (full local suite): 679 passed / 0 failed (675 existing + 4 new).
+  - full local suite ×3 at `--workers=16`: 2037/2037.
+  - `prod` project: listed only (151 tests, unchanged); not run, because it tests the deployed
+    site, which this branch does not change.
+  - `node --check` passes on the config, server and new spec. `git diff --check` is clean.
+    `tools/Verify-Decisions.ps1` passes 74/74 pointers; `Check-DocsConsistency.ps1` 31 items (= `main` baseline).
+not run: CI (not pushed); a pre-fix whole-suite stress baseline, because about 45 reloads ×3 at a
+  0.36% loss rate predicts less than one failure, so it cannot discriminate.
+
+---
+
 ## TASK-060 / D-076 production release verification + smoke follow-up · 2026-09-25
 suite: post-push checks on deployed e6f7650; then `npm run test:prod` against the live site before and
   after the test-only follow-up on `wave/meal-prep-first-prod-smokes`.

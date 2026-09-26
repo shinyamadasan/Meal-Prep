@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -19,7 +17,7 @@ const { waitForAppReady, waitForRestored } = require('./app-ready');
  *                    / saveToFirestore code, not a re-implementation of it.
  */
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 
 const SOY_ID = 'flv-soy-calamansi';
 const SOY_NAME = 'Soy-Calamansi';

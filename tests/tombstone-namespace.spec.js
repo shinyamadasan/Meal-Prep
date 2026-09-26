@@ -1,9 +1,7 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
-const APP_URL = () => pathToFileURL(path.resolve('index.html')).href;
+const APP_URL = () => '/index.html';
 const OLD = '2026-01-01T00:00:00.000Z';
 const TOMB = '2026-06-01T00:00:00.000Z';
 const TOMBSTONE_COLLECTIONS = ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'cookedMeals', 'userIngredients'];

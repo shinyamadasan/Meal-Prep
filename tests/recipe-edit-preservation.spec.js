@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForRestored } = require('./app-ready');
 
 /**
@@ -28,7 +26,7 @@ async function loadLocalApp(page) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   // Condition, not clock. See AI_OS_NOTES 2026-08-23.
   await page.waitForFunction(
     () => typeof AppState !== 'undefined' && Array.isArray(AppState.recipes) &&

@@ -5,15 +5,20 @@ const { defineConfig } = require('@playwright/test');
  * Two projects, because this repo's specs answer two different questions and mixing
  * them made one number meaningless:
  *
- *   local — loads index.html from THIS checkout via file://. Deterministic, offline,
- *           and the only suite that can validate a branch before it is merged.
+ *   local — loads index.html from THIS checkout, served by tests/static-server.js on
+ *           127.0.0.1. Deterministic, no internet dependency, and the only suite that
+ *           can validate a branch before it is merged. Not file:// — Chromium can drop a
+ *           fresh context's whole file:// localStorage across its first reload, which
+ *           made every save-then-reload spec a coin flip (TASK-061, D-077).
  *   prod  — fetches https://shinyamadasan.github.io/Meal-Prep/. Validates whatever is
  *           DEPLOYED, so it cannot say anything about unmerged code, and it fails when
  *           the network or GitHub Pages hiccups rather than when the app is wrong.
  *
- * Everything else is left at Playwright's defaults on purpose: this change is about
- * which specs run together, not about timeouts, retries, workers or reporters. Adding
- * a config file must not quietly re-tune the suite.
+ * Everything else is left at Playwright's defaults on purpose: no timeouts, retries,
+ * workers or reporters are tuned here. The only runtime settings are the local
+ * project's origin (baseURL + webServer) and serviceWorkers: 'block', which keeps the
+ * http origin exactly as SW-free as file:// was — sw.js must not start caching app.js
+ * underneath a test.
  *
  * PROD_SPECS is an explicit list rather than a filename pattern because three of the
  * live-site specs predate the `production-smoke-*` convention (button-smoke,
@@ -39,12 +44,24 @@ const PROD_SPECS = [
   'smoke.spec.js'
 ];
 
+const LOCAL_PORT = 47813;
+const LOCAL_ORIGIN = 'http://127.0.0.1:' + LOCAL_PORT;
+
 module.exports = defineConfig({
   testDir: './tests',
+  // Never reuse an already-running server: it could be serving a different checkout
+  // (e.g. a sibling worktree), and the gate would then validate the wrong code.
+  webServer: {
+    command: 'node tests/static-server.js',
+    url: LOCAL_ORIGIN + '/index.html',
+    env: { LOCAL_APP_PORT: String(LOCAL_PORT) },
+    reuseExistingServer: false
+  },
   projects: [
     {
       name: 'local',
-      testIgnore: PROD_SPECS
+      testIgnore: PROD_SPECS,
+      use: { baseURL: LOCAL_ORIGIN, serviceWorkers: 'block' }
     },
     {
       name: 'prod',

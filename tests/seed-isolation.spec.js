@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForRestored } = require('./app-ready');
 
 /**
@@ -37,7 +35,7 @@ async function bootNoFirebase(page, pre) {
       if (extra) Object.keys(extra).forEach((k) => localStorage.setItem(k, extra[k]));
     } catch (e) {}
   }, pre || null);
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await settled(page);
 }
 

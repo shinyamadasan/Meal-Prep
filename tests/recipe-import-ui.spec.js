@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 
 async function loadLocalApp(page, workerEnvelope) {
   await page.route('**/firebasejs/**', (r) => r.abort());
@@ -23,7 +21,7 @@ async function loadLocalApp(page, workerEnvelope) {
       throw new Error('Unexpected fetch: ' + url);
     };
   }, workerEnvelope);
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
 }
 

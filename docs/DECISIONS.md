@@ -2728,3 +2728,69 @@ Verify: tests/scroll-no-reload.spec.js contains "scrolling back up inside an ope
 Verify: tests/meal-prep-first.spec.js contains "a loose match never deletes unrelated stock: only the tapped record changes"
 Verify: app.js contains "const rowKey = (category, name) => String(category) + '\u0000' + String(name);"
 Verify: tests/meal-prep-first.spec.js contains "REGRESSION: changing an unrelated batch"
+
+---
+
+## D-077 — The local Playwright suite is served over http://127.0.0.1, never file://
+
+**Status:** Implemented on branch `task-061-ci-restore-reliability` (from `main` @ 207d262). Test
+harness only. Held for independent review (TASK-061). Product source byte-unchanged.
+
+### Context
+
+Since 2026-08-25 the local CI gate has failed intermittently in a different spec almost every time
+(`kitchen-truth`, `seed-isolation`, `flavor-library`, `inventory-quantity-truth`,
+`bulk-add-partial-retry`, `recipe-edit-preservation`, `cook-depletion-tombstones`,
+`meal-consumption-events`, …), always the same way: after `page.reload()` the restored state never
+appears and `waitForRestored()` times out. TASK-055/056 attributed this to the Firebase async-init
+gap, but every one of these specs aborts `**/firebasejs/**`, and TASK-056 recorded the runner
+condition as "inferred". The CI logs also show that `waitForAppReady()` passed. The app booted
+fine, but the saved document was simply not there. `seed-isolation` read the saved empty list back
+from `localStorage` *before* reloading and then got 40 re-seeded recipes *after* it.
+
+Measured (Chromium via Playwright 1.61, real app, Firebase aborted, 16 workers). In a fresh
+context, save the document and reload about 0.4s after the first navigation.
+- `file://`: the new document starts with an **empty localStorage** in 8 of 2200 runs. Every key is
+  gone, including ones written by the init script at the very first navigation. sessionStorage in
+  the same tab survives, and a second reload does not bring the data back.
+- The identical probe over `http://127.0.0.1`: **0 of 2300.**
+- On `file://`, the same save→reload repeated 25 times inside one already-warm context: 0 of 1200.
+  The loss is specific to a fresh context's first reload, which is exactly the shape of every
+  failing spec.
+- The renderer process does not change across the reload (checked via CDP), so this is not a
+  process swap. The engine-internal cause is not identified and does not need to be: the repo
+  cannot fix Chromium, only stop depending on the behaviour.
+
+Waiting longer after the reload could never have fixed this, because the state is not late. It is
+gone.
+
+### Decision
+
+1. `playwright.config.js` starts `tests/static-server.js` (dependency-free, serves only the repo
+   root, `Cache-Control: no-store`) through Playwright's webServer option. The `local` project uses
+   `baseURL: http://127.0.0.1:47813` and `serviceWorkers: 'block'`. The `block` setting keeps the
+   http origin as service-worker-free as `file://` was. Otherwise `sw.js` could serve cached files
+   underneath a test.
+2. `reuseExistingServer: false`. A server left running by a sibling worktree would otherwise make
+   the gate validate the wrong checkout.
+3. All 45 local navigations (41 specs) are now `page.goto('/index.html')`. No assertion, predicate,
+   timeout or retry changed. `waitForRestored()` is unchanged; it waits for the right condition,
+   and that condition can now become true.
+4. `tests/local-harness-origin.spec.js` guards the contract. No local spec may navigate to
+   `file://` (negative-proofed: the check flags all 41 pre-fix specs). The local page is on
+   127.0.0.1 with no SW controller. A fresh test starts with empty storage. The last of several
+   rapid saves is exactly what the first reload restores.
+
+### Consequences
+
+- The local gate needs a free port 47813 on 127.0.0.1. It still needs no internet access.
+- A ~0.3% browser race cannot be forced to fail inside one test. The static guard is the
+  deterministic protection; the behavioural test documents the contract.
+- `production` (`prod` project) specs are untouched. They already use https.
+- `seed-isolation`'s absence test (the TASK-056 "Class D" fixed 1500ms wait) also failed through
+  this mechanism (40 recipes re-seeded), not through its wait. Its wait is left as it was.
+
+Verify: playwright.config.js contains "command: 'node tests/static-server.js'"
+Verify: playwright.config.js contains "serviceWorkers: 'block'"
+Verify: tests/local-harness-origin.spec.js contains "no local spec loads the app from file://"
+Verify: tests/seed-isolation.spec.js does not contain "pathToFileURL"

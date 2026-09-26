@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 const { waitForAppReady, waitForRestored } = require('./app-ready');
 
 /**
@@ -64,7 +62,7 @@ async function loadLocalApp(page, opts) {
     } catch (e) {}
   }, opts);
   await page.addInitScript(NOTIFICATION_STUB);
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
 
@@ -179,7 +177,7 @@ test('a browser with no Notification API at all does not break the app', async (
     // iOS Safari in a normal tab looks exactly like this.
     delete window.Notification;
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 
   const result = await page.evaluate(async () => {
@@ -698,7 +696,7 @@ test('a corrupt alert-prefs value falls back to off instead of throwing', async 
       localStorage.setItem('mealPrepFoodAlerts', '{not json');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 
   expect(await page.evaluate(() => loadFoodAlertPrefs())).toEqual({ enabled: false, announced: {} });

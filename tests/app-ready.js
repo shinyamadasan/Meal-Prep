@@ -1,5 +1,5 @@
 /**
- * Shared readiness waits for the local (file://) specs.
+ * Shared readiness waits for the local specs (served over http by tests/static-server.js).
  *
  * Every spec used to do `await page.waitForTimeout(2500)` after a goto or reload. That
  * is a guess, and on a slower runner it fires MID-initialisation: the test then mutates

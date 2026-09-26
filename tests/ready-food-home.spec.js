@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const path = require('path');
-const { pathToFileURL } = require('url');
 
 /**
  * Ready-food wave — Home "Ready to eat" ranking, and the real-world
@@ -25,7 +23,7 @@ async function loadLocalApp(page, { fixedTime = null } = {}) {
       localStorage.setItem('pantryOnboardingDone', '1');
     } catch (e) {}
   });
-  await page.goto(pathToFileURL(path.resolve('index.html')).href, { waitUntil: 'domcontentloaded' });
+  await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   // Condition, not clock: a fixed wait fires mid-init on a slow runner and the test then
   // mutates state that init overwrites. See AI_OS_NOTES 2026-08-23.
   await page.waitForFunction(
