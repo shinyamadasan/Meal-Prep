@@ -4324,7 +4324,7 @@ open items (recorded, deliberately NOT fixed):
 ---
 
 ### TASK-063 · Backfill: Mobile Home polish — compact attention ALWAYS, Recipes behind More, compact leftover row (D-079)
-status: approved
+status: done
 owner: claude
 source: direct owner brief ("BUILDER for a focused MOBILE HOME POLISH wave"). Not from
   `planning/BUILD_QUEUE.md`. Explicitly a bounded follow-up to TASK-062, fixing four real-usage
@@ -4419,9 +4419,28 @@ review 2 (targeted re-review of candidate c67b47c): PASS. Owner-authorized safe 
   696/696, targeted `tests/mobile-layout.spec.js` + `tests/mobile-home-polish.spec.js` 17/17,
   `tests/kitchen-truth.spec.js` 27/27, `tools/Verify-Decisions.ps1` 86/86,
   `tools/Check-DocsConsistency.ps1` drift 38 (unchanged from the fix-first candidate),
-  `git diff --check` clean, `node --check app.js` clean. **Not yet pushed; status stays `approved`,
-  not `done`, until origin/main push + CI + Pages + production-smoke + live verification all
-  confirm green** — see `STATUS.md` for the push/CI/Pages/live-verification record once available.
+  `git diff --check` clean, `node --check app.js` clean.
+
+landing (2026-09-26): pushed `main` `416c0be -> 59840f6` (fast-forward `c67b47c` plus a docs-only
+  landing-bookkeeping commit; both preserved unamended). **CI run `36266036118` ("Button tests")
+  green end to end, first attempt, no retries:** local gate `696/696` (11m56s total), Pages-deploy
+  wait passed, production smokes `147 passed / 0 failed / 4 skipped` (the pre-existing
+  notification-permission skips). **Pages run `36266035143`: success.** Served
+  `app.js`/`index.html`/`style.css` fetched from `https://shinyamadasan.github.io/Meal-Prep/` are
+  byte-identical to `git show main:<file>` after line-ending normalization and carry
+  `recipesInMore`/`dash-attn-review-btn`/`viewFreshnessDetails`/`tab-more-recipes-link`. A
+  disposable, throwaway Playwright pass (not committed) against the live site confirmed every
+  acceptance item: attention stays closed by default with expired items present and shows truthful
+  counts; Review opens it and a repeated tap does not close it; the banner's View action opens
+  Home's attention from both Home and a non-Home tab; `openAttentionView()` works directly;
+  Keep/Remove/Remove-expired stay reachable; Ready to Eat renders above attention; Need
+  ideas/Cook History stay collapsed; the compact leftover row opens the real modal; at both 390px
+  and 360px the 5 primary tabs + More are reachable with no nav/page overflow, Recipes opens via
+  More, and the visible More button (not the hidden primary tab) carries the active state while
+  Recipes is open, clearing once Home is reselected; on desktop the primary Recipes tab is active
+  and More is not, with no mobile-only Recipes duplicate visible; the greeting's emoji stays glued
+  to the last word via the nbsp mechanism. No unexpected console/page errors (after the same
+  benign-Firebase-noise filter every existing production smoke already uses). **TASK-063 is `done`.**
 
 open items (recorded, deliberately NOT fixed):
   - The compact summary's "running low" staple count still shares `#dash-attention` with

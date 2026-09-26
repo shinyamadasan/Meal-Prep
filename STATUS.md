@@ -5,6 +5,53 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-063 / D-079 DONE: `main` 59840f6 pushed, CI green end to end, Pages verified, live-verified
+
+Pushed `main` `416c0be -> 59840f6` (fast-forward of reviewed candidate `c67b47c`, plus this session's
+own docs-only landing-bookkeeping commit on top — both preserved unamended). Immediately before
+push: re-fetched `origin/main` (still `416c0be`, unmoved), confirmed local `main` was the intended
+tip, status clean (only the pre-existing untracked `screenshots/`), sibling worktree untouched. Push
+was a normal fast-forward, no force. `origin/main` confirmed `59840f6` after push.
+
+**CI run `36266036118`** ("Button tests", triggered by the push) went **green end to end, first
+attempt, no retries, 11m56s total**: `Run local suite (branch gate)` — **696 passed, 0 failed**;
+`Wait for GitHub Pages to deploy` — passed; `Run production smokes (post-deploy gate)` — **147
+passed, 0 failed, 4 skipped** (the pre-existing notification-permission skips). No reload/restore
+flake from the pre-TASK-061 class reappeared.
+
+**Pages run `36266035143`: success.** Served `app.js`/`index.html`/`style.css` fetched from
+`https://shinyamadasan.github.io/Meal-Prep/` were fetched and diffed against `git show main:<file>`
+directly (not assumed) — **byte-identical** after line-ending normalization, and the served bundle
+contains `recipesInMore`, `dash-attn-review-btn`, `viewFreshnessDetails`, and
+`tab-more-recipes-link`.
+
+**Live production verification** — a disposable, throwaway Playwright pass against the deployed
+site (not committed, guest/local state only, no sign-in, nothing written to any real account):
+- **Attention:** stays closed by default with expired items present; compact summary shows
+  truthful counts; Review opens it; a second Review tap does not close it; the banner's View action
+  opens Home's attention both from Home and from a non-Home tab; `openAttentionView()` works
+  directly; Keep/Remove/Remove-expired/View-in-Fridge/Plan-it all reachable once open; Ready to Eat
+  renders above attention; Need ideas? and Cook History stay collapsed; the compact "+ Record
+  leftovers / takeout" row opens the real `openManualCookedModal()` flow.
+- **Mobile nav, 390px and 360px:** Home/Plan/Shop/Prep/Fridge/More all visible and reachable, no
+  nav-internal or page-level horizontal overflow, Recipes reachable via More, the visible **More**
+  button (not the hidden primary tab) carries the active state while Recipes is open, and leaving
+  Recipes for Home clears it.
+- **Desktop:** primary Recipes tab visible and active when selected; More does not appear active
+  merely because Recipes is selected; the mobile-only Recipes duplicate is not visible inside
+  desktop's More menu.
+- **Greeting:** the wave emoji stays glued to the last word via the `&nbsp;` mechanism at phone
+  width; no orphaned emoji.
+- **Console:** no unexpected console/page errors, using the same benign-Firebase-noise filter every
+  existing production smoke already uses (`requestStorageAccess`, `net::ERR*`, favicon, etc.).
+
+`TASKS.md` TASK-063 set to `done`. Feature branch `wave/mobile-home-polish` (tip `c67b47c`),
+`release/recipe-url-import-clean` worktree/branch, and the pre-existing untracked `screenshots/`
+directory were untouched throughout the entire TASK-063 arc (build → fix-first → re-review →
+integration → push → verification).
+
+---
+
 ## 2026-09-26 — TASK-063 / D-079 targeted re-review PASS: `main` fast-forwarded to `c67b47c` locally, NOT YET PUSHED
 
 Independent targeted re-review of fix-first candidate `c67b47c` came back **PASS**. Owner-authorized
