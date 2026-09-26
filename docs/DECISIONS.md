@@ -2797,3 +2797,79 @@ Verify: playwright.config.js contains "command: 'node tests/static-server.js'"
 Verify: playwright.config.js contains "serviceWorkers: 'block'"
 Verify: tests/local-harness-origin.spec.js contains "no local spec loads the app from file://"
 Verify: tests/seed-isolation.spec.js does not contain "pathToFileURL"
+
+## D-078 — Plan + Home simplification: one recipe picker, a collapsed by-day scheduler, and a compact Home
+
+**Status:** Implemented on branch `wave/plan-home-simplification` (from `main` @ a64d186). Held
+for independent review. No `plannedBatches`/`weeklyPlan` persistence semantics changed; no
+Firestore/storage/auth surface touched.
+
+### Context
+
+D-076 made planned batches the Plan tab's primary content and gave Home a Plan → Shop → Prep →
+Fridge flow card, but left both screens showing every capability at once: an inline batch search
+that only showed anything with a typed query or a Low-effort default that hid the rest of the
+recipe box, a Prep Mode button duplicated verbatim between the Plan header and the Prep tab, an
+always-expanded 7-day scheduler competing with the batch list for the top of the screen, and a
+Home page where the "What needs attention?" detail, a "Planning" strip duplicating the flow card's
+own Plan step, and a Cook History log were all rendered open by default alongside the flow and
+Ready-to-eat cards. The owner asked for the Plan and Home simplifications to land as one bounded
+UX phase rather than freezing Plan first.
+
+### Decision
+
+**Plan tab:**
+1. The inline `#batch-search` row is replaced by a **"+ Add meals"** button
+   (`openBatchPickerModal()`) opening `#batch-picker-modal` — a full recipe picker. All recipes are
+   listed with no query needed; **Low effort** (`batchSearchLowEffort`) now defaults to **off** and
+   is an optional filter, never the default universe (`getBatchSearchResults()` no longer returns
+   `[]` for an empty, non-low-effort query).
+2. `addPlannedBatch()` checks for an existing batch with the same `recipeId` first. Adding an
+   already-planned recipe again does not push a second `plannedBatches` entry — it points at the
+   existing one (`existing.id`) with a message to adjust servings below. The stored shape and every
+   other `plannedBatches` call site are unchanged.
+3. The Monday–Sunday grid, mobile day nav, weekly nutrition totals and week stats are now inside
+   `<details id="plan-by-day-details">`, closed by default — optional and out of the way, not
+   deleted.
+4. The Plan header's own "Prep Mode" button is removed. It called the exact same
+   `openPrepMode()` the Prep tab's "Prep checklist" button already calls — a literal duplicate, not
+   a distinct feature — so this is a removal, not a demotion.
+
+**Home:**
+1. Card order changes to: greeting → meal-prep flow (now with one **factual next action** line,
+   derived from the same batch/toBuy counts the flow steps already show — add meals → buy → prep →
+   "nothing left", never a new signal) → **Ready to eat** → **What needs attention?** → Record
+   leftovers/takeout → Need ideas? (collapsed, unchanged) → Cook History (now collapsed).
+2. `#dash-attention` becomes a `<details>`: a compact one-line count summary in the `<summary>`,
+   full per-item Keep/Remove detail in the body. It opens automatically whenever `hasExpired` is
+   true — a same-day destructive action is never hidden behind an extra tap — and otherwise
+   preserves whatever the user last set it to across re-renders, the same pattern `#dash-ideas`
+   already uses. `openAttentionView()` (the notification-click path) force-opens it regardless.
+3. `#dash-history` (Cook History) becomes a `<details>`, closed by default, same open-state
+   preservation pattern.
+4. The standalone Level-3 "Planning" card (7-day dot strip + Weekly plan/Nutrition/Goals links) is
+   removed outright, not demoted: it duplicated the flow card's own Plan step and the Plan tab
+   itself, and Nutrition/Goals are already reachable from the top nav's "More" menu. Its
+   now-unused helpers (`dayMealCounts`, `daysPlanned`, `weekStrip`, `planLabel`) and CSS
+   (`.dash-card--planning`, `.dash-week-strip`, `.dash-day-dot*`, `.dash-l3-*`) are removed with it.
+
+### Consequences
+
+- `tests/meal-prep-first.spec.js`'s Plan-tab search test was rewritten for the modal flow, and a
+  new test pins the duplicate-batch guard. Every other spec touching `.dash-card--warn`,
+  `.dash-card--ready`, `.dash-ideas`, or `openAttentionView()` passed unmodified — all seed at
+  least one expired item, so the attention card's auto-open-on-expired rule keeps them green
+  without a test rewrite.
+- `docs/ARCHITECTURE.md`'s Plan-tab entry-render-fn row and `docs/FEATURES.md`'s Plan/Home sections
+  were updated in this same change; `Check-DocsConsistency.ps1` drift stayed at the pre-existing
+  31-item baseline (zero new drift).
+- Deferred, not addressed here: a picker entry that shows *why* a recipe is low-effort beyond the
+  existing meta line; grouping multiple same-recipe batches visually rather than preventing a
+  second one outright (out of scope — no product need for a second batch of the same recipe was
+  named).
+
+Verify: index.html contains "openBatchPickerModal()"
+Verify: index.html contains "plan-by-day-details"
+Verify: app.js contains "existing.id"
+Verify: app.js contains "dash-attention"
+Verify: app.js does not contain "dash-card--planning"

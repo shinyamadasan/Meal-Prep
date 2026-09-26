@@ -21,7 +21,7 @@ Nav order follows the meal-prep flow (D-076): Home · Plan · Shop · Prep · Fr
 | Tab | Section id | Entry render fn |
 |---|---|---|
 | Home / Dashboard | `#dashboard` | `renderDashboard()` → `renderMealPrepFlowCard()` first; the "what to cook/eat" cards sit in the collapsed `#dash-ideas` |
-| Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` (ends with `renderPlannedBatches()`), `renderBatchSearchResults()` |
+| Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` (ends with `renderPlannedBatches()`); the "By day" scheduler is a collapsed `<details>`; `renderBatchPickerResults()` fills the "+ Add meals" picker modal |
 | Shop / Grocery | `#grocery` | `renderGroceryList()` |
 | Prep | `#prep` | `renderPrepTab()` |
 | Fridge (was "Inventory") | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |

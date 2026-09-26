@@ -6217,41 +6217,6 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 
 .dash-card-header .dash-card-label { margin-bottom: 0; }
 
-/* 7-day strip */
-.dash-week-strip {
-  display: flex;
-  gap: 4px;
-}
-
-.dash-day-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.68rem;
-  font-weight: 600;
-  background: var(--color-secondary);
-  color: var(--color-text-secondary);
-  border: 1.5px solid transparent;
-  cursor: default;
-}
-
-.dash-day-dot--filled {
-  background: rgba(var(--color-teal-500-rgb), 0.18);
-  color: var(--color-primary);
-}
-
-.dash-day-dot--today {
-  border-color: var(--color-primary);
-}
-
-.dash-day-dot--filled.dash-day-dot--today {
-  background: var(--color-primary);
-  color: var(--color-btn-primary-text);
-}
-
 /* Today empty state */
 .dash-today-empty {
   font-size: 0.88rem;
@@ -6517,40 +6482,6 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .dash-l2-split { flex-direction: column; gap: 0.9rem; }
   .dash-l2-divider { width: 100%; height: 1px; margin: 0; }
 }
-
-/* ── LEVEL 3: Planning ──────────────────────────────────────────────────────── */
-.dash-card--planning {
-  background: var(--color-secondary);
-  border-color: var(--color-border);
-}
-.dash-l3-week {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.85rem;
-}
-.dash-week-label { font-size: 0.78rem; color: var(--color-text-secondary); }
-.dash-l3-links {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.dash-l3-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  font-size: 0.82rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.dash-l3-link:hover { color: var(--color-primary); border-color: var(--color-primary); }
-.dash-l3-link .lc-icon { width: 13px; height: 13px; }
 
 /* ── Grocery: stock summary bar ─────────────────────────────────────────────── */
 .grocery-stock-bar {
@@ -7615,10 +7546,13 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   padding: 0.9rem 1rem;
   margin-bottom: 1.25rem;
 }
-.batch-plan-header { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.batch-plan-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
 .batch-plan-header h3 { margin: 0; font-size: 1.05rem; }
 .batch-plan-hint { font-size: 0.78rem; color: var(--color-text-secondary); font-weight: 400; }
-.plan-by-day-title { font-size: 1rem; margin: 0.5rem 0 0.75rem; }
+.plan-by-day-details { margin-top: 0.5rem; }
+.plan-by-day-title { font-size: 1rem; margin: 0.5rem 0 0.75rem; cursor: pointer; list-style: revert; }
+.batch-list--picker { max-height: 55vh; overflow-y: auto; }
+.batch-picker-added { flex-shrink: 0; font-size: 0.82rem; color: var(--color-text-secondary); font-weight: 600; }
 .batch-search-row { display: flex; gap: 0.5rem; align-items: center; }
 .batch-search-row .form-control { flex: 1; min-width: 0; }
 .batch-chip {
@@ -7697,6 +7631,14 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 @media (max-width: 480px) {
   .dash-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.dash-ideas > summary { cursor: pointer; list-style: revert; }
-.dash-ideas[open] > summary { margin-bottom: 0.75rem; }
+.dash-flow-next {
+  display: block; width: 100%; margin-top: 0.7rem; padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius-base);
+  background: var(--color-surface); color: var(--color-text); font-weight: 600;
+  font-size: 0.85rem; text-align: left; cursor: pointer;
+}
+.dash-flow-next--done { cursor: default; color: var(--color-text-secondary); font-weight: 500; }
+.dash-ideas > summary, .dash-card--warn > summary, .dash-history > summary { cursor: pointer; list-style: revert; }
+.dash-ideas[open] > summary, .dash-card--warn[open] > summary, .dash-history[open] > summary { margin-bottom: 0.75rem; }
 .dash-ideas .dash-card { box-shadow: none; }
+.dash-attn-summary { text-transform: none; font-weight: 500; letter-spacing: normal; color: var(--color-text-secondary); }

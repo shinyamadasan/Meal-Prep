@@ -5,6 +5,44 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — Plan + Home simplification (TASK-062 / D-078) IMPLEMENTED on `wave/plan-home-simplification`, HELD for independent review, NOT merged
+
+Owner brief: extend the meal-prep-first UX phase to cover Home in the same bounded pass as the
+Plan-tab simplification, rather than freezing Plan first. Built directly by Claude on a new branch
+from `main` @ `a64d186`. **Nothing merged, pushed or deployed.**
+
+**Plan tab:** the inline batch-search row is replaced by a **"+ Add meals"** button opening a full
+recipe-picker modal (`#batch-picker-modal`) — every recipe listed by default, **Low effort** now an
+optional filter defaulting OFF instead of hiding the rest of the recipe box. `addPlannedBatch()`
+now points at an existing batch instead of creating a duplicate row for the same recipe. The
+Monday–Sunday scheduler is collapsed by default inside `<details id="plan-by-day-details">`. The
+Plan header's own "Prep Mode" button is removed outright — it called the exact same
+`openPrepMode()` the Prep tab's "Prep checklist" button already calls, a literal duplicate.
+`plannedBatches`/`weeklyPlan` persistence semantics are unchanged.
+
+**Home:** new order is flow card (now with one factual **next action** line derived from its own
+existing counts) → **Ready to eat** (moved up) → **What needs attention?** (now a compact
+`<details>` summary that auto-opens whenever an expired item needs same-day action) → Record
+leftovers/takeout → Need ideas? (unchanged, still collapsed) → **Cook History** (now collapsed).
+The duplicate Level-3 "Planning" panel (week-dot strip + Weekly plan/Nutrition/Goals links) is
+removed outright — Nutrition/Goals stay reachable from the top nav's "More" menu. No
+`cookedMeals`/expiration/pantry/sync semantics changed.
+
+Gates: full local suite **680/680** (679 baseline + 1 new duplicate-batch-guard test);
+`tools/Verify-Decisions.ps1` **79/79**; `tools/Check-DocsConsistency.ps1` drift **31 -> 35** (the 4
+new items are D-078 itself citing removed identifiers by name — the same pattern already used for
+old commit SHAs elsewhere in `docs/DECISIONS.md`, not accidental drift); `git diff --check` clean;
+`node --check app.js` clean. `docs/ARCHITECTURE.md`/`docs/FEATURES.md`/`docs/DECISIONS.md` (D-078)
+updated in the same change. Expected D-032 gate: UI/CSS-only (no Firestore/sync/storage/auth
+surface touched) reads as `done`-eligible, but the diff spans two whole tab surfaces at once, so
+`approved` is also defensible — left to the reviewer, not decided here.
+
+**Left to the human/reviewer:** independent review of TASK-062 → merge decision. TASK-062 is
+`status: review` in `TASKS.md`; `CHANGELOG.md`/`TEST_REPORT.md` get no entry (Codex-owned logs;
+Codex never executed this task — same convention as TASK-058/059/060).
+
+---
+
 ## 2026-09-26 — TASK-061 and TASK-060 DONE: `main` f58bfe5 pushed, CI green end to end
 
 Independent STRICT review passed TASK-061 (f58bfe5). `main` was fast-forwarded 207d262 -> f58bfe5 (the

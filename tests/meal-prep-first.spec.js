@@ -223,17 +223,38 @@ test('a batch can be planned with no day, shops at its own servings, and survive
   expect(after).toEqual([['r_curry', 6]]);
 });
 
-test('Plan tab: search adds a batch in one tap and it can be removed', async ({ page }) => {
+test('Plan tab: "+ Add meals" opens a full recipe picker; a tap adds a batch and it can be removed', async ({ page }) => {
   await loadWithRecipes(page);
   await page.evaluate(() => showTab('planner'));
-  await page.fill('#batch-search', 'Test Chicken');
-  await expect(page.locator('#batch-search-results .batch-name')).toHaveText(['Test Chicken Curry']);
-  await page.locator('#batch-search-results .batch-add-btn').click();
+
+  // All recipes are discoverable with no query and Low effort off by default.
+  await page.click('.batch-plan-header >> text=+ Add meals');
+  await expect(page.locator('#batch-picker-modal')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#batch-picker-low-effort-chip')).not.toHaveClass(/active/);
+  await expect(page.locator('#batch-picker-results .batch-name')).toContainText(['Test Bare Salad']);
+
+  await page.fill('#batch-picker-search', 'Test Chicken');
+  await expect(page.locator('#batch-picker-results .batch-name')).toHaveText(['Test Chicken Curry']);
+  await page.locator('#batch-picker-results .batch-add-btn').click();
+  await expect(page.locator('#batch-picker-results .batch-picker-added')).toHaveText('Added ✓');
+  await page.click('#batch-picker-modal .modal-footer >> text=Done');
+
   await expect(page.locator('#planned-batches-list .batch-name')).toHaveText(['Test Chicken Curry']);
   await expect(page.locator('#planned-batches-list .batch-servings')).toHaveText('4');
   await page.locator('#planned-batches-list .batch-remove-btn').click();
   await expect(page.locator('#planned-batches-list .batch-row')).toHaveCount(0);
   expect(await page.evaluate(() => AppState.plannedBatches.length)).toBe(0);
+});
+
+test('Plan tab: adding an already-planned recipe again does not create a duplicate row', async ({ page }) => {
+  await loadWithRecipes(page);
+  const r = await page.evaluate(() => {
+    const first = addPlannedBatch('r_curry');
+    const second = addPlannedBatch('r_curry');
+    return { first, second, count: AppState.plannedBatches.length };
+  });
+  expect(r.second).toBe(r.first);
+  expect(r.count).toBe(1);
 });
 
 test('the low-effort filter uses the existing effort signals; turning it off shows everything', async ({ page }) => {

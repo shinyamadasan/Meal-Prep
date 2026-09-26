@@ -301,7 +301,6 @@
                             <button class="btn btn--outline" id="clear-week">Clear Week</button>
                             <button class="btn btn--outline" onclick="saveWeekAsTemplate()"><span class="ic" data-icon="save"></span> Save Week</button>
                             <button class="btn btn--outline" id="load-week-template-btn" onclick="loadWeekTemplate()" disabled><span class="ic" data-icon="calendar-days"></span> Load Saved Week</button>
-                            <button class="btn btn--secondary" onclick="openPrepMode()"><span class="ic" data-icon="soup"></span> Prep Mode</button>
                         </div>
                     </div>
 
@@ -311,44 +310,41 @@
                     <div class="batch-plan" id="batch-plan">
                         <div class="batch-plan-header">
                             <h3>This week's batches</h3>
-                            <span class="batch-plan-hint">No days needed</span>
+                            <button type="button" class="btn btn--primary btn--sm" onclick="openBatchPickerModal()">+ Add meals</button>
                         </div>
-                        <div class="batch-search-row">
-                            <input type="search" id="batch-search" class="form-control" placeholder="Search recipes to prep…" autocomplete="off" aria-label="Search recipes to add as a batch" oninput="renderBatchSearchResults()">
-                            <button type="button" id="batch-low-effort-chip" class="batch-chip active" aria-pressed="true" onclick="toggleBatchLowEffort()">Low effort</button>
-                        </div>
-                        <div id="batch-search-results" class="batch-list"></div>
                         <div id="planned-batches-list" class="batch-list batch-list--planned"></div>
                     </div>
 
-                    <h3 class="plan-by-day-title">By day <span class="batch-plan-hint">optional</span></h3>
+                    <details class="plan-by-day-details" id="plan-by-day-details">
+                        <summary class="plan-by-day-title">By day <span class="batch-plan-hint">optional</span></summary>
 
-                    <div class="mobile-day-nav" id="mobile-day-nav">
-                        <button class="mobile-day-btn" onclick="prevPlannerDay()">&#8249;</button>
-                        <span id="mobile-day-label">Monday</span>
-                        <button class="mobile-day-btn" onclick="nextPlannerDay()">&#8250;</button>
-                    </div>
-
-                    <div class="weekly-planner-container">
-                        <div class="meal-planner-grid" id="meal-planner"></div>
-                    </div>
-
-                    <div id="weekly-nutrition-totals"></div>
-
-                    <div class="week-stats week-stats--compact">
-                        <div class="stat-card">
-                            <span class="stat-label">Prep</span>
-                            <span class="stat-value" id="total-prep-time">0 min</span>
+                        <div class="mobile-day-nav" id="mobile-day-nav">
+                            <button class="mobile-day-btn" onclick="prevPlannerDay()">&#8249;</button>
+                            <span id="mobile-day-label">Monday</span>
+                            <button class="mobile-day-btn" onclick="nextPlannerDay()">&#8250;</button>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Cook</span>
-                            <span class="stat-value" id="total-cook-time">0 min</span>
+
+                        <div class="weekly-planner-container">
+                            <div class="meal-planner-grid" id="meal-planner"></div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Meals</span>
-                            <span class="stat-value" id="planned-meals">0</span>
+
+                        <div id="weekly-nutrition-totals"></div>
+
+                        <div class="week-stats week-stats--compact">
+                            <div class="stat-card">
+                                <span class="stat-label">Prep</span>
+                                <span class="stat-value" id="total-prep-time">0 min</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label">Cook</span>
+                                <span class="stat-value" id="total-cook-time">0 min</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label">Meals</span>
+                                <span class="stat-value" id="planned-meals">0</span>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                 </section>
 
                 <!-- Grocery List Tab -->
@@ -1067,6 +1063,23 @@
                     <button class="btn btn--outline" onclick="closeDeleteAccountModal()">Cancel</button>
                     <button class="btn btn--danger" onclick="deleteAccount()" id="delete-account-btn" disabled>Delete Account</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <!-- Batch Picker Modal: the Plan tab's "+ Add meals" full recipe picker -->
+    <div id="batch-picker-modal" class="modal hidden">
+        <div class="modal-content modal-content--lg">
+            <div class="modal-header">
+                <h3><span class="ic" data-icon="soup"></span> Add meals to this week</h3>
+                <button class="modal-close" onclick="closeBatchPickerModal()">&times;</button>
+            </div>
+            <div class="batch-search-row">
+                <input type="search" id="batch-picker-search" class="form-control" placeholder="Search all recipes…" autocomplete="off" aria-label="Search recipes to add as a batch" oninput="renderBatchPickerResults()">
+                <button type="button" id="batch-picker-low-effort-chip" class="batch-chip" aria-pressed="false" onclick="toggleBatchPickerLowEffort()">Low effort</button>
+            </div>
+            <div id="batch-picker-results" class="batch-list batch-list--picker"></div>
+            <div class="modal-footer">
+                <button class="btn btn--outline" onclick="closeBatchPickerModal()">Done</button>
             </div>
         </div>
     </div>

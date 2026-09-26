@@ -4,14 +4,20 @@
 > Status: **Working** · **Partial** · **Broken** · **Hidden** (built, no nav entry).
 > Anchors are function names + DOM ids (stable). No line numbers.
 
-## Meal-prep flow (D-076) — Plan -> Shop -> Prep -> Fridge
-- **Nav order** — Implemented · branch `wave/meal-prep-first`, held for review, NOT merged ·
-  `Home · Plan · Shop · Prep · Fridge · Recipes · More`. "Inventory" is now **Fridge** and "Cook" is **Recipes**; the
-  `data-tab` ids (`fridge`, `recipes`) are unchanged.
-- **This week's batches (Plan)** — Implemented · `#batch-plan`, `renderPlannedBatches()`,
-  `getBatchSearchResults()` · search recipes with a **Low effort** chip (on by default), one-tap
-  **+ Add** creates a batch at the recipe's base servings, stepper for servings, × to remove. No
-  day is required. The day grid is below it, labelled optional.
+## Meal-prep flow (D-076, extended by D-078) — Plan -> Shop -> Prep -> Fridge
+- **Nav order** — Working · `Home · Plan · Shop · Prep · Fridge · Recipes · More`. "Inventory" is
+  now **Fridge** and "Cook" is **Recipes**; the `data-tab` ids (`fridge`, `recipes`) are unchanged.
+- **This week's batches (Plan)** — Working · `#batch-plan`, `renderPlannedBatches()` · the primary
+  content of the Plan tab, rendered directly below the header (no search box in the way). One-tap
+  **+ Add meals** opens the Batch Picker modal (below); stepper for servings, × to remove. No day
+  is required. Adding a recipe that is already planned points at the existing row instead of
+  creating a second one (`addPlannedBatch()` — see D-078).
+- **Batch Picker modal (D-078)** — Working · `#batch-picker-modal`, `openBatchPickerModal()` /
+  `renderBatchPickerResults()` · a full recipe picker: every recipe is listed by default (no query
+  needed to browse), search narrows it, and **Low effort** is an optional filter chip that starts
+  OFF — it no longer hides the rest of the recipe box by default (`getBatchSearchResults()`).
+- **By day (Plan)** — Working · collapsed `<details id="plan-by-day-details">`, closed by default
+  — the Monday–Sunday scheduler is optional and demoted below the batch list (D-078).
 - **Shop from batches** — Implemented · `generateGroceryList()` includes batches scaled to their servings.
 - **Not anymore? (Shop)** — Implemented · `openNotInKitchenDialog()` / `correctKitchenStock()` ·
   on an auto-ticked "In stock" row, shows WHICH kitchen record matched and corrects that one
@@ -19,7 +25,8 @@
   other records that happened to match loosely.
 - **Prep tab** — Implemented · `#prep`, `renderPrepTab()` · batches with **Prepped → Fridge**
   (`completePlannedBatch()`), the day-plan meals with the existing Cooked flow, **Prep
-  checklist** (existing Prep Mode, now including batches), and **Copy AI Prep Brief**.
+  checklist** (`openPrepMode()`) and **Copy AI Prep Brief**. The Plan tab's own toolbar no longer
+  duplicates the Prep checklist button — the Prep tab is the one place it lives (D-078).
 - **AI Prep Brief** — Implemented · `copyPrepBrief()` / `getPrepBriefText()` · deterministic text:
   recipes, servings, scaled ingredient amounts, stated prep/cook/hands-on time, equipment,
   effort, keeping time, instructions as written, storage notes, shared ingredients, and a
@@ -29,13 +36,31 @@
   `AppState.pantry`); only prep creates ready food (`cookedMeals`).
 
 ## Dashboard (Home)
-- **Meal-prep flow card** — Implemented (D-076) · `renderMealPrepFlowCard()` · first card: Plan / Shop / Prep / Fridge counts, each a tap into its tab.
+- **Card order (D-078)** — greeting → **meal-prep flow** → **Ready to eat** → **What needs
+  attention?** → Record leftovers/takeout → **Need ideas?** (collapsed) → **Cook History**
+  (collapsed). Ready to eat sits right under the flow card so "what can I eat right now?" is
+  answered before anything else; the standalone L3 "Planning" strip (week-dot row + Planner/
+  Nutrition links) was removed as a duplicate of the flow card's own Plan step and the Plan tab
+  itself — Nutrition stays reachable from the top nav's "More" menu.
+- **Meal-prep flow card** — Implemented (D-076, extended D-078) · `renderMealPrepFlowCard()` ·
+  first card: Plan / Shop / Prep / Fridge counts, each a tap into its tab, plus one **factual next
+  action** derived from those same counts (add meals → buy → prep → "nothing left"), never a new
+  signal.
+- **What needs attention?** — Implemented (D-078) · `#dash-attention`, a `<details>` — compact by
+  default (one summary line of counts), but opens automatically whenever there is an expired item
+  needing same-day action. Manual open/close state otherwise survives re-renders, and
+  `openAttentionView()` (the notification-click path) always force-opens it. Content is unchanged:
+  **Expired** (pantry + cooked food, each with one-tap `Keep` / `Remove`, plus a bulk **Remove
+  expired (N)**), **Use soon** (≤2d, informational only — never bulk-removable), low-staple
+  alerts, and **"Use soon"** recipe suggestions. Sourced from `collectAttentionItems()`. See
+  DECISIONS D-057.
+- **"What can I do?"** — Working · cook suggestions (3 tiers) with **"Buy [ingredient]"**
+  (`buyMissingIngredient()`) and buy suggestions, in a split layout. Lives inside "Need ideas?"
+  (below), not a separate top-level card.
 - **"Need ideas?"** — Implemented (D-076) · `#dash-ideas`, collapsed `<details>` holding "What should we eat?", "What should I cook?" and "What can I do?". Demoted from the primary path, not removed. Its open state survives re-renders (view state only).
-- **3-level prioritized home** — Status: Working · `renderDashboard()`
-  - L1 Attention: **Expired** (pantry + cooked food, each with one-tap `Keep` / `Remove`, plus a bulk **Remove expired (N)**), **Use soon** (≤2d, informational only — never bulk-removable), low-staple alerts, and **"Use soon"** recipe suggestions. Sourced from `collectAttentionItems()`. See DECISIONS D-057.
-  - L2 Action split: cook suggestions (3 tiers) with **"Buy [ingredient]"** (`buyMissingIngredient()`); buy suggestions.
-  - L3 Planning strip: 7-day dot row + links to Planner/Nutrition.
-- **Cook History card** — Working · last 10 of `AppState.cookHistory`, hidden when empty.
+- **Cook History card** — Implemented (D-078) · `#dash-history`, collapsed `<details>` (was
+  always-open) — last 10 of `AppState.cookHistory`, hidden entirely when empty, open state
+  survives re-renders.
 - Personalized greeting (display name / email prefix).
 - **"What should we eat?"** — Working · `getWhatShouldWeEatSuggestions()` / `renderWhatShouldWeEatCard()` · up to 3 picks answering the whole question in one card: **Eat this first** (ready cooked food, straight from `getReadyFoodSuggestions()`), **Easiest** (lowest-cost cookable recipe, only when genuinely low-effort), **Something different** (only when there is a `cookHistory` to differ from). Deterministic additive cost, lower = better; shopping is a **tier**, not a weight, so anything cookable now outranks anything needing a trip. Reasons are shown as chips, never a number. Completion hints ("Add rice + steamed veg") are deterministic sentences off the existing `mealBalance`, not composed meals. Zero new persisted state; displaying a pick consumes nothing. Rendered ABOVE the existing Ready-to-eat and What-should-I-cook cards, both unchanged. See DECISIONS D-059.
 - **"Ready to eat"** — Working · `getReadyFoodSuggestions()` / `renderReadyFoodCard()` · up to 3 stored cooked meals, ranked expiring-fridge → fridge → freezer, each with a one-tap **Use 1**. Rendered ABOVE the cook suggestions so the priority is ready food → easiest cook → everything else. Expired batches are excluded. See DECISIONS D-056.
@@ -87,11 +112,12 @@
 - **Edit preserves unowned properties** — Working · `saveRecipe()` starts an edit from the existing recipe and overlays only form-owned fields, so `favorite`, `highlights`, import provenance, `updatedAt`, and the input-less `fiber`/`sodium` nutrition values survive an unrelated edit. The form stays authoritative for what it does own. See DECISIONS D-055.
 
 ## Plan (Weekly Planner)
-- **This week's batches** — see "Meal-prep flow" above. The grid below is optional.
+- **This week's batches** — see "Meal-prep flow" above. The 7-day grid below is collapsed by
+  default, inside `<details id="plan-by-day-details">` (D-078).
 - **7-day grid** — Working · `renderWeeklyPlanner()` · click slot → recipe selection modal; multi-day assign; expiry warnings; week stats; mobile day navigator.
 - **Weekly nutrition totals** — Working · `renderWeeklyNutritionTotals()` → `#weekly-nutrition-totals`.
 - Save/Load week template (fills empty slots only); Day copy/paste/clear; Clear week.
-- **Prep Mode** — Working · `openPrepMode()` · checklist of the week's recipes (day plan + planned batches) + progress bar. Opened from the Plan header and the Prep tab.
+- **Prep Mode** — Working · `openPrepMode()` · checklist of the week's recipes (day plan + planned batches) + progress bar. Opened from the Prep tab only — the Plan tab's own header no longer duplicates the trigger (D-078).
 
 ## Nutrition
 - Goals (cal/protein/carbs/fat/fiber/sodium) — Working.

@@ -3979,7 +3979,6 @@ function showTab(tabId) {
   } else if (tabId === 'planner') {
     updateWeeklyStats();
     renderPlannedBatches();
-    renderBatchSearchResults();
   } else if (tabId === 'prep') {
     renderPrepTab();
   } else if (tabId === 'grocery') {
@@ -6060,7 +6059,6 @@ function renderDashboard() {
   }
 
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   var today = dayNames[new Date().getDay()];
 
   // ── Pantry scan ────────────────────────────────────────────────
@@ -6075,20 +6073,6 @@ function renderDashboard() {
   // ── Expiry-based recipe suggestions (≤3 days) ─────────────────
   // Same scan as before, now shared with getCookSuggestions() (see getExpirySuggestions).
   var expirySuggestions = getExpirySuggestions(3);
-
-  // ── Week analysis ──────────────────────────────────────────────
-  var dayMealCounts = {};
-  weekDays.forEach(function(day) {
-    var plan = AppState.weeklyPlan[day] || {};
-    var count = 0;
-    var countId = function(id) {
-      if (AppState.recipes.find(function(r) { return String(r.id) === String(id); })) count++;
-    };
-    ['breakfast','lunch','dinner'].forEach(function(m) { if (plan[m]) countId(plan[m]); });
-    (plan.snacks || []).forEach(countId);
-    dayMealCounts[day] = count;
-  });
-  var daysPlanned = weekDays.filter(function(d) { return dayMealCounts[d] > 0; }).length;
 
   // ══════════════════════════════════════════════════════════════
   // LEVEL 1 — What needs attention?
@@ -6180,10 +6164,22 @@ function renderDashboard() {
         sugRows +
         '</div>';
     }
-    level1Card = '<div class="dash-card dash-card--warn">' +
-      '<div class="dash-level-header">' + icon('triangle-alert') + ' What needs attention?</div>' +
+    // Compact by default: a one-line summary plus a View action (the disclosure
+    // triangle). Expired items are destructive and time-sensitive, so that case
+    // still opens automatically — nothing that needs a same-day action is ever
+    // hidden behind an extra tap. Manually opened/closed state survives re-render.
+    var attnSummaryParts = [];
+    if (hasExpired) attnSummaryParts.push(attention.expired.length + ' expired');
+    if (hasUseSoon) attnSummaryParts.push(attention.useSoon.length + ' use soon');
+    if (hasLow) attnSummaryParts.push(lowStaples.length + ' running low');
+    if (hasSuggestions) attnSummaryParts.push(expirySuggestions.length + ' use-before-expire idea' + (expirySuggestions.length === 1 ? '' : 's'));
+    var prevAttn = document.getElementById('dash-attention');
+    var attnOpen = hasExpired || !!(prevAttn && prevAttn.open);
+    level1Card = '<details class="dash-card dash-card--warn" id="dash-attention"' + (attnOpen ? ' open' : '') + '>' +
+      '<summary class="dash-level-header">' + icon('triangle-alert') + ' What needs attention?' +
+        '<span class="dash-attn-summary">' + escapeHtml(attnSummaryParts.join(' · ')) + '</span></summary>' +
       expirySection + lowSection + useSoonSection +
-      '</div>';
+      '</details>';
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -6254,32 +6250,6 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
-  // ══════════════════════════════════════════════════════════════
-  // LEVEL 3 — Planning
-  // Always shown at the bottom. Week strip + navigation links.
-  // ══════════════════════════════════════════════════════════════
-  var dayAbbr = { Monday:'M', Tuesday:'T', Wednesday:'W', Thursday:'T', Friday:'F', Saturday:'S', Sunday:'S' };
-  var weekStrip = weekDays.map(function(day) {
-    var count = dayMealCounts[day];
-    var isToday = day === today;
-    var cls = ['dash-day-dot', count > 0 ? 'dash-day-dot--filled' : '', isToday ? 'dash-day-dot--today' : ''].filter(Boolean).join(' ');
-    return '<div class="' + cls + '" title="' + day + ': ' + count + ' meal' + (count !== 1 ? 's' : '') + '">' + dayAbbr[day] + '</div>';
-  }).join('');
-  var planLabel = daysPlanned === 0 ? 'Nothing planned' : daysPlanned === 7 ? 'Week fully planned' : daysPlanned + '/7 days planned';
-
-  var level3Card = '<div class="dash-card dash-card--planning">' +
-    '<div class="dash-level-header">Planning</div>' +
-    '<div class="dash-l3-week">' +
-      '<div class="dash-week-strip">' + weekStrip + '</div>' +
-      '<span class="dash-week-label">' + planLabel + '</span>' +
-    '</div>' +
-    '<div class="dash-l3-links">' +
-      '<button class="dash-l3-link" onclick="showTab(\'planner\')">' + icon('calendar-days') + ' Weekly plan</button>' +
-      '<button class="dash-l3-link" onclick="showTab(\'nutrition\')">' + icon('salad') + ' Nutrition</button>' +
-      '<button class="dash-l3-link" onclick="showTab(\'nutrition\')">' + icon('lightbulb') + ' Goals</button>' +
-    '</div>' +
-    '</div>';
-
   var leftoverPromptCard = '<div class="dash-card dash-card--leftovers">' +
     '<div class="dash-leftover-prompt">' +
       '<div class="dash-leftover-icon">' + icon('utensils') + '</div>' +
@@ -6306,10 +6276,14 @@ function renderDashboard() {
         '<span class="dash-history-meta">' + escapeHtml(dateStr) + ' &bull; ' + (entry.servings || '?') + ' servings</span>' +
         '</div>';
     }).join('');
-    historyCard = '<div class="dash-card">' +
-      '<div class="dash-level-header">Cook History</div>' +
+    // Secondary by design — a log to glance back at, not something needed to
+    // answer "where am I / what's next". Collapsed by default; state preserved.
+    var prevHistory = document.getElementById('dash-history');
+    var historyOpen = !!(prevHistory && prevHistory.open);
+    historyCard = '<details class="dash-card dash-history" id="dash-history"' + (historyOpen ? ' open' : '') + '>' +
+      '<summary class="dash-level-header">Cook History <span class="dash-attn-summary">' + history.length + '</span></summary>' +
       rows +
-      '</div>';
+      '</details>';
   }
 
   // Meal-prep first: the week's Plan -> Shop -> Prep -> Fridge flow and the food that
@@ -6325,13 +6299,14 @@ function renderDashboard() {
     level2Card +
     '</details>';
 
+  // Order answers, in one pass: where am I (flow) -> what can I eat right now
+  // (ready food) -> what needs my attention -> everything else, secondary.
   el.innerHTML = '<div class="dashboard">' +
     '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
     renderMealPrepFlowCard() +
-    level1Card +
     renderReadyFoodCard() +
+    level1Card +
     leftoverPromptCard +
-    level3Card +
     ideasCard +
     historyCard +
     '</div>';
@@ -6362,6 +6337,23 @@ function renderMealPrepFlowCard() {
     ? readyPortions + ' serving' + (readyPortions === 1 ? '' : 's') + ' ready' + (untracked ? ' +' + untracked + ' more' : '')
     : (ready.length ? ready.length + ' meal' + (ready.length === 1 ? '' : 's') + ' ready' : 'Empty');
 
+  // One factual next action, derived from the same state as the four steps
+  // above — never a new signal. Follows the pipeline's own direction: plan,
+  // then buy, then prep; nothing left is the only case with no action.
+  var nextAction;
+  if (batches.length === 0) {
+    nextAction = { text: 'Add meals to plan for this week', tab: 'planner' };
+  } else if (toBuy > 0) {
+    nextAction = { text: 'Buy ' + toBuy + ' item' + (toBuy === 1 ? '' : 's') + ' for this week', tab: 'grocery' };
+  } else if (batches.length > 0) {
+    nextAction = { text: 'Prep ' + batches.length + ' batch' + (batches.length === 1 ? '' : 'es'), tab: 'prep' };
+  } else {
+    nextAction = null;
+  }
+  var nextActionHtml = nextAction
+    ? '<button type="button" class="dash-flow-next" onclick="showTab(\'' + nextAction.tab + '\')">Next: ' + escapeHtml(nextAction.text) + ' →</button>'
+    : '<div class="dash-flow-next dash-flow-next--done">Nothing left to prep this week ✓</div>';
+
   return '<div class="dash-card dash-card--prepflow">' +
     '<div class="dash-level-header">' + icon('chef-hat') + ' This week\'s meal prep</div>' +
     '<div class="dash-flow">' +
@@ -6370,6 +6362,7 @@ function renderMealPrepFlowCard() {
       step(3, 'Prep', prepVal, 'prep') +
       step(4, 'Fridge', fridgeVal, 'fridge') +
     '</div>' +
+    nextActionHtml +
     '</div>';
 }
 
@@ -9998,6 +9991,14 @@ function afterPlannedBatchesChange() {
 function addPlannedBatch(recipeId) {
   var recipe = findRecipeById(recipeId);
   if (!recipe) { showErrorMessage('Recipe not found'); return null; }
+  // Adding an already-planned recipe again would create a second row for the
+  // same meal — clutter, not a distinct plan. Point at the existing one instead.
+  var existing = normalizePlannedBatches(AppState.plannedBatches)
+    .find(function(x) { return x.recipeId === String(recipe.id); });
+  if (existing) {
+    showSuccessMessage(recipe.name + ' is already planned this week — adjust servings below.');
+    return existing.id;
+  }
   var batch = normalizePlannedBatch({
     recipeId: String(recipe.id),
     servings: defaultBatchServings(recipe),
@@ -10060,12 +10061,13 @@ function completePlannedBatch(batchId) {
 window.completePlannedBatch = completePlannedBatch;
 
 // Low-effort discovery for planning. Ordering reuses the app's own effort signals
-// (recipeEffortScore / recipeActiveMinutes) — nothing new is inferred.
-var batchSearchLowEffort = true;
+// (recipeEffortScore / recipeActiveMinutes) — nothing new is inferred. All recipes
+// are discoverable by default; Low effort is an optional filter, never the default
+// universe (see the Batch Picker modal below).
+var batchSearchLowEffort = false;
 
 function getBatchSearchResults(query, lowEffort, limit) {
   var q = String(query || '').trim().toLowerCase();
-  if (!q && !lowEffort) return [];
   return (AppState.recipes || []).filter(function(r) {
     if (q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
     if (lowEffort && recipeEffortScore(r) > 2) return false;
@@ -10078,26 +10080,45 @@ function getBatchSearchResults(query, lowEffort, limit) {
   }).slice(0, limit || 6);
 }
 
-function toggleBatchLowEffort() {
-  batchSearchLowEffort = !batchSearchLowEffort;
-  renderBatchSearchResults();
+// ── Batch Picker modal: the Plan tab's "+ Add meals" full recipe picker ──────
+function openBatchPickerModal() {
+  var m = document.getElementById('batch-picker-modal');
+  if (!m) return;
+  hydrateIcons();
+  m.classList.remove('hidden');
+  var input = document.getElementById('batch-picker-search');
+  if (input) input.value = '';
+  renderBatchPickerResults();
+  if (input) input.focus();
 }
-window.toggleBatchLowEffort = toggleBatchLowEffort;
+window.openBatchPickerModal = openBatchPickerModal;
 
-function renderBatchSearchResults() {
-  var el = document.getElementById('batch-search-results');
+function closeBatchPickerModal() {
+  var m = document.getElementById('batch-picker-modal');
+  if (m) m.classList.add('hidden');
+}
+window.closeBatchPickerModal = closeBatchPickerModal;
+
+function toggleBatchPickerLowEffort() {
+  batchSearchLowEffort = !batchSearchLowEffort;
+  renderBatchPickerResults();
+}
+window.toggleBatchPickerLowEffort = toggleBatchPickerLowEffort;
+
+function renderBatchPickerResults() {
+  var el = document.getElementById('batch-picker-results');
   if (!el) return;
-  var chip = document.getElementById('batch-low-effort-chip');
+  var chip = document.getElementById('batch-picker-low-effort-chip');
   if (chip) {
     chip.classList.toggle('active', batchSearchLowEffort);
     chip.setAttribute('aria-pressed', String(batchSearchLowEffort));
   }
-  var input = document.getElementById('batch-search');
-  var results = getBatchSearchResults(input ? input.value : '', batchSearchLowEffort, 6);
+  var input = document.getElementById('batch-picker-search');
+  var planned = {};
+  normalizePlannedBatches(AppState.plannedBatches).forEach(function(b) { planned[b.recipeId] = true; });
+  var results = getBatchSearchResults(input ? input.value : '', batchSearchLowEffort, 500);
   if (!results.length) {
-    el.innerHTML = (input && input.value.trim())
-      ? '<div class="batch-empty">No matching recipes' + (batchSearchLowEffort ? ' at low effort — tap <b>Low effort</b> to see all' : '') + '.</div>'
-      : '';
+    el.innerHTML = '<div class="batch-empty">No matching recipes' + (batchSearchLowEffort ? ' at low effort — tap <b>Low effort</b> to see all' : '') + '.</div>';
     return;
   }
   el.innerHTML = results.map(function(r) {
@@ -10109,14 +10130,18 @@ function renderBatchSearchResults() {
     if (recipeHasTag(r, 'batch-friendly')) meta.push('batch-friendly');
     var s = defaultBatchServings(r);
     if (s) meta.push(s + ' servings');
+    var alreadyPlanned = !!planned[String(r.id)];
+    var addBtn = alreadyPlanned
+      ? '<span class="batch-picker-added">Added ✓</span>'
+      : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
     return '<div class="batch-result">' +
       '<div class="batch-info"><span class="batch-name">' + escapeHtml(r.name) + '</span>' +
       (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
-      '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\')">+ Add</button>' +
+      addBtn +
       '</div>';
   }).join('');
 }
-window.renderBatchSearchResults = renderBatchSearchResults;
+window.renderBatchPickerResults = renderBatchPickerResults;
 
 function plannedBatchRowHtml(b, mode) {
   var recipe = findRecipeById(b.recipeId);
@@ -14013,6 +14038,7 @@ function openAttentionView() {
   try { window.focus(); } catch (e) {}
   showTab('dashboard');
   var card = document.querySelector('.dash-card--warn');
+  if (card && 'open' in card) card.open = true; // compact by default; a notification always reveals detail
   if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

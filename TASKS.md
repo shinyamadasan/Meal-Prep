@@ -4250,6 +4250,66 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-062 · Backfill: Plan + Home simplification — one recipe picker, collapsed by-day scheduler, compact Home (D-078)
+status: review
+owner: claude
+source: direct owner brief ("EXTEND THE CURRENT UX PHASE — INCLUDE HOME"). Not from
+  `planning/BUILD_QUEUE.md`. Explicitly bundles the Plan-tab and Home simplifications as one
+  UX phase rather than freezing Plan first, per the brief.
+risk: UI/CSS/markup only — no Firestore/sync/storage/auth/tombstone/`saveData()` call site touched.
+  Per D-032's own tie-break, this reads as reversible (`done`-eligible), but the diff spans two
+  whole tab surfaces at once, so the reviewer may reasonably prefer `approved` and hold it for a
+  human look before merge — call left to review, not decided here.
+depends-on: none. Builds on TASK-060/D-076 (meal-prep-first) and does not change its persistence
+  semantics.
+files: app.js, index.html, style.css, tests/meal-prep-first.spec.js, docs/ARCHITECTURE.md,
+  docs/FEATURES.md, docs/DECISIONS.md (D-078)
+branch: wave/plan-home-simplification (base main @ a64d186)
+
+acceptance:
+  - [x] Plan: planned batches are the primary content; "+ Add meals" opens a full recipe picker
+        (`#batch-picker-modal`) listing all recipes by default
+  - [x] Plan: Low effort is an optional filter defaulting OFF, not the default universe
+        (`getBatchSearchResults()` no longer returns `[]` for an empty, non-low-effort query)
+  - [x] Plan: adding an already-planned recipe again does not create a duplicate row
+        (`addPlannedBatch()` returns the existing batch id instead)
+  - [x] Plan: the Monday–Sunday scheduler is collapsed by default (`<details id="plan-by-day-details">`)
+  - [x] Plan: the redundant Plan-header "Prep Mode" button is removed (the Prep tab's "Prep
+        checklist" button already calls the identical `openPrepMode()`)
+  - [x] `plannedBatches`/`weeklyPlan` persistence semantics unchanged — no schema, storage key, or
+        sync-path edit
+  - [x] Home: Plan → Shop → Prep → Fridge flow card stays first and gains one factual contextual
+        next action derived from its own existing counts
+  - [x] Home: Ready to eat moved up, directly under the flow card
+  - [x] Home: the expiry/attention card is collapsed to a compact summary + View, opening
+        automatically whenever an expired item needs same-day action
+  - [x] Home: the duplicate "Planning" panel (week-dot strip + Weekly plan/Nutrition/Goals links)
+        is removed — Nutrition/Goals stay reachable from the top nav's "More" menu
+  - [x] Home: Record leftovers/takeout kept, Need ideas? stays collapsed (unchanged), Cook History
+        is now collapsed
+  - [x] `cookedMeals`/expiration/pantry/sync data semantics unchanged
+  - [x] Targeted tests updated for the new Plan-tab markup; every other spec touching
+        `.dash-card--warn` / `.dash-card--ready` / `.dash-ideas` / `openAttentionView()` passed
+        unmodified
+  - [x] Full local regression suite green; `Verify-Decisions.ps1` and docs-drift baseline held
+
+verification: full local suite 680/680 (679 baseline + 1 new duplicate-batch-guard test),
+  `tools/Verify-Decisions.ps1` 79/79, `tools/Check-DocsConsistency.ps1` drift 31 -> 35 (4 new items
+  are the D-078 entry itself citing removed identifiers `dayMealCounts`/`daysPlanned`/`weekStrip`/
+  `planLabel` by name, the same pattern already used for old commit SHAs elsewhere in
+  docs/DECISIONS.md — not accidental drift), `git diff --check` clean, `node --check app.js` clean.
+  Claude built this directly (owner brief), bypassing Codex, so `CHANGELOG.md`/`TEST_REPORT.md`
+  (Codex-owned append-only logs) get no entry — same convention as TASK-058/059/060.
+
+open items (recorded, deliberately NOT fixed):
+  - No picker affordance shows *why* a recipe is low-effort beyond the existing meta line.
+  - Multiple batches of the same recipe are prevented outright rather than merged/grouped visually
+    — no product need for a second batch of the same recipe was named in the brief.
+  - `docs/DATA_MODEL.md`/`docs/AI_OS_NOTES.md` were not touched; nothing in this wave changes a
+    data shape, so none was owed.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
