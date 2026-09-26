@@ -4324,7 +4324,7 @@ open items (recorded, deliberately NOT fixed):
 ---
 
 ### TASK-063 · Backfill: Mobile Home polish — compact attention ALWAYS, Recipes behind More, compact leftover row (D-079)
-status: review
+status: approved
 owner: claude
 source: direct owner brief ("BUILDER for a focused MOBILE HOME POLISH wave"). Not from
   `planning/BUILD_QUEUE.md`. Explicitly a bounded follow-up to TASK-062, fixing four real-usage
@@ -4412,6 +4412,16 @@ not covered by automated tests (reviewer attention):
   - the `.dash-attn-review-btn`-inside-`<summary>` accessibility observation from review 1 — noted
     non-blocking by the reviewer, explicitly out of scope for this fix-first pass, recorded here as
     deferred technical debt.
+
+review 2 (targeted re-review of candidate c67b47c): PASS. Owner-authorized safe integration:
+  `main` fast-forwarded `416c0be -> c67b47c` (no new commit; `git diff c67b47c main` empty
+  immediately after). All gates re-run fresh on the integrated tree, no retries: full local suite
+  696/696, targeted `tests/mobile-layout.spec.js` + `tests/mobile-home-polish.spec.js` 17/17,
+  `tests/kitchen-truth.spec.js` 27/27, `tools/Verify-Decisions.ps1` 86/86,
+  `tools/Check-DocsConsistency.ps1` drift 38 (unchanged from the fix-first candidate),
+  `git diff --check` clean, `node --check app.js` clean. **Not yet pushed; status stays `approved`,
+  not `done`, until origin/main push + CI + Pages + production-smoke + live verification all
+  confirm green** — see `STATUS.md` for the push/CI/Pages/live-verification record once available.
 
 open items (recorded, deliberately NOT fixed):
   - The compact summary's "running low" staple count still shares `#dash-attention` with

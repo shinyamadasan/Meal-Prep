@@ -5,6 +5,26 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-063 / D-079 targeted re-review PASS: `main` fast-forwarded to `c67b47c` locally, NOT YET PUSHED
+
+Independent targeted re-review of fix-first candidate `c67b47c` came back **PASS**. Owner-authorized
+safe integration: verified `origin/main` still `416c0be` (unmoved), status/staged/worktrees/
+`screenshots/` all matched the expected pre-integration state exactly, then `main` was
+fast-forwarded `416c0be -> c67b47c` (`git merge --ff-only` — no new commit; `git diff c67b47c main`
+empty immediately after, confirming no unrelated file entered).
+
+Every gate re-run fresh on the integrated tree, no retries: full local suite **696/696**,
+`tests/mobile-layout.spec.js` + `tests/mobile-home-polish.spec.js` **17/17**,
+`tests/kitchen-truth.spec.js` **27/27**, `tools/Verify-Decisions.ps1` **86/86**,
+`tools/Check-DocsConsistency.ps1` drift **38** (unchanged from the fix-first candidate — see D-079's
+addendum for the breakdown), `git diff --check` clean, `node --check app.js` clean.
+
+`TASKS.md` TASK-063 set to `status: approved` (not `done`) — the push to `origin/main`, CI, Pages,
+production-smoke and live mobile/desktop verification are still pending. **Not pushed yet.** The
+next entry in this log records the push and its results, once run.
+
+---
+
 ## 2026-09-26 — TASK-063 / D-079 fix-first: mobile "More" active state, 360px nav coverage, and a test-count correction — on `wave/mobile-home-polish`, HELD for re-review, NOT merged
 
 Independent review of candidate `d47387d` came back **FIX FIRST**: one real regression plus two
