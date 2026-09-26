@@ -3962,7 +3962,13 @@ function showTab(tabId) {
   // Reflect "More" section state + close its menu after navigating
   const moreBtn = document.querySelector('.tab-more-btn');
   const moreMenu = document.querySelector('.tab-more-menu');
-  if (moreBtn) moreBtn.classList.toggle('active', tabId === 'ingredients' || tabId === 'hacks' || tabId === 'flavors');
+  // Recipes only counts as "inside More" at the same max-width:768px breakpoint
+  // where style.css hides the primary Recipes tab — at that width the primary
+  // button still gets .active (line above, by data-tab), but it's invisible, so
+  // nothing shows a current-tab indicator unless More claims it here too. On
+  // desktop the primary Recipes tab stays visible and already carries .active.
+  const recipesInMore = tabId === 'recipes' && window.matchMedia('(max-width: 768px)').matches;
+  if (moreBtn) moreBtn.classList.toggle('active', tabId === 'ingredients' || tabId === 'hacks' || tabId === 'flavors' || recipesInMore);
   if (moreMenu) {
     moreMenu.classList.add('hidden');
     if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');

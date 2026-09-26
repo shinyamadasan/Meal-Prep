@@ -3837,7 +3837,7 @@ select.form-control {
   }
   .tab-nav > .tab-btn,
   .tab-more-btn {
-    padding: var(--space-12) var(--space-8);
+    padding: var(--space-12) var(--space-4);
   }
   .tab-nav > .tab-btn[data-tab="recipes"] {
     display: none;

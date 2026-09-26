@@ -2942,20 +2942,19 @@ leaving 👋 alone on its own line.
 - `tests/mobile-layout.spec.js` routes `recipes` through the More menu (`inMore` list), and gained a
   second test asserting `.tab-nav`'s own `scrollWidth`/`clientWidth` — page-level "no overflow" alone
   would not have caught an internally-scrolling nav.
-- New `tests/mobile-home-polish.spec.js` (13 tests) pins: closed-by-default with expired items
+- New `tests/mobile-home-polish.spec.js` (12 tests) pins: closed-by-default with expired items
   present; truthful compact counts; Review force-opens (and a second tap does not close it); the
   banner's View and `openAttentionView()` both open it; Keep/Remove/Remove-expired stay reachable
   once open; the open state survives a subsequent re-render; Ready-to-eat still renders above the
   attention card; the leftover row is compact and still reachable; Need-ideas/Cook-History stay
   collapsed; the greeting's nbsp+emoji mechanism.
-- `Check-DocsConsistency.ps1` drift moves from the pre-existing **35-item baseline to 38** — the
-  checker only scans `app.js`/`index.html`/`style.css`, so the 3 new items (`inMore`, `scrollWidth`,
-  `clientWidth`) are this record naming **test-only** identifiers from
-  `tests/mobile-layout.spec.js`, the same already-tolerated category the 35-item baseline itself
-  carries (`waitForAppReady()`, `waitForRestored()`, `addInitScript`, `pwsh`, …) — not a stale claim
-  about product code. Every product-code identifier this record names (`viewFreshnessDetails`,
-  `dash-attn-review-btn`, `tab-more-recipes-link`, `dash-leftover-compact`) does exist in the current
-  code.
+- `Check-DocsConsistency.ps1` drift moves from the pre-existing **35-item baseline to 38** (see the
+  fix-first addendum below for the final, verified count — the number changed twice across this
+  record's own revisions and is only trustworthy read from the addendum, not this bullet in
+  isolation). The checker only scans `app.js`/`index.html`/`style.css` (plus automation files, for
+  `DECISIONS.md` specifically) and matches by substring, not word boundary. Every product-code
+  identifier this record names (`viewFreshnessDetails`, `dash-attn-review-btn`,
+  `tab-more-recipes-link`, `dash-leftover-compact`, `recipesInMore`) does exist in the current code.
 - Deferred, not addressed here: a "meal ideas" count in the compact summary line still shares the
   same `<details>` as "running low" staples, which the wave's target mockup did not call out
   separately — left as-is since the brief said existing counts should not be recomputed or hidden,
@@ -2966,3 +2965,57 @@ Verify: app.js contains "dash-attn-review-btn"
 Verify: app.js does not contain "dash-card--leftovers"
 Verify: index.html contains "tab-more-recipes-link"
 Verify: tests/mobile-home-polish.spec.js contains "attention details are CLOSED by default even when expired items exist"
+
+### Addendum — review fix-first: mobile "More" showed no active state when Recipes was open
+
+Independent review of candidate `d47387d` found a real regression: at phone width, tapping Recipes
+through the "⋯ More" menu opened the right content, but `showTab()`'s two active-state checks
+disagreed about who was "active." Line one (`btn.dataset.tab === tabId`) still marked the
+**hidden** primary `data-tab="recipes"` button active, because it never considered visibility. Line
+two (the `moreBtn` active condition) only listed `'ingredients' | 'hacks' | 'flavors'` — it had no
+idea Recipes could ever be "inside More," because at the time that condition was written, Recipes
+was not. Net effect: nothing **visible** showed the current tab at all.
+
+Fix, in `showTab()`: a new `recipesInMore` check —
+`tabId === 'recipes' && window.matchMedia('(max-width: 768px)').matches` — added as an `||` clause
+to the existing `moreBtn` active condition. `768px` matches the exact breakpoint `style.css` already
+uses to hide the primary Recipes tab and reveal `.tab-more-recipes-link`, rather than inventing a
+second constant. Desktop is untouched: above that width the primary Recipes tab stays visible and
+already got `.active` from the pre-existing per-button `dataset.tab === tabId` check; `recipesInMore`
+evaluates false there, so `moreBtn` never claims Recipes on desktop.
+
+**Also fixed while already in the nav test file:** the tab-nav-fit pin only ran at 390px; 360px
+(reviewer-verified manually as already working) had no automated coverage and, once measured, was
+actually **2px over** `clientWidth` — imperceptible (`.tab-nav` already hides its own scrollbar via
+`scrollbar-width: none`), but a real, closeable margin, not a rounding artifact worth tolerating in
+the assertion. `.tab-nav > .tab-btn`/`.tab-more-btn` mobile horizontal padding tightened once more
+(`--space-8` → `--space-4`) rather than loosening the test's tolerance, so 360px now genuinely fits
+rather than merely reading as "close enough."
+
+**Test-count correction:** the original D-079 text and TASK-063/STATUS.md bookkeeping claimed
+`tests/mobile-home-polish.spec.js` had 13 tests; it has **12**. The 693 local-suite total was correct
+at the time (680 baseline + 12 there + 1 in `tests/mobile-layout.spec.js` = +13) — only the per-file
+attribution was wrong. Corrected in all three places; no test was added or removed to make a number
+match. This fix-first pass adds 3 more tests to `tests/mobile-layout.spec.js` (the mobile/desktop
+active-state pair, plus splitting the nav-fit pin into a 390px+360px loop), bringing the full local
+suite to **696/696**.
+
+**Final drift count, verified after this addendum's own text existed (the count changed twice while
+writing it — read this line, not the bullet above):** `tools/Check-DocsConsistency.ps1` reports
+**38**, composed of the pre-existing 35-item baseline plus `scrollWidth`/`clientWidth` (test-only,
+already-tolerated) and this addendum's own `d47387d` citation — a commit SHA, the exact same
+already-tolerated historical-reference category as `ac64da8`/`bd89d5d`/`f73ce3c`/etc. elsewhere in
+this file. `inMore` does NOT appear: the checker matches by substring, and `recipesInMore` (the real
+fix, added to `app.js`) happens to contain that substring — coincidence, not a real connection
+between the two, but it does mean `inMore` cannot be cited here as a drift example without being
+wrong the moment this fix landed.
+
+**Not touched, per the review's explicit scope:** `viewFreshnessDetails()`, `openAttentionView()`,
+`goToFreshnessTab()`, the attention card's default-collapsed behavior, the leftover-row compaction,
+the greeting, Home's card order, where Recipes lives, desktop nav layout, and anything
+persistence/sync/storage-shaped. The `.dash-attn-review-btn`-inside-`<summary>` accessibility
+observation the reviewer raised is recorded here as deferred technical debt, not fixed — it did not
+break in live inspection and was explicitly out of scope for this pass.
+
+Verify: app.js contains "recipesInMore"
+Verify: tests/mobile-layout.spec.js contains "selecting Recipes via More visibly marks More as the active tab"

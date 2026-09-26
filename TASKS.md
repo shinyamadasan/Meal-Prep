@@ -4362,26 +4362,56 @@ acceptance:
   - [x] Recipes reachable behind "More" at phone width (`.tab-more-recipes-link`, no `data-tab`)
         without duplicating `data-tab="recipes"` (would have made all 13 existing
         `page.locator('.tab-btn[data-tab="recipes"]')` call sites ambiguous)
-  - [x] Home/Plan/Shop/Prep/Fridge + "More" fit the primary nav row at 390px with no internal
-        horizontal scroll (`.tab-nav` `scrollWidth` <= `clientWidth`); desktop nav unchanged
+  - [x] Home/Plan/Shop/Prep/Fridge + "More" fit the primary nav row at 390px AND 360px with no
+        internal horizontal scroll (`.tab-nav` `scrollWidth` <= `clientWidth`); desktop nav
+        unchanged; the visible "More" button (not just the hidden primary tab) shows active state
+        when Recipes is open at phone width
   - [x] Greeting's wave emoji glued to the last word via `&nbsp;` — cannot land alone on its own
         line; long names can still wrap
   - [x] No expiration calculation, pantry truth, deletion/tombstone semantics, `cookedMeals`/Fridge
         truth, `plannedBatches`, `weeklyPlan`, Shop, Prep, Firestore/sync, import/export, or the
         TASK-061 Playwright harness changed
 
-verification: full local suite 693/693 (680 baseline + 13 new in `tests/mobile-home-polish.spec.js`);
+verification (candidate d47387d): full local suite 693/693 (680 baseline + 12 new in
+  `tests/mobile-home-polish.spec.js` + 1 new in `tests/mobile-layout.spec.js` = +13 total);
   `tests/kitchen-truth.spec.js` 27/27 and `tests/mobile-layout.spec.js` 2/2 after updating both for
   the new default-closed/Recipes-behind-More behavior; `tools/Verify-Decisions.ps1` 84/84;
-  `tools/Check-DocsConsistency.ps1` drift 35 -> 38 (3 new items are `inMore`/`scrollWidth`/
-  `clientWidth` — this record's own D-079 text naming **test-only** identifiers from
-  `tests/mobile-layout.spec.js`, the same already-tolerated category the 35-item baseline itself
-  carries, e.g. `waitForAppReady()`/`addInitScript`/`pwsh` — not a stale product-code claim);
-  `git diff --check` clean; `node --check app.js` clean. A disposable Playwright screenshot pass
-  (not committed) at 390px confirmed the compact attention summary + Review, the opened detail with
+  `tools/Check-DocsConsistency.ps1` drift 35 -> 38 at the time; `git diff --check` clean;
+  `node --check app.js` clean. A disposable Playwright screenshot pass (not committed) at 390px
+  confirmed the compact attention summary + Review, the opened detail with
   Keep/Remove/Remove-expired/View-in-Fridge/Plan-it all reachable, and Recipes at the top of the
   More menu with no visible nav scrollbar. Claude built this directly (owner brief), bypassing
   Codex, so `CHANGELOG.md`/`TEST_REPORT.md` get no entry — same convention as TASK-058/059/060/062.
+
+review 1 (candidate d47387d): FIX FIRST — one blocking regression, fixed in new commits on top
+  (d47387d preserved, not amended), plus two small cleanup items:
+  - [x] At phone width, tapping Recipes through "⋯ More" opened the right content but gave no
+        VISIBLE current-tab indicator — the hidden primary Recipes button got `.active`, the
+        visible More button did not. Fixed in `showTab()`: a `recipesInMore` clause
+        (`tabId === 'recipes' && window.matchMedia('(max-width: 768px)').matches`, the exact
+        breakpoint `style.css` already hides the primary Recipes tab at) added to the existing
+        `moreBtn` active condition. Desktop unaffected — the primary Recipes tab stays visible and
+        already got `.active` from the pre-existing per-button check.
+  - [x] 360px had no automated nav-fit coverage (only 390px did) and, once measured, was genuinely
+        2px over `clientWidth` — imperceptible (the nav already hides its own scrollbar) but a real
+        margin. Closed by tightening `.tab-nav`'s mobile horizontal padding once more
+        (`--space-8` → `--space-4`), not by loosening the test's tolerance. Both widths now pinned
+        in a parametrized loop in `tests/mobile-layout.spec.js`.
+  - [x] Doc/bookkeeping said `tests/mobile-home-polish.spec.js` had 13 tests; verified count is 12
+        (the 693 total was already correct — only this file's own attribution was wrong). Corrected
+        here, in `STATUS.md`, and in `docs/DECISIONS.md` D-079's addendum; no test added/removed to
+        chase a number.
+
+  See `docs/DECISIONS.md` D-079's addendum for the full root-cause writeup and the final,
+  re-verified gate numbers (full local suite 696/696, `Verify-Decisions.ps1` 86/86,
+  `Check-DocsConsistency.ps1` drift 38 — composed of the 35-item baseline + `scrollWidth`/
+  `clientWidth` + this fix's own `d47387d` SHA citation, the same already-tolerated historical-
+  reference category used elsewhere in that file).
+
+not covered by automated tests (reviewer attention):
+  - the `.dash-attn-review-btn`-inside-`<summary>` accessibility observation from review 1 — noted
+    non-blocking by the reviewer, explicitly out of scope for this fix-first pass, recorded here as
+    deferred technical debt.
 
 open items (recorded, deliberately NOT fixed):
   - The compact summary's "running low" staple count still shares `#dash-attention` with

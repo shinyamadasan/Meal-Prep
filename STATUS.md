@@ -5,6 +5,61 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-063 / D-079 fix-first: mobile "More" active state, 360px nav coverage, and a test-count correction — on `wave/mobile-home-polish`, HELD for re-review, NOT merged
+
+Independent review of candidate `d47387d` came back **FIX FIRST**: one real regression plus two
+small cleanup items. Fixed in new commits on top; `d47387d` preserved unamended, per instruction.
+
+**Root cause of the regression.** At phone width, tapping Recipes through "⋯ More" opened the right
+content but showed no VISIBLE current-tab indicator. `showTab()` had two active-state checks that
+disagreed: the per-button `dataset.tab === tabId` check still marked the **hidden** primary
+`data-tab="recipes"` button active (it never considered visibility), while the separate `moreBtn`
+active condition only knew about `'ingredients' | 'hacks' | 'flavors'` — Recipes wasn't in that list
+because it wasn't reachable through More when that condition was written.
+
+**Fix.** A new `recipesInMore` clause —
+`tabId === 'recipes' && window.matchMedia('(max-width: 768px)').matches` — added to the existing
+`moreBtn` active condition in `showTab()`. `768px` matches the exact breakpoint `style.css` already
+uses to hide the primary Recipes tab, rather than inventing a second constant. Desktop is
+unaffected: the primary Recipes tab stays visible there and already got `.active` from the
+pre-existing check.
+
+**360px coverage.** The reviewer verified 360px manually as already working, but the automated
+nav-fit pin only ran at 390px. Once measured at 360px it was genuinely **2px over**
+`clientWidth` — imperceptible (`.tab-nav` already hides its own scrollbar) but real. Closed by
+tightening `.tab-nav`'s mobile horizontal padding once more (`--space-8` → `--space-4`), not by
+loosening the assertion. Both widths are now pinned in a parametrized loop in
+`tests/mobile-layout.spec.js`, plus a dedicated mobile/desktop pair asserting the visible
+current-tab indicator specifically.
+
+**Test-count correction.** The previous entry below (and `TASKS.md`/`docs/DECISIONS.md`) had
+already been corrected once, from a wrong "13" to the verified **12** tests in
+`tests/mobile-home-polish.spec.js`. That correction holds. What changed again here: this fix-first
+pass adds 3 more tests to `tests/mobile-layout.spec.js`, and `tools/Check-DocsConsistency.ps1`'s
+drift count moved again — see `docs/DECISIONS.md` D-079's addendum for the exact, final breakdown
+rather than trusting any single number quoted in an earlier revision of that same record.
+
+**Gates, no retries, re-run after the fix:** full local suite **696/696** (693 + 3 new in
+`tests/mobile-layout.spec.js`); `tools/Verify-Decisions.ps1` **86/86**;
+`tools/Check-DocsConsistency.ps1` drift **38** (35-item baseline + `scrollWidth`/`clientWidth`
+test-only identifiers + this fix's own `d47387d` SHA citation — the same already-tolerated
+historical-reference category as other commit SHAs in that file; `inMore` no longer appears,
+since it now matches by substring against the unrelated `recipesInMore` the real fix added);
+`git diff --check` clean; `node --check app.js` clean. Screenshots (not committed) confirmed no
+visible scrollbar and a readable "⋯ More" menu at both 390px and 360px.
+
+**Not touched, per the review's explicit scope:** `viewFreshnessDetails()`, `openAttentionView()`,
+`goToFreshnessTab()`, attention default-collapsed behavior, the leftover-row compaction, the
+greeting, Home's information hierarchy, where Recipes lives, desktop nav layout, and any
+persistence/sync/storage surface. The reviewer's non-blocking accessibility observation
+(`.dash-attn-review-btn` nested inside `<summary>`) is recorded as deferred technical debt, not
+fixed — it did not break in live inspection and was explicitly out of scope.
+
+**Left to the human/reviewer:** targeted re-review of the fix-first candidate → merge decision.
+TASK-063 stays `status: review` in `TASKS.md`.
+
+---
+
 ## 2026-09-26 — Mobile Home polish (TASK-063 / D-079) IMPLEMENTED on `wave/mobile-home-polish`, HELD for independent review, NOT merged
 
 Owner brief: a focused BUILDER pass fixing four real-usage phone-width frictions D-078's own
@@ -34,8 +89,9 @@ touched:**
 5. The greeting glues its wave emoji to the last word with `&nbsp;` so it can never land alone on
    its own line; an unusually long name can still wrap.
 
-**Gates, no retries:** full local suite **693/693** (680 baseline + 13 new in
-`tests/mobile-home-polish.spec.js`); `tests/kitchen-truth.spec.js` 27/27 and
+**Gates, no retries:** full local suite **693/693** (680 baseline + 12 new in
+`tests/mobile-home-polish.spec.js` + 1 new in `tests/mobile-layout.spec.js` = +13 total);
+`tests/kitchen-truth.spec.js` 27/27 and
 `tests/mobile-layout.spec.js` 2/2 after updating both for the new default-closed/Recipes-behind-More
 behavior (existing tests that asserted on an auto-opened card now call `openAttentionView()` first —
 the real explicit-open path — instead of relying on the removed auto-open; coverage is the same).
