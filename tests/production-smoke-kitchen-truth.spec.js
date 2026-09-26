@@ -211,6 +211,7 @@ test('live: Home shows Needs Attention with Keep / Remove and bulk cleanup', asy
     AppState.cookedMeals = [];
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to assert the detail
   }, DAY_FN);
 
   const card = page.locator('.dash-card--warn');
@@ -240,6 +241,7 @@ test('live: one-tap removal tombstones the record', async ({ page }) => {
     AppState.cookedMeals = [];
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to reach Remove
   }, DAY_FN);
 
   await page.locator('.dash-card--warn .dash-remove-btn').first().click();
@@ -279,6 +281,7 @@ test('live: bulk cleanup crosses MASS_DELETE_GUARD, tombstones every id, and spa
     ]);
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to reach Remove expired
     return { expired: collectAttentionItems().expired.length };
   }, DAY_FN);
 
@@ -410,7 +413,7 @@ test('live: the full loop runs with no application console errors', async ({ pag
   await page.waitForTimeout(500);
   await page.evaluate(() => { showTab('fridge'); renderPantry(); renderCookedMeals(); });
   await page.waitForTimeout(400);
-  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); openAttentionView(); });
   await page.locator('.dash-card--warn .dash-keep-btn').first().click();
   await page.waitForTimeout(500);
 

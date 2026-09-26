@@ -2876,3 +2876,93 @@ Verify: index.html contains "plan-by-day-details"
 Verify: app.js contains "existing.id"
 Verify: app.js contains "dash-attention"
 Verify: app.js does not contain "dash-card--planning"
+
+## D-079 — Mobile Home polish: attention is compact ALWAYS (not just until expired), Recipes moves behind "More" on phone, and two other secondary surfaces shrink
+
+**Status:** Implemented on branch `wave/mobile-home-polish` (from `main` @ 416c0be). Held for
+independent review. No expiration calculation, pantry truth, deletion/tombstone semantics,
+`cookedMeals`/Fridge truth, `plannedBatches`, `weeklyPlan`, Shop, Prep, or Firestore/sync surface
+touched — UI presentation and responsive navigation only.
+
+### Context
+
+Real-usage screenshots after D-078 landed surfaced four remaining phone-width frictions: (1)
+D-078's own `#dash-attention` auto-opened whenever `hasExpired` was true, so a real pantry with
+many expired items rendered the full per-row Keep/Remove/Remove-expired list open on every single
+Home visit — the "compact summary" was compact only when nothing needed attention, the opposite of
+the point. (2) That auto-opened detail restated, at length, the same expired/expiring counts the
+global `#freshness-alert-banner` already shows above every tab. (3) The primary phone nav
+(`Home · Plan · Shop · Prep · Fridge · Recipes` plus a "⋯ More" button) overflowed at 390px and
+showed a visible horizontal scrollbar to reach the meal-prep tabs. (4) `renderDashboard()`'s
+greeting ('Good morning, Name 👋') could break between the name and the emoji at phone width,
+leaving 👋 alone on its own line.
+
+### Decision
+
+1. **`#dash-attention` is compact by default, unconditionally** — `hasExpired` no longer forces it
+   open (`app.js` `renderDashboard()`: `attnOpen` now reads only the element's own prior `.open`
+   state, same pattern `#dash-ideas`/`#dash-history` already used). A new `.dash-attn-review-btn`
+   ("Review") sits in the `<summary>`, `event.preventDefault()`+`stopPropagation()`'d so a tap
+   always **forces** it open through `openAttentionView()` rather than toggling — a second tap
+   cannot close it back. Nothing inside the card (Keep/Remove/Remove-expired/View-in-Fridge/Plan-it/
+   use-soon rows) was removed; only the default open/closed state changed.
+2. **The global banner's "View" action now opens the same Home detail instead of the raw Fridge
+   tab**, so it stops duplicating the banner with a second always-visible summary. This needed a
+   **new** function, `viewFreshnessDetails()` (`dismissFreshnessBanner()` +
+   `openAttentionView()`), rather than repointing the existing `goToFreshnessTab()` — that function
+   is also the click target for the Ready-to-eat and What-should-we-eat cards' own row buttons
+   ("jump to Fridge for this item"), an unrelated call site that must keep going to Fridge.
+   Conflating the two would have silently broken that navigation.
+3. **"Have leftovers or takeout?" collapses from a 3-line card to one row**,
+   `.dash-leftover-compact` (icon + "+ Record leftovers / takeout"), same
+   `onclick="openManualCookedModal()"`. The old `.dash-card--leftovers`/`.dash-leftover-*` CSS this
+   orphaned was removed with it, not left as dead weight.
+4. **Recipes moves into the "⋯ More" menu, unconditionally** — the simplest option the wave brief
+   allowed, and the one with the smallest blast radius: **13** existing Playwright call sites across
+   6 spec files click `.tab-btn[data-tab="recipes"]` directly (assuming the primary desktop-width
+   nav), so the primary button keeps its `data-tab="recipes"` and is only `display:none`-d at
+   `max-width:768px`; a **second**, phone-only entry (`.tab-more-recipes-link`, no `data-tab`, wired
+   via `onclick="showTab('recipes')"` like the existing Settings entry) appears in the More menu
+   only at that same breakpoint. Two elements, never two with `data-tab="recipes"` — that would have
+   made every existing `page.locator('.tab-btn[data-tab="recipes"]')` call ambiguous (Playwright
+   strict-mode violation) regardless of viewport. `.tab-nav > .tab-btn`'s mobile padding also
+   tightened (`--space-16` → `--space-8` horizontal) so Home/Plan/Shop/Prep/Fridge + More fit at
+   390px without the nav's own `overflow-x: auto` ever needing to scroll.
+5. **The greeting glues its last word to the emoji with `&nbsp;`** (`'...'+(name?', '+name:'')+'&nbsp;👋'`)
+   instead of truncating anything — the browser can still wrap an unusually long name, it just can
+   never leave 👋 orphaned on its own line.
+
+### Consequences
+
+- Reverses part of D-078: any spec seeding an expired item and then immediately asserting on
+  `.dash-card--warn`'s content (`kitchen-truth.spec.js`, `production-smoke-kitchen-truth.spec.js`) now
+  calls `openAttentionView()` right after `renderDashboard()` to reach the same detail through the
+  real explicit-open path, instead of relying on the removed auto-open. Coverage is the same;
+  only how the test reaches an open card changed.
+- `tests/mobile-layout.spec.js` routes `recipes` through the More menu (`inMore` list), and gained a
+  second test asserting `.tab-nav`'s own `scrollWidth`/`clientWidth` — page-level "no overflow" alone
+  would not have caught an internally-scrolling nav.
+- New `tests/mobile-home-polish.spec.js` (13 tests) pins: closed-by-default with expired items
+  present; truthful compact counts; Review force-opens (and a second tap does not close it); the
+  banner's View and `openAttentionView()` both open it; Keep/Remove/Remove-expired stay reachable
+  once open; the open state survives a subsequent re-render; Ready-to-eat still renders above the
+  attention card; the leftover row is compact and still reachable; Need-ideas/Cook-History stay
+  collapsed; the greeting's nbsp+emoji mechanism.
+- `Check-DocsConsistency.ps1` drift moves from the pre-existing **35-item baseline to 38** — the
+  checker only scans `app.js`/`index.html`/`style.css`, so the 3 new items (`inMore`, `scrollWidth`,
+  `clientWidth`) are this record naming **test-only** identifiers from
+  `tests/mobile-layout.spec.js`, the same already-tolerated category the 35-item baseline itself
+  carries (`waitForAppReady()`, `waitForRestored()`, `addInitScript`, `pwsh`, …) — not a stale claim
+  about product code. Every product-code identifier this record names (`viewFreshnessDetails`,
+  `dash-attn-review-btn`, `tab-more-recipes-link`, `dash-leftover-compact`) does exist in the current
+  code.
+- Deferred, not addressed here: a "meal ideas" count in the compact summary line still shares the
+  same `<details>` as "running low" staples, which the wave's target mockup did not call out
+  separately — left as-is since the brief said existing counts should not be recomputed or hidden,
+  only made optional to view.
+
+Verify: app.js contains "viewFreshnessDetails"
+Verify: app.js contains "dash-attn-review-btn"
+Verify: app.js does not contain "dash-card--leftovers"
+Verify: index.html contains "tab-more-recipes-link"
+Verify: tests/mobile-home-polish.spec.js contains "attention details are CLOSED by default even when expired items exist"

@@ -17,6 +17,10 @@ re-rendered imperatively by `render*()` functions that read `AppState` and write
 Each tab is a `<section class="tab-content">`; `showTab(name)` toggles visibility.
 
 Nav order follows the meal-prep flow (D-076): Home · Plan · Shop · Prep · Fridge · Recipes · More.
+At phone width (≤768px, D-079) the primary row shows only the five meal-prep tabs plus "More" —
+Recipes is `display:none`-d there and reachable through a second, `data-tab`-less entry inside the
+More menu (`.tab-more-recipes-link`) instead, so the row never needs its own horizontal scroll.
+Desktop is unchanged.
 
 | Tab | Section id | Entry render fn |
 |---|---|---|
@@ -215,6 +219,14 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
 scans `AppState.pantry` (via `pantryDaysLeft()`) and `AppState.cookedMeals` (via `cookedShelfLife()`)
 in one pass and returns `{ expired, useSoon, low }`. The two record types keep separate shapes — this
 unifies the attention experience, not the data model.
+
+`#dash-attention` is compact by default, unconditionally (D-079) — an expired item no longer forces
+it open. It opens only through an explicit action: the card's own `.dash-attn-review-btn` ("Review",
+force-opens rather than toggling), or `openAttentionView()`, which is also the notification/deep-link
+entry point and the target of the global banner's own View action via `viewFreshnessDetails()`.
+`viewFreshnessDetails()` is deliberately separate from `goToFreshnessTab()` — the latter is what the
+Ready-to-eat and What-should-we-eat cards' row buttons still use to jump straight to the Fridge tab
+for a specific item, an unrelated call site `viewFreshnessDetails()` must not disturb.
 
 Actions: `keepAttentionItem()` writes `keptOn = todayISO()` (suppresses the record from attention
 surfaces for the day; alters no dates), `removeAttentionItem()` removes one, `removeAllExpired()`

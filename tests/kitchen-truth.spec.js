@@ -385,6 +385,7 @@ test('Home renders the attention card with per-row Keep / Remove and a bulk acti
     AppState.cookedMeals = [];
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to assert the detail
   }, LOCAL_DAY_FN);
 
   const card = page.locator('.dash-card--warn');
@@ -416,6 +417,7 @@ test('one tap removes a single expired item and tombstones it', async ({ page })
     AppState.cookedMeals = [];
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to reach Remove
   }, LOCAL_DAY_FN);
 
   await page.locator('.dash-card--warn .dash-remove-btn').first().click();
@@ -456,6 +458,7 @@ test('bulk cleanup removes every expired record and nothing else', async ({ page
     ]);
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — force it open to reach Remove expired
     return { expiredCount: collectAttentionItems().expired.length };
   }, LOCAL_DAY_FN);
 
@@ -630,7 +633,7 @@ test('Keep is a one-day acknowledgement — the item is actionable again tomorro
   expect(dayN1.bannerExpired).toBe(2);
 
   // And Home offers the actions again.
-  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); openAttentionView(); });
   const card = page.locator('.dash-card--warn');
   await expect(card).toContainText('Old Broccoli');
   await expect(card).toContainText('Old Adobo');
@@ -661,7 +664,7 @@ test('Keep can be tapped again the next day, and re-suppresses for that day only
   expect(setup.yesterday).not.toBe(setup.today);
   expect(setup.actionableOnOpen).toEqual(['p_again']);   // yesterday's Keep does not carry over
 
-  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); openAttentionView(); });
   await page.locator('.dash-card--warn .dash-keep-btn').first().click();
   await page.waitForTimeout(300);
 
@@ -891,6 +894,7 @@ test('mobile: expired cleanup is reachable and tappable on a phone viewport', as
     AppState.cookedMeals = [];
     showTab('dashboard');
     renderDashboard();
+    openAttentionView(); // compact by default now — the real explicit-open path
   }, LOCAL_DAY_FN);
 
   // Every control that DELETES must be a real tap target, not a text link. The
@@ -952,7 +956,7 @@ test('the whole grocery → attention → cleanup loop runs with no console erro
   await page.evaluate(() => { showTab('fridge'); renderPantry(); renderCookedMeals(); });
   await page.waitForTimeout(200);
 
-  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); });
+  await page.evaluate(() => { showTab('dashboard'); renderDashboard(); openAttentionView(); });
   await page.locator('.dash-card--warn .dash-keep-btn').first().click();
   await page.waitForTimeout(300);
 

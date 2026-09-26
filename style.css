@@ -3814,7 +3814,12 @@ select.form-control {
 
 /* ── Mobile overrides ─────────────────────────────────────────────────────── */
 
-/* Tab nav — horizontal scroll instead of wrapping */
+/* Tab nav — the 5 meal-prep tabs (Home/Plan/Shop/Prep/Fridge) plus "More" fit
+   without horizontal scrolling at phone width. Recipes moves into the More
+   menu here (its own duplicate entry, .tab-more-recipes-link) rather than
+   scrolling off with the rest of the row. overflow-x stays as a safety net,
+   not the primary mechanism, and never shows a scrollbar unless something
+   genuinely still overflows. */
 @media (max-width: 768px) {
   .tab-nav {
     flex-wrap: nowrap;
@@ -3823,11 +3828,25 @@ select.form-control {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 2px;
+    gap: var(--space-4);
   }
   .tab-nav::-webkit-scrollbar { display: none; }
   .tab-btn {
     flex-shrink: 0;
     white-space: nowrap;
+  }
+  .tab-nav > .tab-btn,
+  .tab-more-btn {
+    padding: var(--space-12) var(--space-8);
+  }
+  .tab-nav > .tab-btn[data-tab="recipes"] {
+    display: none;
+  }
+  /* Higher specificity than the unconditional .tab-more-recipes-link rule
+     further down the file (same-specificity + later-source-order would
+     otherwise win over this media query, regardless of viewport width). */
+  .tab-more-menu .tab-more-recipes-link {
+    display: block;
   }
 }
 
@@ -5837,6 +5856,9 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .tab-more-menu.hidden { display: none; }
 .tab-more-menu .tab-btn { text-align: left; width: 100%; white-space: nowrap; }
 .tab-more-sep { height: 1px; background: var(--color-border); margin: 0.25rem 0; }
+/* Desktop keeps Recipes in the primary row; this duplicate only appears at
+   phone width (see the max-width: 768px block below). */
+.tab-more-recipes-link { display: none; }
 
 /* "Start here" getting-started card (My Recipes tab, first-time users) */
 .gs-card {
@@ -6140,64 +6162,25 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   box-shadow: var(--shadow-sm);
 }
 
-.dash-card--leftovers {
+/* Compact secondary action — was a full dash-card, reduced to one row
+   (see app.js renderDashboard()'s leftoverPromptCard). */
+.dash-leftover-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
   background: rgba(var(--color-teal-500-rgb), 0.08);
-  border-color: rgba(var(--color-teal-500-rgb), 0.22);
-}
-
-.dash-leftover-prompt {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.dash-leftover-icon {
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.dash-leftover-icon .lc-icon { width: 16px; height: 16px; }
-
-.dash-leftover-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.dash-leftover-title {
-  font-size: 0.95rem;
-  font-weight: 650;
+  border: 1px solid rgba(var(--color-teal-500-rgb), 0.22);
+  border-radius: var(--radius-lg);
+  padding: 0.6rem 0.9rem;
   color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
-
-.dash-leftover-copy {
-  margin-top: 0.15rem;
-  font-size: 0.82rem;
-  color: var(--color-text-secondary);
-  line-height: 1.35;
-}
-
-.dash-leftover-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-@media (max-width: 480px) {
-  .dash-leftover-prompt {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .dash-leftover-btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
+.dash-leftover-compact:hover { background: rgba(var(--color-teal-500-rgb), 0.14); }
+.dash-leftover-compact .lc-icon { width: 16px; height: 16px; color: var(--color-primary); flex-shrink: 0; }
 
 .dash-card-header {
   display: flex;
@@ -6319,6 +6302,30 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   border-color: rgba(217, 119, 6, 0.35);
   background: rgba(254, 243, 199, 0.45);
 }
+/* Compact by default, always — see app.js renderDashboard(). The summary line
+   is just counts; Review is the one explicit control that forces it open. */
+.dash-card--warn .dash-attn-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-attn-review-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.dash-attn-review-btn:hover { background: rgba(217, 119, 6, 0.12); }
 .dash-l1-block { margin-bottom: 0.1rem; }
 .dash-l1-block--sep {
   margin-top: 0.75rem;

@@ -6164,20 +6164,22 @@ function renderDashboard() {
         sugRows +
         '</div>';
     }
-    // Compact by default: a one-line summary plus a View action (the disclosure
-    // triangle). Expired items are destructive and time-sensitive, so that case
-    // still opens automatically — nothing that needs a same-day action is ever
-    // hidden behind an extra tap. Manually opened/closed state survives re-render.
+    // Compact by default, ALWAYS — even with expired items. It only opens
+    // through an explicit action (the Review button, the global banner's View,
+    // or openAttentionView()'s notification/deep-link path), never automatically
+    // on render. Manually opened/closed state still survives re-render.
     var attnSummaryParts = [];
     if (hasExpired) attnSummaryParts.push(attention.expired.length + ' expired');
     if (hasUseSoon) attnSummaryParts.push(attention.useSoon.length + ' use soon');
     if (hasLow) attnSummaryParts.push(lowStaples.length + ' running low');
-    if (hasSuggestions) attnSummaryParts.push(expirySuggestions.length + ' use-before-expire idea' + (expirySuggestions.length === 1 ? '' : 's'));
+    if (hasSuggestions) attnSummaryParts.push(expirySuggestions.length + ' meal idea' + (expirySuggestions.length === 1 ? '' : 's'));
     var prevAttn = document.getElementById('dash-attention');
-    var attnOpen = hasExpired || !!(prevAttn && prevAttn.open);
+    var attnOpen = !!(prevAttn && prevAttn.open);
     level1Card = '<details class="dash-card dash-card--warn" id="dash-attention"' + (attnOpen ? ' open' : '') + '>' +
-      '<summary class="dash-level-header">' + icon('triangle-alert') + ' What needs attention?' +
-        '<span class="dash-attn-summary">' + escapeHtml(attnSummaryParts.join(' · ')) + '</span></summary>' +
+      '<summary class="dash-level-header">' + icon('triangle-alert') +
+        '<span class="dash-attn-summary">' + escapeHtml(attnSummaryParts.join(' · ')) + '</span>' +
+        '<button type="button" class="dash-attn-review-btn" onclick="event.preventDefault();event.stopPropagation();openAttentionView();">Review</button>' +
+      '</summary>' +
       expirySection + lowSection + useSoonSection +
       '</details>';
   }
@@ -6250,16 +6252,9 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
-  var leftoverPromptCard = '<div class="dash-card dash-card--leftovers">' +
-    '<div class="dash-leftover-prompt">' +
-      '<div class="dash-leftover-icon">' + icon('utensils') + '</div>' +
-      '<div class="dash-leftover-body">' +
-        '<div class="dash-leftover-title">Have leftovers or takeout?</div>' +
-        '<div class="dash-leftover-copy">Record it so the app can remind you before it goes bad.</div>' +
-      '</div>' +
-      '<button class="btn btn--primary btn--sm dash-leftover-btn" onclick="openManualCookedModal()">+ Record meal</button>' +
-    '</div>' +
-    '</div>';
+  var leftoverPromptCard = '<button type="button" class="dash-leftover-compact" onclick="openManualCookedModal()">' +
+      icon('utensils') + ' <span>+ Record leftovers / takeout</span>' +
+    '</button>';
 
   // ══════════════════════════════════════════════════════════════
   // Cook History
@@ -6302,7 +6297,7 @@ function renderDashboard() {
   // Order answers, in one pass: where am I (flow) -> what can I eat right now
   // (ready food) -> what needs my attention -> everything else, secondary.
   el.innerHTML = '<div class="dashboard">' +
-    '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + ' 👋</div></div>' +
+    '<div class="dash-greeting-block"><div class="dash-greeting">Good ' + timeOfDay + (name ? ', ' + name : '') + '&nbsp;👋</div></div>' +
     renderMealPrepFlowCard() +
     renderReadyFoodCard() +
     level1Card +
@@ -7998,6 +7993,7 @@ window.removeCookedMeal = removeCookedMeal;
 window.renderCookedMeals = renderCookedMeals;
 window.dismissFreshnessBanner = dismissFreshnessBanner;
 window.goToFreshnessTab = goToFreshnessTab;
+window.viewFreshnessDetails = viewFreshnessDetails;
 window.goToTab = function (t) { showTab(t); };
 window.dismissGettingStarted = dismissGettingStarted;
 window.renderIngredientsTab = renderIngredientsTab;
@@ -13885,7 +13881,7 @@ function renderFreshnessBanner() {
   el.innerHTML =
     '<span class="freshness-banner-text">' + icon('triangle-alert') + ' ' + parts.join(' · ') + '</span>' +
     '<span class="freshness-banner-actions">' +
-      '<button class="freshness-banner-view" onclick="goToFreshnessTab()">View</button>' +
+      '<button class="freshness-banner-view" onclick="viewFreshnessDetails()">View</button>' +
       '<button class="freshness-banner-close" onclick="dismissFreshnessBanner()" title="Dismiss">×</button>' +
     '</span>';
 }
@@ -13899,6 +13895,16 @@ function dismissFreshnessBanner() {
 function goToFreshnessTab() {
   dismissFreshnessBanner();
   showTab('fridge');
+}
+
+// The global banner's own "View" action — distinct from goToFreshnessTab(),
+// which the Ready-to-eat / What-should-we-eat cards still use to jump to the
+// Fridge tab for a specific item. This one opens Home's own attention detail
+// (Keep/Remove/use-soon list) instead, so View never duplicates the banner
+// with a second summary — it reveals the one place the actions live.
+function viewFreshnessDetails() {
+  dismissFreshnessBanner();
+  openAttentionView();
 }
 
 // Small count badge on the My Fridge tab.

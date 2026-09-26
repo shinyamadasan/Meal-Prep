@@ -59,6 +59,10 @@
                     <div class="tab-more">
                         <button type="button" class="tab-btn tab-more-btn" aria-haspopup="true" aria-expanded="false">⋯ More</button>
                         <div class="tab-more-menu hidden">
+                            <!-- Phone-width-only duplicate of the primary Recipes tab above (hidden there
+                                 at narrow widths so the primary row fits without scrolling). No data-tab,
+                                 so it never collides with `.tab-btn[data-tab="recipes"]` selectors. -->
+                            <button class="tab-btn tab-more-recipes-link" onclick="showTab('recipes')">Recipes</button>
                             <button class="tab-btn" data-tab="nutrition">Nutrition</button>
                             <button class="tab-btn" data-tab="ingredients">Price Book</button>
                             <button class="tab-btn" data-tab="flavors">Flavor Library</button>
