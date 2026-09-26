@@ -4323,6 +4323,75 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+### TASK-063 · Backfill: Mobile Home polish — compact attention ALWAYS, Recipes behind More, compact leftover row (D-079)
+status: review
+owner: claude
+source: direct owner brief ("BUILDER for a focused MOBILE HOME POLISH wave"). Not from
+  `planning/BUILD_QUEUE.md`. Explicitly a bounded follow-up to TASK-062, fixing four real-usage
+  friction points its own screenshots surfaced — not a redesign.
+risk: UI/CSS/markup + responsive nav only — no Firestore/sync/storage/auth/tombstone/`saveData()`
+  call site touched; no expiration/pantry/deletion calculation changed. Per D-032's tie-break this
+  reads as reversible (`done`-eligible), matching TASK-062's own precedent, but left to the
+  reviewer to decide, same as TASK-062.
+depends-on: TASK-062/D-078 (reverses its auto-open-on-expired rule specifically; does not touch
+  anything else it shipped).
+files: app.js, index.html, style.css, tests/mobile-home-polish.spec.js (new),
+  tests/mobile-layout.spec.js, tests/kitchen-truth.spec.js, tests/production-smoke-kitchen-truth.spec.js,
+  docs/ARCHITECTURE.md, docs/FEATURES.md, docs/DECISIONS.md (D-079)
+branch: wave/mobile-home-polish (base main @ 416c0be)
+
+acceptance:
+  - [x] `#dash-attention` is closed by default even when expired items exist — `hasExpired` no
+        longer forces it open
+  - [x] The compact summary shows truthful expired/use-soon/running-low/meal-idea counts, unchanged
+        source (`collectAttentionItems()` / `getExpirySuggestions()`), no new calculation
+  - [x] A new `.dash-attn-review-btn` ("Review") force-opens the card via `openAttentionView()` —
+        a second tap does not close it back (not a native toggle)
+  - [x] The global banner's View action opens the same Home detail via a new `viewFreshnessDetails()`,
+        kept deliberately separate from `goToFreshnessTab()` (still used by the Ready-to-eat /
+        What-should-we-eat row buttons to jump to Fridge — an unrelated call site)
+  - [x] `openAttentionView()` (notification/deep-link path) still force-opens the card
+  - [x] Keep / Remove / Remove expired / View in Fridge / Plan it / use-soon detail all remain
+        reachable once opened — nothing removed, only default visibility changed
+  - [x] Manually-opened state still survives a subsequent re-render (same pattern as
+        `#dash-ideas`/`#dash-history`)
+  - [x] Ready to eat still renders above the attention card; Need ideas? and Cook History stay
+        collapsed by default (TASK-062 behavior preserved, not regressed)
+  - [x] "Have leftovers or takeout?" reduced to one compact row (`.dash-leftover-compact`),
+        same `openManualCookedModal()`; orphaned old CSS removed with it
+  - [x] Recipes reachable behind "More" at phone width (`.tab-more-recipes-link`, no `data-tab`)
+        without duplicating `data-tab="recipes"` (would have made all 13 existing
+        `page.locator('.tab-btn[data-tab="recipes"]')` call sites ambiguous)
+  - [x] Home/Plan/Shop/Prep/Fridge + "More" fit the primary nav row at 390px with no internal
+        horizontal scroll (`.tab-nav` `scrollWidth` <= `clientWidth`); desktop nav unchanged
+  - [x] Greeting's wave emoji glued to the last word via `&nbsp;` — cannot land alone on its own
+        line; long names can still wrap
+  - [x] No expiration calculation, pantry truth, deletion/tombstone semantics, `cookedMeals`/Fridge
+        truth, `plannedBatches`, `weeklyPlan`, Shop, Prep, Firestore/sync, import/export, or the
+        TASK-061 Playwright harness changed
+
+verification: full local suite 693/693 (680 baseline + 13 new in `tests/mobile-home-polish.spec.js`);
+  `tests/kitchen-truth.spec.js` 27/27 and `tests/mobile-layout.spec.js` 2/2 after updating both for
+  the new default-closed/Recipes-behind-More behavior; `tools/Verify-Decisions.ps1` 84/84;
+  `tools/Check-DocsConsistency.ps1` drift 35 -> 38 (3 new items are `inMore`/`scrollWidth`/
+  `clientWidth` — this record's own D-079 text naming **test-only** identifiers from
+  `tests/mobile-layout.spec.js`, the same already-tolerated category the 35-item baseline itself
+  carries, e.g. `waitForAppReady()`/`addInitScript`/`pwsh` — not a stale product-code claim);
+  `git diff --check` clean; `node --check app.js` clean. A disposable Playwright screenshot pass
+  (not committed) at 390px confirmed the compact attention summary + Review, the opened detail with
+  Keep/Remove/Remove-expired/View-in-Fridge/Plan-it all reachable, and Recipes at the top of the
+  More menu with no visible nav scrollbar. Claude built this directly (owner brief), bypassing
+  Codex, so `CHANGELOG.md`/`TEST_REPORT.md` get no entry — same convention as TASK-058/059/060/062.
+
+open items (recorded, deliberately NOT fixed):
+  - The compact summary's "running low" staple count still shares `#dash-attention` with
+    expired/use-soon/meal-idea counts; the wave's target mockup did not call it out separately and
+    the brief said existing counts should only become optional to view, never recomputed or hidden.
+  - Desktop nav is unchanged — Recipes still sits in the primary row there; only the phone-width
+    (≤768px) breakpoint moves it behind More.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:

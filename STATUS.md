@@ -5,6 +5,63 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — Mobile Home polish (TASK-063 / D-079) IMPLEMENTED on `wave/mobile-home-polish`, HELD for independent review, NOT merged
+
+Owner brief: a focused BUILDER pass fixing four real-usage phone-width frictions D-078's own
+screenshots surfaced — not a redesign. Built directly by Claude on a new branch from `main` @
+`416c0be` (confirmed == `origin/main` before branching). **Nothing merged, pushed or deployed.**
+`release/recipe-url-import-clean` worktree/branch and the pre-existing untracked `screenshots/`
+directory were untouched throughout.
+
+**What changed, all UI/CSS/responsive-nav only — no expiration/pantry/deletion/sync semantics
+touched:**
+
+1. `#dash-attention` is compact by default **unconditionally** now — an expired item no longer
+   forces it open (this reverses that one specific D-078 rule). A new `.dash-attn-review-btn`
+   ("Review") force-opens it through `openAttentionView()`; a second tap does not toggle it closed.
+2. The global freshness banner's **View** action now opens Home's own attention detail instead of
+   jumping to the raw Fridge tab, through a **new** `viewFreshnessDetails()` — kept deliberately
+   separate from the existing `goToFreshnessTab()`, which the Ready-to-eat / What-should-we-eat
+   cards' row buttons still use for their own (unrelated) "jump to Fridge for this item" behavior.
+   Conflating the two was tried first and caught by the existing suite before it landed.
+3. "Have leftovers or takeout?" shrinks from a 3-line card to one compact row
+   (`.dash-leftover-compact`), same `openManualCookedModal()`; the CSS it orphaned was removed with
+   it, not left as dead weight.
+4. Recipes moves behind "⋯ More" at phone width only (`.tab-more-recipes-link`, no `data-tab`, so
+   it never collides with the 13 existing `page.locator('.tab-btn[data-tab="recipes"]')` call
+   sites across 6 spec files) — freeing enough width that Home/Plan/Shop/Prep/Fridge + More fit the
+   primary nav row at 390px with no internal horizontal scroll. Desktop nav is unchanged.
+5. The greeting glues its wave emoji to the last word with `&nbsp;` so it can never land alone on
+   its own line; an unusually long name can still wrap.
+
+**Gates, no retries:** full local suite **693/693** (680 baseline + 13 new in
+`tests/mobile-home-polish.spec.js`); `tests/kitchen-truth.spec.js` 27/27 and
+`tests/mobile-layout.spec.js` 2/2 after updating both for the new default-closed/Recipes-behind-More
+behavior (existing tests that asserted on an auto-opened card now call `openAttentionView()` first —
+the real explicit-open path — instead of relying on the removed auto-open; coverage is the same).
+`tools/Verify-Decisions.ps1` **84/84**. `tools/Check-DocsConsistency.ps1` drift **35 -> 38** (3 new
+items — `inMore`/`scrollWidth`/`clientWidth` — are D-079's own text naming **test-only** identifiers
+from `tests/mobile-layout.spec.js`, the same already-tolerated category the 35-item baseline itself
+carries, e.g. `waitForAppReady()`/`addInitScript`/`pwsh` — not a stale product-code claim).
+`git diff --check` clean; `node --check app.js` clean. `docs/ARCHITECTURE.md`/`docs/FEATURES.md`/
+`docs/DECISIONS.md` (D-079) updated in the same change.
+
+A disposable Playwright screenshot pass (not committed, saved to the session scratchpad) at 390px
+confirmed: nav shows Home/Plan/Shop/Prep/Fridge/⋯More on one line with no scrollbar; the compact
+attention line reads "⚠ 2 expired · 1 use soon · 1 meal idea  Review"; tapping Review opens Keep/
+Remove/Remove expired (2)/View in Fridge/Plan it, all reachable; opening "⋯ More" shows Recipes at
+the top, above Nutrition/Price Book/Flavor Library/Cooking Hacks/Settings.
+
+Committed on the branch as `945d9b3` (10 files, +474/-90). `TASKS.md` TASK-063 and
+`docs/DECISIONS.md` D-079 backfilled in the same commit, same convention as TASK-058 through
+TASK-062 (Claude built this directly, bypassing Codex, so `CHANGELOG.md`/`TEST_REPORT.md` — Codex's
+own append-only logs — get no entry).
+
+**Left to the human/reviewer:** independent review of TASK-063 → merge decision. TASK-063 is
+`status: review` in `TASKS.md`.
+
+---
+
 ## 2026-09-26 — TASK-062 / D-078 DONE: `main` 9a88169 pushed, CI green end to end, live-verified
 
 Independent review of candidate `d7b5197` (base `a64d186`) came back **PASS**, with one
