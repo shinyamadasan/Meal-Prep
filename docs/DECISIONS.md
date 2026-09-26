@@ -2861,8 +2861,11 @@ UX phase rather than freezing Plan first.
   least one expired item, so the attention card's auto-open-on-expired rule keeps them green
   without a test rewrite.
 - `docs/ARCHITECTURE.md`'s Plan-tab entry-render-fn row and `docs/FEATURES.md`'s Plan/Home sections
-  were updated in this same change; `Check-DocsConsistency.ps1` drift stayed at the pre-existing
-  31-item baseline (zero new drift).
+  were updated in this same change; `Check-DocsConsistency.ps1` drift moved from the pre-existing
+  31-item baseline to **35**. The 4 new items are this very decision record naming the identifiers
+  it removed (`dayMealCounts`, `daysPlanned`, `weekStrip`, `planLabel`) — historical references to
+  code that no longer exists, the same pattern already used elsewhere in this file for old commit
+  SHAs, not a stale claim about current architecture.
 - Deferred, not addressed here: a picker entry that shows *why* a recipe is low-effort beyond the
   existing meta line; grouping multiple same-recipe batches visually rather than preventing a
   second one outright (out of scope — no product need for a second batch of the same recipe was
