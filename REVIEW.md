@@ -4,6 +4,20 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-061 — CI restore reliability (D-077) — PASS (STRICT) -> landed
+branch: `task-061-ci-restore-reliability`; reviewed f58bfe5 (base `main @ 207d262`)
+date: 2026-09-26
+
+### Provenance — recorded from owner relay, not written by the reviewer
+The independent STRICT review ran outside this repository and returned **VERDICT: PASS** on
+f58bfe5d9ff728e0646b2aa9b3c192f4c7e3d5c1. Its report is not committed here.
+
+### Landing
+Owner-authorized. `main` fast-forwarded to f58bfe5 (reviewed SHA preserved, no rebase or new commit) and
+pushed normally. CI run 36236203757 was green: local gate 679/679 and production smokes 147/0/4-skipped.
+D-032 gate: `done` (test harness and config only; product source byte-unchanged).
+
+---
 ## Review TASK-060 — Meal-prep first (D-076) — FIX FIRST -> fixed -> APPROVED FOR INTEGRATION (D-032 held gate)
 branch: `wave/meal-prep-first`; reviewed e1c9f1c, then fix candidate 288fd58 (base `main @ e7c3777`)
 date: 2026-09-25

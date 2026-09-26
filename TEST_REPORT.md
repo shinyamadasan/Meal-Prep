@@ -5,6 +5,23 @@
 
 ---
 
+## TASK-061 / D-077 landing + TASK-060 release gate · 2026-09-26
+suite: on fast-forwarded `main` f58bfe5 before pushing, `npm test`, `node --check` (config, server, new
+  spec), `git diff --check 207d262 HEAD`, `Verify-Decisions.ps1`. After pushing, the push-triggered
+  GitHub Actions and Pages runs, plus a check of served files against Git blobs.
+result:
+  - pre-push: `npm test` 679/679 (includes local-harness-origin and suite-classification). node --check OK;
+    diff-check clean; Verify-Decisions 74/74.
+  - CI "Button tests" run 36236203757 (SHA f58bfe5), ubuntu, 2 workers. Local branch gate: 679 passed /
+    0 failed; the log has zero `waitForRestored` / test-timeout lines. The production-smoke step RAN
+    (not skipped): 147 passed / 0 failed / 4 skipped. The 4 are the pre-existing conditional
+    notification-permission skips, the same 4 as before.
+  - Pages run 36236203463: success. Served app.js, index.html, style.css, sw.js and manifest.json
+    blob hashes match `HEAD` exactly.
+not run: CI reruns (none needed; none attempted).
+
+---
+
 ## TASK-061 / D-077 CI restore reliability · 2026-09-26
 suite: local Windows machine (12 cores), Playwright 1.61 Chromium. Probes were throwaway specs
   outside the repo.

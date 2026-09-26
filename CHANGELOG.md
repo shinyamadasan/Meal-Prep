@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-061 / D-077 + TASK-060 / D-076 — landed and released (main f58bfe5)
+- Integration: `main` 207d262 -> f58bfe5 by `--ff-only`. The reviewed commit itself is `main`; tree
+  identical, product files unchanged. Pushed normally (no force).
+- Bookkeeping only (this entry): TASKS.md (TASK-060 and TASK-061 -> done; TASK-060's stale "awaiting
+  push" wording corrected), STATUS.md, TEST_REPORT.md, REVIEW.md (relayed TASK-061 verdict),
+  planning/DONE.md, docs/DECISIONS.md (D-077 landed line).
+
+---
+
 ## TASK-061 / D-077 — local suite served over http; CI restore flake removed (branch: task-061-ci-restore-reliability)
 base: `main` @ 207d262. Test harness and config only; no product file changed.
 changes:

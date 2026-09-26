@@ -4131,7 +4131,7 @@ follow-ups:
 ---
 
 ### TASK-060 · Backfill: Meal-prep first — unscheduled batches, Prep tab + AI Prep Brief, "Not anymore?" stock correction, scroll-reload fix (D-076)
-status: review
+status: done
 owner: claude
 source: none — direct owner brief ("You are the BUILDER"), implemented directly by Claude, not Codex,
   and NOT from `planning/BUILD_QUEUE.md`. Recorded here so the OS record matches the repo, the
@@ -4171,16 +4171,21 @@ release (2026-09-25): status corrected from a PREMATURE `done` back to `review`.
   - [x] owner-authorized push: `main` e6f7650 = `origin/main`; Pages run 36153456540 succeeded; the
         served app.js/index.html/style.css/sw.js/manifest.json match the Git blobs
   - [x] live functional smoke of every TASK-060 outcome: 2/2 (read-only, Firebase blocked)
-  - [ ] production smokes (`npm run test:prod`): 143 passed / 4 failed / 4 skipped on e6f7650. The 4
-        failures are stale pre-TASK-060 Home-layout expectations. Corrected on branch
-        `wave/meal-prep-first-prod-smokes` (test-only): 147 passed / 0 failed / 4 skipped (the
-        pre-existing notification-permission skips). Awaiting targeted re-review, then an
-        authorized push.
-  - [ ] CI "Button tests" run 36153457263 on e6f7650: FAILED in the local branch gate, 674/675,
+  - [x] production smokes (`npm run test:prod`): 143 passed / 4 failed / 4 skipped on e6f7650. The 4
+        failures were stale pre-TASK-060 Home-layout expectations, corrected test-only on
+        `wave/meal-prep-first-prod-smokes` @ 207d262 and PUSHED (`origin/main` 207d262). In CI run
+        36236203757 the production-smoke step RAN: 147 passed / 0 failed / 4 skipped (the
+        pre-existing notification-permission skips).
+  - [x] CI "Button tests" run 36153457263 on e6f7650: FAILED in the local branch gate, 674/675,
         on `tests/cook-depletion-tombstones.spec.js` "a full cook still creates the batch…" (restore
         timeout after reload); the prod-smoke step was skipped. Assessed as the known CI
         restore-timeout flake (15/15 locally under repeat); NOT modified. Needs a green CI run on
         the next push, or an explicit owner decision.
+        CLEARED 2026-09-26: the root cause was the harness, not TASK-060 (TASK-061 / D-077). CI run
+        36236203757 on f58bfe5 is green end to end: local gate 679/679, production smokes
+        147 passed / 0 failed / 4 skipped, and Pages deploy succeeded. Served
+        app.js/index.html/style.css/sw.js/manifest.json match Git. TASK-060 product files are
+        byte-unchanged since e6f7650, so the live smoke evidence still holds. Status: done.
 review 1 (candidate e1c9f1c): FIX FIRST — two bounded blockers, both fixed in a new commit on top
   (e1c9f1c preserved, not amended):
   - [x] `generateGroceryList()` reset every plan-generated row to unchecked, so a batch +/- un-bought
@@ -4195,7 +4200,7 @@ not covered by automated tests (reviewer attention):
 ---
 
 ### TASK-061 · CI restore reliability: serve the local suite over http, not file:// (D-077)
-status: review
+status: done
 owner: claude
 source: owner brief ("NEW BUILDER for a separate CI reliability task"). Not from
   `planning/BUILD_QUEUE.md`. Deliberately SEPARATE from TASK-060, which stays `review` until its
@@ -4226,8 +4231,11 @@ acceptance:
         starting with empty storage, and the last of 3 rapid saves restored by the first reload
   - [x] Product source byte-unchanged vs 207d262 (app.js, index.html, style.css, sw.js,
         manifest.json). `prod` project unchanged (151 tests listed).
-  - [ ] Independent review
-  - [ ] Green CI run on push (not pushed; needs authorization)
+  - [x] Independent review: STRICT, verdict PASS on f58bfe5 (relayed by the owner; see REVIEW.md)
+  - [x] Green CI run on push: owner-authorized fast-forward of `main` 207d262 -> f58bfe5 (reviewed
+        SHA preserved, no new commit). "Button tests" run 36236203757: local gate 679/679 with
+        zero `waitForRestored`/test timeouts, production smokes 147 passed / 0 failed /
+        4 skipped. Pages run 36236203463: success.
 
 verification: see TEST_REPORT.md "TASK-061".
 

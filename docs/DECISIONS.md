@@ -2735,6 +2735,9 @@ Verify: tests/meal-prep-first.spec.js contains "REGRESSION: changing an unrelate
 
 **Status:** Implemented on branch `task-061-ci-restore-reliability` (from `main` @ 207d262). Test
 harness only. Held for independent review (TASK-061). Product source byte-unchanged.
+**Landed 2026-09-26:** independent STRICT review PASS. `main` was fast-forwarded to the reviewed SHA f58bfe5 and
+pushed. CI run 36236203757 was green: local gate 679/679 with no restore timeout, production
+smokes 147 passed / 4 skipped.
 
 ### Context
 

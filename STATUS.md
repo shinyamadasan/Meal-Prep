@@ -5,6 +5,18 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-061 and TASK-060 DONE: `main` f58bfe5 pushed, CI green end to end
+
+Independent STRICT review passed TASK-061 (f58bfe5). `main` was fast-forwarded 207d262 -> f58bfe5 (the
+reviewed SHA itself, no new commit) and pushed normally. CI "Button tests" run 36236203757 had a local
+gate of **679/679** with zero restore timeouts, which is the first real-runner proof of D-077. Its production
+smokes RAN: **147 passed / 0 failed / 4 skipped** (the pre-existing notification-permission skips). Pages
+run 36236203463 succeeded, and the served app.js/index.html/style.css/sw.js/manifest.json match Git. That clears
+TASK-060's last release blocker, so **TASK-060 and TASK-061 are both `done`**. Still open and untouched:
+the hard-coded-date fixtures seen in historical run 33128957608.
+
+---
+
 ## 2026-09-26 — TASK-061 / D-077: CI restore flake root-caused and fixed on a branch, NOT pushed
 
 The recurring "restore wait timed out after reload" CI failures were never slow restoration.
