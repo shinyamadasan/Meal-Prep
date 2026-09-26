@@ -4251,7 +4251,7 @@ open items (recorded, deliberately NOT fixed):
 ---
 
 ### TASK-062 · Backfill: Plan + Home simplification — one recipe picker, collapsed by-day scheduler, compact Home (D-078)
-status: review
+status: done
 owner: claude
 source: direct owner brief ("EXTEND THE CURRENT UX PHASE — INCLUDE HOME"). Not from
   `planning/BUILD_QUEUE.md`. Explicitly bundles the Plan-tab and Home simplifications as one
@@ -4300,6 +4300,19 @@ verification: full local suite 680/680 (679 baseline + 1 new duplicate-batch-gua
   docs/DECISIONS.md — not accidental drift), `git diff --check` clean, `node --check app.js` clean.
   Claude built this directly (owner brief), bypassing Codex, so `CHANGELOG.md`/`TEST_REPORT.md`
   (Codex-owned append-only logs) get no entry — same convention as TASK-058/059/060.
+
+landing (2026-09-26): independent review verdict PASS on `d7b5197`; one non-blocking docs
+  correction requested (D-078's Consequences section understated the docs-drift delta as
+  "31 -> zero new drift" when it is actually 31 -> 35) — fixed as its own commit `9a88169` on
+  `main`, no implementation code touched. `main` fast-forwarded `a64d186` -> `d7b5197` -> `9a88169`
+  and pushed; `origin/main` confirmed at `9a88169`. Served `app.js`/`index.html`/`style.css` are
+  byte-identical to the repo after line-ending normalization. CI run `36257430742` ("Button tests",
+  SHA `9a88169`) **green end to end, first attempt**: local gate 680/680, Pages wait passed,
+  production smokes 147 passed / 4 skipped / 0 failed. Pages run `36257430014`: success. A
+  disposable, throwaway Playwright pass against the live site (not committed) confirmed every
+  Plan/Home/attention behavior in the acceptance list, including the duplicate-batch guard and the
+  attention card's auto-open-on-expired rule, plus no console errors and no phone-width overflow.
+  TASK-062 -> `done`.
 
 open items (recorded, deliberately NOT fixed):
   - No picker affordance shows *why* a recipe is low-effort beyond the existing meta line.

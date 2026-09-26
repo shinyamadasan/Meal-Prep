@@ -5,6 +5,49 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-26 — TASK-062 / D-078 DONE: `main` 9a88169 pushed, CI green end to end, live-verified
+
+Independent review of candidate `d7b5197` (base `a64d186`) came back **PASS**, with one
+non-blocking docs correction: D-078's Consequences section understated the
+`Check-DocsConsistency.ps1` delta as "stayed at the 31-item baseline" when it actually moved to
+**35** (the 4 new hits are D-078 itself naming identifiers the wave removed —
+`dayMealCounts`/`daysPlanned`/`weekStrip`/`planLabel` — as history, same pattern already used for
+old commit SHAs elsewhere in that file). Fixed as its own docs-only commit `9a88169` on `main`,
+per convention — the reviewed product/code commit `d7b5197` was preserved unamended.
+
+`main` was fast-forwarded `a64d186` -> `d7b5197` (`git diff d7b5197 main` empty, proving the
+integrated tree is byte-identical to the reviewed candidate) -> `9a88169`, then pushed normally
+(no force). `origin/main` confirmed at `9a88169` post-push. Pre-push gates on the integrated tree,
+all green: full local suite 680/680, 185/185 targeted Plan/Home/attention specs, production smokes
+147/0/4-skipped against the live build, `Verify-Decisions.ps1` 79/79, `git diff --check` clean,
+`node --check app.js` clean.
+
+**CI run `36257430742`** ("Button tests", SHA `9a88169`) went **green end to end on the first
+attempt**: local gate 680/680, Pages wait passed, production smokes 147 passed / 4 skipped / 0
+failed. **Pages run `36257430014`: success.** Served `app.js`/`index.html`/`style.css` fetched from
+`https://shinyamadasan.github.io/Meal-Prep/` are byte-identical to `git show main:<file>` after
+line-ending normalization, and carry the D-078 markers (`openBatchPickerModal`,
+`plan-by-day-details`, `dash-attention`).
+
+**Live UX verification** (disposable Playwright pass against the deployed site, not committed):
+Plan — the picker replaces the inline search, lists all recipes with Low effort off by default,
+search/filter work, re-adding an already-planned recipe does not duplicate the row, serving +/-
+works, the day scheduler is collapsed by default and reveals the real planner when opened,
+`weeklyPlan` data is intact, and the Prep tab (not the Plan header) is the only place "Prep
+checklist" lives. Home — the flow card leads with a working next-action link, Ready to eat renders
+before "Need ideas?", both "Need ideas?" and Cook History are collapsed by default, the old
+Planning panel is gone, and Nutrition stays reachable from "More". The attention card stays
+compact for a use-soon-only pantry and auto-opens for a real expired item; `openAttentionView()`
+force-opens it. No console errors (after the same benign-Firebase-noise filter every existing
+production smoke already uses), no phone-width (390px) overflow on Plan, Home, or the picker
+modal.
+
+**TASK-062 is `done`.** Feature branch `wave/plan-home-simplification` and the
+`release/recipe-url-import-clean` worktree/branch were untouched throughout; the pre-existing
+untracked `screenshots/` directory remains untouched.
+
+---
+
 ## 2026-09-26 — Plan + Home simplification (TASK-062 / D-078) IMPLEMENTED on `wave/plan-home-simplification`, HELD for independent review, NOT merged
 
 Owner brief: extend the meal-prep-first UX phase to cover Home in the same bounded pass as the
