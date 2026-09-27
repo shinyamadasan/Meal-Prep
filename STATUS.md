@@ -5,6 +5,53 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-09-27 — TASK-065 planned (Conversational Control Bridge v1): Phase 0 discovery + D-082 architecture decision, no code written
+
+**Verified live state first:** `main` = `origin/main` = `07f4b41` (matches expected, no drift);
+status clean except pre-existing untracked `screenshots/`; `task-064` worktree
+(`.claude/worktrees/agent-ae0df3b6b4652615e`) and the `release/recipe-url-import-clean` worktree
+both left untouched. Noted TASK-064 has no `TASKS.md` entry (landed via direct commits, same
+pattern as TASK-058/059/060/062 — documented instead in `docs/DECISIONS.md` D-080/D-081).
+
+**Task:** The human handed over a large, strict builder brief for a "Conversational Control Bridge"
+letting an external ChatGPT integration read/write pantry + ready-food state. Ran Phase 0 discovery
+before writing any code: confirmed no authenticated backend exists anywhere in this repo (GitHub
+Pages static hosting; the one precedent, `workers/recipe-import`, is stateless and secret-free);
+found D-058 already declined Cloud Functions + Blaze once, for a related security-surface reason;
+confirmed the existing whole-document `version` field (D-004) is reusable as-is for both
+concurrency AND idempotency without a schema migration; confirmed pantry item ids
+(`Date.now()+Math.random()`) have no authoritative-identity mechanism, so `create_inventory_item`
+is out of v1 scope.
+
+Presented two viable architectures to the human (Firebase-ID-token passthrough vs. a
+single-account Cloudflare Worker with a static bearer token + scoped service account) rather than
+choosing unilaterally — this is a real secret-custody/infrastructure decision, not a pure
+engineering call. Human chose the single-account Worker (Option B).
+
+**Completed:** Wrote `docs/DECISIONS.md` D-082 (full architecture: runtime, auth model — both
+directions, concurrency/idempotency mechanics, exact v1 operation scope, what's explicitly
+deferred) and `TASKS.md` TASK-065 (Definition-of-Ready: objective, exact operation contract, chaos
+test matrix, security tests, app↔bridge consistency requirement, constraints, verification steps).
+Marked `Risk: High · Execution: Solo` per Hard Rule 10 — this touches auth, a new backend, and
+Firestore writes from outside the app, so it is never chained with other work regardless of what
+else is queued.
+
+**Files changed:** `docs/DECISIONS.md` (D-082, new), `TASKS.md` (TASK-065, new), `STATUS.md` (this
+entry). No `app.js`/`index.html`/`style.css`/worker code touched — per Delegation Policy this is
+Codex's build, not Claude's; Claude's job here was architecture + planning.
+
+**Branch:** `main` — docs-only planning changes, not yet committed.
+**Tests:** none run (no code written).
+**Next task:** `git add docs/DECISIONS.md TASKS.md STATUS.md && git commit` the planning docs, then
+hand TASK-065 to Codex (`Continue` — first `status: codex` task). Production enablement (real
+secrets, a real deploy, connecting ChatGPT) is explicitly out of scope until a separate approval
+after TASK-065's candidate is reviewed.
+**Blockers:** none for planning. Implementation itself may legitimately hit a STOP condition
+TASK-065's own constraints call for (see "If any acceptance item... requires a schema/migration
+change D-082 didn't anticipate, STOP") — that is expected process, not a blocker to resolve now.
+
+---
+
 ## 2026-09-26 — TASK-063 / D-079 DONE: `main` 59840f6 pushed, CI green end to end, Pages verified, live-verified
 
 Pushed `main` `416c0be -> 59840f6` (fast-forward of reviewed candidate `c67b47c`, plus this session's

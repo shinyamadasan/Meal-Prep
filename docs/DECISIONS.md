@@ -3219,3 +3219,131 @@ Verify: app.js contains "var batchSearchFavoritesOnly = false;"
 Verify: app.js contains "function getBatchSearchResults(query, lowEffort, limit, favoritesOnly)"
 Verify: index.html contains "batch-picker-favorites-chip"
 Verify: style.css contains "#batch-picker-modal .modal-footer"
+
+## D-082 — Conversational Control Bridge v1: a single-account Cloudflare Worker, not Cloud Functions, not raw Firestore CRUD
+
+**Status:** Architecture approved by the human (2026-09-27). Implementation not started — this
+decision exists to give Codex a concrete, non-inferred spec for TASK-065. This entry will be
+updated (or superseded) once a candidate lands and is reviewed; no `Verify:` lines yet because
+nothing has been built.
+
+### Context
+
+Product goal, stated by the human: "App for looking. ChatGPT for telling the system what
+happened." The app stays deterministic and authoritative; an external ChatGPT integration should
+be able to read and update the same canonical pantry/ready-food state the app uses, without a
+second AI layer inside Meal Prep and without becoming an unauthenticated production write endpoint.
+
+Phase 0 discovery (recorded in full in the TASK-065 chat transcript, summarized here) established:
+
+- **No authenticated, stateful backend exists anywhere in this repo.** Hosting is GitHub Pages
+  (static only). The one existing backend, `workers/recipe-import` (a Cloudflare Worker), is
+  deliberately stateless, holds no secrets, and never touches Firestore — it is the only
+  server-side precedent this repo has, and it does not solve this problem, but it does establish
+  Cloudflare Workers as an already-adopted platform.
+- **This exact question came up before, for push notifications, and was explicitly declined.**
+  D-058 characterized the platform and concluded that a scheduled Cloud Functions + Cloud
+  Scheduler backend on the Blaze plan would be "a scheduled backend that reads every user's
+  inventory... a materially larger security and privacy surface than the app has today," and
+  TASK-046's acceptance criteria forbid adding one. This bridge is a different shape — a
+  per-request, explicitly user/operator-invoked command surface, not an always-on scheduler
+  reading every account — but the underlying caution (don't casually expand the security surface,
+  don't reach for Cloud Functions/Blaze reflexively) carries forward.
+- **A usable optimistic-concurrency token already exists and needs no migration**: the whole
+  `users/{uid}` Firestore document carries a `version` integer (`AppState.dataVersion` client-side),
+  bumped on every save and checked inside `saveToFirestore()`'s `runTransaction` (D-004). There is
+  no per-item (per-pantry-item / per-cooked-meal) revision field — this token is
+  whole-document-grained, not row-grained.
+- **No operation/idempotency ledger exists**, and none is needed for v1: reusing the same
+  document-level `version` field as the idempotency guard (client always submits the revision it
+  last read; a lost-response retry that resends the identical `(operation, expectedRevision)` pair
+  either applies cleanly or is rejected as stale because the first attempt already bumped the
+  version) covers the retry-safety case without inventing new persisted state.
+- Pantry item ids are `Date.now() + Math.random()` — client-generated, not looked up against any
+  canonical registry (`INGREDIENT_DB` matching happens by name, not id). There is no authoritative
+  mechanism to mint a new stable id for a not-yet-existing ingredient outside the app's own UI, so
+  the bridge cannot safely support "create a new pantry item" in v1 without inventing a second,
+  competing identity scheme — exactly what the brief and this project's own tombstone/identity
+  discipline (D-071) warn against.
+
+### Decision
+
+Build TASK-065 as a **new, single-account Cloudflare Worker** (`workers/conversational-bridge/`),
+not Firebase Cloud Functions, and not a passthrough that lets the caller supply their own Firebase
+credential.
+
+1. **Runtime: Cloudflare Workers.** Reuses the platform this repo already has one live Worker on.
+   Requires no Firebase billing-plan change (Cloud Functions needs Blaze; a Worker calling
+   Firestore's REST API via a service account does not) and introduces no new cloud provider.
+2. **Auth, caller → Worker: a static bearer token**, minted once by the operator and stored only as
+   a Cloudflare Worker secret (`wrangler secret put BRIDGE_API_TOKEN`) and in ChatGPT's own
+   connector config — never in this repo, never in GitHub Pages JS. Checked with a constant-time
+   comparison; missing or wrong → `401 unauthorized`.
+3. **Auth, Worker → Firestore: a scoped service-account key**, also a Worker secret
+   (`FIREBASE_SERVICE_ACCOUNT_JSON` or its split fields), exchanged for a short-lived OAuth2 access
+   token via the standard JWT-bearer flow (signed with Web Crypto, no Node-only Admin SDK — Workers
+   can't run it). The Worker is hardcoded to exactly **one** target `uid` (also a secret,
+   `TARGET_UID`) — this is a single-owner account in practice (`sharedRecipes` is an orphaned
+   feature and family-invitation accept-flow is incomplete per `docs/ARCHITECTURE.md`), so scoping
+   the bridge to one account by construction is strictly narrower and more defensible than
+   accepting "any Firebase user," and sidesteps the alternative design (passing through the
+   caller's own Firebase ID token) entirely — that alternative was rejected specifically because it
+   would require ChatGPT to hold a Firebase refresh token, a long-lived, account-equivalent
+   credential, to keep minting fresh ID tokens. A static, rotatable, narrowly-scoped bearer token is
+   a smaller and more inspectable secret to hand to a third party.
+4. **The Worker speaks domain operations, never raw CRUD.** No endpoint accepts an arbitrary
+   Firestore path or collection name. Every write:
+   - targets one of the two in-scope collections only — `pantry` (raw inventory) or `cookedMeals`
+     (prepared/ready-to-eat food) — never both, and never any other field on the user document;
+   - is applied via a Firestore REST `PATCH` scoped by `updateMask.fieldPaths` to exactly the
+     touched top-level field(s) plus `version` — never a whole-document overwrite, even though the
+     service account has admin-equivalent access;
+   - requires `expectedRevision` (no optional/omittable form, including on creates — this is what
+     gives creates their retry-safety, per the idempotency finding above);
+   - is checked against the live document's `version` field *and* Firestore's own
+     `currentDocument.updateTime` precondition on the same read, so the conflict check is atomic at
+     the Firestore protocol level, not a read-then-hope race;
+   - on a revision mismatch, returns `409 revision_conflict` with the current state attached, and
+     applies nothing — never a partial write.
+5. **Raw ingredient vs. prepared food stays the app's existing distinction, not a new one.** Write
+   operations reuse the exact semantics of the existing functions they stand in for
+   (`correctKitchenStock()` for mark-out-of-stock, `_doMarkCooked()`'s record shape for
+   ready-food creation, `useCookedPortion()`'s last-portion-removes-the-record behavior for
+   consumption) — the Worker reimplements these against Firestore's REST API (it cannot call
+   client-side `app.js` functions directly), so it is a second implementation of the same rules and
+   must be kept honest against `docs/DATA_MODEL.md`, not a new parallel model.
+6. **V1 scope, exactly:** `inventory_get`, `inventory_set_quantity`, `inventory_mark_out_of_stock`,
+   `inventory_mark_in_stock` (staples only), `ready_food_get`, `ready_food_record`,
+   `ready_food_consume`, `ready_food_finish`. No `create_inventory_item` (no authoritative id
+   authority to safely assign one — see Context). No Plan/Shop/Prep writes. No recipe generation.
+   No MCP. No natural-language parsing inside the Worker — it receives resolved typed operations
+   only.
+7. **MCP later, without moving logic into it.** If an MCP server is ever added, it should be a thin
+   transport adapter in front of this same Worker's operations (translating MCP tool calls into the
+   same authenticated HTTP requests this Worker already accepts) — the domain validation,
+   concurrency and idempotency logic stays in the Worker, not duplicated into MCP.
+
+### Consequences
+
+- No Firebase billing-plan change, no new cloud provider, no secret ever committed or shipped to
+  the browser.
+- The concurrency guarantee is coarser than per-item: any change anywhere in the user's document
+  (an unrelated recipe edit from the phone, say) invalidates a bridge write's `expectedRevision`,
+  even though the two changes don't actually conflict. This is a false-positive-safe trade-off
+  (over-cautious, never data-losing) consistent with D-004's own union-merge philosophy, not a
+  correctness gap — accepted rather than building a new per-item revision scheme this task has no
+  mandate to introduce.
+- The bridge is a second implementation of pantry/cooked-meal write rules (it cannot reuse `app.js`
+  functions directly, since those run in the browser). Drift between the Worker and `app.js` is a
+  real risk this task must guard against with tests that assert on `docs/DATA_MODEL.md`'s documented
+  shapes, not just on the Worker's own idea of them.
+- `create_inventory_item` is explicitly out of v1. "I bought milk" (a genuinely new item) is not
+  yet expressible through the bridge — recorded as a known gap, not an oversight.
+- Even fully built and tested locally, this Worker must not be deployed with real secrets or
+  connected to ChatGPT without a separate, explicit production-enablement approval (see TASK-065's
+  acceptance criteria) — this decision authorizes building and locally testing a candidate, not
+  exposing it.
+
+Supersedes: nothing. Extends the platform choice `workers/recipe-import` already established;
+does not revisit or reverse D-058's caution about scheduled/always-on backends, because this
+bridge is not one.

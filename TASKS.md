@@ -4451,6 +4451,207 @@ open items (recorded, deliberately NOT fixed):
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     TASK-065 · Conversational Control Bridge v1 (D-082)
+     Risk: High · Execution: Solo (Hard Rule 10 — never chained)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-065 · Conversational Control Bridge v1 — read/write pantry + ready-food via a new authenticated Cloudflare Worker
+status: todo → codex
+owner: codex
+source: direct owner brief ("Conversational Control Bridge v1"). Not from `planning/BUILD_QUEUE.md`.
+  Architecture decided with Claude in chat 2026-09-27 after Phase 0 discovery — see D-082 for the
+  full reasoning; this task is D-082's implementation.
+risk: New auth surface, new secrets, new backend, Firestore writes from outside the app. Every box
+  Hard Rule 10 names. Build this solo — do NOT batch or chain it with any other task, regardless of
+  what else is queued when Codex picks this up.
+depends-on: none
+files (new): workers/conversational-bridge/src/index.js, workers/conversational-bridge/src/auth.js,
+  workers/conversational-bridge/src/firestore.js (REST client + typed-value <-> plain-JS converter),
+  workers/conversational-bridge/src/operations/inventory.js,
+  workers/conversational-bridge/src/operations/readyFood.js,
+  workers/conversational-bridge/wrangler.jsonc, workers/conversational-bridge/package.json,
+  workers/conversational-bridge/README.md (contract + local setup, mirror
+  workers/recipe-import/README.md's structure), workers/conversational-bridge/openapi.yaml,
+  workers/conversational-bridge/test/*.node.js (chaos + security + consistency suites)
+files (docs, update): docs/DECISIONS.md (D-082 — fill in the `Verify:` lines and any correction once
+  built), docs/ARCHITECTURE.md (one short section describing the bridge exists and what it touches),
+  AGENTS.md (if a new local test command is added, e.g. `npm run test:bridge`)
+branch: task-065 (base main @ current tip — re-verify the exact SHA before branching; do not assume
+  it is still `07f4b41`)
+
+objective:
+  A candidate, locally-built-and-tested Cloudflare Worker that lets an authenticated external
+  caller (eventually ChatGPT) read and write the SAME canonical pantry (`AppState.pantry`) and
+  ready-food (`AppState.cookedMeals`) state the app itself uses — never a competing model, never
+  raw Firestore CRUD. Full design is D-082; do not re-derive or second-guess the architecture
+  choice there (runtime, auth model, concurrency/idempotency model) — implement it. Where D-082 is
+  silent on a mechanical detail, use judgment consistent with its stated reasoning and note the
+  choice in `CHANGELOG.md`.
+
+operation contract (exact — do not rename):
+  Every request requires header `Authorization: Bearer <BRIDGE_API_TOKEN>`; missing/wrong →
+  `401 { ok:false, error:{ code:"unauthorized" } }`.
+
+  Read:
+  - `GET /v1/inventory` → `{ ok:true, revision, items:[{ ingredientId, name, quantity, unit,
+    inStock, staple, stockLevel, storage, updatedAt }] }`. `inStock` is derived (non-staple:
+    presence in `pantry` = true; staple: `stockLevel !== 'empty'`) — never a stored field that can
+    drift from the records it's supposed to summarize.
+  - `GET /v1/ready-food` → `{ ok:true, revision, items:[{ cookedMealId, recipeId, name,
+    servingsRemaining, trackedPortions, storage, cookedDate, updatedAt }] }`. `trackedPortions`
+    false ⇒ `servingsRemaining` is `null` (untracked batch — see `cookedMealTracksPortions()`).
+
+  Write (inventory — `pantry` field only):
+  - `POST /v1/inventory/set-quantity { ingredientId, quantity, unit?, expectedRevision }` —
+    absolute set on an EXISTING record only. Unknown `ingredientId` → `404 not_found`. Idempotent
+    by construction (absolute set).
+  - `POST /v1/inventory/mark-out-of-stock { ingredientId, expectedRevision }` — mirrors
+    `correctKitchenStock()`: staple → `stockLevel:'empty'`; non-staple → removed with an EXPLICIT
+    tombstone written the same way `writeTombstone('pantry', id)` does client-side (reimplement the
+    write, do not skip it — D-071). Already-out/already-removed → `200 { ok:true, unchanged:true,
+    ... }`, not an error (chaos test #4).
+  - `POST /v1/inventory/mark-in-stock { ingredientId, expectedRevision }` — staples only
+    (`stockLevel` → `'full'`). Targeting a non-staple record (whose presence already means in
+    stock) → `422 validation_failed` with a message saying why, not a silent no-op.
+
+  Write (ready food — `cookedMeals` field only):
+  - `POST /v1/ready-food/record { name, recipeId?, servings, storage, expectedRevision }` — creates
+    one record shaped exactly like `_doMarkCooked()`'s output (`id: 'cm_<ts>_<rand>'`,
+    `initialPortions`/`portionsRemaining` = `servings`, `cookedDate` = today, local calendar date
+    per `docs/DATA_MODEL.md`'s note that this is NOT a UTC timestamp).
+  - `POST /v1/ready-food/consume { cookedMealId, servings, expectedRevision }` — decrements
+    `portionsRemaining`. `servings` > remaining → `422 insufficient_servings` with the actual
+    remaining count attached; nothing is applied. Consuming exactly the remainder removes the
+    record via the same tombstoned path `removeCookedMeal()` uses when `useCookedPortion()`'s last
+    portion is taken — do not leave a zero-portion record behind.
+  - `POST /v1/ready-food/finish { cookedMealId, expectedRevision }` — removes the record regardless
+    of servings remaining, mirroring `finishCookedMeal()`.
+
+  Every write response on success: `{ ok:true, revision, <the changed record's new state> }` — the
+  brief requires enough structured post-write state for the caller to verify the result without a
+  second read.
+
+  Shared error codes (uniform envelope `{ ok:false, error:{ code, message, detail? } }`):
+  `unauthorized`, `not_found`, `ambiguous` (reserved — no v1 operation currently triggers it, but
+  the code must exist in the contract), `validation_failed`, `revision_conflict` (409, current
+  state attached), `insufficient_servings` (422), `infrastructure_error` (502/504, no secrets or
+  stack traces in the body).
+
+concurrency + idempotency (implements D-082 — do not redesign):
+  - `expectedRevision` is REQUIRED on every write, no exceptions, including `ready-food/record`.
+  - Read current doc, compare `expectedRevision` to the live `version` field AND pass
+    `currentDocument.updateTime` from that same read as a Firestore REST commit precondition, so
+    the check is atomic at the protocol level, not a separate read-then-hope race.
+  - On mismatch: `409 revision_conflict`, apply nothing, return current `revision` + current state
+    of the specific record(s) the caller asked about so it can decide whether to reread and retry.
+  - Every write PATCH uses `updateMask.fieldPaths` scoped to exactly the touched top-level field
+    (`pantry` or `cookedMeals`) plus `version` — never a whole-document overwrite. This is a hard
+    constraint, not a style preference: the service account has admin-equivalent access, and the
+    field mask is what stands between "domain operation" and "arbitrary Firestore CRUD."
+
+auth + secrets (implements D-082):
+  - Secrets via `wrangler secret put` only — `BRIDGE_API_TOKEN`, `FIREBASE_SERVICE_ACCOUNT_JSON` (or
+    split fields), `TARGET_UID`. None committed, none in `vars` (unlike `recipe-import`'s
+    `ALLOWED_ORIGINS`, which is genuinely non-secret).
+  - Worker → Firestore auth is the service-account JWT-bearer OAuth2 flow via Web Crypto (no
+    `firebase-admin` — it is not Workers-compatible). Cache the exchanged access token in module
+    scope for reuse across requests in the same isolate; do not fetch a fresh one per call.
+  - The Worker acts ONLY on `TARGET_UID` — no request field can select a different document. There
+    is no code path that accepts a caller-supplied uid or Firestore path.
+
+acceptance:
+  - [ ] All 8 operations above implemented exactly as specified (paths, request/response shapes,
+        error codes)
+  - [ ] `inventory_get` / `ready_food_get` return the same canonical data the app itself would
+        render — proven by a consistency test, not just an inspection (see below)
+  - [ ] No operation accepts an arbitrary Firestore path, collection name, or uid
+  - [ ] No secret appears in any response body, log line, or error message
+  - [ ] `create_inventory_item` is NOT implemented (out of v1 scope per D-082) — confirm no route
+        exists for it
+  - [ ] No Plan/Shop/Prep write, no recipe generation, no MCP server, no natural-language parsing
+        inside the Worker
+  - [ ] `openapi.yaml` documents all 8 operations with request/response schemas and every error
+        code above
+  - [ ] `workers/conversational-bridge/README.md` documents local setup (emulating or mocking
+        Firestore for tests — do not require a live GCP project to run the test suite) and states
+        in as many words that this is a local-only candidate, not deployed
+
+chaos test matrix (from the brief — implement all, against a mocked/local Firestore, never a real
+  production account):
+  inventory: 1) set quantity 5→12 · 2) repeat identical idempotent set · 3) mark milk out of stock
+  · 4) mark already-out milk out again (no error, `unchanged:true`) · 5) unknown ingredientId → 404
+  · 6) two records with the same display name but different ids — operate on the id given, never
+  resolve by name · 7) invalid quantity/unit → 422 · 8) stale `expectedRevision` → 409 · 9)
+  simulated concurrent app-side edit between bridge read and bridge write → 409, not a silent
+  overwrite
+  ready food: 10) record cooked food · 11) consume 1 serving · 12) consume exactly the remainder
+  (record removed) · 13) consume more than remaining → 422, nothing applied · 14) retry an
+  already-applied consume with the same `expectedRevision` → 409, not double-consumed · 15) unknown
+  `cookedMealId` → 404 · 16) finish/remove per existing semantics · 17) stale revision → 409
+  auth: 18) missing bearer token → 401 · 19) wrong token → 401 · 20) (only if a second account
+  scenario is meaningfully testable given the single-`TARGET_UID` design — otherwise state in
+  `CHANGELOG.md` why it's structurally inapplicable, don't fake a test) · 21) a payload that
+  supplies an arbitrary Firestore path/collection field → ignored/rejected, never followed · 22)
+  malformed JSON body → 400
+  failure behavior: 23) a validation error must not partially mutate state (assert via a follow-up
+  read) · 24) a failed request leaves state byte-identical to before (assert via a snapshot diff,
+  not just "no error thrown") · 25) retry semantics are deterministic — running the same chaos case
+  twice produces the same outcome both times
+
+security tests: unauthenticated read rejected · unauthenticated write rejected · malformed
+  `Authorization` header rejected · unrecognized/extra fields in a request body are ignored, never
+  applied to a protected field (over-posting) · request body size bounded · wrong `Content-Type`
+  rejected · no stack trace or secret value ever appears in a 4xx/5xx body
+
+app↔bridge consistency tests (the brief's non-negotiable "no separate bridge truth" requirement):
+  Because the Worker cannot run the actual `app.js` in a browser, prove consistency by writing the
+  SAME Firestore document shape both paths use and asserting both a bridge read and a reimplemented
+  reference read (using `docs/DATA_MODEL.md`'s documented shape, not the Worker's own code) agree.
+  At minimum: bridge write → assert the resulting Firestore document, decoded, matches exactly what
+  `_doMarkCooked()` / `correctKitchenStock()` / `useCookedPortion()` would have produced for the
+  same logical action (name every field, don't assert loosely). If a real local Firestore emulator
+  is available and can run in this sandbox, prefer it over a hand-rolled mock for this suite
+  specifically, since the whole point is proving fidelity to the real system, not to a
+  reimplementation of it — but do not block the whole task on emulator availability; if it can't
+  run here, say so explicitly and use the strongest mock you can, documented as a known gap.
+
+constraints:
+  - Do NOT deploy this Worker (no `wrangler deploy`, no real secrets set on any live Cloudflare
+    account, no live Firebase service-account key generated against the real `meal-prep-f8907`
+    project for this task — use a fake/local service-account fixture for tests)
+  - Do NOT touch `app.js`, `index.html`, `style.css`, or any existing Playwright test
+  - Do NOT modify Firestore security rules
+  - Do NOT add `create_inventory_item`, Plan/Shop/Prep writes, MCP, or any AI/LLM call inside the
+    Worker
+  - Do NOT invent a second tombstone/deletion mechanism — reimplement the D-071 explicit-tombstone
+    write for the one path that needs it (`mark-out-of-stock` on a non-staple)
+  - Do NOT use `firebase-admin` (not Workers-compatible) — Firestore REST API + Web Crypto only
+  - If any acceptance item or chaos case turns out to require a schema/migration change D-082
+    didn't anticipate, STOP and set `status: blocked` with the specific gap recorded — do not
+    improvise a new persisted field to work around it
+
+verification:
+  - [ ] `npm run test:bridge` (or equivalent, added to `package.json`) — full chaos + security +
+        consistency suite, exact pass count recorded in `TEST_REPORT.md`
+  - [ ] `node --check` (or the Worker-appropriate syntax check) on every new file
+  - [ ] `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc` —
+        config is valid, without actually deploying
+  - [ ] Existing full local Playwright suite still green (proves nothing in `app.js`/`index.html`/
+        `style.css` was touched)
+  - [ ] `tools/Verify-Decisions.ps1` and `tools/Check-DocsConsistency.ps1` both run clean or with
+        only the pre-existing baseline drift
+
+merge gate:
+  This lands at `status: review`, never `done` or `approved` on Codex's own say-so. D-032 red
+  zone (auth + new backend + Firestore writes) — Claude reviews, and even a clean PASS stays
+  `approved` (held) for explicit human sign-off, same as D-080. Separately, and regardless of the
+  code review outcome: production enablement (real secrets, a real deploy, connecting ChatGPT) is
+  explicitly OUT of scope for this task and requires its own later approval — do not fold it into
+  this task's Definition of Done.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
