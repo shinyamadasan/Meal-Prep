@@ -3022,10 +3022,10 @@ Verify: tests/mobile-layout.spec.js contains "selecting Recipes via More visibly
 
 ## D-080 — weeklyPlan clear/remove must call saveData(); it never wrote to storage on its own
 
-**Status:** Implemented on branch `task-064` (from `main` @ 27618b1). Held for independent review
-(TASK-064) — touches `saveData()` call sites, a Hard Rule/red-zone surface by topic, even though
-every change is additive (one call added per site) and no schema, tombstone, or merge-precedence
-logic changed.
+**Status:** Implemented on branch `task-064` (from `main` @ 27618b1). Independent review PASSED — see
+addendum below. Held for human merge (D-032 `approved`, not `done`) — touches `saveData()` call
+sites, a Hard Rule/red-zone surface by topic, even though every change is additive (one call added
+per site) and no schema, tombstone, or merge-precedence logic changed.
 
 ### Context
 
@@ -3098,12 +3098,35 @@ Verify: app.js contains "batch-name batch-name-btn"
 Verify: app.js contains "storage-alert-recipe-link"
 Verify: tests/plan-persistence-and-picker.spec.js contains "clearDay() persists"
 
+### Addendum — independent review (PASS), covers D-081 too (same branch, reviewed as one unit)
+
+Reviewed independently from a separate context than the implementation, against `main..task-064` —
+not a re-statement of the builder's own report. Read the full diff directly rather than trusting the
+summary: confirmed `openEditRecipeModal()`, `toggleFavorite()`, `saveData()`, and `escJ()` all exist
+at their claimed definitions and are invoked correctly; confirmed the three added `saveData()` calls
+sit in the exact position `selectRecipeForPlanning()` already uses (read side by side, not assumed
+from the report); confirmed exactly one `:root` block remains in `style.css` (Hard Rule 7 — this
+diff does not touch it).
+
+Re-ran evidence from a clean state rather than accepting the builder's numbers: `node --check app.js`
+clean; `tests/plan-persistence-and-picker.spec.js` alone — **15/15 pass**; full local suite
+(`npx playwright test --project=local`) — **711/711 pass**, 0 failed, 0 skipped. Read the three
+persistence tests' mechanism directly: each uses a genuine `page.reload()` against
+localStorage-backed state (not an in-memory re-invocation of a load function), so a pass on those
+three specifically rules out the reported resurrection bug rather than merely exercising adjacent
+code.
+
+No corrections required — nothing in this pass was returned to `status: codex`. **Verdict:
+`approved` (held), per the D-032 gate above.** This addendum changes the verdict from "held pending
+review" to "held pending merge" — it does not authorize a merge. The human still performs the actual
+merge to `main`.
+
 ## D-081 — Add-meals picker: inset spacing and a reused favorite toggle
 
-**Status:** Implemented on branch `task-064` (from `main` @ 27618b1), same branch as D-080. Held for
-independent review alongside it. Purely additive UI (spacing + reusing an existing toggle) — would
-be `done`-eligible on its own, but ships on the same branch as the red-zone D-080 fix, so the whole
-branch is reviewed and merged as one unit.
+**Status:** Implemented on branch `task-064` (from `main` @ 27618b1), same branch as D-080. Reviewed
+alongside it — PASSED (see D-080's addendum). Purely additive UI (spacing + reusing an existing
+toggle) — would be `done`-eligible on its own, but ships on the same branch as the red-zone D-080
+fix, so the whole branch is held for human merge as one unit.
 
 ### Context
 
