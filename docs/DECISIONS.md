@@ -3019,3 +3019,134 @@ break in live inspection and was explicitly out of scope for this pass.
 
 Verify: app.js contains "recipesInMore"
 Verify: tests/mobile-layout.spec.js contains "selecting Recipes via More visibly marks More as the active tab"
+
+## D-080 — weeklyPlan clear/remove must call saveData(); it never wrote to storage on its own
+
+**Status:** Implemented on branch `task-064` (from `main` @ 27618b1). Held for independent review
+(TASK-064) — touches `saveData()` call sites, a Hard Rule/red-zone surface by topic, even though
+every change is additive (one call added per site) and no schema, tombstone, or merge-precedence
+logic changed.
+
+### Context
+
+Reported in real production use: a cleared weekly/day plan came back after closing and reopening
+the app, and the freshness warning above "This week's batches" named recipes that were not in the
+visible batch list. Reproduced from the code, not guessed: `AppState.weeklyPlan` and
+`AppState.plannedBatches` are already-documented as two intentionally independent stores (D-076) —
+the warning (`renderStorageAlerts()`) reads only `weeklyPlan` (the optional, collapsed "By day"
+scheduler, D-078), while "This week's batches" reads only `plannedBatches`. That divergence is by
+design, not a bug.
+
+The actual bug: `removeRecipeFromSlot()`, `clearDay()`'s confirm callback, and
+`clearWeeklyPlan()`'s confirm callback each mutated `AppState.weeklyPlan` and called
+`renderWeeklyPlanner()`/`updateWeeklyStats()`/`generateGroceryList()`, but never `saveData()`. Every
+other `weeklyPlan` mutator already did — `selectRecipeForPlanning()`, `pasteDayInto()`,
+`deleteRecipe()`'s slot-cleanup, `planRecipeForToday()`, and `loadWeekTemplate()` all call
+`saveData()`. So a clear looked correct for the rest of that session (in-memory state and every
+render reflected it), but `localStorage`'s `mealPrepAppData` — and a signed-in user's Firestore doc
+— still held the pre-clear plan, because nothing had told them otherwise. The next load (a real
+app close/reopen, not just a re-render) restored the stale plan. No autosave-on-background/close
+path exists in this app (confirmed: no beforeunload/pagehide/save-interval listener) to paper
+over the gap. `plannedBatches` was never affected — its own mutators all funnel through
+`afterPlannedBatchesChange()`, which always calls `saveData()`.
+
+### Decision
+
+Add the missing `saveData()` call to `removeRecipeFromSlot()`, `clearDay()`, and
+`clearWeeklyPlan()`, in the same position the already-correct mutators use (after
+`renderWeeklyPlanner()`/`updateWeeklyStats()`, before `generateGroceryList()`). No new mechanism:
+`weeklyPlan` keeps its documented whole-field, local-wins, non-tombstoned persistence model
+(DATA_MODEL.md, D-076) — the model was correct; three call sites simply skipped it. Confirmed by a
+temporarily-reverted-and-restored run of the new regression suite: with the three `saveData()`
+calls removed, `tests/plan-persistence-and-picker.spec.js`'s three persistence tests fail (the
+post-reload wait times out because the clear never restores); with them present, all pass.
+
+While tracing the same code, two small additive fixes landed alongside it:
+- `renderStorageAlerts()` now carries the source recipe's own stable `id` into each warning line
+  (it already had `recipe` in scope; no name-based lookup introduced) so the warning text can link
+  to the real recipe.
+- A planned batch's recipe title (`plannedBatchRowHtml()`, "This week's batches" only — the Prep
+  tab and the picker's own rows keep their original non-interactive presentation except where noted
+  below) and the picker's own row title (`renderBatchPickerResults()`) became a `<button
+  class="batch-name-btn">` that calls `openEditRecipeModal(recipeId)` — the same recipe edit/detail
+  modal every other "click to inspect a recipe" surface in the app already uses. No second recipe
+  detail view was built. Neither addition touches `plannedBatches` or `weeklyPlan` state; both are
+  read-only navigation.
+
+### Consequences
+
+- `weeklyPlan`'s persistence contract is now honestly what DATA_MODEL.md already claimed: any
+  mutator persists through `saveData()`. No known remaining call site skips it (checked every
+  direct `AppState.weeklyPlan` write in `app.js`).
+- No migration: existing saved plans are untouched by this change; only the three previously-buggy
+  clear paths behave differently (and now match every add/paste/template-load path that already
+  worked).
+- Deferred, not addressed here: the Prep tab's own batch rows and the "Also on your day plan"
+  scheduled-meal rows still show plain recipe names, not links — out of scope; only "This week's
+  batches" and the Add-meals picker were reported as needing inspection.
+
+### D-032 gate
+
+**`approved` (held), not `done`.** All three fixed functions are `saveData()` call sites — CLAUDE.md
+names that surface by topic in its red-zone list — even though each change is additive (one line)
+and touches no tombstone, merge-precedence, or Firestore-shape logic.
+
+Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the removed recipe"
+Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the cleared day"
+Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the old weekly plan"
+Verify: app.js contains "batch-name batch-name-btn"
+Verify: app.js contains "storage-alert-recipe-link"
+Verify: tests/plan-persistence-and-picker.spec.js contains "clearDay() persists"
+
+## D-081 — Add-meals picker: inset spacing and a reused favorite toggle
+
+**Status:** Implemented on branch `task-064` (from `main` @ 27618b1), same branch as D-080. Held for
+independent review alongside it. Purely additive UI (spacing + reusing an existing toggle) — would
+be `done`-eligible on its own, but ships on the same branch as the red-zone D-080 fix, so the whole
+branch is reviewed and merged as one unit.
+
+### Context
+
+Two more real-usage findings on the mobile "+ Add meals" picker (`#batch-picker-modal`): its search
+row and results list sat flush against the modal's edges, and recipes had no favorite control in
+the picker even though `docs/DATA_MODEL.md` already documents a `Recipe.favorite` field.
+
+Traced before changing anything: `.modal-content` (both definitions in `style.css`) carries no
+padding of its own — every other modal's content is wrapped in a `.modal-body` (`padding:
+var(--space-16)`), but `#batch-picker-modal`'s `.batch-search-row` and `#batch-picker-results` sit
+directly inside `.modal-content--lg` with no such wrapper, so they rendered edge-to-edge. Separately,
+`favorite` is a fully-wired, authoritative mechanism, not display-only: `toggleFavorite(recipeId)`
+sets `recipe.favorite = !recipe.favorite` on the actual `AppState.recipes` record, calls
+`saveData()`, and the Recipes tab already renders it as a heart toggle (`.recipe-fav-btn`,
+`recipe-card` header) filterable via `#favorites-filter`. It syncs and tombstones exactly like any
+other recipe field, because it lives on the recipe document itself.
+
+### Decision
+
+1. Give `.batch-search-row` and `#batch-picker-results` the same 16px (`var(--space-16)`)
+   horizontal inset `.modal-header` already uses, plus a matching inset on this modal's own
+   `.modal-footer` (scoped to `#batch-picker-modal` only — no other modal's footer changed). No new
+   wrapper element; existing design tokens, not a hardcoded pixel value tuned to one screenshot.
+2. Reuse `toggleFavorite()`/`.recipe-fav-btn` exactly in `renderBatchPickerResults()` — same
+   function, same class, same ♥ glyph and active-state color — rather than a new star icon or a new
+   persistence path. Widened its hit target and re-centered it only inside
+   `#batch-picker-results` (`.recipe-fav-btn`'s `align-self: flex-start` is tuned for the Recipes
+   card header, not this row).
+3. Added an optional "★ Favorites" chip next to "Low effort", off by default, composing with Low
+   effort by simple AND (`getBatchSearchResults()` gained a `favoritesOnly` parameter, appended
+   *after* the existing `(query, lowEffort, limit)` signature rather than inserted before it, so
+   the existing positional test call in `tests/meal-prep-first.spec.js` needed no change).
+4. Recipe title, favorite star, and +Add/Added are three separate `<button>`s in the row (no row-
+   level `onclick`), so none of the three taps can be ambiguous with another.
+
+### Consequences
+
+- No new persisted field, no new AppState collection, no import/export change: `favorite` already
+  round-trips through the recipe object exactly as before.
+- Verified no horizontal overflow and a 12–16px inset at 360px, 390px, and 1280px
+  (`tests/plan-persistence-and-picker.spec.js`).
+
+Verify: app.js contains "var batchSearchFavoritesOnly = false;"
+Verify: app.js contains "function getBatchSearchResults(query, lowEffort, limit, favoritesOnly)"
+Verify: index.html contains "batch-picker-favorites-chip"
+Verify: style.css contains "#batch-picker-modal .modal-footer"

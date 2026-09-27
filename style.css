@@ -3656,6 +3656,17 @@ select.form-control {
   padding: 0;
 }
 .storage-alert-list li { margin: 0.2rem 0; }
+.storage-alert-recipe-link {
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.storage-alert-recipe-link:hover, .storage-alert-recipe-link:focus-visible { color: #7a3a00; }
 .meal-slot.expiry-warning {
   border-color: #f59e0b !important;
   background: #fffbeb !important;
@@ -7560,8 +7571,15 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .plan-by-day-title { font-size: 1rem; margin: 0.5rem 0 0.75rem; cursor: pointer; list-style: revert; }
 .batch-list--picker { max-height: 55vh; overflow-y: auto; }
 .batch-picker-added { flex-shrink: 0; font-size: 0.82rem; color: var(--color-text-secondary); font-weight: 600; }
-.batch-search-row { display: flex; gap: 0.5rem; align-items: center; }
-.batch-search-row .form-control { flex: 1; min-width: 0; }
+/* TASK-064: .modal-content has no padding of its own (only .modal-header/.modal-footer
+   pad themselves) and this modal's search row + results list aren't wrapped in a
+   .modal-body, so they rendered flush against the modal edges. Match the header's own
+   16px horizontal inset so the search field, Low effort chip, recipe rows and their
+   Add/Added controls all line up with the title/close button above them. */
+.batch-search-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; padding: 0 var(--space-16); }
+.batch-search-row .form-control { flex: 1 1 140px; min-width: 140px; }
+#batch-picker-results.batch-list--picker { padding: 0 var(--space-16); }
+#batch-picker-modal .modal-footer { padding: 0 var(--space-16) var(--space-16); }
 .batch-chip {
   flex-shrink: 0;
   min-height: 36px;
@@ -7586,9 +7604,39 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .batch-result:last-child, .batch-row:last-child { border-bottom: none; }
 .batch-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* TASK-064: the picker's own favorite toggle reuses .recipe-fav-btn's icon/color/active
+   state exactly, but that class's align-self:flex-start (tuned for the Recipes-tab card
+   header) sits high against this row's centered layout, and its glyph-only hit area is
+   too small on phone. Widen the target and re-center only in this list. */
+#batch-picker-results .recipe-fav-btn {
+  align-self: center;
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 1.3rem;
+}
 .batch-name { font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
 .batch-meta { font-size: 0.78rem; color: var(--color-text-secondary); }
 .batch-add-btn, .batch-done-btn { flex-shrink: 0; min-height: 36px; }
+/* TASK-064: recipe title on a planned batch row is its own tap target — inspects the
+   recipe via the existing edit modal without touching servings/remove. The negative
+   margin cancels the padding's effect on row spacing while keeping a larger hit area. */
+.batch-name-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text);
+  padding: 0.3rem 0;
+  margin: -0.3rem 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 2px;
+}
+.batch-name-btn:hover, .batch-name-btn:focus-visible { color: var(--color-primary); }
 .batch-stepper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .batch-step-btn, .batch-remove-btn {
   width: 36px;

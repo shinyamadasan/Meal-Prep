@@ -5729,7 +5729,9 @@ function renderStorageAlerts() {
     const check = id => {
       const recipe = AppState.recipes.find(r => String(r.id) === String(id));
       if (recipe && willExpire(recipe, day)) {
-        issues.push(`<strong>${recipe.name}</strong> — planned ${day}, but only lasts ${recipe.fridgeLife}d`);
+        // Carries the same stable recipeId the source plan slot stores — deterministic,
+        // never a display-name lookup — so the warning can link to the real recipe (TASK-064).
+        issues.push({ recipeId: String(recipe.id), name: recipe.name, day, fridgeLife: recipe.fridgeLife });
       }
     };
     ['breakfast', 'lunch', 'dinner'].forEach(meal => { if (plan[meal]) check(plan[meal]); });
@@ -5744,7 +5746,9 @@ function renderStorageAlerts() {
   el.innerHTML = `
     <div class="storage-alert-banner">
       ${icon('triangle-alert')} <strong>${issues.length} recipe${issues.length > 1 ? 's' : ''} may not stay fresh until their planned day</strong>
-      <ul class="storage-alert-list">${issues.map(i => `<li>${i}</li>`).join('')}</ul>
+      <ul class="storage-alert-list">${issues.map(i =>
+        `<li><button type="button" class="storage-alert-recipe-link" onclick="openEditRecipeModal('${escJ(i.recipeId)}')">${i.name}</button> — planned ${i.day}, but only lasts ${i.fridgeLife}d</li>`
+      ).join('')}</ul>
     </div>`;
 }
 
@@ -5757,6 +5761,7 @@ function removeRecipeFromSlot(day, meal) {
   
   renderWeeklyPlanner();
   updateWeeklyStats();
+  saveData(); // TASK-064: this clear must persist, or a reload resurrects the removed recipe
   generateGroceryList();
   showSuccessMessage('Recipe removed!');
 }
@@ -5777,6 +5782,7 @@ function clearDay(day) {
       AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
       renderWeeklyPlanner();
       updateWeeklyStats();
+      saveData(); // TASK-064: this clear must persist, or a reload resurrects the cleared day
       generateGroceryList();
       showSuccessMessage(`${day} cleared!`);
     }
@@ -5978,6 +5984,7 @@ function clearWeeklyPlan() {
       });
       renderWeeklyPlanner();
       updateWeeklyStats();
+      saveData(); // TASK-064: this clear must persist, or a reload resurrects the old weekly plan
       generateGroceryList();
     }
   );
@@ -10067,12 +10074,18 @@ window.completePlannedBatch = completePlannedBatch;
 // are discoverable by default; Low effort is an optional filter, never the default
 // universe (see the Batch Picker modal below).
 var batchSearchLowEffort = false;
+// TASK-064: Favorites is a second optional filter, off by default, composing with Low
+// effort by simple AND — reuses the existing recipe.favorite truth, no new state.
+var batchSearchFavoritesOnly = false;
 
-function getBatchSearchResults(query, lowEffort, limit) {
+// favoritesOnly is appended after the original (query, lowEffort, limit) signature,
+// not inserted before it, so existing positional callers (incl. tests) are unaffected.
+function getBatchSearchResults(query, lowEffort, limit, favoritesOnly) {
   var q = String(query || '').trim().toLowerCase();
   return (AppState.recipes || []).filter(function(r) {
     if (q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
     if (lowEffort && recipeEffortScore(r) > 2) return false;
+    if (favoritesOnly && !r.favorite) return false;
     return true;
   }).sort(function(a, b) {
     return (recipeEffortScore(a) - recipeEffortScore(b)) ||
@@ -10107,6 +10120,12 @@ function toggleBatchPickerLowEffort() {
 }
 window.toggleBatchPickerLowEffort = toggleBatchPickerLowEffort;
 
+function toggleBatchPickerFavorites() {
+  batchSearchFavoritesOnly = !batchSearchFavoritesOnly;
+  renderBatchPickerResults();
+}
+window.toggleBatchPickerFavorites = toggleBatchPickerFavorites;
+
 function renderBatchPickerResults() {
   var el = document.getElementById('batch-picker-results');
   if (!el) return;
@@ -10115,12 +10134,20 @@ function renderBatchPickerResults() {
     chip.classList.toggle('active', batchSearchLowEffort);
     chip.setAttribute('aria-pressed', String(batchSearchLowEffort));
   }
+  var favChip = document.getElementById('batch-picker-favorites-chip');
+  if (favChip) {
+    favChip.classList.toggle('active', batchSearchFavoritesOnly);
+    favChip.setAttribute('aria-pressed', String(batchSearchFavoritesOnly));
+  }
   var input = document.getElementById('batch-picker-search');
   var planned = {};
   normalizePlannedBatches(AppState.plannedBatches).forEach(function(b) { planned[b.recipeId] = true; });
-  var results = getBatchSearchResults(input ? input.value : '', batchSearchLowEffort, 500);
+  var results = getBatchSearchResults(input ? input.value : '', batchSearchLowEffort, 500, batchSearchFavoritesOnly);
   if (!results.length) {
-    el.innerHTML = '<div class="batch-empty">No matching recipes' + (batchSearchLowEffort ? ' at low effort — tap <b>Low effort</b> to see all' : '') + '.</div>';
+    var hints = [];
+    if (batchSearchLowEffort) hints.push('at low effort');
+    if (batchSearchFavoritesOnly) hints.push('in favorites');
+    el.innerHTML = '<div class="batch-empty">No matching recipes' + (hints.length ? ' ' + hints.join(' or ') + ' — clear a filter to see all' : '') + '.</div>';
     return;
   }
   el.innerHTML = results.map(function(r) {
@@ -10136,9 +10163,15 @@ function renderBatchPickerResults() {
     var addBtn = alreadyPlanned
       ? '<span class="batch-picker-added">Added ✓</span>'
       : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
+    // Three distinct controls, none of which mutate another: title inspects (reuses the
+    // same recipe edit/detail modal as the Plan tab's batch list), the heart reuses the
+    // existing Recipes-tab favorite toggle exactly, and +Add/Added is unchanged (TASK-064).
+    var nameBtn = '<button type="button" class="batch-name batch-name-btn" onclick="openEditRecipeModal(\'' + escJ(String(r.id)) + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
+    var favBtn = '<button type="button" class="recipe-fav-btn' + (r.favorite ? ' active' : '') + '" onclick="toggleFavorite(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()" title="' + (r.favorite ? 'Remove from favorites' : 'Add to favorites') + '" aria-label="' + (r.favorite ? 'Remove ' + escapeHtml(r.name) + ' from favorites' : 'Add ' + escapeHtml(r.name) + ' to favorites') + '">♥</button>';
     return '<div class="batch-result">' +
-      '<div class="batch-info"><span class="batch-name">' + escapeHtml(r.name) + '</span>' +
+      '<div class="batch-info">' + nameBtn +
       (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
+      favBtn +
       addBtn +
       '</div>';
   }).join('');
@@ -10163,8 +10196,14 @@ function plannedBatchRowHtml(b, mode) {
       '</div>' +
       '<button type="button" class="batch-remove-btn" aria-label="Remove ' + escapeHtml(name) + '" onclick="removePlannedBatch(\'' + idArg + '\')">×</button>';
   }
+  // Recipe title is inspectable only on the Plan tab's own batch list, and only when
+  // the recipe still exists — reuses the existing edit/detail modal by stable recipeId,
+  // never a display-name lookup (TASK-064). Prep tab and picker rows are unchanged.
+  var nameHtml = (mode !== 'prep' && recipe)
+    ? '<button type="button" class="batch-name batch-name-btn" onclick="openEditRecipeModal(\'' + escJ(String(recipe.id)) + '\')" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
+    : '<span class="batch-name">' + escapeHtml(name) + '</span>';
   return '<div class="batch-row" data-batch-id="' + escapeHtml(b.id) + '">' +
-    '<div class="batch-info"><span class="batch-name">' + escapeHtml(name) + '</span>' +
+    '<div class="batch-info">' + nameHtml +
     '<span class="batch-meta">' + escapeHtml(servingsText) + '</span></div>' +
     controls + '</div>';
 }
