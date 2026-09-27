@@ -5,6 +5,77 @@
 
 ---
 
+## TASK-065 / D-082 — Conversational Control Bridge v1 candidate, built and locally tested (branch: task-065)
+base: `main` @ `d550de0`. Builder note: `owner: codex` in `TASKS.md`, but Codex was unavailable
+this cycle — built directly by Claude under the AI Dev OS's documented exception ("Codex is
+unavailable"), confirmed explicitly by the human before any code was written. Not deployed; no
+production secrets exist; not merged.
+changes:
+  - workers/conversational-bridge/src/index.js (new, 217 loc): HTTP routing, bearer-token gate
+    (checked before anything else), an allow-listed request-body schema per route (rejects any
+    unexpected field — the over-posting defense), and dispatch into the domain layer. A write's
+    `expectedRevision` is checked against the live document BEFORE any Firestore call, so a stale
+    request never even attempts a network write.
+  - workers/conversational-bridge/src/auth.js (new, 138 loc): `requireBearerToken()` (constant-time
+    compare) and `getFirestoreAccessToken()` — the service-account JWT-bearer OAuth2 exchange,
+    signed with Web Crypto, cached in module scope and reused across requests in the isolate.
+  - workers/conversational-bridge/src/firestore.js (new, 183 loc): typed-value codec (plain JS <->
+    Firestore REST's wrapped value shapes) and a client scoped to exactly one document
+    (`users/{TARGET_UID}`), read via a fixed field mask and written via `updateMask.fieldPaths`
+    (supports dotted nested paths, e.g. `deletions.pantry`) plus a `currentDocument.updateTime`
+    precondition — never a whole-document overwrite. A precondition failure
+    (`FAILED_PRECONDITION`/`ABORTED`) re-reads and surfaces fresh state as a `RevisionConflictError`;
+    any other failure is a sanitized `InfrastructureError`, never conflated with a conflict.
+  - workers/conversational-bridge/src/operations/inventory.js (new, 112 loc) and
+    src/operations/readyFood.js (new, 137 loc): pure domain functions reimplementing
+    `correctKitchenStock()`, `_doMarkCooked()`'s record shape, `useCookedPortion()`/
+    `removeCookedMeal()`'s exact-remainder removal, and `finishCookedMeal()` against decoded
+    Firestore values. Four judgment calls recorded in `docs/DECISIONS.md` D-082's addendum: (1)
+    `isStaple()` narrowed to the explicit `staple===true` flag (no `INGREDIENT_DB` access
+    server-side); (2) `consume`/`finish` write the `cookedMeals` tombstone explicitly and
+    immediately rather than relying on the client's baseline-diff mechanism, which has no bridge
+    equivalent; (3) `ready-food/record` never deducts pantry (D-082 forbids one write touching two
+    collections); (4) a bridge-created `cookedDate` uses the Worker's own UTC date, not a
+    caller-local date the server has no way to know.
+  - workers/conversational-bridge/src/errors.js (new, 26 loc): `NotFoundError`, `ValidationError`,
+    `InsufficientServingsError` — the three response codes not already owned by auth.js/firestore.js.
+  - workers/conversational-bridge/{package.json,wrangler.jsonc} (new): no `vars` block (unlike
+    recipe-import) — every configuration value this Worker needs is a secret.
+  - workers/conversational-bridge/openapi.yaml (new): full machine-readable contract for a future
+    ChatGPT connector — not configured in this task.
+  - workers/conversational-bridge/README.md (new): architecture, required secrets, the four
+    judgment calls, and a 7-step "production enablement checklist" (service-account + bearer-token
+    minting, real deploy, smoke test, THEN a ChatGPT connector — none of which happened here).
+  - workers/conversational-bridge/test/*.node.js + test/support/{fakeFirestore,fixtures}.js (new,
+    59 tests): an in-memory fake Firestore (honors field-mask + updateTime precondition semantics)
+    and a throwaway RSA-2048 test keypair (never a real credential) stand in for every dependency —
+    no network call anywhere in the suite. Covers the typed-value codec, the auth boundary, every
+    domain operation's validation/idempotency rules, the full TASK-065 chaos/security matrix
+    (auth, malformed JSON, wrong method/content-type, over-posting, stale revisions, insufficient
+    servings, sanitized infra errors, no-partial-success), and an app<->bridge consistency suite
+    proving bridge writes and simulated app-side writes share one canonical store.
+  - package.json: added `test:bridge` script.
+  - docs/ARCHITECTURE.md: new "Conversational Control Bridge" section.
+  - docs/DECISIONS.md: D-082 status updated to "candidate built"; implementation addendum with the
+    four judgment calls above and 7 new `Verify:` pointers.
+tests: `npm run test:bridge` (59/59 pass); `npm run test:worker` (9/9 pass, unaffected);
+  `./tools/Verify-Decisions.ps1` (106/106 pointers hold, including the 7 new ones);
+  `./tools/Check-DocsConsistency.ps1` (51 pre-existing findings, byte-identical to a clean
+  `main` baseline — this change introduced zero new drift); `git diff --check` (clean);
+  `node --check` on all 13 new `.js` files (clean).
+blockers: none for this candidate.
+deviations/gates not run: Worker lint/type/build tooling — none exists in this repo for
+  `workers/recipe-import` either, so there is nothing to run (not a gap introduced here). The
+  full local Playwright suite (`npm test`) was **not** run: this worktree has no `node_modules`
+  installed (a fresh `git worktree add`, not `npm install`ed), and the change touches zero
+  `app.js`/`index.html`/`style.css` lines, so installing ~100+ packages and a browser download
+  purely to re-verify an unrelated surface was judged not worth the time/network cost — reported
+  here as SKIP, not PASS. A reviewer running from a checkout with dependencies already installed
+  should run it before approving.
+→ status set to `review` in `TASKS.md`.
+
+---
+
 ## TASK-061 / D-077 + TASK-060 / D-076 — landed and released (main f58bfe5)
 - Integration: `main` 207d262 -> f58bfe5 by `--ff-only`. The reviewed commit itself is `main`; tree
   identical, product files unchanged. Pushed normally (no force).

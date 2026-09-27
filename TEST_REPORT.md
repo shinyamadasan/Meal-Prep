@@ -5,6 +5,51 @@
 
 ---
 
+## TASK-065 / D-082 Conversational Control Bridge v1 candidate · 2026-09-27
+suite: `node --test workers/conversational-bridge/test/*.node.js` (via `npm run test:bridge`), all
+  against an in-memory fake Firestore (`test/support/fakeFirestore.js`) and a throwaway RSA-2048
+  test keypair — zero network calls, zero real credentials, zero production data touched.
+result:
+  - 59/59 pass (`firestore.node.js` 9, `auth.node.js` 7, `operations.node.js` 18 pantry/ready-food
+    domain tests, `security.node.js` 21 chaos/security-matrix tests, `consistency.node.js` 5
+    app<->bridge consistency tests). 0 failed, 0 skipped.
+  - Security/chaos matrix, all present and passing: missing/wrong/valid bearer; over-posted
+    uid/path field rejected; no route accepts a Firestore path; inventory read/set-quantity/
+    idempotent-repeat/mark-out-of-stock-already-out(unchanged:true)/unknown-id-404/invalid-
+    quantity-422/stale-revision-409-with-no-partial-write; ready-food read/record/consume-
+    partial/consume-exact-remainder(tombstoned)/over-consume-422-with-remaining-count/unknown-id-
+    404/finish/stale-revision-409/replayed-stale-revision-cannot-double-apply; malformed JSON;
+    wrong method (405); wrong content-type; missing required field; infrastructure error
+    sanitized (no stack trace or secret text in the response body, asserted directly); a failed
+    Firestore write reports `ok:false`, never a partial success.
+  - App<->bridge consistency: a bridge pantry write is visible to a raw store read (simulated
+    app-side hydration); a simulated app-side pantry mutation is visible to the next bridge read;
+    a bridge `ready-food/record` write is visible in the store's `cookedMeals`; a simulated
+    app-side consume/remove is visible to the next bridge read; bridge writes and simulated
+    app-side writes advance the same `version` counter interchangeably.
+  - `npm run test:worker` (existing recipe-import suite, unaffected by this change): 9/9 pass.
+  - `./tools/Verify-Decisions.ps1`: 106/106 pointers hold (99 pre-existing + 7 new D-082 addendum
+    pointers).
+  - `./tools/Check-DocsConsistency.ps1`: 51 findings, byte-identical output diffed against a clean
+    `main` baseline (`diff` reported no difference) — this change introduced zero new drift; the
+    51 are pre-existing and out of this task's scope (the checker only scans
+    app.js/index.html/style.css, not `workers/`).
+  - `git diff --check` (staged): clean, 0 whitespace errors.
+  - `node --check` on all 13 new `.js` files: clean.
+not run (reported as SKIP, not PASS):
+  - Worker lint/type/build tooling: none exists in this repo (not even for `workers/recipe-import`,
+    the only precedent) — nothing to run.
+  - `npm test` (full local Playwright suite): this worktree has no `node_modules` installed (fresh
+    `git worktree add`, no `npm install` run). The change touches zero `app.js`/`index.html`/
+    `style.css` lines, so a ~100+ package install plus a browser download to re-verify a wholly
+    separate surface was judged not worth the cost here. A reviewer with dependencies already
+    installed should run `npm test` before approving, per the standard gate.
+  - A real Cloudflare Worker deploy / `wrangler` dry run: `wrangler` is not an installed dependency
+    in this repo (recipe-import's README also assumes an ad hoc `npx wrangler`) and TASK-065
+    explicitly forbids any deployment in this phase regardless.
+
+---
+
 ## TASK-061 / D-077 landing + TASK-060 release gate · 2026-09-26
 suite: on fast-forwarded `main` f58bfe5 before pushing, `npm test`, `node --check` (config, server, new
   spec), `git diff --check 207d262 HEAD`, `Verify-Decisions.ps1`. After pushing, the push-triggered

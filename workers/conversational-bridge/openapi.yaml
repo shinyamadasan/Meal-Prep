@@ -1,0 +1,246 @@
+openapi: 3.1.0
+info:
+  title: Meal Prep Conversational Control Bridge
+  version: "1.0.0"
+  description: >
+    Read/write access to a single user's canonical pantry (raw inventory) and cookedMeals
+    (ready-to-eat food) state, for a narrow, authenticated external caller such as a ChatGPT
+    connector. Not a general Firestore proxy: every operation below is a fixed domain command.
+    See docs/DECISIONS.md D-082 for the full architecture and docs/DATA_MODEL.md for the
+    underlying record shapes this contract reimplements.
+servers:
+  - url: https://REPLACE-WITH-DEPLOYED-WORKER-URL.workers.dev
+    description: Set after a real deploy (see README.md "Production enablement checklist"). Not live yet.
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Static token minted by the operator (BRIDGE_API_TOKEN). Never expires automatically; rotate by re-running `wrangler secret put`.
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [unauthorized, not_found, ambiguous, validation_failed, revision_conflict, insufficient_servings, infrastructure_error]
+            message: { type: string }
+            detail: { type: object, additionalProperties: true, description: "Present for revision_conflict (current state) and insufficient_servings (remaining count)." }
+    InventoryItem:
+      type: object
+      properties:
+        ingredientId: { type: string }
+        name: { type: string, nullable: true }
+        quantity: { type: number, nullable: true }
+        unit: { type: string, nullable: true }
+        inStock: { type: boolean, description: "Derived, never stored: non-staple presence = true; staple = stockLevel !== 'empty'." }
+        staple: { type: boolean }
+        stockLevel: { type: string, nullable: true, enum: [full, ok, low, empty, null] }
+        storage: { type: string, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    ReadyFoodItem:
+      type: object
+      properties:
+        cookedMealId: { type: string }
+        recipeId: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        servingsRemaining: { type: integer, nullable: true, description: "null when trackedPortions is false (an untracked batch)." }
+        trackedPortions: { type: boolean }
+        storage: { type: string, enum: [fridge, freezer] }
+        cookedDate: { type: string, format: date, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    WriteResult:
+      type: object
+      required: [ok, revision, item, unchanged, removed]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        revision: { type: integer, description: "The new authoritative revision after this write. Use it as the next call's expectedRevision." }
+        item: { oneOf: [{ $ref: '#/components/schemas/InventoryItem' }, { $ref: '#/components/schemas/ReadyFoodItem' }, { type: 'null' }] }
+        unchanged: { type: boolean, description: "true when the request was already satisfied (e.g. already out of stock) and nothing was written." }
+        removed: { type: boolean, description: "true when this write deleted the record (item is null in that case)." }
+  responses:
+    Unauthorized: { description: Missing or invalid bearer token., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    NotFound: { description: Unknown stable id., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    ValidationFailed: { description: Request failed validation (missing/invalid/unexpected field)., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    RevisionConflict: { description: "expectedRevision did not match the live document. Reread and retry with the attached current state.", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    InfrastructureError: { description: A downstream service (Firestore) failed. Safe to retry., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+paths:
+  /v1/inventory:
+    get:
+      operationId: getInventory
+      summary: Read all pantry (raw inventory) items.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  revision: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/InventoryItem' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/inventory/set-quantity:
+    post:
+      operationId: setInventoryQuantity
+      summary: Absolute-set the quantity of an EXISTING pantry record. Idempotent by construction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ingredientId, quantity, expectedRevision]
+              additionalProperties: false
+              properties:
+                ingredientId: { type: string, description: "Stable pantry record id — never match by display name." }
+                quantity: { type: number, minimum: 0 }
+                unit: { type: string, maxLength: 40 }
+                expectedRevision: { type: integer, minimum: 0, description: "The revision this write is conditioned on — from the last read." }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '502': { $ref: '#/components/responses/InfrastructureError' }
+  /v1/inventory/mark-out-of-stock:
+    post:
+      operationId: markInventoryOutOfStock
+      summary: >
+        Staple -> stockLevel 'empty'. Non-staple -> removed with an explicit tombstone.
+        Already-out/already-removed returns 200 { unchanged: true }, not an error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ingredientId, expectedRevision]
+              additionalProperties: false
+              properties:
+                ingredientId: { type: string }
+                expectedRevision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '502': { $ref: '#/components/responses/InfrastructureError' }
+  /v1/inventory/mark-in-stock:
+    post:
+      operationId: markInventoryInStock
+      summary: Staples only — stockLevel -> 'full'. Targeting a non-staple is a validation error (its presence already means in stock).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ingredientId, expectedRevision]
+              additionalProperties: false
+              properties:
+                ingredientId: { type: string }
+                expectedRevision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '502': { $ref: '#/components/responses/InfrastructureError' }
+  /v1/ready-food:
+    get:
+      operationId: getReadyFood
+      summary: Read all ready-to-eat cooked-meal batches.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  revision: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/ReadyFoodItem' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/ready-food/record:
+    post:
+      operationId: recordCookedFood
+      summary: Record a new tracked cooked-food batch. Does NOT deduct pantry ingredients (a single write never touches both collections — D-082).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, servings, storage, expectedRevision]
+              additionalProperties: false
+              properties:
+                name: { type: string, maxLength: 200 }
+                recipeId: { type: string, description: "Optional — the source recipe's stable id, if any." }
+                servings: { type: integer, minimum: 1, maximum: 99 }
+                storage: { type: string, enum: [fridge, freezer] }
+                expectedRevision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '502': { $ref: '#/components/responses/InfrastructureError' }
+  /v1/ready-food/consume:
+    post:
+      operationId: consumeReadyFoodPortions
+      summary: Decrement portionsRemaining. Consuming the exact remainder removes the record (with a tombstone) instead of leaving a zero-portion row.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cookedMealId, servings, expectedRevision]
+              additionalProperties: false
+              properties:
+                cookedMealId: { type: string }
+                servings: { type: integer, minimum: 1, maximum: 99 }
+                expectedRevision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '422':
+          description: "validation_failed (untracked batch, or invalid servings) OR insufficient_servings (attached remaining count)."
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+        '502': { $ref: '#/components/responses/InfrastructureError' }
+  /v1/ready-food/finish:
+    post:
+      operationId: finishCookedFood
+      summary: Remove a cooked-food batch regardless of servings remaining.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cookedMealId, expectedRevision]
+              additionalProperties: false
+              properties:
+                cookedMealId: { type: string }
+                expectedRevision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/WriteResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RevisionConflict' }
+        '502': { $ref: '#/components/responses/InfrastructureError' }

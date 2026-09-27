@@ -3222,10 +3222,11 @@ Verify: style.css contains "#batch-picker-modal .modal-footer"
 
 ## D-082 — Conversational Control Bridge v1: a single-account Cloudflare Worker, not Cloud Functions, not raw Firestore CRUD
 
-**Status:** Architecture approved by the human (2026-09-27). Implementation not started — this
-decision exists to give Codex a concrete, non-inferred spec for TASK-065. This entry will be
-updated (or superseded) once a candidate lands and is reviewed; no `Verify:` lines yet because
-nothing has been built.
+**Status:** Architecture approved by the human (2026-09-27). A local, tested candidate landed the
+same day on branch `task-065` (built by Claude directly, under the AI Dev OS's documented
+"Codex unavailable" exception to its usual Codex-builds default — see `TASKS.md` TASK-065 and
+`CHANGELOG.md` for the full implementation record). Not deployed; no production secrets exist.
+Pending independent review — see "Implementation addendum" below for what a reviewer should check.
 
 ### Context
 
@@ -3347,3 +3348,41 @@ credential.
 Supersedes: nothing. Extends the platform choice `workers/recipe-import` already established;
 does not revisit or reverse D-058's caution about scheduled/always-on backends, because this
 bridge is not one.
+
+### Implementation addendum (2026-09-27, TASK-065 candidate)
+
+Four mechanical-detail judgment calls the original decision didn't specify, recorded here per
+TASK-065's "use judgment consistent with its stated reasoning and note the choice" instruction —
+none of them change the architecture above, and none required a STOP:
+
+1. **`isStaple()` is `pantry.staple === true` only, server-side.** The bridge has no
+   `INGREDIENT_DB`/`PANTRY_KNOWLEDGE` to run the client's name/category inference fallback
+   against, so it uses the explicit flag alone. A record the app would infer as staple but that
+   lacks the explicit flag behaves as a plain non-staple through the bridge until the app itself
+   stamps it. Safe narrowing, not a data-loss risk.
+2. **`consume`'s exact-remainder path and `finish` write the `cookedMeals` tombstone explicitly
+   and immediately**, rather than relying on `removeCookedMeal()`'s own behavior (which is just an
+   array filter — the client's tombstone is written later, by `recordLocalDeletions()`'s baseline
+   diff across the NEXT `saveToFirestore()` call, a mechanism with no bridge equivalent since each
+   Worker request is stateless). This preserves D-071's actual cross-device invariant rather than
+   the specific code path that happens to produce it client-side — the same treatment TASK-065
+   already specifies explicitly for pantry's mark-out-of-stock.
+3. **`ready-food/record` never deducts pantry ingredients**, unlike `_doMarkCooked()` client-side.
+   Deducting would require one write to touch both `pantry` and `cookedMeals`, which decision
+   point 4 above forbids. Recorded as an intentional scope narrowing.
+4. **A bridge-created cooked-food record's `cookedDate` uses the Worker's own UTC calendar date**,
+   not the caller's local date — a stateless server has no caller-timezone concept to borrow. A
+   record created within a few hours of the caller's local midnight may land on the adjacent
+   calendar day versus what the app itself would stamp. Accepted rather than plumbing a
+   caller-supplied timezone through the operation contract, which TASK-065 does not ask for.
+
+Full reasoning for each: `workers/conversational-bridge/README.md` "Known, recorded judgment
+calls."
+
+Verify: workers/conversational-bridge/src/index.js contains "requireBearerToken(request, env);"
+Verify: workers/conversational-bridge/src/auth.js contains "export function constantTimeEqual"
+Verify: workers/conversational-bridge/src/firestore.js contains "currentDocument.updateTime"
+Verify: workers/conversational-bridge/src/operations/inventory.js contains "isStapleRecord(p) {"
+Verify: workers/conversational-bridge/src/operations/readyFood.js contains "TOMBSTONE NOTE (D-071)"
+Verify: workers/conversational-bridge/README.md contains "Production enablement checklist"
+Verify: package.json contains "test:bridge"

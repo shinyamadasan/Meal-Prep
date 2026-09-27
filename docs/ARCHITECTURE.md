@@ -269,6 +269,17 @@ FoodData Central API with `DEMO_KEY` (D-007).
 `attachIngredientAutocomplete(inputEl)` wires any text input (recipe form AND pantry input) to
 `INGREDIENT_DB`, showing name, unit, category, price, and store.
 
+## Conversational Control Bridge (`workers/conversational-bridge/`, TASK-065, D-082)
+A second, independently-scoped Cloudflare Worker (the app's static-hosting/recipe-import platform
+already established) that lets an authenticated external caller — a bearer token, never a Firebase
+user session — read and write the same canonical `pantry`/`cookedMeals` Firestore fields the app
+itself uses, via a fixed set of domain operations (never raw Firestore CRUD, never a caller-chosen
+document path or uid). It reimplements the concurrency guard (`version` + `currentDocument.
+updateTime`) and the invariants `correctKitchenStock()` / `_doMarkCooked()` / `useCookedPortion()`
+/ `finishCookedMeal()` enforce client-side, against a Firestore REST client instead of `AppState`.
+Local build/test only as of this entry — see `workers/conversational-bridge/README.md`'s
+"Production enablement checklist" for what must happen before it is reachable by anything real.
+
 ## Safety / cross-cutting
 - All user strings pass `escapeHtml()` before `innerHTML`.
 - Global error handler: `window.addEventListener('error', …)` shows a dismissable banner.

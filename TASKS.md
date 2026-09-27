@@ -4457,8 +4457,13 @@ open items (recorded, deliberately NOT fixed):
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-065 · Conversational Control Bridge v1 — read/write pantry + ready-food via a new authenticated Cloudflare Worker
-status: todo → codex
-owner: codex
+status: review
+owner: codex (built by Claude this cycle — Codex was unavailable; confirmed explicitly by the
+  human before implementation started, per the AI Dev OS's documented exception. See CHANGELOG.md
+  and D-082's implementation addendum for the full builder-identity note.)
+branch task-065 is at candidate stage: locally built and tested only, not merged, not deployed, no
+  production secrets exist. Needs a fresh Reviewer pass (Claude, a NEW session per the human's
+  "START NEW REVIEWER" instruction — the builder must not self-approve).
 source: direct owner brief ("Conversational Control Bridge v1"). Not from `planning/BUILD_QUEUE.md`.
   Architecture decided with Claude in chat 2026-09-27 after Phase 0 discovery — see D-082 for the
   full reasoning; this task is D-082's implementation.
