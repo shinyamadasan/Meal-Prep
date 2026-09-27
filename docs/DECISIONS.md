@@ -3121,6 +3121,52 @@ No corrections required — nothing in this pass was returned to `status: codex`
 review" to "held pending merge" — it does not authorize a merge. The human still performs the actual
 merge to `main`.
 
+### Addendum — owner-approved integration, push, and live production verification
+
+Owner reviewed the branch and the addendum above and directed integration. Fast-forwarded `main`
+from `27618b1` to `task-064`'s tip (no merge commit; `task-064` was already a direct linear
+descendant). Re-ran every gate on the integrated `main` tip fresh — not reused from the branch
+review above — before pushing: `node --check app.js` clean; focused suite 15/15; full local suite
+711/711; `Verify-Decisions.ps1` 96/96; `Check-DocsConsistency.ps1` 38 drift items (same pre-existing
+baseline, zero new); `git diff --check` clean. `git push origin main` (no force) after re-confirming
+`origin/main` had not moved from `27618b1`. CI (`Button tests`, run `36322333785`) and GitHub Pages
+(`pages-build-deployment`, run `36322333025`) both went green; fetched the deployed `app.js` directly
+and confirmed it serves this branch's `saveData()`/`batch-name-btn` markers, not a stale Pages/CDN
+copy.
+
+Added `tests/production-smoke-plan-persistence.spec.js` (8 tests, registered in `PROD_SPECS`) to
+verify the actual reported bug against the DEPLOYED build, not just the local suite — the existing
+`production-smoke-*.spec.js` files cover other features, none of them touch `weeklyPlan`/
+`plannedBatches`/the picker. First run: 2 of 8 failed. Traced with a standalone diagnostic script
+before concluding anything either way — **not a regression, a test-authoring bug in the new spec
+itself.** The live (unstubbed) Firebase page takes measurably longer to run its real
+`loadFromLocalStorage()` restore than the local suite does (local either stubs `firebasejs` out
+entirely or never touches the network); a reload-completion predicate that only checks
+`weeklyPlan.X.field === null` cannot tell "not yet restored, still at its freshly-initialized
+default" apart from "restored, and genuinely cleared" — both read `null`. The diagnostic script
+proved `plannedBatches` was correctly sitting in `localStorage` throughout; the test read
+`AppState.plannedBatches` in the narrow window before the async restore had actually applied it to
+memory. Fixed by waiting for unambiguous post-restore evidence instead — the seeded test recipe id
+appearing in `AppState.recipes`, which cannot be true before the real snapshot loads — in all three
+reload-based tests in that file (including the one that happened to pass by coincidence the first
+time, `clearDay()`, for the same latent reason). Re-ran twice after the fix: 8/8 both times. This is
+a test-infrastructure lesson, not a product-code change — recorded here because the failure mode
+(a reload-predicate that is trivially true in the pre-restore default state) is a real trap for any
+future live/prod spec that asserts a field returned to `null`/falsy after a clear, not specific to
+this fix.
+
+Also ran the existing `test:prod` suite against the now-live build: **147 passed, 4 skipped**
+(`production-smoke-attention-notifications.spec.js`'s notification-permission tests — a pre-existing,
+unrelated skip condition, not caused by this change).
+
+**TASK-064 / D-080 / D-081 → DONE.** Pushed SHA `38b23a8`. Reviewed implementation (`943a0a9`)
+verified byte-identical inside it, unmodified. `screenshots/` and the sibling
+`release/recipe-url-import-clean` worktree were never touched.
+
+Verify: playwright.config.js contains "production-smoke-plan-persistence.spec.js"
+Verify: tests/production-smoke-plan-persistence.spec.js contains "live: clearWeeklyPlan() persists across reload and does not touch plannedBatches"
+Verify: tests/production-smoke-plan-persistence.spec.js contains "AppState.recipes.some((r) => r.id ==="
+
 ## D-081 — Add-meals picker: inset spacing and a reused favorite toggle
 
 **Status:** Implemented on branch `task-064` (from `main` @ 27618b1), same branch as D-080. Reviewed

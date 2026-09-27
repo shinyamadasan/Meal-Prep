@@ -39,6 +39,7 @@ const PROD_SPECS = [
   'production-smoke-cook-tombstones.spec.js',
   'production-smoke-kitchen-truth.spec.js',
   'production-smoke-low-effort.spec.js',
+  'production-smoke-plan-persistence.spec.js',
   'production-smoke-ready-food.spec.js',
   'production-smoke-what-should-we-eat.spec.js',
   'smoke.spec.js'
