@@ -28,3 +28,27 @@ export class InsufficientServingsError extends Error {
     this.detail = { remaining };
   }
 }
+
+// The `ambiguous` code the operation contract reserves for exactly this case (TASKS.md /
+// D-082): a destructive operation whose safety depends on a classification the bridge cannot
+// prove without data it doesn't have (INGREDIENT_DB). Fail safe rather than guess — see
+// operations/inventory.js's classifyStaple().
+export class AmbiguousError extends Error {
+  constructor(message, detail) {
+    super(message || 'Cannot safely determine how to apply this operation.');
+    this.name = 'AmbiguousError';
+    this.code = 'ambiguous';
+    this.detail = detail;
+  }
+}
+
+// A request body that failed to even parse as JSON — distinct from a well-formed JSON body that
+// fails domain/schema validation (ValidationError, 422). TASK-065's contract requires malformed
+// JSON specifically to be 400.
+export class MalformedBodyError extends Error {
+  constructor(message) {
+    super(message || 'Request body must be valid JSON.');
+    this.name = 'MalformedBodyError';
+    this.code = 'validation_failed';
+  }
+}

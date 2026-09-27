@@ -4462,8 +4462,13 @@ owner: codex (built by Claude this cycle — Codex was unavailable; confirmed ex
   human before implementation started, per the AI Dev OS's documented exception. See CHANGELOG.md
   and D-082's implementation addendum for the full builder-identity note.)
 branch task-065 is at candidate stage: locally built and tested only, not merged, not deployed, no
-  production secrets exist. Needs a fresh Reviewer pass (Claude, a NEW session per the human's
-  "START NEW REVIEWER" instruction — the builder must not self-approve).
+  production secrets exist. First candidate `9961521` got an independent STRICT review: FIX FIRST
+  on 5 bounded findings (2 must-fix — pantry staple misclassification risk, cookedDate UTC vs.
+  local-calendar mismatch; 3 low — test-count reporting, malformed-JSON status, missing
+  body-size-limit test coverage). All 5 fixed in the current candidate on top of `9961521` (not
+  amended) — see CHANGELOG.md and D-082's "Corrections after independent review" addendum. Needs a
+  targeted Reviewer pass on just those 5 fixes (Claude, a NEW session — the builder must not
+  self-approve).
 source: direct owner brief ("Conversational Control Bridge v1"). Not from `planning/BUILD_QUEUE.md`.
   Architecture decided with Claude in chat 2026-09-27 after Phase 0 discovery — see D-082 for the
   full reasoning; this task is D-082's implementation.

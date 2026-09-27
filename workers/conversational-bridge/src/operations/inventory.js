@@ -4,19 +4,34 @@
 // a NEW array/bucket plus the response item, so index.js can diff "did anything actually change"
 // cleanly for the `unchanged:true` cases the contract requires.
 //
-// KNOWN NARROWING (recorded in CHANGELOG.md / D-082 addendum): the bridge has no access to
-// INGREDIENT_DB or PANTRY_KNOWLEDGE, so `isStaple()` here is strictly `pantry.staple === true` —
-// no name/category fallback inference like the client's `isStaple()`. This is a safe narrowing
-// (a record the client would infer as staple but that lacks the explicit flag is treated as a
-// plain non-staple record here), never a data-loss risk, but it means a record whose staple-ness
-// the app only *infers* will behave differently through the bridge than through the UI until the
-// app itself stamps `staple: true` on it.
-import { NotFoundError, ValidationError } from '../errors.js';
+// CLASSIFICATION (D-082 addendum, corrected after independent review): the bridge has no access
+// to INGREDIENT_DB, so it cannot fully reproduce the client's isStaple(). It DOES reproduce the
+// client's other, INGREDIENT_DB-free fallback: an explicit flag, else `category === 'pantry'`.
+// That leaves one real gap — a record with no explicit `staple` and a category that ISN'T
+// 'pantry' can still be a staple in the live app via an INGREDIENT_DB entry (confirmed in
+// app.js's own seed data: e.g. 'Garlic (Bawang)' and 'Evaporated Milk' are `isStaple: true` with
+// category 'Vegetable'/'Dairy', not 'Pantry' — and at least two active pantry-creation call sites
+// store `staple: undefined` outright for an unmatched custom ingredient, so this isn't a rare
+// legacy-data corner case). classifyStaple() returns 'ambiguous' for exactly that gap, and
+// markOutOfStock() refuses to guess: guessing "non-staple" here risks tombstoning a record the
+// real app would only have marked empty, which is real, unrecoverable(ish) data loss; guessing
+// "staple" risks nothing (the record just survives with stockLevel stamped). See
+// AmbiguousError / the reserved `ambiguous` contract code in errors.js.
+import { NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
 
 const MAX_UNIT_LENGTH = 40;
 
+function classifyStaple(p) {
+  if (!p) return 'non-staple';
+  if (p.staple === true) return 'staple';
+  if (p.staple === false) return 'non-staple';
+  const category = (p.category == null ? '' : String(p.category)).trim().toLowerCase();
+  if (category === 'pantry') return 'staple';
+  return 'ambiguous';
+}
+
 function isStapleRecord(p) {
-  return !!p && p.staple === true;
+  return classifyStaple(p) === 'staple';
 }
 
 function findPantryIndex(pantry, ingredientId) {
@@ -86,7 +101,18 @@ export function markOutOfStock(pantry, deletionsPantry, { ingredientId }) {
   }
 
   const record = pantry[index];
-  if (isStapleRecord(record)) {
+  const classification = classifyStaple(record);
+
+  if (classification === 'ambiguous') {
+    throw new AmbiguousError(
+      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
+      'the bridge cannot safely tell whether removing it or marking it empty is correct without INGREDIENT_DB. ' +
+      'Set an explicit staple value on this record (in the app) before retrying.',
+      { field: 'ingredientId', category: record.category != null ? record.category : null }
+    );
+  }
+
+  if (classification === 'staple') {
     if (record.stockLevel === 'empty') {
       return { pantry, deletionsPantry, item: toInventoryItem(record), unchanged: true, removed: false };
     }

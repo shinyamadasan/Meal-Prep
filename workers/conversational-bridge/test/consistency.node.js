@@ -42,7 +42,7 @@ test('a bridge cooked-food write is visible in the Ready-to-Eat model an app-sid
   const fake = createFakeFirestore({ fields: { cookedMeals: [], version: 0 } });
   const call = bridgeOn(fake);
 
-  const recorded = await (await call('/v1/ready-food/record', { method: 'POST', body: { name: 'Chili', servings: 3, storage: 'fridge', expectedRevision: 0 } })).json();
+  const recorded = await (await call('/v1/ready-food/record', { method: 'POST', body: { name: 'Chili', servings: 3, storage: 'fridge', cookedDate: '2026-01-15', expectedRevision: 0 } })).json();
 
   assert.equal(fake.store.fields.cookedMeals.length, 1);
   assert.equal(fake.store.fields.cookedMeals[0].id, recorded.item.cookedMealId);

@@ -4,7 +4,7 @@
 // collection, or uid.
 import { requireBearerToken, getFirestoreAccessToken, UnauthorizedError } from './auth.js';
 import { getUserDocument, patchUserDocument, RevisionConflictError, InfrastructureError } from './firestore.js';
-import { NotFoundError, ValidationError, InsufficientServingsError } from './errors.js';
+import { NotFoundError, ValidationError, InsufficientServingsError, AmbiguousError, MalformedBodyError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
 
@@ -126,7 +126,7 @@ const BODY_SCHEMAS = {
   'inventory.setQuantity': { required: ['ingredientId', 'quantity', 'expectedRevision'], optional: ['unit'] },
   'inventory.markOutOfStock': { required: ['ingredientId', 'expectedRevision'], optional: [] },
   'inventory.markInStock': { required: ['ingredientId', 'expectedRevision'], optional: [] },
-  'readyFood.record': { required: ['name', 'servings', 'storage', 'expectedRevision'], optional: ['recipeId'] },
+  'readyFood.record': { required: ['name', 'servings', 'storage', 'cookedDate', 'expectedRevision'], optional: ['recipeId'] },
   'readyFood.consume': { required: ['cookedMealId', 'servings', 'expectedRevision'], optional: [] },
   'readyFood.finish': { required: ['cookedMealId', 'expectedRevision'], optional: [] }
 };
@@ -150,12 +150,13 @@ async function readJsonBody(request) {
   }
 
   const text = await readBoundedText(request, MAX_BODY_BYTES);
-  if (!text) throw new ValidationError('Request body must be valid JSON.', { field: 'body' });
   let body;
   try {
     body = JSON.parse(text);
   } catch (e) {
-    throw new ValidationError('Request body must be valid JSON.', { field: 'body' });
+    // Syntactically invalid (or empty) JSON is its own contract-specified status (400) —
+    // distinct from well-formed JSON that fails domain/schema validation (422, below).
+    throw new MalformedBodyError();
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new ValidationError('Request body must be a JSON object.', { field: 'body' });
@@ -215,8 +216,10 @@ function errorResponse(code, status, message, detail) {
 function errorFromException(error) {
   if (error instanceof UnauthorizedError) return errorResponse('unauthorized', 401, error.message);
   if (error instanceof NotFoundError) return errorResponse('not_found', 404, error.message);
+  if (error instanceof MalformedBodyError) return errorResponse('validation_failed', 400, error.message);
   if (error instanceof ValidationError) return errorResponse('validation_failed', 422, error.message, error.detail);
   if (error instanceof InsufficientServingsError) return errorResponse('insufficient_servings', 422, error.message, error.detail);
+  if (error instanceof AmbiguousError) return errorResponse('ambiguous', 422, error.message, error.detail);
   if (error instanceof RevisionConflictError) {
     return errorResponse('revision_conflict', 409, error.message, {
       revision: error.current.revision,

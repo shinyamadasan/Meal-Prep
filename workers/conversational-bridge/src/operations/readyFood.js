@@ -70,26 +70,42 @@ function validateName(name) {
   }
 }
 
+// A stateless Worker has no "local timezone" of its own — only the caller (the conversational
+// client resolving what the human actually meant by "today"/"yesterday") can know the user's
+// intended calendar date. So `cookedDate` is a REQUIRED, caller-supplied `YYYY-MM-DD` string,
+// validated as a real calendar date, never derived from `new Date()` server-side (D-082 addendum,
+// corrected after independent review — an earlier draft used the Worker's own UTC date, which
+// could silently shift `cookedDate` by a day versus app.js's `todayISO()`, a LOCAL-calendar-date
+// helper). Rejects both malformed shapes (regex) and impossible dates (e.g. 2024-02-30, which the
+// regex alone would accept) by round-tripping through Date.UTC() and checking every component.
+function validateCookedDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ValidationError('cookedDate must be a YYYY-MM-DD calendar date string.', { field: 'cookedDate' });
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const asDate = new Date(Date.UTC(year, month - 1, day));
+  const roundTrips = asDate.getUTCFullYear() === year && asDate.getUTCMonth() === month - 1 && asDate.getUTCDate() === day;
+  if (!roundTrips) {
+    throw new ValidationError('cookedDate "' + value + '" is not a real calendar date.', { field: 'cookedDate' });
+  }
+  return value;
+}
+
 // Always creates a TRACKED batch (initialPortions === portionsRemaining === servings) —
 // `servings` and `expectedRevision` are both required, no exceptions, which is what makes a
 // lost-response retry of this create safe (D-082 idempotency model): a retry under the same
 // stale expectedRevision is rejected upstream, never re-applied as a second batch.
-//
-// `cookedDate` uses the Worker's own UTC calendar date as "today". The app's equivalent is the
-// user's LOCAL calendar date (docs/DATA_MODEL.md) and a Worker has no caller-timezone concept —
-// this is a recorded, accepted judgment call (not a STOP condition): dates created via the
-// bridge within a few hours of the caller's local midnight may land on the adjacent calendar day
-// versus what the app would have stamped. See CHANGELOG.md / D-082 addendum.
-export function recordCookedFood({ name, recipeId, servings, storage }) {
+export function recordCookedFood({ name, recipeId, servings, storage, cookedDate }) {
   validateName(name);
   const portions = validateServings(servings, 'servings');
   validateStorage(storage);
+  const date = validateCookedDate(cookedDate);
 
   const record = {
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     recipeId: recipeId != null ? String(recipeId) : null,
     name,
-    cookedDate: new Date().toISOString().slice(0, 10),
+    cookedDate: date,
     storage,
     fridgeLife: null,
     freezerLife: null,

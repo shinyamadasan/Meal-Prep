@@ -3225,8 +3225,11 @@ Verify: style.css contains "#batch-picker-modal .modal-footer"
 **Status:** Architecture approved by the human (2026-09-27). A local, tested candidate landed the
 same day on branch `task-065` (built by Claude directly, under the AI Dev OS's documented
 "Codex unavailable" exception to its usual Codex-builds default — see `TASKS.md` TASK-065 and
-`CHANGELOG.md` for the full implementation record). Not deployed; no production secrets exist.
-Pending independent review — see "Implementation addendum" below for what a reviewer should check.
+`CHANGELOG.md` for the full implementation record). Not deployed; no production secrets exist. An
+independent STRICT review of that first candidate (`9961521`) confirmed the architecture and
+returned FIX FIRST on 5 bounded findings (2 must-fix, 3 low); all 5 are fixed in the current
+candidate — see "Implementation addendum" and "Corrections after independent review" below.
+Pending a targeted re-review of just those fixes.
 
 ### Context
 
@@ -3353,13 +3356,20 @@ bridge is not one.
 
 Four mechanical-detail judgment calls the original decision didn't specify, recorded here per
 TASK-065's "use judgment consistent with its stated reasoning and note the choice" instruction —
-none of them change the architecture above, and none required a STOP:
+none of them change the architecture above. Two (#1 and #4) were corrected the same day after an
+independent STRICT review found the initial version of each too permissive/too divergent — see
+"Corrections after independent review" immediately below for what changed and why; none required
+a STOP, and none reopened the architecture itself.
 
-1. **`isStaple()` is `pantry.staple === true` only, server-side.** The bridge has no
-   `INGREDIENT_DB`/`PANTRY_KNOWLEDGE` to run the client's name/category inference fallback
-   against, so it uses the explicit flag alone. A record the app would infer as staple but that
-   lacks the explicit flag behaves as a plain non-staple through the bridge until the app itself
-   stamps it. Safe narrowing, not a data-loss risk.
+1. **Pantry staple classification is a three-way call: `staple`, `non-staple`, or `ambiguous`.**
+   The bridge reproduces app.js's `isStaple()` as far as it can without `INGREDIENT_DB`: explicit
+   `staple === true`/`staple === false` first, then the same category-only fallback the client
+   uses (`staple !== false && category === 'pantry'`). What it cannot reproduce is the client's
+   middle step — an `INGREDIENT_DB` name lookup that can mark a record staple regardless of
+   category. A record with no explicit flag and a non-`'pantry'` category is genuinely unprovable
+   server-side, so it classifies as `ambiguous`; the destructive `mark-out-of-stock` operation
+   refuses an ambiguous record (`422 ambiguous`) rather than risking a tombstone on what might
+   actually be a staple. (Corrected from an earlier, narrower version — see below.)
 2. **`consume`'s exact-remainder path and `finish` write the `cookedMeals` tombstone explicitly
    and immediately**, rather than relying on `removeCookedMeal()`'s own behavior (which is just an
    array filter — the client's tombstone is written later, by `recordLocalDeletions()`'s baseline
@@ -3370,19 +3380,54 @@ none of them change the architecture above, and none required a STOP:
 3. **`ready-food/record` never deducts pantry ingredients**, unlike `_doMarkCooked()` client-side.
    Deducting would require one write to touch both `pantry` and `cookedMeals`, which decision
    point 4 above forbids. Recorded as an intentional scope narrowing.
-4. **A bridge-created cooked-food record's `cookedDate` uses the Worker's own UTC calendar date**,
-   not the caller's local date — a stateless server has no caller-timezone concept to borrow. A
-   record created within a few hours of the caller's local midnight may land on the adjacent
-   calendar day versus what the app itself would stamp. Accepted rather than plumbing a
-   caller-supplied timezone through the operation contract, which TASK-065 does not ask for.
+4. **`cookedDate` on `ready-food/record` is a REQUIRED, caller-supplied `YYYY-MM-DD` local
+   calendar date** — never derived by the Worker. A stateless server has no caller-timezone
+   concept to borrow, so instead of guessing (the earlier version used the Worker's own UTC date),
+   the contract makes the calling client responsible for resolving what the human meant by
+   "today"/"yesterday" before issuing the command. (Corrected from an earlier, UTC-guessing
+   version — see below.)
 
 Full reasoning for each: `workers/conversational-bridge/README.md` "Known, recorded judgment
 calls."
+
+#### Corrections after independent review (2026-09-27, same day)
+
+An independent STRICT review of candidate `9961521` confirmed the architecture, auth model,
+concurrency model, and every other mechanism sound, and found two of the four judgment calls
+above needed correction before approval — both fixed in the immediate next candidate, on top of
+`9961521`, without touching anything the review had already confirmed:
+
+- **Staple classification was too narrow.** The first candidate used `staple === true` only,
+  meaning ANY record without the explicit flag — including ones the real app treats as staples via
+  its category fallback, or via an `INGREDIENT_DB` entry — would take the destructive
+  mark-out-of-stock path. Live seed-data evidence made the risk concrete: `Garlic (Bawang)` and
+  `Evaporated Milk` in `INGREDIENT_DB` are `isStaple: true` with category `Vegetable`/`Dairy`, and
+  at least two active `app.js` pantry-creation call sites store `staple: undefined` outright for
+  an unmatched custom ingredient — this is common, not a rare edge case. Fixed by adding the
+  category-only fallback (matching the client) plus the new `ambiguous` classification (using the
+  contract's already-reserved `ambiguous` error code) for the residual gap that only
+  `INGREDIENT_DB` could resolve, which the bridge refuses rather than guesses on.
+- **`cookedDate` used the Worker's own UTC date.** Since nothing is deployed and no client exists
+  yet to have a compatibility obligation to, the review directed an outright contract correction
+  rather than preserving the divergence: `cookedDate` is now required on `ready-food/record`,
+  caller-supplied, and validated as an exact, real `YYYY-MM-DD` date.
+- Two low-severity findings were also corrected: malformed (syntactically invalid) JSON now
+  returns `400` per TASK-065's contract (previously conflated with `422` domain-validation
+  failures), and the 8 KB body-size limit — implemented since the first candidate but untested —
+  now has dedicated regression coverage (both a truthful oversized `Content-Length` and an
+  unbounded streamed body with no declared length).
+- A test-count reporting error in the first candidate's `TEST_REPORT.md`/`CHANGELOG.md` (claimed
+  9/7/18/21/5 = 60; the runner actually produced 8/7/16/23/5 = 59) was corrected to the runner's
+  own numbers rather than hand arithmetic — see `TEST_REPORT.md` for the current, fresh count.
 
 Verify: workers/conversational-bridge/src/index.js contains "requireBearerToken(request, env);"
 Verify: workers/conversational-bridge/src/auth.js contains "export function constantTimeEqual"
 Verify: workers/conversational-bridge/src/firestore.js contains "currentDocument.updateTime"
 Verify: workers/conversational-bridge/src/operations/inventory.js contains "isStapleRecord(p) {"
+Verify: workers/conversational-bridge/src/operations/inventory.js contains "function classifyStaple(p) {"
 Verify: workers/conversational-bridge/src/operations/readyFood.js contains "TOMBSTONE NOTE (D-071)"
+Verify: workers/conversational-bridge/src/operations/readyFood.js contains "function validateCookedDate(value) {"
+Verify: workers/conversational-bridge/src/errors.js contains "export class AmbiguousError"
+Verify: workers/conversational-bridge/src/errors.js contains "export class MalformedBodyError"
 Verify: workers/conversational-bridge/README.md contains "Production enablement checklist"
 Verify: package.json contains "test:bridge"

@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listInventory, setQuantity, markOutOfStock, markInStock } from '../src/operations/inventory.js';
-import { NotFoundError, ValidationError, InsufficientServingsError } from '../src/errors.js';
+import { NotFoundError, ValidationError, InsufficientServingsError, AmbiguousError } from '../src/errors.js';
 import { listReadyFood, recordCookedFood, consumePortions, finishCookedMeal } from '../src/operations/readyFood.js';
+
+const COOKED_DATE = '2026-01-15';
 
 // ── Inventory ────────────────────────────────────────────────────────────────
 
@@ -72,6 +74,37 @@ test('markOutOfStock rejects a truly unknown id (never existed, never tombstoned
   assert.throws(() => markOutOfStock([], {}, { ingredientId: 'ghost' }), NotFoundError);
 });
 
+// Corrected per independent review: a record with no explicit `staple` flag can still be a
+// staple through app.js's own category-only fallback (`category === 'pantry'`) — the bridge must
+// match that, not silently treat every undecorated record as non-staple.
+test('markOutOfStock treats an undecorated record with category "pantry" as a staple (retain + empty, no tombstone)', () => {
+  const pantry = [{ id: 'p1', name: 'Rice', category: 'pantry', quantity: 2 }]; // staple field absent entirely
+  const result = markOutOfStock(pantry, {}, { ingredientId: 'p1' });
+  assert.equal(result.removed, false);
+  assert.equal(result.pantry.find((p) => p.id === 'p1').stockLevel, 'empty');
+  assert.deepEqual(result.deletionsPantry, {}, 'a category-fallback staple must never be tombstoned');
+});
+
+// The residual gap: no explicit flag AND a category that doesn't prove classification (real
+// app.js seed data has `isStaple: true` entries with category 'Vegetable'/'Dairy'/'Protein' —
+// e.g. Garlic, Evaporated Milk — so this is a genuine, common case, not a hypothetical). The
+// bridge cannot safely guess without INGREDIENT_DB, so a destructive mark-out-of-stock must
+// refuse rather than risk tombstoning a record that's actually a staple.
+test('markOutOfStock refuses an ambiguous record (no explicit flag, non-"pantry" category) rather than guessing destructively', () => {
+  const pantry = [{ id: 'g1', name: 'Garlic', category: 'Vegetable', quantity: 3 }];
+  assert.throws(() => markOutOfStock(pantry, {}, { ingredientId: 'g1' }), AmbiguousError);
+  // Confirm the refusal is a pure read: nothing was mutated or tombstoned by the failed attempt.
+  const stillThere = pantry.find((p) => p.id === 'g1');
+  assert.ok(stillThere);
+  assert.equal(stillThere.stockLevel, undefined);
+});
+
+test('markOutOfStock still treats an ambiguous-shaped record as staple once explicitly flagged, even off-category', () => {
+  const pantry = [{ id: 'g1', name: 'Garlic', category: 'Vegetable', quantity: 3, staple: true }];
+  const result = markOutOfStock(pantry, {}, { ingredientId: 'g1' });
+  assert.equal(result.pantry.find((p) => p.id === 'g1').stockLevel, 'empty');
+});
+
 test('markInStock only applies to staples and is a validation error on a non-staple', () => {
   const pantry = [
     { id: 's1', name: 'Salt', staple: true, stockLevel: 'empty' },
@@ -107,25 +140,42 @@ test('listReadyFood reports servingsRemaining null for an untracked batch', () =
 });
 
 test('recordCookedFood always creates a tracked batch shaped like _doMarkCooked()\'s output', () => {
-  const result = recordCookedFood({ name: 'Chili', recipeId: '5', servings: 4, storage: 'fridge' });
+  const result = recordCookedFood({ name: 'Chili', recipeId: '5', servings: 4, storage: 'fridge', cookedDate: COOKED_DATE });
   assert.equal(result.record.initialPortions, 4);
   assert.equal(result.record.portionsRemaining, 4);
   assert.match(result.record.id, /^cm_/);
   assert.equal(result.record.fridgeLife, null);
+  assert.equal(result.record.cookedDate, COOKED_DATE);
 });
 
 test('recordCookedFood rejects invalid name, servings, and storage', () => {
-  assert.throws(() => recordCookedFood({ name: '', servings: 1, storage: 'fridge' }), ValidationError);
-  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 0, storage: 'fridge' }), ValidationError);
-  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'counter' }), ValidationError);
+  assert.throws(() => recordCookedFood({ name: '', servings: 1, storage: 'fridge', cookedDate: COOKED_DATE }), ValidationError);
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 0, storage: 'fridge', cookedDate: COOKED_DATE }), ValidationError);
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'counter', cookedDate: COOKED_DATE }), ValidationError);
 });
 
 // portionCountOrNull()'s documented app.js behavior is to FLOOR a fractional count, not reject
 // it ("half a meal portion is not a concept this app has") — the bridge mirrors that exactly
 // rather than inventing stricter validation the app itself doesn't enforce.
 test('recordCookedFood floors a fractional servings count rather than rejecting it, matching portionCountOrNull()', () => {
-  const result = recordCookedFood({ name: 'Chili', servings: 1.9, storage: 'fridge' });
+  const result = recordCookedFood({ name: 'Chili', servings: 1.9, storage: 'fridge', cookedDate: COOKED_DATE });
   assert.equal(result.record.initialPortions, 1);
+});
+
+// Corrected per independent review: cookedDate is now a REQUIRED, caller-supplied local calendar
+// date (matching app.js's todayISO(), which is device-local) — the Worker never derives "today"
+// itself, since a stateless server has no caller-timezone concept to borrow.
+test('recordCookedFood requires an explicit, exact, real cookedDate — never a silent UTC fallback', () => {
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge' }), ValidationError, 'missing cookedDate');
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge', cookedDate: '2026/01/15' }), ValidationError, 'wrong shape');
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge', cookedDate: 'yesterday' }), ValidationError, 'free-form text');
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge', cookedDate: '2026-02-30' }), ValidationError, 'impossible calendar date');
+  assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge', cookedDate: '2026-13-01' }), ValidationError, 'invalid month');
+
+  // A caller resolving "yesterday" for a user near local midnight can legitimately supply a date
+  // that differs from the Worker's own UTC "today" — that must be honored exactly, not corrected.
+  const result = recordCookedFood({ name: 'Chili', servings: 1, storage: 'fridge', cookedDate: '2026-01-01' });
+  assert.equal(result.record.cookedDate, '2026-01-01');
 });
 
 test('consumePortions decrements, rejects over-consumption, and removes on exact remainder with a tombstone', () => {

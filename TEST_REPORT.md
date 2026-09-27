@@ -5,6 +5,63 @@
 
 ---
 
+## TASK-065 / D-082 Conversational Control Bridge v1 — fixes from independent STRICT review · 2026-09-27
+suite: `node --test workers/conversational-bridge/test/*.node.js` (via `npm run test:bridge`),
+  same in-memory fake Firestore / throwaway test keypair as the entry below — zero network, zero
+  real credentials.
+**Correction to the entry below:** its claimed per-file counts (9/7/18/21/5 = 60) were wrong — an
+  independent STRICT review reproduced the runner directly and got 8/7/16/23/5 = 59. That was a
+  hand-arithmetic error in how the previous entry was written, not a runner discrepancy. This
+  entry's counts are taken directly from `node --test`'s own summary line, run once per file, with
+  no manual addition performed on top of what the runner reported.
+result:
+  - Total: 68/68 pass, 0 fail, 0 skipped. Per file (exact runner output, `ℹ tests N` per run):
+    firestore.node.js 8, auth.node.js 7, operations.node.js 20, security.node.js 28,
+    consistency.node.js 5. (Net change from the reviewed 59: +9, all new regression tests added
+    for this fix cycle — operations.node.js 16->20, security.node.js 23->28 — no test was removed
+    or altered to make old arithmetic true, per the review's explicit instruction.)
+  - New coverage this cycle, all passing:
+    - Pantry classification (Finding 1): an undecorated record with `category:'pantry'` retains +
+      goes `stockLevel:'empty'` with no tombstone written; an undecorated, off-`'pantry'`-category
+      record (`Garlic`/`Vegetable` fixture, matching real `INGREDIENT_DB` shape) is refused with
+      `422 ambiguous` and left completely untouched (no mutation, no tombstone, store version
+      unchanged); the same off-category record WITH an explicit `staple:true` still resolves
+      normally. Covered at both the pure-function level (operations.node.js) and the full
+      HTTP/Firestore-adapter level (security.node.js).
+    - cookedDate contract (Finding 2): missing, wrong-shape (`2026/01/15`), free-form
+      (`"yesterday"`), and impossible (`2026-02-30`, `2026-13-01`) values are all rejected
+      (`422 validation_failed`); a valid caller-supplied local date is preserved on the record
+      exactly as given, never adjusted. Covered at both levels; all rejected attempts left the
+      store untouched.
+    - Malformed JSON vs. domain validation (Finding 4): syntactically invalid JSON (and an empty
+      body) now returns `400`; a well-formed JSON body with an invalid domain value (e.g. negative
+      quantity) still returns `422` — both asserted in the same test so the distinction is proven,
+      not just each half checked in isolation.
+    - Body-size limit (Finding 5): a genuinely oversized request (truthful `Content-Length` > the
+      8 KB limit) is rejected before any Firestore call is made (asserted via a call counter on
+      the fake fetch, not just the HTTP status); a chunked/streamed request with NO declared
+      `Content-Length` is independently rejected by the bounded-reader loop (confirmed the test
+      precondition that no `Content-Length` header was present, so this genuinely exercises the
+      streaming path, not the header fast-path) — same zero-Firestore-calls assertion.
+  - `npm run test:worker` (existing recipe-import suite, unaffected): 9/9 pass.
+  - `./tools/Verify-Decisions.ps1`: 110/110 pointers hold (106 before this cycle + 4 new).
+  - `./tools/Check-DocsConsistency.ps1`: output diffed byte-for-byte against the same clean `main`
+    baseline used for the first candidate — identical, zero new drift.
+  - `git diff --check` (staged): clean.
+  - `node --check` on every `.js` file under `workers/conversational-bridge/` (13 files from the
+    first candidate + edits, no new files added this cycle): clean.
+not run (reported as SKIP, not PASS — unchanged reasoning from the first candidate; this fix
+  touches zero files outside `workers/conversational-bridge/`, `docs/`, `TASKS.md`, `package.json`):
+  - Full local Playwright suite (`npm test`): this worktree still has no `node_modules` installed.
+  - Worker lint/type/build tooling: still none exists in this repo for any Worker.
+  - Real `wrangler` deploy/dry-run: the re-review brief explicitly allowed a dry run, but
+    `wrangler` remains an uninstalled dependency in this repo, and this fix cycle changed no
+    deploy-relevant configuration (`wrangler.jsonc` untouched) — a dry run would have exercised
+    nothing this cycle actually changed, so it was skipped for the same reason as the first
+    candidate rather than run just to produce a green checkmark.
+
+---
+
 ## TASK-065 / D-082 Conversational Control Bridge v1 candidate · 2026-09-27
 suite: `node --test workers/conversational-bridge/test/*.node.js` (via `npm run test:bridge`), all
   against an in-memory fake Firestore (`test/support/fakeFirestore.js`) and a throwaway RSA-2048

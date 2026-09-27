@@ -88,7 +88,7 @@ Every request requires `Authorization: Bearer <BRIDGE_API_TOKEN>`. Missing/wrong
 | POST | `/v1/inventory/set-quantity` | `{ ingredientId, quantity, unit?, expectedRevision }` |
 | POST | `/v1/inventory/mark-out-of-stock` | `{ ingredientId, expectedRevision }` |
 | POST | `/v1/inventory/mark-in-stock` | `{ ingredientId, expectedRevision }` (staples only) |
-| POST | `/v1/ready-food/record` | `{ name, recipeId?, servings, storage, expectedRevision }` |
+| POST | `/v1/ready-food/record` | `{ name, recipeId?, servings, storage, cookedDate, expectedRevision }` |
 | POST | `/v1/ready-food/consume` | `{ cookedMealId, servings, expectedRevision }` |
 | POST | `/v1/ready-food/finish` | `{ cookedMealId, expectedRevision }` |
 
@@ -100,16 +100,41 @@ An unlisted/extra field in any request body (an attempt to smuggle a `uid`, `pat
 `collection`) is rejected as `422 validation_failed` — the schema is an allow-list, not a
 best-effort shape check.
 
+`cookedDate` on `ready-food/record` is **required** and must be an exact `YYYY-MM-DD` real
+calendar date — the user's intended LOCAL date, matching app.js's `todayISO()`. A stateless
+Worker has no timezone of its own, so it never derives "today" itself; the calling client (the
+one resolving what "today"/"yesterday" meant) supplies it. Malformed shape, an impossible date
+(e.g. `2026-02-30`), or a missing value are all `422 validation_failed`.
+
+**Malformed JSON vs. invalid content.** A body that isn't even syntactically valid JSON (or is
+empty) is `400`. A syntactically valid JSON body that fails a domain/schema rule (wrong type,
+missing/extra field, out-of-range value) is `422 validation_failed`. The two are never conflated.
+
+**The reserved `ambiguous` code** is used by `mark-out-of-stock` when a pantry record has no
+explicit `staple` flag and a category that doesn't resolve it either — see the classification
+note below. It means "refused because the bridge cannot safely tell," not "malformed request."
+
 ## Known, recorded judgment calls (not gaps — see CHANGELOG.md for the full reasoning)
 
-- **`isStaple()` is `pantry.staple === true` only.** The bridge has no access to `INGREDIENT_DB`
-  or `PANTRY_KNOWLEDGE`, so it can't reproduce the client's name/category inference fallback. A
-  record whose staple-ness the app only infers (never explicitly stamped) is treated as a plain
-  non-staple record here. Safe narrowing, never a data-loss risk.
-- **`cookedDate` on a bridge-created record uses the Worker's own UTC calendar date**, not the
-  caller's local date (a server has no "local timezone" to borrow). Within a few hours of the
-  caller's local midnight, a bridge-created date may land on the adjacent calendar day versus
-  what the app itself would stamp.
+- **Pantry staple classification (corrected after independent review).** The bridge reproduces
+  app.js's `isStaple()` as far as it can without `INGREDIENT_DB`: explicit `staple === true` /
+  `staple === false` first, then the category-only fallback (`staple !== false && category ===
+  'pantry'`). What it CANNOT reproduce is the middle step — an `INGREDIENT_DB` lookup by name that
+  can mark a record staple regardless of category (real seed-data examples: `Garlic (Bawang)` and
+  `Evaporated Milk` are `isStaple: true` with category `Vegetable`/`Dairy`, not `Pantry`; and at
+  least two active pantry-creation call sites in `app.js` store `staple: undefined` outright for
+  an unmatched custom ingredient — this is a live, common case, not rare legacy data). A record
+  with no explicit flag and a non-`'pantry'` category is genuinely unprovable server-side, so
+  `mark-out-of-stock` refuses it with `422 ambiguous` rather than guessing — guessing "non-staple"
+  risks tombstoning a record the real app would only have marked empty, which is real data loss;
+  refusing costs the caller a retry after the app-side record gets an explicit flag. Reads
+  (`GET /v1/inventory`) still report a best-effort `staple`/`inStock` for display, treating the
+  ambiguous case as non-staple, since a read can't destroy anything.
+- **`cookedDate` is a required, caller-supplied field (corrected after independent review).** An
+  earlier draft had the Worker stamp its own UTC "today," which could silently disagree with
+  app.js's LOCAL-calendar-date `todayISO()` by a day near midnight. Since nothing is deployed yet
+  and no client exists to have a compatibility obligation to, the contract was corrected outright
+  instead of preserving the divergence — see "Endpoint contract" above.
 - **`consume`'s exact-remainder path and `finish` write an explicit `cookedMeals` tombstone
   directly**, rather than relying on `removeCookedMeal()`'s client-side behavior (which is
   actually just an array filter — the tombstone is written later by `recordLocalDeletions()`'s
@@ -134,9 +159,15 @@ happens automatically:
 1. A human reviews this branch (see `REVIEW.md` once filed) and approves it per the AI Dev OS
    risk-gated merge process (D-032) — this is Hard-Rule-10 High-risk work, so it lands as
    `approved`, held for manual merge, never auto-merged.
-2. A real Firebase service-account key is minted (scoped as narrowly as the Firebase console
-   allows) and stored ONLY via `wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON` — never in this
-   repo, never pasted into a chat, never in a Worker `vars` block.
+2. A real Firebase service-account key is minted with the smallest practical Firestore IAM role
+   (never Owner/Editor) and stored ONLY via `wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON` —
+   never in this repo, never pasted into a chat, never in a Worker `vars` block. **Be precise about
+   what this does and doesn't scope:** Firestore IAM has no per-document restriction, so the
+   service-account credential itself can reach every document the granted role allows across the
+   whole database — the fixed `TARGET_UID` in this Worker's code is an APPLICATION-level
+   restriction, not an IAM one. Compromise of the service-account credential is therefore a
+   materially bigger blast radius than compromise of the bearer token alone (which only reaches
+   this Worker's fixed operations on one account); rotate and audit it accordingly.
 3. A real `BRIDGE_API_TOKEN` is generated (a long random value, not a password) and stored via
    `wrangler secret put BRIDGE_API_TOKEN` — the SAME value is later given to ChatGPT's connector
    config, nowhere else.

@@ -5,6 +5,96 @@
 
 ---
 
+## TASK-065 / D-082 — Conversational Control Bridge v1: fixes from independent STRICT review (branch: task-065)
+base: candidate `9961521` (previous entry below), NOT amended — this is a new commit on top.
+Builder note unchanged: built by Claude under the AI Dev OS's "Codex unavailable" exception.
+
+An independent STRICT review of `9961521` confirmed the architecture, auth model, concurrency
+model, Firestore adapter, and every other mechanism sound, and returned FIX FIRST on 5 bounded
+findings (2 must-fix, 3 low). All 5 fixed here; nothing else touched.
+
+changes:
+  - workers/conversational-bridge/src/operations/inventory.js: `isStapleRecord()` replaced by
+    `classifyStaple()`, a three-way call (`staple` / `non-staple` / `ambiguous`) — explicit flag
+    first, then the client's own category-only fallback (`staple !== false && category ===
+    'pantry'`), matching app.js's `isStaple()` as far as possible without `INGREDIENT_DB`.
+    `markOutOfStock()` now throws the new `AmbiguousError` for the residual `ambiguous` case
+    (no explicit flag, non-`'pantry'` category — confirmed against live seed data: `Garlic
+    (Bawang)`/`Evaporated Milk` are `isStaple: true` with category `Vegetable`/`Dairy`, and two
+    active `app.js` pantry-creation call sites store `staple: undefined` for unmatched custom
+    ingredients, so this is a real, common case) instead of guessing non-staple and risking a
+    destructive tombstone on what might actually be a staple.
+  - workers/conversational-bridge/src/errors.js: added `AmbiguousError` (uses the contract's
+    already-reserved `ambiguous` code) and `MalformedBodyError` (distinct from `ValidationError`
+    so malformed JSON can map to its own HTTP status).
+  - workers/conversational-bridge/src/operations/readyFood.js: `recordCookedFood()` now requires
+    an explicit `cookedDate` (`YYYY-MM-DD`, the caller's LOCAL calendar date) via a new
+    `validateCookedDate()` — rejects wrong shape, free-form text, and impossible calendar dates
+    (e.g. `2026-02-30`, which a regex alone would accept) by round-tripping through `Date.UTC()`
+    and checking every component. The Worker's own `new Date().toISOString().slice(0,10)` UTC
+    fallback is gone entirely — no silent guessing, since nothing is deployed yet and there is no
+    client compatibility obligation to preserve it for.
+  - workers/conversational-bridge/src/index.js: `readyFood.record`'s `BODY_SCHEMAS` entry now
+    requires `cookedDate`. `readJsonBody()` throws the new `MalformedBodyError` on a JSON.parse
+    failure (or empty body) instead of `ValidationError`, and `errorFromException()` maps
+    `MalformedBodyError` -> `400` and `AmbiguousError` -> `422 ambiguous`, keeping "syntactically
+    invalid JSON" (400) and "well-formed JSON, invalid domain value" (422) distinct per TASK-065's
+    contract (the first candidate had conflated them at 422).
+  - workers/conversational-bridge/openapi.yaml: `ready-food/record` requires `cookedDate`
+    (pattern + format + description of the local-date contract); a `MalformedBody` (400) response
+    added to all 6 POST endpoints; `mark-out-of-stock` gained a documented `422 ambiguous`
+    response; `ReadyFoodItem.cookedDate` description clarified as caller-supplied, never derived.
+  - workers/conversational-bridge/README.md: rewrote the two corrected judgment-call entries
+    (staple classification, cookedDate) with the live-data evidence and the new contract; added
+    explicit "malformed JSON vs. invalid content" and "`ambiguous` code" notes to the endpoint
+    contract section; strengthened the production-checklist service-account step per the review's
+    explicit instruction — Firestore IAM has no per-document restriction, so `TARGET_UID` is an
+    application-level scope, not an IAM one, and a compromised service-account credential has a
+    materially bigger blast radius than a compromised bearer token. Never claims the IAM role
+    itself is confined to one document.
+  - docs/DECISIONS.md: D-082 Status line updated (STRICT review verdict + fix summary); the
+    Implementation-addendum's items #1 and #4 rewritten to the corrected behavior; new
+    "Corrections after independent review" subsection explaining what changed and why, with 4 new
+    `Verify:` pointers added alongside the original 7 (110 total across the file now, up from 106
+    before this fix cycle — confirmed by `Verify-Decisions.ps1`'s own count, not hand arithmetic).
+  - TASKS.md: TASK-065 status note updated with the review verdict and fix summary; still
+    `status: review` (targeted re-review needed, not `done`).
+  - test/operations.node.js: added 3 pantry-classification tests (undecorated `category:'pantry'`
+    retains + empties, no tombstone; undecorated off-category `AmbiguousError` with nothing
+    mutated; an off-category record with an explicit `staple:true` still resolves normally) and 1
+    cookedDate test (missing/wrong-shape/free-form/impossible all rejected; a valid caller date is
+    preserved verbatim). Fixed the 3 existing `recordCookedFood(...)` call sites across
+    operations.node.js/security.node.js/consistency.node.js to pass `cookedDate` now that it's
+    required.
+  - test/security.node.js: added an HTTP-level `ambiguous` test (mark-out-of-stock on Garlic-like
+    fixture -> 422, store untouched) and its undecorated-but-safe `category:'pantry'` counterpart;
+    an HTTP-level cookedDate contract test (missing/impossible -> 422, valid preserved exactly,
+    store untouched by rejected attempts); rewrote the malformed-JSON test to assert 400 and added
+    an explicit companion assertion that a well-formed-but-invalid body is still 422 in the same
+    test, so the distinction is proven, not just each half in isolation; added 2 new tests for
+    Finding 5 (a genuinely oversized `Content-Length` request, and a chunked/streamed request with
+    no declared `Content-Length` exercising the bounded-reader path directly) — both assert zero
+    Firestore calls happened and the store is untouched, not just the HTTP status.
+tests: `npm run test:bridge` — 68/68 pass (exact runner counts, corrected per finding 3: 8
+  firestore.node.js, 7 auth.node.js, 20 operations.node.js, 28 security.node.js, 5
+  consistency.node.js). `npm run test:worker` — 9/9 pass, unaffected. `./tools/Verify-Decisions.ps1`
+  — 110/110 pointers hold. `./tools/Check-DocsConsistency.ps1` — output byte-identical to a clean
+  `main` baseline (zero new drift). `git diff --check` (staged) — clean. `node --check` on every
+  `.js` file under `workers/conversational-bridge/` — clean.
+blockers: none.
+deviations/gates not run (reported as SKIP, not PASS — same reasoning as the first candidate,
+  unchanged by this fix cycle): the full local Playwright suite (`npm test`) — this worktree still
+  has no `node_modules` installed, and this fix touches zero `app.js`/`index.html`/`style.css`
+  lines. Worker lint/type/build tooling — still none exists in this repo for any Worker. A real
+  `wrangler` deploy/dry-run — `wrangler` is still not an installed dependency here, and TASK-065
+  forbids deployment regardless; a dry run was allowed per the re-review brief but was skipped for
+  the same "not an installed dependency, would require a fresh network install" reason as the
+  first candidate, and it would exercise nothing this fix cycle actually changed.
+→ status remains `review` in `TASKS.md` (targeted re-review, not full re-review, since only the 5
+  bounded findings changed).
+
+---
+
 ## TASK-065 / D-082 — Conversational Control Bridge v1 candidate, built and locally tested (branch: task-065)
 base: `main` @ `d550de0`. Builder note: `owner: codex` in `TASKS.md`, but Codex was unavailable
 this cycle — built directly by Claude under the AI Dev OS's documented exception ("Codex is
