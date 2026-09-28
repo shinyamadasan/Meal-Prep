@@ -4711,8 +4711,13 @@ checkpoint A progress (2026-09-28):
   - BLOCKED before any credential was created: the Cloudflare API token in this environment
     (`CLOUDFLARE_API_TOKEN`, status active) can list Workers but has no Workers write access —
     a real `wrangler deploy` uploaded nothing (0 scripts in the account afterwards) and was denied
-    at `/deployments`. The account currently has zero Workers (recipe-import is not deployed
-    either). No GCP role, service account, key, Worker, or Worker secret exists yet.
+    at `/deployments`. No GCP role, service account, key, Worker, or Worker secret exists yet.
+  - CORRECTION (same day): an earlier version of this note said the account had zero Workers.
+    That was wrong. `GET .../workers/scripts` only lists what the token is allowed to see. The live
+    `meal-prep-recipe-import` Worker exists (the token got 403 on `workers/services/
+    meal-prep-recipe-import` but 404 on nonexistent names; the app's `RECIPE_IMPORT_ENDPOINT`
+    answers with the repo's exact `METHOD_NOT_ALLOWED` envelope), and the account's workers.dev
+    subdomain (`shinyamadasan`) already exists. Do not treat an empty list as "no Workers".
   - OPEN DECISION: the reviewed `wrangler.jsonc` sets `workers_dev: false`, so a deploy would have
     no public URL. Exposing one is an owner decision, and would change reviewed config.
 
