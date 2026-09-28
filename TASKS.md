@@ -4709,11 +4709,16 @@ checkpoint A progress (2026-09-28):
     bridge 68/68, recipe-import 9/9, node --check, Verify-Decisions 110/110, diff --check, secret
     scan clean, `wrangler deploy --dry-run` valid (no bindings, no vars).
   - BLOCKED before any credential was created: the Cloudflare API token in this environment
-    (`CLOUDFLARE_API_TOKEN`, status active) can list Workers but has no Workers write access —
-    a real `wrangler deploy` uploaded nothing (0 scripts in the account afterwards) and was denied
-    at `/deployments`. No GCP role, service account, key, Worker, or Worker secret exists yet.
-  - CORRECTION (same day): an earlier version of this note said the account had zero Workers.
-    That was wrong. `GET .../workers/scripts` only lists what the token is allowed to see. The live
+    (`CLOUDFLARE_API_TOKEN`, status active) has no Workers write access — a real `wrangler
+    deploy` was denied at `/deployments`. The failed attempt created no new Worker. The
+    restricted token's visible scripts list stayed empty afterwards; that did NOT prove the
+    account had zero Workers (see the CORRECTION below). No GCP role, service account, key,
+    Worker, or Worker secret exists yet.
+  - CORRECTION (same day): an earlier version of this note read that observation as "the account
+    has zero Workers" (originally recorded as "0 scripts in the account afterwards"). That was
+    wrong, and this correction is the authoritative current fact. Later read-only probes showed
+    that `meal-prep-recipe-import` already existed and was simply not visible to that token.
+    `GET .../workers/scripts` only lists what the token is allowed to see. The live
     `meal-prep-recipe-import` Worker exists (the token got 403 on `workers/services/
     meal-prep-recipe-import` but 404 on nonexistent names; the app's `RECIPE_IMPORT_ENDPOINT`
     answers with the repo's exact `METHOD_NOT_ALLOWED` envelope), and the account's workers.dev
@@ -4732,8 +4737,17 @@ checkpoint A progress (2026-09-28):
     product Admin if that is the only form that can create a new Worker). No DNS, Routes, KV, R2,
     billing, cache, security or AI permissions. Accepted limitation: for its short life it has
     Workers-level authority over `meal-prep-recipe-import` too. It is used only for bridge
-    provisioning, revoked right after bootstrap, then replaced by a per-Worker token scoped to
-    `meal-prep-conversational-bridge` only.
+    provisioning and revoked right after bootstrap. Creating the initially nonexistent Worker
+    may require Workers product/account-wide authority (per-Worker scope cannot apply to a Worker
+    that does not exist yet). Afterwards a per-Worker maintenance credential scoped to
+    `meal-prep-conversational-bridge` only is PREFERRED, but adopted ONLY IF Cloudflare supports
+    every maintenance operation actually needed at that narrower scope — deployment AND secret
+    maintenance (`wrangler secret put`). Neither has been tested against this account: the
+    per-Worker Editor role is documented as updating and deploying an existing Worker, but
+    coverage of secret changes was not confirmed in the documentation reviewed. If it does not
+    cover them, the fallback (a short-lived broader token
+    for secret rotation, or another owner-approved arrangement) is an owner decision, not
+    something to assume.
 
 checkpoint B — controlled first write + ChatGPT connection (NOT approved; requires a separate
   explicit owner decision after checkpoint A's evidence is reviewed).
