@@ -39,11 +39,13 @@ accepts a caller-supplied uid, collection name, or document path.
 
 ## Public exposure (workers.dev)
 
-`wrangler.jsonc` sets `workers_dev: true`, so once deployed the Worker is reachable on the public
-internet at `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev` (the account's
+`wrangler.jsonc` sets `workers_dev: true` and `preview_urls: false`, both explicitly rather than
+relying on Wrangler defaults. Once deployed, the production workers.dev hostname is the ONLY public
+hostname: `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev` (the account's
 existing workers.dev subdomain; the sibling `meal-prep-recipe-import` Worker lives on the same
-subdomain). There is no custom domain, no route, and no DNS change. Being publicly reachable means
-the bearer token is the ONLY gate on the URL: every request is rejected with `401` before any
+subdomain). Version/Preview URLs (`<version>-<name>.shinyamadasan.workers.dev`) are explicitly
+disabled. There is no custom domain, no route, and no DNS change. Being publicly reachable means
+the bearer token is the ONLY gate on the URL, and bearer authentication stays mandatory on it: every request is rejected with `401` before any
 routing, body parsing, or Firestore access unless it carries the exact `BRIDGE_API_TOKEN`. An
 deployed Worker with no `BRIDGE_API_TOKEN` configured also fails closed (covered by a test). (Before this setting was
 approved the config had `workers_dev: false`, which would have produced no URL at all.)

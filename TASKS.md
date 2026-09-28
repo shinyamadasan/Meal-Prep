@@ -4721,7 +4721,9 @@ checkpoint A progress (2026-09-28):
   - OWNER DECISION (2026-09-28): `workers_dev: true` APPROVED for the bridge, replacing the
     reviewed `false` (which would have given the Worker no URL). Expected endpoint:
     `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev`. The account's workers.dev
-    subdomain (`shinyamadasan`) already exists. NO custom domain, route, or DNS change is part of
+    subdomain (`shinyamadasan`) already exists. `preview_urls: false` is set explicitly alongside
+    it, so the production hostname is the only public hostname and Version/Preview URLs are
+    disabled (not left to Wrangler defaults). NO custom domain, route, or DNS change is part of
     this. The bearer token remains the only gate on that public URL. This is a config-only
     candidate awaiting a targeted re-review; no credential, Worker, or secret is created before
     that review returns PASS.
