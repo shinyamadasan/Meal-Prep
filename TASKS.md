@@ -4718,8 +4718,20 @@ checkpoint A progress (2026-09-28):
     meal-prep-recipe-import` but 404 on nonexistent names; the app's `RECIPE_IMPORT_ENDPOINT`
     answers with the repo's exact `METHOD_NOT_ALLOWED` envelope), and the account's workers.dev
     subdomain (`shinyamadasan`) already exists. Do not treat an empty list as "no Workers".
-  - OPEN DECISION: the reviewed `wrangler.jsonc` sets `workers_dev: false`, so a deploy would have
-    no public URL. Exposing one is an owner decision, and would change reviewed config.
+  - OWNER DECISION (2026-09-28): `workers_dev: true` APPROVED for the bridge, replacing the
+    reviewed `false` (which would have given the Worker no URL). Expected endpoint:
+    `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev`. The account's workers.dev
+    subdomain (`shinyamadasan`) already exists. NO custom domain, route, or DNS change is part of
+    this. The bearer token remains the only gate on that public URL. This is a config-only
+    candidate awaiting a targeted re-review; no credential, Worker, or secret is created before
+    that review returns PASS.
+  - BOOTSTRAP CREDENTIAL PLAN (owner-accepted): a short-lived, single-account Cloudflare token with
+    only the minimum Workers script create/deploy permission (Workers Scripts: Edit, or Workers
+    product Admin if that is the only form that can create a new Worker). No DNS, Routes, KV, R2,
+    billing, cache, security or AI permissions. Accepted limitation: for its short life it has
+    Workers-level authority over `meal-prep-recipe-import` too. It is used only for bridge
+    provisioning, revoked right after bootstrap, then replaced by a per-Worker token scoped to
+    `meal-prep-conversational-bridge` only.
 
 checkpoint B — controlled first write + ChatGPT connection (NOT approved; requires a separate
   explicit owner decision after checkpoint A's evidence is reviewed).

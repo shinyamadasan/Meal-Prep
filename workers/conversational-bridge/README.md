@@ -37,6 +37,17 @@ External client (ChatGPT connector)
 The Worker is hardcoded to exactly one Firestore document (`TARGET_UID`, a secret). No route
 accepts a caller-supplied uid, collection name, or document path.
 
+## Public exposure (workers.dev)
+
+`wrangler.jsonc` sets `workers_dev: true`, so once deployed the Worker is reachable on the public
+internet at `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev` (the account's
+existing workers.dev subdomain; the sibling `meal-prep-recipe-import` Worker lives on the same
+subdomain). There is no custom domain, no route, and no DNS change. Being publicly reachable means
+the bearer token is the ONLY gate on the URL: every request is rejected with `401` before any
+routing, body parsing, or Firestore access unless it carries the exact `BRIDGE_API_TOKEN`. An
+deployed Worker with no `BRIDGE_API_TOKEN` configured also fails closed (covered by a test). (Before this setting was
+approved the config had `workers_dev: false`, which would have produced no URL at all.)
+
 ## Required secrets
 
 Set with `wrangler secret put <NAME>` before any real deploy — never committed, never in
