@@ -4662,6 +4662,55 @@ merge gate:
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     TASK-066 · Conversational Bridge Production Enablement
+     Risk: CRITICAL · Execution: Solo (Hard Rule 10 — never chained)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-066 · Conversational Bridge Production Enablement
+status: in-progress (checkpoint A only; checkpoint B not started, not approved)
+owner: claude (builder, under the same "Codex unavailable" exception as TASK-065); every production
+  gate below needs explicit owner approval — no gate is implied by an earlier one.
+source: direct owner briefs 2026-09-28 ("APPROVE TASK-066 PHASE A", then "OWNER INPUTS READY").
+depends-on: TASK-065 (code integrated on `main` @ 7a49a3e, STRICT review PASS). TASK-065's own
+  scope text already separates code completion from production enablement; this task does not
+  reopen, rewrite, or re-status it. (Its status line still reads `review` although the code is
+  reviewed, integrated and pushed — under D-032 a clean PASS on red-zone work lands as `approved`
+  (held). That bookkeeping is the owner's/reviewer's call and is deliberately NOT changed here.)
+files: none in tracked source. Production state only: one dedicated GCP service account, Cloudflare
+  Worker `meal-prep-conversational-bridge` and its four Worker secrets. Evidence is recorded in
+  CHANGELOG.md / TEST_REPORT.md by name, never by value.
+branch: none — no product/security code changes are permitted in this task. If `workers/
+  conversational-bridge/` differs from 7a49a3e in any product or security respect, STOP and require
+  a fresh review before any deploy.
+
+objective:
+  Make the reviewed TASK-065 Worker real, in two owner-gated checkpoints, without ever exposing a
+  credential in chat, docs, logs, or git.
+
+checkpoint A — provision + deploy + READ-ONLY (approved 2026-09-28):
+  - Verify live GCP/Firebase/Cloudflare state and prove `TARGET_UID` (do not infer it).
+  - Create a NEW dedicated service account with the narrowest practical Firestore role; never
+    Owner/Editor, never the existing `firebase-adminsdk` account, never a personal credential.
+  - Store `FIREBASE_SERVICE_ACCOUNT_JSON`, `BRIDGE_API_TOKEN`, `TARGET_UID`, `FIRESTORE_PROJECT_ID`
+    only as Cloudflare Worker secrets (`wrangler secret put`); no plaintext copy survives.
+  - Deploy ONLY workers/conversational-bridge. recipe-import is not touched.
+  - Negative auth/security smokes first, then READ-ONLY calls: GET /v1/inventory, GET /v1/ready-food.
+  - Compare bridge reads to app canonical state; check logs for credential leakage; document
+    rotation / revocation / rollback / emergency stop.
+  - HARD BOUNDARY: ZERO bridge write endpoints are called. No ChatGPT. No MCP.
+
+checkpoint B — controlled first write + ChatGPT connection (NOT approved; requires a separate
+  explicit owner decision after checkpoint A's evidence is reviewed).
+
+honest scope note (must stay in every doc that describes this): Firestore IAM has no per-document
+  restriction. The service-account credential can reach whatever its role allows across the whole
+  `meal-prep-f8907` database; the fixed `TARGET_UID` inside the Worker is an APPLICATION-level
+  boundary, not an IAM one. Compromise of that key is a larger blast radius than compromise of the
+  bearer token alone.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
