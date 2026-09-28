@@ -4668,7 +4668,8 @@ merge gate:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-066 · Conversational Bridge Production Enablement
-status: in-progress (checkpoint A only; checkpoint B not started, not approved)
+status: in-progress (checkpoint A provisioning + read-only evidence COMPLETE 2026-09-28, awaiting
+  the final Phase-A evidence review; checkpoint B not started, not approved)
 owner: claude (builder, under the same "Codex unavailable" exception as TASK-065); every production
   gate below needs explicit owner approval — no gate is implied by an earlier one.
 source: direct owner briefs 2026-09-28 ("APPROVE TASK-066 PHASE A", then "OWNER INPUTS READY").
@@ -4748,6 +4749,58 @@ checkpoint A progress (2026-09-28):
     cover them, the fallback (a short-lived broader token
     for secret rotation, or another owner-approved arrangement) is an owner decision, not
     something to assume.
+
+checkpoint A RESULT (2026-09-28) — supersedes the "BLOCKED" and "no Worker/secret exists yet" notes
+  above, which stay as history:
+  - Worker `meal-prep-conversational-bridge` created from `main` @ 1c213f2 (reviewed source and
+    config unchanged; `workers_dev: true`, `preview_urls: false`). Public URL
+    `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev`. Version-prefixed preview
+    hostnames return 404. No routes, no custom domains, no bindings other than the four secrets.
+    (First attempt with the bootstrap token failed because its policy was scoped below product-level
+    Admin; the owner edited it to Workers/Admin/Entire Account, the retry succeeded. Nothing was
+    created by the failed attempts.)
+  - The broad bootstrap Workers-Admin token was used only to create the Worker. All later Cloudflare
+    work used a per-Worker Editor token scoped to the bridge: it sees only the bridge and is
+    denied (403) on `meal-prep-recipe-import`, and it successfully ran `wrangler secret put` — so
+    per-Worker Editor secret installation is now VERIFIED, while `secret delete` is not. Bootstrap
+    token revocation could not be inspected with the narrower token: UNVERIFIED (it was set to
+    expire 2026-09-28 23:59:59; the owner should confirm it is revoked).
+  - GCP (project `meal-prep-f8907`), all new, none pre-existing: service account
+    `meal-prep-bridge@meal-prep-f8907.iam.gserviceaccount.com`; project custom role
+    `projects/meal-prep-f8907/roles/mealPrepBridgeFirestore` containing EXACTLY
+    `datastore.entities.get` and `datastore.entities.update` (no create, delete or list); that role
+    is the service account's only project-level binding. One USER_MANAGED key (id
+    `13e1ffab597929c27372c13fc04302ffc90722a2`) plus Google's SYSTEM_MANAGED key. The key was
+    written to a protected temp file outside the repo, streamed straight into
+    `FIREBASE_SERVICE_ACCOUNT_JSON`, then overwritten and deleted (verified gone).
+  - Worker secrets present (names only): `BRIDGE_API_TOKEN`, `FIREBASE_SERVICE_ACCOUNT_JSON`,
+    `TARGET_UID`, `FIRESTORE_PROJECT_ID`. `TARGET_UID` was proven to resolve to the owner's account.
+    `BRIDGE_API_TOKEN` was rotated during the log check and its value was never persisted: nobody
+    currently holds a valid bridge token, which is intended — checkpoint B generates a fresh one.
+  - Read-only production smoke: no-auth and invalid-bearer requests to `/v1/inventory` and
+    `/v1/ready-food` -> 401 (before any secret existed, and again after). Authenticated GET
+    `/v1/inventory` -> 200, revision 29473, 97 items; GET `/v1/ready-food` -> 200, revision 29473,
+    1 item; both revisions equal the Firestore document `version`, the bridge's sorted pantry names
+    matched Firestore exactly, and the cookedMeal id sets matched. Responses carry only
+    `ok`, `revision`, `items`.
+  - No mutation: Firestore `version` 29473 and `updateTime` 01:48:06 were identical before and after
+    all bridge traffic, and a canonical (key-sorted) content hash of pantry/cookedMeals/deletions/
+    version was identical across repeated reads. (An earlier "content hash changed" reading was a
+    flaw in my first hash, which depended on JSON key order; it changed across three reads with no
+    write. The canonical hash was only measured after the first smoke, so it proves stability from
+    then on; the pre-smoke proof of no write is the unchanged `version` + `updateTime` and the
+    absence of any write path on GET routes.) ZERO bridge writes were performed.
+  - Logs: a live `wrangler tail` over four requests (2 x 401, 2 x 200) contained no bearer token
+    (valid or canary), no key material, no OAuth token, no `TARGET_UID`, and no response-body
+    fields; Cloudflare itself redacts the `authorization` header. The Worker emitted no console
+    logs or exceptions.
+  - Not re-verifiable with the narrow token: account custom domains and zone routes (403). The
+    bootstrap-token checks right after creation showed 0 custom domains, 0 zone routes, and a null
+    `routes` field, and only secrets were added afterwards.
+  - The `update` path (`datastore.entities.update` alone being sufficient for the reviewed PATCH)
+    is deliberately UNTESTED until checkpoint B's first controlled write.
+  - Operational runbook (rotate/revoke/disable/emergency stop): `workers/conversational-bridge/
+    README.md`, "Operations".
 
 checkpoint B — controlled first write + ChatGPT connection (NOT approved; requires a separate
   explicit owner decision after checkpoint A's evidence is reviewed).

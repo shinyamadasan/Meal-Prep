@@ -5,8 +5,13 @@ read and write the SAME canonical `pantry` (raw inventory) and `cookedMeals` (re
 state the app itself uses — never a competing model, never raw Firestore CRUD. Full design
 rationale: `docs/DECISIONS.md` D-082. Operation contract: `TASKS.md` TASK-065.
 
-**Status: local candidate only. Not deployed. No production secrets exist yet.** See
-"Production enablement checklist" below for exactly what must happen before this is real.
+**Status (TASK-066 checkpoint A, 2026-09-28): deployed and provisioned, READ-ONLY verified only.**
+The Worker exists at the workers.dev URL below with its four secrets installed. Only authenticated
+GET requests have been made against production; no bridge write has ever been performed and
+ChatGPT is not connected. The write path (`update` permission sufficiency, first controlled write)
+and the ChatGPT connection are checkpoint B and need a separate owner decision. The "Production
+enablement checklist" below is kept as the original plan; see `TASKS.md` TASK-066 for what was
+actually done.
 
 ## Architecture
 
@@ -163,6 +168,43 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
 UI). No Plan/Shop/Prep writes. No recipe generation. No MCP. No natural-language parsing inside
 the Worker — it accepts resolved, typed operations only.
+
+## Operations: rotation, revocation, emergency stop
+
+Names below are non-secret identifiers. GCP project `meal-prep-f8907`; service account
+`meal-prep-bridge@meal-prep-f8907.iam.gserviceaccount.com`; custom role
+`projects/meal-prep-f8907/roles/mealPrepBridgeFirestore` (exactly `datastore.entities.get` and
+`datastore.entities.update`). Never paste a secret value into chat, docs or a command line: feed
+it to `wrangler secret put` through stdin. `wrangler secret delete` and per-Worker Editor's
+ability to run it were not exercised in checkpoint A (only `secret put` was).
+
+- **Rotate `BRIDGE_API_TOKEN`:** generate a new random value from the OS CSPRNG, then
+  `wrangler secret put BRIDGE_API_TOKEN --config workers/conversational-bridge/wrangler.jsonc`
+  with the value on stdin. The old value stops working as soon as the new version is live. Update
+  the caller's copy last.
+- **Replace the service-account key:** create a new key, store it with
+  `wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON` (stdin), confirm a GET works, THEN delete
+  the old key: `gcloud iam service-accounts keys delete <KEY_ID> --iam-account=<service account>`.
+  Delete any temporary key file the moment the secret is stored.
+- **Remove a Worker secret:** `wrangler secret delete <NAME> --config ...` (untested here). A
+  Worker missing `BRIDGE_API_TOKEN` rejects every request with `401`; missing Firestore secrets
+  produce a sanitized `infrastructure_error`, never data.
+- **Disable or delete the Worker:** turning off its workers.dev route or deleting it needs a
+  credential above per-Worker Editor (Editor cannot delete): use the Cloudflare dashboard as the
+  account owner.
+- **Revoke Firestore access:** `gcloud projects remove-iam-policy-binding meal-prep-f8907
+  --member=serviceAccount:<service account> --role=projects/meal-prep-f8907/roles/mealPrepBridgeFirestore`,
+  then, if retiring the bridge, delete the service account and the custom role.
+- **Emergency stop (suspicious traffic), fastest first:** (1) delete the user-managed
+  service-account key (the Worker can no longer reach Firestore at all); (2) rotate
+  `BRIDGE_API_TOKEN` (the caller can no longer get past the door); (3) remove the IAM binding;
+  (4) disable or delete the Worker in the dashboard; (5) review what the Worker's requests did.
+  Step 1 needs GCP access (`gcloud`); step 2 needs only the per-Worker Editor token; step 4 needs
+  the Cloudflare dashboard.
+
+Accepted limits, stated plainly: the IAM role is not document-scoped, so a stolen service-account
+key can get and update any existing Firestore document in this project, not only
+`users/{TARGET_UID}`; the fixed `TARGET_UID` in the Worker is the application-level boundary.
 
 ## Production enablement checklist
 
