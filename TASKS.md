@@ -4700,6 +4700,22 @@ checkpoint A — provision + deploy + READ-ONLY (approved 2026-09-28):
     rotation / revocation / rollback / emergency stop.
   - HARD BOUNDARY: ZERO bridge write endpoints are called. No ChatGPT. No MCP.
 
+checkpoint A progress (2026-09-28):
+  - DONE, read-only: gcloud account `shinyamadasan.co@gmail.com` (project Owner) and project
+    `meal-prep-f8907` verified; `TARGET_UID` proven (Firebase Auth resolves it to that same email;
+    `users/{uid}` exists in Firestore `(default)`, asia-southeast1). Only pre-existing service
+    account is the standard `firebase-adminsdk` — not reused.
+  - DONE: pre-deploy gates on `main` (no drift from 7a49a3e in workers/, app files, package.json):
+    bridge 68/68, recipe-import 9/9, node --check, Verify-Decisions 110/110, diff --check, secret
+    scan clean, `wrangler deploy --dry-run` valid (no bindings, no vars).
+  - BLOCKED before any credential was created: the Cloudflare API token in this environment
+    (`CLOUDFLARE_API_TOKEN`, status active) can list Workers but has no Workers write access —
+    a real `wrangler deploy` uploaded nothing (0 scripts in the account afterwards) and was denied
+    at `/deployments`. The account currently has zero Workers (recipe-import is not deployed
+    either). No GCP role, service account, key, Worker, or Worker secret exists yet.
+  - OPEN DECISION: the reviewed `wrangler.jsonc` sets `workers_dev: false`, so a deploy would have
+    no public URL. Exposing one is an owner decision, and would change reviewed config.
+
 checkpoint B — controlled first write + ChatGPT connection (NOT approved; requires a separate
   explicit owner decision after checkpoint A's evidence is reviewed).
 
