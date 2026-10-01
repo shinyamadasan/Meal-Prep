@@ -4814,6 +4814,113 @@ honest scope note (must stay in every doc that describes this): Firestore IAM ha
 
 ---
 
+<!-- ═══════════════════════════════════════════════════════
+     TASK-067 · MCP Feasibility Spike
+     Risk: High · Execution: Solo (new remote protocol surface; local-only candidate)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-067 · MCP FEASIBILITY SPIKE
+status: codex
+owner: codex
+source: direct owner approval in the TASK-067 planning-only unblock. This task is intentionally
+  not Phase B implementation and does not authorize production enablement.
+depends-on: the integrated TASK-065 bridge and completed TASK-066 checkpoint A evidence. TASK-066
+  checkpoint B is not a dependency and remains unapproved.
+files: workers/conversational-bridge/** (only the MCP adapter, its focused tests, directly required
+  dependency metadata, and the bridge README); package.json and package-lock.json only if a root
+  test command or dependency lock update is genuinely required; CHANGELOG.md; TEST_REPORT.md;
+  TASKS.md status field only after this planning entry lands
+branch: task-067 (branch from the verified planning commit on main)
+
+objective:
+  Determine whether the owner's actual ChatGPT "Create MCP App" capability can connect to a custom
+  remote MCP endpoint and invoke BOTH a read-classified tool and a write-classified tool, while
+  both tools remain harmless, stateless probes that perform zero external mutation. Add only a thin
+  MCP adapter to the existing conversational-bridge Worker; do not move or duplicate canonical
+  meal-prep business rules. This local implementation is a feasibility candidate, not Phase B.
+
+acceptance:
+  - [ ] The existing Cloudflare Worker serves a standards-compliant MCP Streamable HTTP endpoint at
+        `/mcp`; no second server, process, or backend is introduced.
+  - [ ] `tools/list` exposes exactly two model-visible tools: `probe_read` and `probe_write`. No
+        real meal-prep tool (`get_inventory`, `get_ready_food`, `set_inventory_item`,
+        `mark_inventory_out`, `record_ready_food`, `remove_ready_food`, or equivalent) exists.
+  - [ ] `probe_read` accepts no inputs, returns harmless static data equivalent to
+        `{ ok:true, probe:"read" }`, and declares `readOnlyHint:true`, `destructiveHint:false`, and
+        `openWorldHint:false`.
+  - [ ] `probe_write` accepts no inputs, returns harmless static data equivalent to
+        `{ ok:true, probe:"write-classified-noop" }`, and declares `readOnlyHint:false`,
+        `destructiveHint:false`, `idempotentHint:true`, and `openWorldHint:false`.
+  - [ ] Both probes are structurally isolated from Firestore and the existing inventory/ready-food
+        domain operations. They make no external network call, write no Cloudflare or durable
+        state, alter no file, expose no user data, and perform zero durable or external mutation.
+  - [ ] Neither probe depends on or reads `TARGET_UID`, `FIREBASE_SERVICE_ACCOUNT_JSON`,
+        `FIRESTORE_PROJECT_ID`, or `BRIDGE_API_TOKEN`.
+  - [ ] Existing REST routes retain their current fail-closed bearer-auth boundary and request/
+        response behavior. MCP must not make `/v1/inventory`, `/v1/ready-food`, or any REST
+        mutation route reachable without their existing reviewed authorization and domain layers.
+  - [ ] Focused automated tests prove MCP initialize/handshake success; `tools/list` returns exactly
+        the two probes; every annotation above is exact; both tool calls succeed; neither probe
+        reaches Firestore, `fetch`, a meal-prep domain operation, or any mutation/state primitive;
+        malformed MCP requests and unknown tools fail safely with no secret or stack disclosure.
+  - [ ] Existing bridge tests remain green, including explicit REST bearer-auth regression
+        coverage for missing and incorrect credentials.
+  - [ ] The bridge README records the feasibility contract: this is NOT Phase B; local build/test
+        only; no deployment or ChatGPT configuration is authorized by this task.
+  - [ ] The README records the later live decision rule without claiming a result: PASS only when
+        the owner's real ChatGPT surface connects to a reviewed deployment and invokes BOTH probes;
+        FAIL if write-classified invocation is unavailable or the required connection/auth model
+        is disproportionately complex. PASS prefers MCP as a thin ChatGPT adapter; FAIL stops MCP
+        work and keeps the existing deterministic REST bridge.
+
+constraints:
+  - LOCAL IMPLEMENTATION ONLY. Do not deploy, configure ChatGPT, change a production Worker secret
+    or bearer, create a Cloudflare token, modify GCP IAM, create a service-account key, access
+    production Firestore, add a route/domain, or perform any production write.
+  - Phase A remains complete. Production bridge writes and ChatGPT integration remain unapproved.
+    `PRODUCTION_WRITE_COUNT` must remain 0 throughout this task.
+  - No backend, Supabase, or Firebase migration; no Firebase Functions rewrite; no redesign of the
+    canonical bridge/domain logic. MCP is an adapter only.
+  - Do not add any real inventory, ready-food, planning, shopping, prep, recipe, or natural-language
+    MCP tool. Do not duplicate business rules in the adapter.
+  - Prefer the official MCP SDK only if its current Streamable HTTP server approach integrates
+    cleanly with the existing Cloudflare Worker runtime. Do not add a second server/process to
+    accommodate it; record the exact dependency/runtime choice in `CHANGELOG.md`.
+  - Probe code must have no import or call path into `src/firestore.js` or
+    `src/operations/{inventory,readyFood}.js`. Tests must prove this isolation with spies/test
+    doubles in addition to code inspection.
+  - Do not log Authorization headers, bridge bearer values, service-account JSON, OAuth tokens,
+    `TARGET_UID`, or Firestore document bodies.
+  - Do not touch `app.js`, `index.html`, `style.css`, existing Playwright specs, Firestore rules,
+    docs outside the bridge README, or any unrelated worker.
+  - If a standards-compliant `/mcp` endpoint cannot coexist safely in the current Worker, or the
+    SDK requires a second process/backend or weakens REST auth, set `status: blocked` and record
+    the exact incompatibility instead of redesigning the backend.
+
+verification:
+  - [ ] Run the focused MCP test file directly; record its exact pass/fail count in
+        `TEST_REPORT.md`.
+  - [ ] Run `npm run test:bridge`; all existing and new bridge tests pass, with exact counts
+        recorded.
+  - [ ] Run explicit REST auth regression tests showing missing/wrong bearer credentials still
+        fail closed before Firestore or domain access.
+  - [ ] Run `node --check` on every changed/new JavaScript file.
+  - [ ] Run `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`;
+        validate only, never deploy.
+  - [ ] Run the repo-required `npm test` Playwright suite and record the result; the task must not
+        change any app or Playwright file.
+  - [ ] Run `tools/Verify-Decisions.ps1` and `tools/Check-DocsConsistency.ps1`; report only the
+        pre-existing docs-drift baseline, if any.
+  - [ ] Run a secret scan over the diff and changed files (the repo has no dedicated secret-scan
+        script), plus `git diff --check`; both must be clean.
+
+merge gate:
+  Hand off at `status: review`. A new independent reviewer must return PASS before any deployment.
+  Deployment and live ChatGPT testing are a separate, later owner-approved step; this task neither
+  authorizes nor performs them.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
