@@ -8,9 +8,10 @@ import {
   MCP_RESOURCE_METADATA,
   MCP_SCOPE,
   McpAuthError,
-  requireAccessOwner
+  requireAccessOwner,
+  requireMcpReadContext
 } from '../src/mcpAuth.js';
-import { OAUTH_PROVIDER_CONFIG, handleDefaultRequest } from '../src/oauth.js';
+import { OAUTH_PROVIDER_CONFIG, handleDefaultRequest, requireExactAuthorizationScope } from '../src/oauth.js';
 import { testEnv } from './support/fixtures.js';
 
 const NOW = 1_800_000_000;
@@ -22,7 +23,7 @@ publicJwk.kid = 'task-068-test-key';
 publicJwk.alg = 'RS256';
 const jwks = createLocalJWKSet({ keys: [publicJwk] });
 
-async function accessAssertion(overrides = {}, signingKey = privateKey) {
+async function accessAssertion(overrides = {}, signingKey = privateKey, kid = 'task-068-test-key') {
   const claims = Object.assign({
     type: 'app',
     email: 'changed-display-value@example.test',
@@ -34,7 +35,7 @@ async function accessAssertion(overrides = {}, signingKey = privateKey) {
     exp: NOW + 300
   }, overrides);
   return new SignJWT(claims)
-    .setProtectedHeader({ alg: 'RS256', kid: 'task-068-test-key', typ: 'JWT' })
+    .setProtectedHeader({ alg: 'RS256', kid, typ: 'JWT' })
     .sign(signingKey);
 }
 
@@ -42,7 +43,7 @@ function authorizeRequest(token, { method = 'GET', body } = {}) {
   const headers = {};
   if (token) headers['Cf-Access-Jwt-Assertion'] = token;
   if (body !== undefined) headers['Content-Type'] = 'application/x-www-form-urlencoded';
-  return new Request('https://meal-prep-conversational-bridge.shinyamadasan.workers.dev/authorize', {
+  return new Request('https://meal-prep-conversational-bridge.shinyamadasan.workers.dev/authorize?resource=' + encodeURIComponent(MCP_RESOURCE), {
     method,
     headers,
     body
@@ -103,6 +104,7 @@ test('missing, malformed, invalid-signature, expired, future, wrong issuer/audie
     { name: 'missing', token: null },
     { name: 'malformed', token: 'not-a-jwt' },
     { name: 'invalid-signature', token: await accessAssertion({}, otherKey.privateKey) },
+    { name: 'wrong-kid', token: await accessAssertion({}, privateKey, 'unusable-test-key') },
     { name: 'expired', token: await accessAssertion({ exp: NOW - 1 }) },
     { name: 'not-yet-valid', token: await accessAssertion({ nbf: NOW + 1 }) },
     { name: 'wrong-issuer', token: await accessAssertion({ iss: 'https://attacker.example' }) },
@@ -125,10 +127,48 @@ test('missing, malformed, invalid-signature, expired, future, wrong issuer/audie
   }
 });
 
+test('missing authorized-owner configuration fails closed', async () => {
+  const env = testEnv();
+  delete env.MCP_AUTHORIZED_OWNER_SUBJECT;
+  await assert.rejects(
+    requireAccessOwner(authorizeRequest(await accessAssertion()), env, {
+      jwks,
+      currentDate: new Date(NOW * 1000)
+    }),
+    (error) => error instanceof McpAuthError && error.code === 'auth_configuration_missing'
+  );
+  assert.throws(
+    () => requireMcpReadContext(env, {
+      auth: { token: 'opaque', audience: MCP_RESOURCE, expiresAt: NOW + 300, scope: [MCP_SCOPE], userId: 'test-owner-subject' },
+      props: { ownerSubject: 'test-owner-subject', issuer: MCP_ISSUER, resource: MCP_RESOURCE, notBefore: NOW - 5 }
+    }, NOW),
+    (error) => error instanceof McpAuthError && error.code === 'auth_configuration_missing'
+  );
+});
+
+test('authorization scope normalization accepts only the deduplicated mealprep:read set', () => {
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:read']), ['mealprep:read']);
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:read', 'mealprep:read']), ['mealprep:read']);
+  assert.deepEqual(requireExactAuthorizationScope('  mealprep:read  mealprep:read  '), ['mealprep:read']);
+  for (const scope of [undefined, '', [], 'mealprep:read\tmealprep:read', ['mealprep:write'], ['unknown'], ['mealprep:read', 'mealprep:write'], ['mealprep:read', 'unknown']]) {
+    assert.throws(() => requireExactAuthorizationScope(scope), (error) => error.name === 'AuthorizationError');
+  }
+});
+
 test('authorization GET requires the signed owner before parsing client metadata and escapes consent content', async () => {
   const calls = [];
   const oauth = {
-    parseAuthRequest: async () => { calls.push('parse'); return { clientId: 'https://chatgpt.com/oauth/client.json' }; },
+    parseAuthRequest: async () => {
+      calls.push('parse');
+      return {
+        clientId: 'https://chatgpt.com/oauth/client.json',
+        redirectUri: 'https://chatgpt.com/connector_platform_oauth_redirect',
+        scope: [MCP_SCOPE],
+        resource: MCP_RESOURCE,
+        state: 'test-state',
+        issuer: MCP_ISSUER
+      };
+    },
     describeConsent: async () => ({
       clientName: '<script>alert(1)</script>',
       clientDomain: 'chatgpt.com',
@@ -156,6 +196,7 @@ test('authorization GET requires the signed owner before parsing client metadata
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /&#60;script&#62;/);
   assert.match(html, /read-only access/);
+  assert.match(html, /<code>mealprep:read<\/code>/);
   assert.deepEqual(calls, ['parse']);
 
   calls.length = 0;
@@ -206,6 +247,35 @@ test('authorization POST grants only mealprep:read to the configured owner and f
     notBefore: NOW
   });
   assert.doesNotMatch(JSON.stringify(completedOptions), /mealprep:write|attacker/);
+});
+
+test('authorization POST rejects a stored unsupported request before grant creation', async () => {
+  let completed = 0;
+  const oauth = {
+    approveConsent: async () => ({
+      request: {
+        clientId: 'https://chatgpt.com/oauth/client.json',
+        redirectUri: 'https://chatgpt.com/connector_platform_oauth_redirect',
+        scope: ['mealprep:write'],
+        resource: MCP_RESOURCE,
+        state: 'test-state',
+        issuer: MCP_ISSUER
+      },
+      headers: new Headers()
+    }),
+    completeAuthorization: async () => { completed += 1; throw new Error('must not complete'); }
+  };
+  const response = await handleDefaultRequest(authorizeRequest(await accessAssertion(), {
+    method: 'POST',
+    body: 'handle=stored-handle&decision=approve'
+  }), testEnv(), {
+    oauth,
+    jwks,
+    currentDate: new Date(NOW * 1000)
+  });
+  assert.equal(response.status, 302);
+  assert.equal(new URL(response.headers.get('Location')).searchParams.get('error'), 'invalid_scope');
+  assert.equal(completed, 0);
 });
 
 test('non-authorization requests remain delegated to the unchanged REST handler', async () => {

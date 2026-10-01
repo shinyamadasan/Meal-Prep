@@ -5,6 +5,46 @@
 
 ---
 
+## TASK-068 fix-first correction · 2026-10-01
+suite: `node --test workers/conversational-bridge/test/mcp-auth.node.js
+  workers/conversational-bridge/test/oauth-provider-integration.node.js`; `npm run test:bridge`;
+  `node --test workers/conversational-bridge/test/auth.node.js`; `npm test`; `node --check` on all
+  3 changed/new JavaScript files; `npm audit --omit=dev` from the bridge; `npx wrangler deploy
+  --dry-run --config workers/conversational-bridge/wrangler.jsonc`; `tools/Verify-Decisions.ps1`;
+  `tools/Check-DocsConsistency.ps1`; staged `git diff --check`; delta secret/QA scan
+result:
+  - Focused OAuth/provider: 16/16 passed, 0 failed/skipped. The installed
+    `@cloudflare/workers-oauth-provider` request path is exercised with in-memory KV, fake CIMD
+    documents, and throwaway RSA keys. Exact/deduplicated read scope, missing/write/unknown/mixed
+    scope rejection, exact consent scope display, current public-client CIMD negotiation to `none`,
+    incompatible metadata/auth, redirect validation, valid/missing/wrong PKCE, code replay,
+    authorization/token resource enforcement, opaque-token failures, production discovery /
+    challenge output, and complete grant revocation all pass.
+  - Access JWT additions: wrong `kid` / unusable JWKS selection and missing
+    `MCP_AUTHORIZED_OWNER_SUBJECT` fail closed on authorization and protected-context checks.
+  - Revocation: a real provider-issued access/refresh pair initially authorizes; provider
+    `revokeGrant(grantId, userId)` deletes all associated access-token records and the grant holding
+    refresh-token state. The old access token returns `invalid_token`, the old refresh token returns
+    `invalid_grant`, and provider grant/token listings are empty.
+  - Full bridge: 94/94 passed, 0 failed/skipped. Focused REST auth: 7/7 passed. The existing
+    `get_inventory` / `get_ready_food` mappings, zero-mutation assertions, owner authorization,
+    challenges, and REST↔MCP credential isolation remain green.
+  - Full local Playwright: 711/711 passed, 0 failed/skipped (`npm test`, 1.9 minutes).
+  - Syntax: all 3 changed/new JavaScript files passed `node --check`.
+  - Dependency audit: 0 vulnerabilities. Wrangler 4.145.0 dry-run bundled at 1544.67 KiB /
+    gzip 281.24 KiB, found no configured binding, and exited without deployment.
+  - Verify-Decisions: all 110 pointers hold. Check-DocsConsistency: exit 1 with the same 51
+    pre-existing candidates from unchanged scanned app/docs files; this correction changes none of
+    those inputs and introduces zero new drift.
+  - Staged `git diff --check`, delta secret scan, SELF_REVIEW code-health gate, and applicable QA
+    checks pass; "Would I ship this?" = yes.
+untested: live OAuth/Access/KV provisioning, production deployment, owner ChatGPT linking,
+  production Firestore, and every production write remain forbidden and were not attempted.
+  `DEPLOYED=false`; `LIVE_OAUTH_RESOURCES_CREATED=false`; `FIRESTORE_ACCESSED=false`;
+  `PRODUCTION_WRITE_COUNT=0`; `CHATGPT_PRIVATE_DATA_CONFIGURED=false`.
+
+---
+
 ## TASK-068 · 2026-10-01
 suite: `node --test workers/conversational-bridge/test/mcp-auth.node.js
   workers/conversational-bridge/test/mcp.node.js`; `npm run test:bridge`; `npm test`; `node --check`

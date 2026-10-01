@@ -118,8 +118,12 @@ Project decisions:
 - Canonical protected resource: the same origin plus `/mcp`; metadata is at
   `/.well-known/oauth-protected-resource/mcp` and authorization-server metadata is at
   `/.well-known/oauth-authorization-server`.
-- Only `mealprep:read` is advertised, requested, granted, and accepted. `mealprep:write` is neither
-  configured nor accepted as a substitute.
+- Authorization requests must contain a scope set equal to exactly `{ mealprep:read }` before a
+  consent transaction is created and again before a grant is written. OAuth's ASCII-space
+  delimiters are normalized and exact duplicate `mealprep:read` tokens are deduplicated; missing, empty, unknown,
+  write, or mixed scope sets are rejected rather than replaced with read access. The consent page
+  displays the exact `mealprep:read` scope. `mealprep:write` is neither configured nor accepted as
+  a substitute.
 - Client registration is CIMD only; DCR is not enabled. The provider accepts the public-client
   `none` token-endpoint method with PKCE. Because the provider advertises RFC 9207 issuer
   identification, the expected current ChatGPT values are client id
@@ -130,6 +134,8 @@ Project decisions:
   refresh grants. It validates token existence, expiry, and exact audience from KV before invoking
   MCP. The MCP handler then rechecks expiry, exact resource, exact one-scope set, issuer/resource
   properties fixed at authorization, and both copies of the configured owner subject.
+- The canonical `resource` is required explicitly on both authorization-code authorization and
+  token/refresh requests; missing, alternate-host, and other-resource values fail closed.
 - Owner sign-in is independently gated by a path-specific Access policy and by Worker validation
   of `Cf-Access-Jwt-Assertion`. Authorization uses only the exact configured stable Access `sub`;
   email, display fields, field order, and caller form values cannot select the owner.
@@ -175,7 +181,7 @@ TASK-068 deliberately leaves it out of `wrangler.jsonc`; no live namespace exist
 From the repository root:
 
 ```powershell
-node --test workers/conversational-bridge/test/mcp-auth.node.js workers/conversational-bridge/test/mcp.node.js
+node --test workers/conversational-bridge/test/mcp-auth.node.js workers/conversational-bridge/test/oauth-provider-integration.node.js workers/conversational-bridge/test/mcp.node.js
 npm run test:bridge
 ```
 
@@ -186,13 +192,16 @@ cd workers/conversational-bridge
 npm test
 ```
 
-Every test runs against an in-memory fake Firestore and throwaway RSA test keys — no real
-credential, production data, or production Firestore call. TASK-068 coverage includes provider
-configuration, signed Access assertion validation, every required adverse token/owner/scope/
-resource case, escaped consent, fixed read-only grants, per-tool metadata, canonical read results/
-revisions/stable ids, zero-mutation assertions, REST/OAuth credential crossing, and exact/near-path
-routing. The existing bridge codec, domain, chaos/security, and app<->bridge consistency suites
-still run unchanged.
+Every test runs against in-memory fake Firestore/KV bindings and throwaway RSA test keys — no real
+credential, production data, or production Firestore call. The provider integration suite loads
+the installed `@cloudflare/workers-oauth-provider` implementation and exercises its real request
+path for production-origin discovery/challenges, CIMD negotiation, redirect validation, exact
+scope/resource policy, authorization-code + PKCE exchange, code replay, opaque bearer validation,
+and complete `revokeGrant()` behavior. The remaining TASK-068 coverage includes signed Access
+assertion edge cases, owner/scope checks, per-tool metadata, canonical read results/revisions/stable
+ids, zero-mutation assertions, REST/OAuth credential crossing, and exact/near-path routing. The
+existing bridge codec, domain, chaos/security, and app<->bridge consistency suites still run
+unchanged.
 
 Worker deployment dry run (does not require secrets to be set, since `--dry-run` doesn't execute):
 
@@ -309,11 +318,20 @@ ability to run it were not exercised in checkpoint A (only `secret put` was).
   (4) disable or delete the Worker in the dashboard; (5) review what the Worker's requests did.
   Step 1 needs GCP access (`gcloud`); step 2 needs only the per-Worker Editor token; step 4 needs
   the Cloudflare dashboard.
-- **Revoke MCP access after TASK-068 is provisioned:** revoke/delete the provider grant in
-  `OAUTH_KV` (or rotate/delete the namespace when retiring all grants), remove or deny the Access
-  policy, and disconnect the ChatGPT app. Removing the owner subject secret makes authorization
-  and protected tool calls fail closed. Short-lived access tokens still expire after 15 minutes;
-  do not treat expiry alone as incident response.
+- **Revoke MCP access after TASK-068 is provisioned:** from a separately authorized, non-public
+  operator path using the same `OAUTH_KV` binding, call the provider's
+  `listUserGrants(configuredOwnerSubject)` (following pagination) and then
+  `revokeGrant(grant.id, configuredOwnerSubject)` for every returned grant, using the same exact
+  owner-subject value used when the grant was created. Do not manually delete a
+  `grant:*` key: provider 1.2.1's supported operation first enumerates and deletes every associated
+  `token:<user>:<grant>:*` access-token record, then deletes the grant record that contains the
+  refresh-token identifiers/wrapped key. Local provider-path coverage proves the old access token
+  then returns `invalid_token`, the old refresh token returns `invalid_grant`, and grant/token state
+  is gone. No public admin/revocation endpoint exists or should be added for this operation. After
+  provider revocation, remove or deny the Access policy and disconnect the ChatGPT app; deleting
+  the dedicated namespace is an all-grants retirement option. Removing the owner subject secret
+  makes authorization and protected tool calls fail closed. Do not treat 15-minute access-token
+  expiry alone as incident response.
 
 Accepted limits, stated plainly: the IAM role is not document-scoped, so a stolen service-account
 key can get and update any existing Firestore document in this project, not only

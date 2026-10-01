@@ -5,6 +5,35 @@
 
 ---
 
+## TASK-068 — fix-first correction (branch: task-068)
+base: reviewed candidate `4253d0a8775e517ff36f39598ce9bf10f621d77d`; correction committed separately, not amended
+changed:
+  - workers/conversational-bridge/src/oauth.js (exact deduplicated `mealprep:read` authorization
+    policy before consent and grant creation, exact consent display, explicit canonical resource on
+    authorization/token requests, and a real-provider construction seam; 78 added / 7 removed loc)
+  - workers/conversational-bridge/test/oauth-provider-integration.node.js (actual installed-provider
+    request-path coverage with fake local KV/CIMD/keys for scopes, client negotiation, PKCE/replay,
+    resource binding, bearer denial, production discovery/challenge, and complete revocation;
+    515 loc)
+  - workers/conversational-bridge/test/mcp-auth.node.js (wrong-kid, missing-owner configuration,
+    exact scope normalization, exact consent display, and stale unsupported-consent defense;
+    76 added / 6 removed loc)
+  - workers/conversational-bridge/README.md (exact scope/resource rules, production-faithful test
+    coverage, and provider-supported `listUserGrants()` + `revokeGrant()` runbook; 33 added /
+    15 removed loc)
+tests: focused OAuth/provider 16/16 pass; full bridge 94/94 pass; REST auth 7/7 pass; full local
+  Playwright 711/711 pass; 3 changed/new JavaScript syntax checks pass; Wrangler 4.145.0 dry-run
+  bundles successfully; npm audit reports 0 vulnerabilities; Verify-Decisions 110/110; complete
+  evidence in TEST_REPORT.md
+blockers: none
+deviations: none in implementation scope. TASK-068 remains local-only: no deployment, live OAuth /
+  Access / KV resource, private ChatGPT connection, production Firestore access, or production
+  write occurred. Check-DocsConsistency retains the same 51 pre-existing candidates from unchanged
+  app/docs inputs.
+→ TASK-068 remains `review` in TASKS.md for targeted re-review
+
+---
+
 ## TASK-068 — done (branch: task-068)
 changed:
   - workers/conversational-bridge/src/oauth.js (Cloudflare Workers OAuth Provider integration,
