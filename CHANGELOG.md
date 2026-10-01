@@ -5,6 +5,37 @@
 
 ---
 
+## TASK-067 — done (branch: task-067)
+changed:
+  - workers/conversational-bridge/src/mcp.js (new stateless `/mcp` adapter using the official
+    `@modelcontextprotocol/server` v2 Web-standard Streamable HTTP handler; exactly
+    `probe_read` and `probe_write`, strict zero-input schemas, exact annotations, static results,
+    and Host/Origin validation; 85 loc)
+  - workers/conversational-bridge/src/index.js (`routeRequest()` dispatches only exact `/mcp`
+    requests to the isolated adapter before the unchanged REST handler; 8 added / 1 changed loc)
+  - workers/conversational-bridge/test/mcp.node.js (11 focused protocol, annotation, invocation,
+    isolation, failure, Host/Origin, and REST-auth regression cases; 194 loc)
+  - workers/conversational-bridge/package.json and package-lock.json (pin the only two direct
+    runtime dependencies: `@modelcontextprotocol/server@2.2.0` for the official stateless
+    Streamable HTTP/server implementation and `zod@4.6.5` for strict input/output schemas;
+    transitive `@modelcontextprotocol/core@2.2.0` only; 52 added loc)
+  - workers/conversational-bridge/README.md (local-only feasibility architecture, zero-mutation
+    boundary, exact tool contract, dependency/transport choice, and the later live PASS/FAIL rule
+    without claiming a result; 46 added / 3 changed loc)
+tests: focused MCP 11/11 pass; full bridge 79/79 pass; explicit REST missing/wrong-bearer
+  regression 1/1 pass; full local Playwright 711/711 pass; changed-JS syntax checks pass;
+  Wrangler 4.145.0 deploy dry-run bundles successfully and exits without deployment; npm audit
+  reports 0 vulnerabilities; Verify-Decisions 110/110; git/delta secret/QA checks recorded in
+  TEST_REPORT.md
+blockers: none
+deviations: live deployment and the owner's actual ChatGPT Create MCP App invocation are
+  deliberately untested and unclaimed; those are separately authorized only after independent
+  review. `Check-DocsConsistency.ps1` still reports the 51 pre-existing drift candidates from
+  unchanged docs/app inputs; TASK-067 adds zero scanned-file drift.
+→ status set to `review` in TASKS.md
+
+---
+
 ## TASK-065 / D-082 — Conversational Control Bridge v1: fixes from independent STRICT review (branch: task-065)
 base: candidate `9961521` (previous entry below), NOT amended — this is a new commit on top.
 Builder note unchanged: built by Claude under the AI Dev OS's "Codex unavailable" exception.

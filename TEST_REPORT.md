@@ -5,6 +5,41 @@
 
 ---
 
+## TASK-067 · 2026-09-30
+suite: `node --test workers/conversational-bridge/test/mcp.node.js`; `npm run test:bridge`;
+  explicit REST-auth `--test-name-pattern`; changed-file `node --check`; `npm test`;
+  `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`;
+  `npm audit --omit=dev`; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`;
+  staged `git diff --check`; delta secret scan and QA greps
+result:
+  - Focused MCP: 11/11 passed, 0 failed/skipped. Initialize plus initialized notification
+    succeed; `tools/list` exposes exactly `probe_read` and `probe_write`; annotations and strict
+    empty schemas are exact; both static calls succeed; malformed JSON, unknown tool, unsupported
+    HTTP methods/media type, and hostile Host/Origin fail safely.
+  - Isolation is exercised, not assumed: a throwing environment Proxy, injected token/read/write/
+    fetch spies, and a temporary global-fetch trap all remain untouched for both probes. A source
+    boundary assertion independently confirms `src/mcp.js` has no Firestore/domain/secret/durable-
+    state import or call path.
+  - Full bridge: 79/79 passed, 0 failed/skipped. Explicit focused REST auth regression: 1/1 passed
+    for both missing and wrong bearer values, with zero token, Firestore, domain, or fetch access.
+  - Full local Playwright: 711/711 passed, 0 failed/skipped (`npm test`, 2.0 minutes).
+  - `node --check`: all 3 changed/new JavaScript files passed.
+  - Wrangler 4.145.0 dry-run: bundle succeeded (1244.31 KiB / gzip 215.98 KiB), no bindings,
+    `--dry-run: exiting now`; no deployment occurred.
+  - Dependency audit: 0 vulnerabilities. Direct dependencies are pinned to
+    `@modelcontextprotocol/server@2.2.0` and `zod@4.6.5`; no unrelated package upgrade.
+  - Verify-Decisions: 110/110 pointers hold. Check-DocsConsistency: exit 1 with the same 51
+    pre-existing potential drift items; TASK-067 changes none of that script's scanned inputs
+    (`docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/DECISIONS.md`, `CLAUDE.md`, app files, or
+    automation scripts), so it introduces zero new drift.
+  - Staged `git diff --check`, delta secret scan, intended-file/QA greps: clean.
+untested: live ChatGPT connection and invocation, production deployment, production Firestore,
+  production secrets, Cloudflare state, and GCP IAM. These are explicitly outside TASK-067 and
+  remain separately gated. `FIRESTORE_ACCESSED=false`; `PRODUCTION_WRITE_COUNT=0`;
+  `DEPLOYED=false`; `CHATGPT_CONFIGURED=false`.
+
+---
+
 ## TASK-065 / D-082 Conversational Control Bridge v1 — fixes from independent STRICT review · 2026-09-27
 suite: `node --test workers/conversational-bridge/test/*.node.js` (via `npm run test:bridge`),
   same in-memory fake Firestore / throwaway test keypair as the entry below — zero network, zero

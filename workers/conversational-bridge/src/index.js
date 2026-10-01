@@ -7,14 +7,21 @@ import { getUserDocument, patchUserDocument, RevisionConflictError, Infrastructu
 import { NotFoundError, ValidationError, InsufficientServingsError, AmbiguousError, MalformedBodyError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
+import { handleMcpRequest } from './mcp.js';
 
 const MAX_BODY_BYTES = 8 * 1024;
 
 export default {
   async fetch(request, env) {
-    return handleRequest(request, env || {});
+    return routeRequest(request, env || {});
   }
 };
+
+export function routeRequest(request, env = {}, deps = {}) {
+  const url = new URL(request.url);
+  if (url.pathname === '/mcp') return handleMcpRequest(request);
+  return handleRequest(request, env, deps);
+}
 
 export async function handleRequest(request, env = {}, deps = {}) {
   const fetchImpl = deps.fetchImpl || fetch;

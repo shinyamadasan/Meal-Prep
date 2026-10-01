@@ -5,13 +5,18 @@ read and write the SAME canonical `pantry` (raw inventory) and `cookedMeals` (re
 state the app itself uses — never a competing model, never raw Firestore CRUD. Full design
 rationale: `docs/DECISIONS.md` D-082. Operation contract: `TASKS.md` TASK-065.
 
-**Status (TASK-066 checkpoint A, 2026-09-28): deployed and provisioned, READ-ONLY verified only.**
+**Production status (TASK-066 checkpoint A, 2026-09-28): deployed and provisioned, READ-ONLY
+verified only.**
 The Worker exists at the workers.dev URL below with its four secrets installed. Only authenticated
 GET requests have been made against production; no bridge write has ever been performed and
 ChatGPT is not connected. The write path (`update` permission sufficiency, first controlled write)
 and the ChatGPT connection are checkpoint B and need a separate owner decision. The "Production
 enablement checklist" below records the current checkpoint status; see `TASKS.md` TASK-066 for the
 detailed evidence.
+
+**Local candidate status (TASK-067): an MCP feasibility endpoint now exists in source only.** It
+has not been deployed and ChatGPT has not been configured. The deployed checkpoint-A Worker does
+not include this candidate until a separate review and deployment approval occur.
 
 ## Architecture
 
@@ -41,6 +46,41 @@ External client (ChatGPT connector)
 
 The Worker is hardcoded to exactly one Firestore document (`TARGET_UID`, a secret). No route
 accepts a caller-supplied uid, collection name, or document path.
+
+## TASK-067 MCP feasibility spike (local only)
+
+`/mcp` is a thin, stateless protocol surface in the existing Worker, implemented with the official
+`@modelcontextprotocol/server` v2 Web-standard Streamable HTTP handler and `zod` schemas. It does
+not add another server, process, Durable Object, storage binding, or framework. The handler creates
+a fresh MCP server per request and keeps legacy stateless initialize compatibility for clients that
+still use that handshake.
+
+The endpoint exposes exactly two tools:
+
+| Tool | Classification | Behavior |
+|---|---|---|
+| `probe_read` | `readOnlyHint: true`, non-destructive, closed-world | Returns static `{ "ok": true, "probe": "read" }`. |
+| `probe_write` | `readOnlyHint: false`, non-destructive, idempotent, closed-world | Returns static `{ "ok": true, "probe": "write-classified-noop" }`. |
+
+Both schemas accept no inputs. Both implementations are pure no-ops: `src/mcp.js` imports no bridge
+domain or Firestore module, receives no Worker environment, reads no secret, calls no network, and
+creates no durable state. `/mcp` is therefore intentionally unauthenticated for this bounded probe.
+That exception does not extend to product data or actions. Every existing `/v1/*` route still takes
+the unchanged REST path through `BRIDGE_API_TOKEN` validation before token exchange, Firestore, or
+domain work. No real inventory, ready-food, planning, shopping, prep, recipe, or natural-language
+MCP tool exists in this spike.
+
+This is an MCP **feasibility spike**, not Phase B implementation. The later live decision remains:
+
+- **PASS:** after independent review and separate deployment authorization, the owner's real
+  ChatGPT Create MCP App surface connects to the reviewed endpoint and invokes both `probe_read`
+  and `probe_write`. MCP then becomes the preferred thin ChatGPT adapter in front of the existing
+  deterministic bridge/domain layer.
+- **FAIL:** the write-classified tool cannot be invoked, or the required connection/auth model adds
+  disproportionate complexity. Stop MCP work and use the existing deterministic REST bridge.
+
+No PASS or FAIL result is claimed here; TASK-067 performs local implementation and verification
+only. Deployment and ChatGPT configuration remain separately gated.
 
 ## Public exposure (workers.dev)
 
@@ -72,6 +112,7 @@ Set with `wrangler secret put <NAME>` before any real deploy — never committed
 From the repository root:
 
 ```powershell
+node --test workers/conversational-bridge/test/mcp.node.js
 npm run test:bridge
 ```
 
@@ -166,8 +207,10 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 ## Not in v1 (by design — see D-082)
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
-UI). No Plan/Shop/Prep writes. No recipe generation. No MCP. No natural-language parsing inside
-the Worker — it accepts resolved, typed operations only.
+UI). No Plan/Shop/Prep writes. No recipe generation. No real meal-prep MCP tools. TASK-067 adds
+only the two static, no-op feasibility probes documented above; it does not expose these domain
+operations over MCP. No natural-language parsing inside the Worker — its REST surface accepts
+resolved, typed operations only.
 
 ## Operations: rotation, revocation, emergency stop
 

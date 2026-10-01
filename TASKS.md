@@ -4820,7 +4820,7 @@ honest scope note (must stay in every doc that describes this): Firestore IAM ha
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-067 · MCP FEASIBILITY SPIKE
-status: codex
+status: review
 owner: codex
 source: direct owner approval in the TASK-067 planning-only unblock. This task is intentionally
   not Phase B implementation and does not authorize production enablement.
