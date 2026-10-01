@@ -4680,7 +4680,8 @@ depends-on: TASK-065 (code integrated on `main` @ 7a49a3e, STRICT review PASS). 
   (held). That bookkeeping is the owner's/reviewer's call and is deliberately NOT changed here.)
 files: none in tracked source. Production state only: one dedicated GCP service account, Cloudflare
   Worker `meal-prep-conversational-bridge` and its four Worker secrets. Evidence is recorded in
-  CHANGELOG.md / TEST_REPORT.md by name, never by value.
+  this task's `checkpoint A RESULT` below and in `workers/conversational-bridge/README.md` by name,
+  never by value.
 branch: none — no product/security code changes are permitted in this task. If `workers/
   conversational-bridge/` differs from 7a49a3e in any product or security respect, STOP and require
   a fresh review before any deploy.

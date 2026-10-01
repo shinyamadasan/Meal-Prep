@@ -10,8 +10,8 @@ The Worker exists at the workers.dev URL below with its four secrets installed. 
 GET requests have been made against production; no bridge write has ever been performed and
 ChatGPT is not connected. The write path (`update` permission sufficiency, first controlled write)
 and the ChatGPT connection are checkpoint B and need a separate owner decision. The "Production
-enablement checklist" below is kept as the original plan; see `TASKS.md` TASK-066 for what was
-actually done.
+enablement checklist" below records the current checkpoint status; see `TASKS.md` TASK-066 for the
+detailed evidence.
 
 ## Architecture
 
@@ -208,31 +208,20 @@ key can get and update any existing Firestore document in this project, not only
 
 ## Production enablement checklist
 
-This candidate is built and locally tested. None of the following has happened, and none of it
-happens automatically:
+Checkpoint A is complete and read-only production access is live:
 
-1. A human reviews this branch (see `REVIEW.md` once filed) and approves it per the AI Dev OS
-   risk-gated merge process (D-032) — this is Hard-Rule-10 High-risk work, so it lands as
-   `approved`, held for manual merge, never auto-merged.
-2. A real Firebase service-account key is minted with the smallest practical Firestore IAM role
-   (never Owner/Editor) and stored ONLY via `wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON` —
-   never in this repo, never pasted into a chat, never in a Worker `vars` block. **Be precise about
-   what this does and doesn't scope:** Firestore IAM has no per-document restriction, so the
-   service-account credential itself can reach every document the granted role allows across the
-   whole database — the fixed `TARGET_UID` in this Worker's code is an APPLICATION-level
-   restriction, not an IAM one. Compromise of the service-account credential is therefore a
-   materially bigger blast radius than compromise of the bearer token alone (which only reaches
-   this Worker's fixed operations on one account); rotate and audit it accordingly.
-3. A real `BRIDGE_API_TOKEN` is generated (a long random value, not a password) and stored via
-   `wrangler secret put BRIDGE_API_TOKEN` — the SAME value is later given to ChatGPT's connector
-   config, nowhere else.
-4. `TARGET_UID` and `FIRESTORE_PROJECT_ID` secrets are set to the real account's values.
-5. `npx wrangler deploy --config workers/conversational-bridge/wrangler.jsonc` is run deliberately
-   by a human, not by any agent.
-6. The deployed Worker is smoke-tested directly (curl/Postman) against the REAL account's data
-   before anything else touches it — read-only operations first.
-7. Only after step 6 passes is a ChatGPT connector/Action configured, pointed at the deployed
-   Worker URL, using the OpenAPI contract in `openapi.yaml` and the bearer token from step 3.
+- [x] Worker deployed to the production workers.dev endpoint.
+- [x] Production workers.dev endpoint is live; Version/Preview URLs are disabled.
+- [x] All four Worker secrets are installed: `BRIDGE_API_TOKEN`,
+  `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIRESTORE_PROJECT_ID`, and `TARGET_UID`.
+- [x] A dedicated GCP service account and custom Firestore role were provisioned. The role contains
+  only `datastore.entities.get` and `datastore.entities.update`; it is not Owner or Editor.
+- [x] Authenticated read-only smoke completed against the real account's inventory and ready food.
+- [x] Zero bridge production writes were performed.
+- [ ] ChatGPT is not configured or connected.
+- [ ] Checkpoint B remains unapproved. The first controlled write, write-permission proof, and
+  ChatGPT connection require a separate explicit owner decision.
 
-Until all seven steps happen, "ChatGPT can update Meal Prep" is not true yet — this PR makes it
-buildable, not live.
+Firestore IAM has no per-document restriction: the service-account credential can reach every
+document its role permits in the database. The fixed `TARGET_UID` is an application-level boundary,
+not an IAM boundary. `TASKS.md` TASK-066 contains the detailed checkpoint A evidence.
