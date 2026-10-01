@@ -4820,7 +4820,7 @@ honest scope note (must stay in every doc that describes this): Firestore IAM ha
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-067 · MCP FEASIBILITY SPIKE
-status: review
+status: done
 owner: codex
 source: direct owner approval in the TASK-067 planning-only unblock. This task is intentionally
   not Phase B implementation and does not authorize production enablement.
@@ -4918,6 +4918,232 @@ merge gate:
   Hand off at `status: review`. A new independent reviewer must return PASS before any deployment.
   Deployment and live ChatGPT testing are a separate, later owner-approved step; this task neither
   authorizes nor performs them.
+
+live result (2026-10-01): PASS — independently reviewed, integrated, and verified on the owner's
+  actual ChatGPT "Create MCP App" surface. A bounded production deployment connected successfully;
+  `probe_read` returned `{ "ok":true, "probe":"read" }`; write-classified `probe_write` returned
+  `{ "ok":true, "probe":"write-classified-noop" }`. Both probes remained stateless and made zero
+  Firestore calls; production write count remained 0; no real meal-prep MCP tool was exposed.
+decision: MCP is selected as the preferred thin ChatGPT adapter over the existing conversational
+  bridge. This closes feasibility only: authenticated real-data MCP reads are not yet implemented,
+  Phase-B writes are not complete, and production writes remain unapproved.
+
+---
+
+<!-- ═══════════════════════════════════════════════════════
+     TASK-068 · Authenticated MCP Real-Data Read Layer
+     Risk: High · Execution: Solo (auth/security + private production data; never chained)
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-068 · AUTHENTICATED MCP REAL-DATA READ LAYER
+status: codex
+owner: codex
+source: direct owner governance transition after TASK-067's successful live feasibility result
+  (2026-10-01). This is approved Phase B1 only; production writes remain unapproved.
+depends-on: TASK-067 (`done`) and TASK-066 checkpoint A's completed read-only production evidence.
+  TASK-066 checkpoint B's controlled write is not a dependency and remains unapproved.
+files: workers/conversational-bridge/** (MCP adapter/auth/resource-server code, focused tests,
+  provider/config integration needed for local implementation, directly required dependency
+  metadata/locks, and bridge README); CHANGELOG.md; TEST_REPORT.md; TASKS.md status field only
+  during Builder execution. Do not touch app/UI files, existing Playwright specs, Firestore rules,
+  another Worker, or unrelated root metadata.
+branch: task-068 (branch from the verified planning commit on main)
+
+objective:
+  Replace the public feasibility-only MCP probe surface with a standards-compliant, authenticated,
+  owner-only MCP read layer that exposes the existing canonical inventory and ready-food read
+  semantics to the owner's ChatGPT account. This is Phase B1 and is LOCAL IMPLEMENTATION ONLY.
+  The architecture is fixed:
+
+    ChatGPT
+        ↓ authenticated MCP (OAuth 2.1; owner + `mealprep:read` required)
+    thin MCP adapter
+        ↓
+    existing reviewed bridge/domain read layer
+        ↓
+    Firestore (`TARGET_UID` remains server-controlled)
+
+  MCP is an adapter only. The existing REST bridge remains supported with its current bearer-auth
+  contract. Do not create a second canonical model or duplicate pantry/ready-food semantics.
+
+model-visible tool contract (exact for Phase B1):
+  Canonical inspection established that REST `/v1/inventory` delegates to
+  `inventory.listInventory()` and `/v1/ready-food` delegates to `readyFood.listReadyFood()`.
+  Expose exactly these two private real-data tools and no write tool:
+
+  - `get_inventory` — no caller-supplied identity/path input; returns the existing inventory read
+    shape, including the canonical `revision` and stable `ingredientId` values.
+  - `get_ready_food` — no caller-supplied identity/path input; returns the existing ready-food read
+    shape, including the canonical `revision` and stable `cookedMealId` values.
+
+  Each tool requires the authenticated owner and `mealprep:read`, reuses the existing reviewed
+  Firestore decode + domain-list functions, performs zero mutation, and declares per-tool OAuth
+  `securitySchemes` plus `readOnlyHint:true`, `destructiveHint:false`, and `openWorldHint:false`.
+  Remove `probe_read` and `probe_write` from the production model-visible surface when these tools
+  replace them. Test-only helpers/fixtures may remain only when they are not model-visible.
+
+authentication contract:
+  Current official OpenAI MCP authentication guidance is the implementation baseline
+  (`https://developers.openai.com/plugins/build/auth`). Before exposing any private data:
+
+  - Use OAuth 2.1 authorization-code flow with PKCE; authorization-server metadata MUST advertise
+    `code_challenge_methods_supported` containing `S256`.
+  - Publish correct protected-resource metadata at the standards-defined well-known URL and use
+    standards-compliant authorization-server/OIDC discovery metadata.
+  - Propagate the canonical MCP resource identifier through authorization and token exchange via
+    `resource`; bind the resulting credential to that resource/audience.
+  - Support a ChatGPT-compatible client identity/registration mode: CIMD is preferred where the
+    selected provider supports it cleanly; otherwise use DCR or a compatible predefined OAuth
+    client. Record the exact redirect URI and token-endpoint auth method required by that mode.
+  - Verify the credential/assertion on EVERY protected tool call: cryptographic signature where
+    applicable, exact issuer, expected audience/resource, `exp`, `nbf`, required scope, and owner
+    authorization. Do not trust ChatGPT to perform resource-server validation.
+  - Declare `securitySchemes: [{ type:"oauth2", scopes:["mealprep:read"] }]` on each real-data
+    tool. Unauthenticated or insufficient-scope calls must return protocol-correct HTTP
+    `WWW-Authenticate` protected-resource discovery metadata and MCP
+    `_meta["mcp/www_authenticate"]` challenge data so ChatGPT can initiate/retry account linking.
+  - The selected provider must support the exact production ChatGPT callback/redirect mode shown
+    by ChatGPT for this connection; do not guess or hard-code a stale callback.
+
+auth-provider decision gate (do not prejudge):
+  Prefer an established OAuth provider over implementing OAuth cryptography/protocol storage from
+  scratch. Cloudflare documents Access/Managed OAuth as one available MCP provider direction, but
+  it is NOT preselected. Before choosing a provider, record live documentation/test evidence that
+  it satisfies ALL requirements above: protected-resource and authorization-server metadata,
+  PKCE S256, `resource` propagation and audience binding, ChatGPT-compatible CIMD and/or DCR or a
+  predefined client, redirect URI behavior, scope enforcement, owner identity claims, and token /
+  forwarded-assertion validation semantics. If Cloudflare Access satisfies the full contract
+  cleanly, prefer it because the Worker already runs on Cloudflare. Otherwise use the smallest
+  established provider that does. Do not build a home-grown authorization server merely to retain
+  a preferred provider. If no candidate can be proven locally/documentarily without a materially
+  different architecture, set `status: blocked` with the exact gap rather than guessing.
+
+owner authorization + scope boundary:
+  - This is a single-owner personal application. Successful authentication alone is insufficient:
+    provider policy should allow only the owner, and the Worker must independently compare a
+    configured authorized-owner claim when the provider exposes a stable claim.
+  - Prefer an immutable/stable subject identifier over mutable email. Do not hard-code a personal
+    subject, email, UID, or other identity in source control; keep provider and owner identifiers
+    in secrets/config appropriate to the selected provider.
+  - No model/tool input may select an owner, UID, Firebase user document, Firestore collection, or
+    Firestore path. `TARGET_UID` remains fixed and server-controlled.
+  - Phase B1's only live scope is `mealprep:read`. `mealprep:write` is reserved for a later,
+    separately approved phase and MUST NOT be advertised, requested, granted, accepted as a
+    substitute, or used by TASK-068's live path.
+  - Do not give ChatGPT `BRIDGE_API_TOKEN`, service-account credentials, a static key in tool
+    parameters, a secret URL, or an unauthenticated real-data tool.
+
+credential boundary:
+  - REST `/v1/*` continues to require the existing `BRIDGE_API_TOKEN` exactly as before.
+  - MCP `/mcp` real-data tools use OAuth owner authentication only.
+  - A REST bridge bearer MUST NOT authorize MCP. An MCP OAuth credential MUST NOT authorize REST.
+  - Exact `/mcp` and required well-known metadata paths may be added/handled deliberately; near
+    paths and malformed requests remain fail-closed and expose no private data.
+
+acceptance:
+  AUTH DISCOVERY / CHATGPT LINKING
+  - [ ] Protected-resource metadata is standards-correct, names the canonical HTTPS MCP resource,
+        identifies the selected authorization server, and advertises only `mealprep:read` for B1.
+  - [ ] Authorization-server/OIDC discovery is compatible with current ChatGPT requirements;
+        PKCE S256 and the selected CIMD/DCR/predefined-client mode are advertised and work in the
+        local/provider test seam.
+  - [ ] Authorization and token requests preserve `resource`; the resulting token/assertion is
+        bound to the expected MCP audience/resource.
+  - [ ] Both real tools declare exact per-tool OAuth `securitySchemes` for `mealprep:read` and exact
+        read-only/non-destructive/closed-world annotations.
+  - [ ] Missing auth and insufficient scope produce correct HTTP and MCP challenge metadata that
+        triggers ChatGPT-compatible linking/reauthorization behavior; challenges disclose no secret.
+
+  TOKEN VALIDATION
+  - [ ] A valid, correctly signed, unexpired owner credential for the expected issuer, resource /
+        audience, and `mealprep:read` passes.
+  - [ ] Missing, malformed, invalid-signature, expired, not-yet-valid, wrong-issuer, wrong-audience /
+        resource, and missing-scope credentials are each denied before Firestore/domain access.
+  - [ ] A validly authenticated non-owner identity is denied before Firestore/domain access.
+
+  AUTHORIZATION / IDENTITY
+  - [ ] Authenticated identity deterministically resolves to the one configured owner using a stable
+        provider subject where available; source contains no hard-coded personal identity.
+  - [ ] Tool schemas reject/omit alternate UID, owner identity, document, collection, and Firestore
+        path inputs; over-posting cannot influence server-controlled `TARGET_UID`.
+  - [ ] Reordered fields, duplicate/ambiguous claims, or display-name/email changes cannot select a
+        different identity or create input-order-dependent authorization.
+
+  REAL READ TOOLS
+  - [ ] `tools/list` exposes exactly `get_inventory` and `get_ready_food`; production-visible
+        `probe_read`, `probe_write`, and every real write tool are absent.
+  - [ ] `get_inventory` uses the existing Firestore read/decode path plus
+        `inventory.listInventory()` and preserves the canonical response, revision, and stable IDs.
+  - [ ] `get_ready_food` uses the existing Firestore read/decode path plus
+        `readyFood.listReadyFood()` and preserves the canonical response, revision, and stable IDs.
+  - [ ] Focused tests prove both tools are read-only: no `patchUserDocument`, write operation,
+        tombstone mutation, revision increment, or other mutation primitive is invoked.
+
+  CREDENTIAL / ROUTING BOUNDARIES
+  - [ ] Existing REST missing/wrong/correct bearer behavior remains green and unchanged.
+  - [ ] REST bearer cannot authorize MCP; OAuth credential cannot authorize REST.
+  - [ ] Missing/invalid MCP auth cannot expose private data through initialize, tool listing,
+        invocation, error details, or a near-path routing variation.
+  - [ ] Exact `/mcp`, well-known metadata paths, wrong methods/content types, malformed MCP bodies,
+        unknown tools, host/origin validation, and near paths all behave intentionally and safely.
+
+  LOGGING / SECRETS
+  - [ ] No OAuth access/refresh token, authorization code, PKCE verifier, service-account material,
+        bridge bearer, unnecessary identity claim, `TARGET_UID`, or full private Firestore document
+        appears in application logs, responses, thrown messages, snapshots, fixtures, or commits.
+  - [ ] Bridge README documents the chosen provider evidence, discovery/redirect/resource contract,
+        owner mapping, scopes, credential separation, local verification, deployment plan, rollback /
+        revocation considerations, and the still-unapproved production-write gate without claiming
+        that live provisioning or deployment occurred.
+
+constraints:
+  - LOCAL IMPLEMENTATION ONLY. Do not create a live OAuth/Access application or any other live auth
+    resource; do not deploy TASK-068; do not configure production ChatGPT with private tools; do
+    not rotate production credentials; do not access production Firestore; do not call any bridge
+    or MCP production write; do not change Cloudflare settings, DNS, routes, custom domains, GCP
+    IAM, service-account keys, Firebase configuration, or Firestore rules.
+  - `PRODUCTION_WRITE_COUNT` remains 0. No TASK-068 path may mutate inventory, ready food,
+    Firestore, revisions, or tombstones. Do not expose, implement, wire, or test against production
+    any MCP write tool.
+  - Preserve the approved architecture: no Supabase/Firebase/backend migration, no Firebase
+    Functions rewrite, no direct model-to-Firestore access, no alternate canonical business logic,
+    and no duplicate pantry/ready-food read mapping. Existing REST remains supported.
+  - Reuse deterministic code for routing, scope checks, claim validation, and protocol transforms;
+    do not use an LLM for auth decisions, routing, retries, identity mapping, or data transforms.
+  - Production writes remain UNAPPROVED. The first real MCP write requires a separate owner decision
+    only after: independent review PASS of this authenticated read layer; successful live OAuth
+    linking from the owner's ChatGPT account; successful real inventory and ready-food reads; and
+    proof that Firestore version/state remained unchanged.
+  - If the selected provider requires a materially broader architecture, cannot enforce the owner /
+    scope/resource contract, or cannot interoperate with current ChatGPT OAuth requirements, set
+    `status: blocked`; do not weaken authentication or silently switch to static credentials.
+
+verification:
+  - [ ] Run focused MCP OAuth discovery/challenge/token-validation tests, including every malformed
+        and adversarial credential case above; record exact command and pass/fail count.
+  - [ ] Run focused `get_inventory` / `get_ready_food` contract tests against the existing fake
+        Firestore/auth seams; prove canonical shapes/revision/IDs and zero write-function calls.
+  - [ ] Run explicit REST↔MCP cross-credential and exact/near-path routing regression tests.
+  - [ ] Run `npm run test:bridge`; record the exact full bridge pass/fail count.
+  - [ ] Run the repo-required `npm test` Playwright suite; TASK-068 must not change app or existing
+        Playwright files.
+  - [ ] Run `node --check` on every changed/new JavaScript file.
+  - [ ] Run `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`;
+        validate only and do not deploy.
+  - [ ] Run the appropriate dependency audit from `workers/conversational-bridge` and record exact
+        findings; no unresolved high/critical issue in the introduced auth/MCP dependency path.
+  - [ ] Run `tools/Verify-Decisions.ps1` and `tools/Check-DocsConsistency.ps1`; report any existing
+        baseline separately from TASK-068-caused failures.
+  - [ ] Run `git diff --check` and a secret scan over the complete diff/changed files; both clean.
+  - [ ] Complete `SELF_REVIEW.md` and `QA.md` gates before handoff. No production Firestore access
+        is required or permitted for any local verification.
+
+merge/deployment gate:
+  Hand off at `status: review`. Because this is auth/security/private-data work, a NEW independent
+  STRICT reviewer must return PASS before any provisioning or deployment. Only after that PASS may
+  a separately authorized bounded step create the required OAuth infrastructure, deploy, connect
+  the owner's ChatGPT account, perform authenticated READ-only live verification, and prove the
+  Firestore version/state remained unchanged. That later step still may not perform a real write.
 
 ---
 
