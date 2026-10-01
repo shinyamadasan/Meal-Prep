@@ -90,10 +90,14 @@ hostname: `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev` (t
 existing workers.dev subdomain; the sibling `meal-prep-recipe-import` Worker lives on the same
 subdomain). Version/Preview URLs (`<version>-<name>.shinyamadasan.workers.dev`) are explicitly
 disabled. There is no custom domain, no route, and no DNS change. Being publicly reachable means
-the bearer token is the ONLY gate on the URL, and bearer authentication stays mandatory on it: every request is rejected with `401` before any
-routing, body parsing, or Firestore access unless it carries the exact `BRIDGE_API_TOKEN`. An
-deployed Worker with no `BRIDGE_API_TOKEN` configured also fails closed (covered by a test). (Before this setting was
-approved the config had `workers_dev: false`, which would have produced no URL at all.)
+the bearer token remains the application gate for every `/v1/*` REST operation: those requests are
+rejected with `401` before body parsing or Firestore access unless they carry the exact
+`BRIDGE_API_TOKEN`. TASK-067's exact `/mcp` path is the intentional exception: it is unauthenticated
+and exposes only the two static, zero-mutation probes described above, with no Firestore, domain,
+or user-data access. A deployed Worker with no `BRIDGE_API_TOKEN` configured therefore fails closed
+for `/v1/*` REST operations (covered by a test), while the static MCP probes remain independent.
+(Before this setting was approved the config had `workers_dev: false`, which would have produced no
+URL at all.)
 
 ## Required secrets
 
@@ -136,9 +140,11 @@ Worker deployment dry run (does not require secrets to be set, since `--dry-run`
 npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc
 ```
 
-## Endpoint contract
+## REST endpoint contract
 
-Every request requires `Authorization: Bearer <BRIDGE_API_TOKEN>`. Missing/wrong -> `401`.
+Every `/v1/*` REST request requires `Authorization: Bearer <BRIDGE_API_TOKEN>`. Missing/wrong ->
+`401`. The separate TASK-067 `/mcp` feasibility endpoint is intentionally unauthenticated and has
+no product-data or mutation path.
 
 | Method | Path | Notes |
 |---|---|---|
@@ -193,7 +199,7 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
   earlier draft had the Worker stamp its own UTC "today," which could silently disagree with
   app.js's LOCAL-calendar-date `todayISO()` by a day near midnight. Since nothing is deployed yet
   and no client exists to have a compatibility obligation to, the contract was corrected outright
-  instead of preserving the divergence — see "Endpoint contract" above.
+  instead of preserving the divergence — see "REST endpoint contract" above.
 - **`consume`'s exact-remainder path and `finish` write an explicit `cookedMeals` tombstone
   directly**, rather than relying on `removeCookedMeal()`'s client-side behavior (which is
   actually just an array filter — the tombstone is written later by `recordLocalDeletions()`'s
@@ -230,8 +236,9 @@ ability to run it were not exercised in checkpoint A (only `secret put` was).
   the old key: `gcloud iam service-accounts keys delete <KEY_ID> --iam-account=<service account>`.
   Delete any temporary key file the moment the secret is stored.
 - **Remove a Worker secret:** `wrangler secret delete <NAME> --config ...` (untested here). A
-  Worker missing `BRIDGE_API_TOKEN` rejects every request with `401`; missing Firestore secrets
-  produce a sanitized `infrastructure_error`, never data.
+  Worker missing `BRIDGE_API_TOKEN` rejects every `/v1/*` REST request with `401`; missing
+  Firestore secrets produce a sanitized `infrastructure_error`, never data. The static `/mcp`
+  feasibility probes do not read either secret.
 - **Disable or delete the Worker:** turning off its workers.dev route or deleting it needs a
   credential above per-Worker Editor (Editor cannot delete): use the Cloudflare dashboard as the
   account owner.

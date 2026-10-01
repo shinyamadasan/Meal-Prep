@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { handleRequest, routeRequest } from '../src/index.js';
+import { routeRequest } from '../src/index.js';
 
 const MCP_URL = 'https://localhost/mcp';
 
@@ -183,11 +183,38 @@ test('MCP rejects untrusted Host and browser Origin values before protocol handl
   assert.equal(badOrigin.status, 403);
 });
 
-test('existing REST routes still fail closed before token, Firestore, domain, or fetch access', async () => {
-  for (const authorization of [null, 'Bearer wrong-token']) {
+test('routeRequest keeps exact REST routes behind bearer auth before downstream access', async () => {
+  const cases = [
+    { method: 'GET', pathname: '/v1/inventory', authorization: null },
+    { method: 'GET', pathname: '/v1/inventory', authorization: 'Bearer wrong-token' },
+    { method: 'POST', pathname: '/v1/ready-food/record', authorization: null },
+    { method: 'POST', pathname: '/v1/ready-food/record', authorization: 'Bearer wrong-token' }
+  ];
+
+  for (const { method, pathname, authorization } of cases) {
     const guards = isolationGuards();
     const headers = authorization ? { Authorization: authorization } : {};
-    const response = await handleRequest(new Request('https://worker.test/v1/inventory', { headers }), {}, guards.deps);
+    const response = await routeRequest(
+      new Request('https://worker.test' + pathname, { method, headers }),
+      { BRIDGE_API_TOKEN: 'expected-token' },
+      guards.deps
+    );
+    assert.equal(response.status, 401);
+    assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
+  }
+});
+
+test('routeRequest sends only exact /mcp to the unauthenticated MCP handler', async () => {
+  const exact = await routeRequest(mcpRequest(rpcRequest(8, 'tools/list')));
+  assert.equal(exact.status, 200);
+
+  for (const pathname of ['/mcp/', '/mcp-evil']) {
+    const guards = isolationGuards();
+    const response = await routeRequest(
+      new Request('https://worker.test' + pathname),
+      { BRIDGE_API_TOKEN: 'expected-token' },
+      guards.deps
+    );
     assert.equal(response.status, 401);
     assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
   }
