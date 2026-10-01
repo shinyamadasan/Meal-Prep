@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { routeRequest } from '../src/index.js';
+import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE } from '../src/mcpAuth.js';
+import { testEnv } from './support/fixtures.js';
 
 const MCP_URL = 'https://localhost/mcp';
+const NOW = 1_800_000_000;
 
-function mcpRequest(body, { method = 'POST', contentType = 'application/json' } = {}) {
+function mcpRequest(body, { method = 'POST', contentType = 'application/json', authorization = 'Bearer oauth-test-token' } = {}) {
   const headers = {
     Host: 'localhost',
     Accept: 'application/json, text/event-stream'
   };
+  if (authorization) headers.Authorization = authorization;
   if (contentType) headers['Content-Type'] = contentType;
   const init = { method, headers };
   if (body !== undefined && method !== 'GET' && method !== 'HEAD') {
@@ -36,186 +39,232 @@ function toolCall(id, name, args = {}) {
   return rpcRequest(id, 'tools/call', { name, arguments: args });
 }
 
-function isolationGuards() {
-  const calls = { token: 0, read: 0, write: 0, fetch: 0 };
-  const deps = {
-    getFirestoreAccessToken: async () => { calls.token += 1; throw new Error('token path reached'); },
-    getUserDocument: async () => { calls.read += 1; throw new Error('read path reached'); },
-    patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
-    fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
+function validContext(overrides = {}) {
+  return {
+    auth: Object.assign({
+      token: 'not-a-real-token',
+      audience: MCP_RESOURCE,
+      expiresAt: NOW + 300,
+      scope: [MCP_SCOPE],
+      userId: 'test-owner-subject',
+      clientId: 'https://chatgpt.com/oauth/client.json'
+    }, overrides.auth || {}),
+    props: Object.assign({
+      ownerSubject: 'test-owner-subject',
+      issuer: MCP_ISSUER,
+      resource: MCP_RESOURCE,
+      notBefore: NOW - 1
+    }, overrides.props || {})
   };
-  const env = new Proxy({}, {
-    get(_target, property) {
-      throw new Error('environment binding read: ' + String(property));
-    }
-  });
-  return { calls, deps, env };
 }
 
-test('MCP initialize handshake succeeds over Streamable HTTP without secrets', async () => {
+function readDeps(doc) {
+  const calls = { token: 0, read: 0, write: 0, fetch: 0 };
+  return {
+    calls,
+    deps: {
+      nowSeconds: NOW,
+      getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
+      getUserDocument: async () => { calls.read += 1; return doc; },
+      patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+      fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
+    }
+  };
+}
+
+test('MCP initialize handshake succeeds for an authenticated owner context', async () => {
   const response = await routeRequest(mcpRequest(rpcRequest(1, 'initialize', {
     protocolVersion: '2025-11-25',
     capabilities: {},
-    clientInfo: { name: 'task-067-test', version: '1.0.0' }
-  })));
+    clientInfo: { name: 'task-068-test', version: '1.0.0' }
+  })), testEnv(), { nowSeconds: NOW }, validContext());
   assert.equal(response.status, 200);
   const message = await responseMessage(response);
-  assert.equal(message.jsonrpc, '2.0');
-  assert.equal(message.id, 1);
   assert.equal(message.result.protocolVersion, '2025-11-25');
-  assert.equal(message.result.serverInfo.name, 'meal-prep-mcp-feasibility-probes');
-
-  const initialized = await routeRequest(mcpRequest({
-    jsonrpc: '2.0',
-    method: 'notifications/initialized'
-  }));
-  assert.equal(initialized.status, 202);
-  assert.equal(await initialized.text(), '');
+  assert.equal(message.result.serverInfo.name, 'meal-prep-private-reads');
 });
 
-test('tools/list exposes exactly the two probes with exact annotations', async () => {
-  const response = await routeRequest(mcpRequest(rpcRequest(2, 'tools/list')));
-  assert.equal(response.status, 200);
+test('tools/list exposes exactly the two read tools with OAuth and read-only annotations', async () => {
+  const response = await routeRequest(
+    mcpRequest(rpcRequest(2, 'tools/list')),
+    testEnv(),
+    { nowSeconds: NOW },
+    validContext()
+  );
   const message = await responseMessage(response);
-  const tools = message.result.tools;
-  assert.deepEqual(tools.map((tool) => tool.name), ['probe_read', 'probe_write']);
-  assert.deepEqual(tools[0].annotations, {
-    readOnlyHint: true,
-    destructiveHint: false,
-    openWorldHint: false
-  });
-  assert.deepEqual(tools[1].annotations, {
-    readOnlyHint: false,
-    destructiveHint: false,
-    idempotentHint: true,
-    openWorldHint: false
-  });
-  const emptyInputSchema = {
-    type: 'object',
-    $schema: 'https://json-schema.org/draft/2020-12/schema',
-    properties: {},
-    additionalProperties: false
-  };
-  assert.deepEqual(tools[0].inputSchema, emptyInputSchema);
-  assert.deepEqual(tools[1].inputSchema, emptyInputSchema);
-});
-
-for (const probe of [
-  { name: 'probe_read', expected: { ok: true, probe: 'read' } },
-  { name: 'probe_write', expected: { ok: true, probe: 'write-classified-noop' } }
-]) {
-  test(probe.name + ' returns only static data and reaches no environment, Firestore, domain, fetch, or state path', async () => {
-    const guards = isolationGuards();
-    const originalFetch = globalThis.fetch;
-    let globalFetchCalls = 0;
-    globalThis.fetch = async () => { globalFetchCalls += 1; throw new Error('global fetch reached'); };
-    try {
-      const response = await routeRequest(mcpRequest(toolCall(3, probe.name)), guards.env, guards.deps);
-      assert.equal(response.status, 200);
-      const message = await responseMessage(response);
-      assert.deepEqual(message.result.structuredContent, probe.expected);
-      assert.deepEqual(JSON.parse(message.result.content[0].text), probe.expected);
-      assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
-      assert.equal(globalFetchCalls, 0);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-}
-
-test('probe schemas reject inputs instead of accepting hidden parameters', async () => {
-  const response = await routeRequest(mcpRequest(toolCall(4, 'probe_read', { uid: 'must-not-be-accepted' })));
-  assert.equal(response.status, 200);
-  const message = await responseMessage(response);
-  assert.equal(message.result.isError, true);
-  assert.match(message.result.content[0].text, /input validation error/i);
-  assert.doesNotMatch(JSON.stringify(message), /stack|TARGET_UID|FIREBASE_SERVICE_ACCOUNT_JSON/);
-});
-
-test('probe module has no import or call path to bridge domain, Firestore, secrets, or durable state', async () => {
-  const source = await readFile(new URL('../src/mcp.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /\.\/firestore|\.\/operations\/|inventory|readyFood/);
-  assert.doesNotMatch(source, /TARGET_UID|FIREBASE_SERVICE_ACCOUNT_JSON|FIRESTORE_PROJECT_ID|BRIDGE_API_TOKEN/);
-  assert.doesNotMatch(source, /DurableObject|KVNamespace|D1Database|R2Bucket|\.put\s*\(|\.write\s*\(/);
-});
-
-test('malformed MCP JSON fails safely without stack or secret disclosure', async () => {
-  const response = await routeRequest(mcpRequest('{not json'));
-  assert.equal(response.status, 400);
-  const text = await response.text();
-  assert.doesNotMatch(text, /stack|BRIDGE_API_TOKEN|FIREBASE_SERVICE_ACCOUNT_JSON|TARGET_UID|at file:/i);
-});
-
-test('an unknown MCP tool fails safely without reaching bridge dependencies', async () => {
-  const guards = isolationGuards();
-  const response = await routeRequest(mcpRequest(toolCall(5, 'unknown_tool')), guards.env, guards.deps);
-  assert.equal(response.status, 200);
-  const message = await responseMessage(response);
-  assert.equal(message.error.code, -32602);
-  assert.match(message.error.message, /tool unknown_tool not found/i);
-  assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
-  assert.doesNotMatch(JSON.stringify(message), /stack|BRIDGE_API_TOKEN|FIREBASE_SERVICE_ACCOUNT_JSON|TARGET_UID/i);
-});
-
-test('unsupported MCP HTTP methods and media types are rejected', async () => {
-  for (const method of ['GET', 'DELETE', 'PUT']) {
-    const response = await routeRequest(mcpRequest(undefined, { method, contentType: null }));
-    assert.equal(response.status, 405, method + ' must be rejected');
+  assert.deepEqual(message.result.tools.map((tool) => tool.name), ['get_inventory', 'get_ready_food']);
+  for (const tool of message.result.tools) {
+    assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
+    assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
+    assert.deepEqual(tool.annotations, {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false
+    });
+    assert.deepEqual(tool.inputSchema.properties, {});
+    assert.equal(tool.inputSchema.additionalProperties, false);
   }
-  const wrongType = await routeRequest(mcpRequest(rpcRequest(6, 'tools/list'), { contentType: 'text/plain' }));
+  assert.doesNotMatch(JSON.stringify(message), /probe_read|probe_write|mealprep:write/);
+});
+
+test('get_inventory preserves the canonical revision and stable ingredient ids without mutation', async () => {
+  const read = readDeps({
+    revision: 17,
+    pantry: [{ id: 'pantry-stable-1', name: 'Rice', quantity: 2, unit: 'cups', staple: true, stockLevel: 'ok', storage: 'pantry' }],
+    cookedMeals: []
+  });
+  const response = await routeRequest(mcpRequest(toolCall(3, 'get_inventory')), testEnv(), read.deps, validContext());
+  const message = await responseMessage(response);
+  assert.deepEqual(message.result.structuredContent, {
+    ok: true,
+    revision: 17,
+    items: [{
+      ingredientId: 'pantry-stable-1',
+      name: 'Rice',
+      quantity: 2,
+      unit: 'cups',
+      inStock: true,
+      staple: true,
+      stockLevel: 'ok',
+      storage: 'pantry',
+      updatedAt: null
+    }]
+  });
+  assert.deepEqual(read.calls, { token: 1, read: 1, write: 0, fetch: 0 });
+});
+
+test('get_ready_food preserves the canonical revision and stable cooked-meal ids without mutation', async () => {
+  const read = readDeps({
+    revision: 18,
+    pantry: [],
+    cookedMeals: [{ id: 'meal-stable-1', recipeId: 'recipe-1', name: 'Adobo', portionsRemaining: 3, storage: 'fridge', cookedDate: '2026-09-30' }]
+  });
+  const response = await routeRequest(mcpRequest(toolCall(4, 'get_ready_food')), testEnv(), read.deps, validContext());
+  const message = await responseMessage(response);
+  assert.deepEqual(message.result.structuredContent, {
+    ok: true,
+    revision: 18,
+    items: [{
+      cookedMealId: 'meal-stable-1',
+      recipeId: 'recipe-1',
+      name: 'Adobo',
+      servingsRemaining: 3,
+      trackedPortions: true,
+      storage: 'fridge',
+      cookedDate: '2026-09-30',
+      updatedAt: null
+    }]
+  });
+  assert.deepEqual(read.calls, { token: 1, read: 1, write: 0, fetch: 0 });
+});
+
+test('read tool schemas reject caller-controlled identity and Firestore targeting fields', async () => {
+  for (const field of ['uid', 'owner', 'path', 'collection', 'document', 'TARGET_UID']) {
+    const read = readDeps({ revision: 1, pantry: [], cookedMeals: [] });
+    const response = await routeRequest(
+      mcpRequest(toolCall(5, 'get_inventory', { [field]: 'attacker-value' })),
+      testEnv(),
+      read.deps,
+      validContext()
+    );
+    const message = await responseMessage(response);
+    assert.equal(message.result.isError, true, field);
+    assert.match(message.result.content[0].text, /input validation error/i, field);
+    assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 }, field);
+  }
+});
+
+test('missing, expired, not-yet-valid, wrong-resource, wrong-issuer, missing-scope, and wrong-owner contexts fail before reads', async () => {
+  const cases = [
+    { name: 'missing', ctx: {} },
+    { name: 'expired', ctx: validContext({ auth: { expiresAt: NOW } }) },
+    { name: 'not-yet-valid', ctx: validContext({ props: { notBefore: NOW + 1 } }) },
+    { name: 'wrong-resource', ctx: validContext({ auth: { audience: 'https://attacker.example/mcp' } }) },
+    { name: 'wrong-issuer', ctx: validContext({ props: { issuer: 'https://attacker.example' } }) },
+    { name: 'missing-scope', ctx: validContext({ auth: { scope: [] } }) },
+    { name: 'write-scope-is-not-a-substitute', ctx: validContext({ auth: { scope: ['mealprep:write'] } }) },
+    { name: 'wrong-owner-token', ctx: validContext({ auth: { userId: 'another-owner' } }) },
+    { name: 'wrong-owner-props', ctx: validContext({ props: { ownerSubject: 'another-owner' } }) }
+  ];
+
+  for (const item of cases) {
+    const read = readDeps({ revision: 1, pantry: [], cookedMeals: [] });
+    const response = await routeRequest(mcpRequest(toolCall(6, 'get_inventory')), testEnv(), read.deps, item.ctx);
+    const message = await responseMessage(response);
+    assert.equal(message.result.isError, true, item.name);
+    assert.ok(Array.isArray(message.result._meta['mcp/www_authenticate']), item.name);
+    assert.match(message.result._meta['mcp/www_authenticate'][0], /resource_metadata=/, item.name);
+    if (item.name.includes('scope')) assert.match(message.result._meta['mcp/www_authenticate'][0], /insufficient_scope/, item.name);
+    assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 }, item.name);
+    assert.doesNotMatch(JSON.stringify(message), /test-owner-subject|TARGET_UID|BRIDGE_API_TOKEN/, item.name);
+  }
+});
+
+test('a REST bearer cannot authorize MCP and an OAuth bearer cannot authorize REST', async () => {
+  const read = readDeps({ revision: 1, pantry: [], cookedMeals: [] });
+  const mcpResponse = await routeRequest(
+    mcpRequest(toolCall(7, 'get_inventory'), { authorization: 'Bearer test-bridge-token' }),
+    testEnv(),
+    read.deps,
+    {}
+  );
+  const mcpMessage = await responseMessage(mcpResponse);
+  assert.equal(mcpMessage.result.isError, true);
+  assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 });
+
+  const restResponse = await routeRequest(
+    new Request('https://worker.test/v1/inventory', { headers: { Authorization: 'Bearer oauth-test-token' } }),
+    testEnv(),
+    read.deps
+  );
+  assert.equal(restResponse.status, 401);
+  assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 });
+});
+
+test('malformed JSON, unknown tools, wrong methods, and wrong media types fail safely', async () => {
+  const malformed = await routeRequest(mcpRequest('{not json'), testEnv(), { nowSeconds: NOW }, validContext());
+  assert.equal(malformed.status, 400);
+  assert.doesNotMatch(await malformed.text(), /stack|BRIDGE_API_TOKEN|TARGET_UID|test-owner-subject/i);
+
+  const unknown = await routeRequest(mcpRequest(toolCall(8, 'unknown_tool')), testEnv(), { nowSeconds: NOW }, validContext());
+  const unknownMessage = await responseMessage(unknown);
+  assert.equal(unknownMessage.error.code, -32602);
+
+  for (const method of ['GET', 'DELETE', 'PUT']) {
+    const response = await routeRequest(mcpRequest(undefined, { method, contentType: null }), testEnv(), { nowSeconds: NOW }, validContext());
+    assert.equal(response.status, 405, method);
+  }
+  const wrongType = await routeRequest(
+    mcpRequest(rpcRequest(9, 'tools/list'), { contentType: 'text/plain' }),
+    testEnv(),
+    { nowSeconds: NOW },
+    validContext()
+  );
   assert.equal(wrongType.status, 415);
 });
 
 test('MCP rejects untrusted Host and browser Origin values before protocol handling', async () => {
-  const body = JSON.stringify(rpcRequest(7, 'tools/list'));
+  const body = JSON.stringify(rpcRequest(10, 'tools/list'));
   const badHost = await routeRequest(new Request(MCP_URL, {
     method: 'POST',
     headers: { Host: 'attacker.example', Accept: 'application/json', 'Content-Type': 'application/json' },
     body
-  }));
+  }), testEnv(), { nowSeconds: NOW }, validContext());
   assert.equal(badHost.status, 403);
 
   const badOrigin = await routeRequest(new Request(MCP_URL, {
     method: 'POST',
     headers: { Host: 'localhost', Origin: 'https://attacker.example', Accept: 'application/json', 'Content-Type': 'application/json' },
     body
-  }));
+  }), testEnv(), { nowSeconds: NOW }, validContext());
   assert.equal(badOrigin.status, 403);
 });
 
-test('routeRequest keeps exact REST routes behind bearer auth before downstream access', async () => {
-  const cases = [
-    { method: 'GET', pathname: '/v1/inventory', authorization: null },
-    { method: 'GET', pathname: '/v1/inventory', authorization: 'Bearer wrong-token' },
-    { method: 'POST', pathname: '/v1/ready-food/record', authorization: null },
-    { method: 'POST', pathname: '/v1/ready-food/record', authorization: 'Bearer wrong-token' }
-  ];
-
-  for (const { method, pathname, authorization } of cases) {
-    const guards = isolationGuards();
-    const headers = authorization ? { Authorization: authorization } : {};
-    const response = await routeRequest(
-      new Request('https://worker.test' + pathname, { method, headers }),
-      { BRIDGE_API_TOKEN: 'expected-token' },
-      guards.deps
-    );
-    assert.equal(response.status, 401);
-    assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
-  }
-});
-
-test('routeRequest sends only exact /mcp to the unauthenticated MCP handler', async () => {
-  const exact = await routeRequest(mcpRequest(rpcRequest(8, 'tools/list')));
-  assert.equal(exact.status, 200);
-
-  for (const pathname of ['/mcp/', '/mcp-evil']) {
-    const guards = isolationGuards();
-    const response = await routeRequest(
-      new Request('https://worker.test' + pathname),
-      { BRIDGE_API_TOKEN: 'expected-token' },
-      guards.deps
-    );
-    assert.equal(response.status, 401);
-    assert.deepEqual(guards.calls, { token: 0, read: 0, write: 0, fetch: 0 });
+test('exact REST routes remain bearer-gated and near MCP paths fail closed', async () => {
+  for (const pathname of ['/v1/inventory', '/v1/ready-food', '/mcp/', '/mcp-evil']) {
+    const read = readDeps({ revision: 1, pantry: [], cookedMeals: [] });
+    const response = await routeRequest(new Request('https://worker.test' + pathname), testEnv(), read.deps);
+    assert.equal(response.status, 401, pathname);
+    assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 }, pathname);
   }
 });

@@ -7,19 +7,28 @@ import { getUserDocument, patchUserDocument, RevisionConflictError, Infrastructu
 import { NotFoundError, ValidationError, InsufficientServingsError, AmbiguousError, MalformedBodyError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
-import { handleMcpRequest } from './mcp.js';
+import { handleMcpRequest, validateMcpRequestOrigin } from './mcp.js';
+import { getOAuthWorker } from './oauth.js';
 
 const MAX_BODY_BYTES = 8 * 1024;
 
 export default {
-  async fetch(request, env) {
-    return routeRequest(request, env || {});
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === '/mcp') {
+      const rejected = validateMcpRequestOrigin(request);
+      if (rejected) return rejected;
+    } else if (url.pathname === '/mcp/' || url.pathname.startsWith('/mcp-')) {
+      return handleRequest(request, env || {});
+    }
+    const oauthWorker = await getOAuthWorker(handleRequest);
+    return oauthWorker.fetch(request, env || {}, ctx);
   }
 };
 
-export function routeRequest(request, env = {}, deps = {}) {
+export function routeRequest(request, env = {}, deps = {}, ctx = {}) {
   const url = new URL(request.url);
-  if (url.pathname === '/mcp') return handleMcpRequest(request);
+  if (url.pathname === '/mcp') return handleMcpRequest(request, env, deps, ctx);
   return handleRequest(request, env, deps);
 }
 

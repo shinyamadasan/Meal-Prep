@@ -5,6 +5,51 @@
 
 ---
 
+## TASK-068 · 2026-10-01
+suite: `node --test workers/conversational-bridge/test/mcp-auth.node.js
+  workers/conversational-bridge/test/mcp.node.js`; `npm run test:bridge`; `npm test`; `node --check`
+  on all 7 changed/new JavaScript files; `npx wrangler deploy --dry-run --config
+  workers/conversational-bridge/wrangler.jsonc`; `npm audit --omit=dev` from the bridge;
+  `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`; `git diff --check`; delta secret
+  scan; local Wrangler discovery/challenge smoke
+result:
+  - Focused OAuth/MCP: 16/16 passed, 0 failed/skipped. Coverage includes exact provider/resource/
+    scope/CIMD configuration; valid signed owner assertion; missing, malformed, invalid-signature,
+    expired, not-yet-valid, wrong-issuer, wrong-audience, wrong-owner, ambiguous-identity, and wrong-
+    token-type assertions; field-order/email independence; owner-gated escaped consent; fixed
+    `mealprep:read` grant despite over-posting; exact tool list/security metadata/annotations;
+    canonical inventory and ready-food revision/stable-id translation; zero write/fetch mutation;
+    caller-controlled UID/path rejection; context expiry/resource/issuer/scope/owner denial; REST↔
+    MCP credential crossing; malformed/unknown/method/media-type/Host/Origin/near-path failures.
+  - Local provider smoke: RFC 8414 metadata returned 200 and advertised authorization/token
+    endpoints, only `mealprep:read`, authorization-code + refresh grants, PKCE `S256`, RFC 9207
+    issuer identification, and CIMD support. Unauthenticated `/mcp` returned HTTP 401 with a Bearer
+    challenge and `mealprep:read`. The production-origin RFC 9728 URL/value is asserted in the
+    focused seam; a localhost request is intentionally a different canonical origin, for which the
+    provider contract omits `resource_metadata`.
+  - Full bridge: 84/84 passed, 0 failed/skipped. Existing REST missing/wrong/correct bearer tests
+    pass unchanged; no REST regression.
+  - Full local Playwright: 711/711 passed, 0 failed/skipped (`npm test`, 2.0 minutes).
+  - Syntax: all 7 changed/new JavaScript files passed `node --check`.
+  - Wrangler 4.145.0 dry-run: bundle succeeded (1541.52 KiB / gzip 280.56 KiB), no binding or
+    deploy occurred. `OAUTH_KV` is intentionally deferred to the separately authorized
+    provisioning step.
+  - Dependency audit: 0 vulnerabilities. New direct dependencies are exactly
+    `@cloudflare/workers-oauth-provider@1.2.1` and `jose@6.2.12`; no unrelated upgrade.
+  - Verify-Decisions: all 110 pointers hold. Check-DocsConsistency: exit 1 with the same 51
+    pre-existing candidates from unchanged scanned app/docs files; TASK-068 changes none of those
+    inputs and introduces zero new drift.
+  - `git diff --check` and delta secret scan: clean. SELF_REVIEW code-health gate passes and
+    "Would I ship this?" = yes. QA's applicable AI checks pass; app/UI/data-model checks are not
+    applicable because TASK-068 changes only the authorized bridge surface and task records.
+untested: no live authorization-code/token exchange because TASK-068 expressly forbids creating
+  the required Access application and `OAUTH_KV` binding. No production deployment, OAuth resource,
+  private ChatGPT connection, production Firestore access, or write was attempted.
+  `DEPLOYED=false`; `LIVE_OAUTH_RESOURCES_CREATED=false`; `FIRESTORE_ACCESSED=false`;
+  `PRODUCTION_WRITE_COUNT=0`; `CHATGPT_PRIVATE_DATA_CONFIGURED=false`.
+
+---
+
 ## TASK-067 · 2026-09-30
 suite: `node --test workers/conversational-bridge/test/mcp.node.js`; `npm run test:bridge`;
   explicit REST-auth `--test-name-pattern`; changed-file `node --check`; `npm test`;

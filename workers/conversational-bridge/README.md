@@ -14,17 +14,26 @@ and the ChatGPT connection are checkpoint B and need a separate owner decision. 
 enablement checklist" below records the current checkpoint status; see `TASKS.md` TASK-066 for the
 detailed evidence.
 
-**Local candidate status (TASK-067): an MCP feasibility endpoint now exists in source only.** It
-has not been deployed and ChatGPT has not been configured. The deployed checkpoint-A Worker does
-not include this candidate until a separate review and deployment approval occur.
+**Local candidate status (TASK-068): authenticated real-data MCP reads now exist in source only.**
+TASK-067's live ChatGPT feasibility check passed, so MCP is the selected conversational adapter.
+This candidate has not been deployed, no OAuth/Access/KV resource has been created, and ChatGPT has
+not been connected to private tools. Production writes and the `mealprep:write` scope remain
+unapproved.
 
 ## Architecture
 
 ```
-External client (ChatGPT connector)
-        |  Authorization: Bearer <BRIDGE_API_TOKEN>
-        v
-   src/index.js        — HTTP routing, auth, request validation (allow-listed fields only)
+REST client                         ChatGPT connector
+Authorization: BRIDGE_API_TOKEN     OAuth 2.1 + PKCE S256, mealprep:read
+        |                                      |
+        +------------------+-------------------+
+                           v
+   src/index.js        — exact-path routing and separate REST/MCP auth domains
+        |                       |
+        |                       +-- src/oauth.js / src/mcpAuth.js
+        |                           provider protocol + owner/scope/resource checks
+        |                       +-- src/mcp.js
+        |                           thin get_inventory/get_ready_food adapter
         |
    src/operations/*.js — pure domain functions: reimplement the exact invariants
         |                 correctKitchenStock() / _doMarkCooked() / useCookedPortion() /
@@ -38,7 +47,19 @@ External client (ChatGPT connector)
                           never a whole-document overwrite.
 ```
 
-`src/auth.js` owns two unrelated auth hops — never conflate them:
+The authentication domains are deliberately separate:
+
+1. REST caller -> Worker: `BRIDGE_API_TOKEN`, compared in constant time by `src/auth.js`.
+2. MCP caller -> Worker: provider-issued OAuth bearer, validated by
+   `@cloudflare/workers-oauth-provider`, then independently checked for the exact resource,
+   expiry, `mealprep:read`, and configured owner subject by `src/mcpAuth.js`.
+3. Browser owner -> `/authorize`: a Cloudflare Access application assertion, whose RS256
+   signature, issuer, audience, `exp`, `nbf`, token type, and stable `sub` are validated by the
+   Worker before consent can be completed.
+4. Worker -> Firestore: the service account's JWT-bearer OAuth2 exchange, signed with Web Crypto.
+
+The first and fourth hops predate TASK-068. Never give an MCP caller `BRIDGE_API_TOKEN` or any
+Firestore credential. `src/auth.js` still owns these two unrelated REST/Firestore hops:
 1. Caller -> Worker: a static bearer token (`BRIDGE_API_TOKEN`), compared in constant time.
 2. Worker -> Firestore: the service account's own JWT-bearer OAuth2 exchange, signed with Web
    Crypto (no `firebase-admin` — it isn't Workers-compatible) and cached in module scope for the
@@ -47,40 +68,73 @@ External client (ChatGPT connector)
 The Worker is hardcoded to exactly one Firestore document (`TARGET_UID`, a secret). No route
 accepts a caller-supplied uid, collection name, or document path.
 
-## TASK-067 MCP feasibility spike (local only)
+## TASK-068 authenticated MCP read candidate (local only)
 
-`/mcp` is a thin, stateless protocol surface in the existing Worker, implemented with the official
-`@modelcontextprotocol/server` v2 Web-standard Streamable HTTP handler and `zod` schemas. It does
-not add another server, process, Durable Object, storage binding, or framework. The handler creates
-a fresh MCP server per request and keeps legacy stateless initialize compatibility for clients that
-still use that handshake.
+`/mcp` retains the official `@modelcontextprotocol/server` v2 Web-standard Streamable HTTP
+transport. The public TASK-067 probes have been removed from the model-visible surface. Exactly two
+zero-input tools remain:
 
-The endpoint exposes exactly two tools:
-
-| Tool | Classification | Behavior |
+| Tool | Existing canonical mapping | Result |
 |---|---|---|
-| `probe_read` | `readOnlyHint: true`, non-destructive, closed-world | Returns static `{ "ok": true, "probe": "read" }`. |
-| `probe_write` | `readOnlyHint: false`, non-destructive, idempotent, closed-world | Returns static `{ "ok": true, "probe": "write-classified-noop" }`. |
+| `get_inventory` | `getUserDocument()` -> `inventory.listInventory(doc.pantry)` | `{ ok, revision, items }`, including stable `ingredientId` values. |
+| `get_ready_food` | `getUserDocument()` -> `readyFood.listReadyFood(doc.cookedMeals)` | `{ ok, revision, items }`, including stable `cookedMealId` values. |
 
-Both schemas accept no inputs. Both implementations are pure no-ops: `src/mcp.js` imports no bridge
-domain or Firestore module, receives no Worker environment, reads no secret, calls no network, and
-creates no durable state. `/mcp` is therefore intentionally unauthenticated for this bounded probe.
-That exception does not extend to product data or actions. Every existing `/v1/*` route still takes
-the unchanged REST path through `BRIDGE_API_TOKEN` validation before token exchange, Firestore, or
-domain work. No real inventory, ready-food, planning, shopping, prep, recipe, or natural-language
-MCP tool exists in this spike.
+Both declare OAuth `mealprep:read` security schemes and `readOnlyHint: true`,
+`destructiveHint: false`, `openWorldHint: false`. Their strict empty input schemas reject alternate
+UIDs, owners, collections, documents, and paths. The existing Firestore adapter still selects only
+the server-side `TARGET_UID`. Neither MCP tool imports or invokes `patchUserDocument`, increments a
+revision, creates a tombstone, or exposes a write operation.
 
-This is an MCP **feasibility spike**, not Phase B implementation. The later live decision remains:
+### Selected OAuth design and evidence
 
-- **PASS:** after independent review and separate deployment authorization, the owner's real
-  ChatGPT Create MCP App surface connects to the reviewed endpoint and invokes both `probe_read`
-  and `probe_write`. MCP then becomes the preferred thin ChatGPT adapter in front of the existing
-  deterministic bridge/domain layer.
-- **FAIL:** the write-classified tool cannot be invoked, or the required connection/auth model adds
-  disproportionate complexity. Stop MCP work and use the existing deterministic REST bridge.
+The selected design is `@cloudflare/workers-oauth-provider` 1.2.1 in the same Worker, with
+Cloudflare Access used only as the upstream owner sign-in gate on `/authorize`. Access Managed
+OAuth was not selected as the MCP authorization server because its current contract did not
+provide a clean project-controlled `mealprep:read` grant/resource model. No OAuth protocol,
+cryptography, token persistence, PKCE validation, or client-registration protocol is implemented
+by application code.
 
-No PASS or FAIL result is claimed here; TASK-067 performs local implementation and verification
-only. Deployment and ChatGPT configuration remain separately gated.
+Source facts verified against current upstream contracts on 2026-10-01:
+
+- OpenAI requires OAuth 2.1 authorization code + PKCE S256, RFC 9728 protected-resource metadata,
+  authorization-server discovery, `resource` propagation/audience binding, per-tool
+  `securitySchemes`, and runtime challenges. It prefers CIMD where supported:
+  https://developers.openai.com/plugins/build/auth
+- Cloudflare's provider publishes RFC 9728 metadata and Bearer challenges, persists grants/tokens
+  in `OAUTH_KV`, binds tokens to the canonical resource, supports PKCE S256 and CIMD, and passes
+  `ctx.auth`/`ctx.props` to the protected handler. Its `requiredScopes` option advertises rather
+  than enforces scopes, so this Worker enforces the exact scope itself:
+  https://github.com/cloudflare/workers-oauth-provider
+- Cloudflare Access application tokens use RS256 and carry `iss`, `aud`, `sub`, `exp`, `nbf`, and
+  `type`; Cloudflare says origins must validate the JWT signature and claims:
+  https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/application-token/
+- Cloudflare supports hostname/path-specific Access on a `workers.dev` URL, so only `/authorize`
+  needs to be behind Access; discovery, `/oauth/token`, and `/mcp` stay reachable by ChatGPT:
+  https://developers.cloudflare.com/workers/configuration/cloudflare-access/
+
+Project decisions:
+
+- Canonical issuer: `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev`.
+- Canonical protected resource: the same origin plus `/mcp`; metadata is at
+  `/.well-known/oauth-protected-resource/mcp` and authorization-server metadata is at
+  `/.well-known/oauth-authorization-server`.
+- Only `mealprep:read` is advertised, requested, granted, and accepted. `mealprep:write` is neither
+  configured nor accepted as a substitute.
+- Client registration is CIMD only; DCR is not enabled. The provider accepts the public-client
+  `none` token-endpoint method with PKCE. Because the provider advertises RFC 9207 issuer
+  identification, the expected current ChatGPT values are client id
+  `https://chatgpt.com/oauth/client.json` and redirect URI
+  `https://chatgpt.com/connector_platform_oauth_redirect`. At provisioning time, copy the exact
+  client document and redirect URI shown in ChatGPT's management page; do not assume a stale value.
+- The provider issues short-lived (15-minute) opaque access tokens and fixed-lifetime 14-day
+  refresh grants. It validates token existence, expiry, and exact audience from KV before invoking
+  MCP. The MCP handler then rechecks expiry, exact resource, exact one-scope set, issuer/resource
+  properties fixed at authorization, and both copies of the configured owner subject.
+- Owner sign-in is independently gated by a path-specific Access policy and by Worker validation
+  of `Cf-Access-Jwt-Assertion`. Authorization uses only the exact configured stable Access `sub`;
+  email, display fields, field order, and caller form values cannot select the owner.
+- REST `/v1/*` remains on `BRIDGE_API_TOKEN`. OAuth bearer tokens do not authorize REST, and the
+  REST bearer does not authorize MCP.
 
 ## Public exposure (workers.dev)
 
@@ -90,14 +144,12 @@ hostname: `https://meal-prep-conversational-bridge.shinyamadasan.workers.dev` (t
 existing workers.dev subdomain; the sibling `meal-prep-recipe-import` Worker lives on the same
 subdomain). Version/Preview URLs (`<version>-<name>.shinyamadasan.workers.dev`) are explicitly
 disabled. There is no custom domain, no route, and no DNS change. Being publicly reachable means
-the bearer token remains the application gate for every `/v1/*` REST operation: those requests are
-rejected with `401` before body parsing or Firestore access unless they carry the exact
-`BRIDGE_API_TOKEN`. TASK-067's exact `/mcp` path is the intentional exception: it is unauthenticated
-and exposes only the two static, zero-mutation probes described above, with no Firestore, domain,
-or user-data access. A deployed Worker with no `BRIDGE_API_TOKEN` configured therefore fails closed
-for `/v1/*` REST operations (covered by a test), while the static MCP probes remain independent.
-(Before this setting was approved the config had `workers_dev: false`, which would have produced no
-URL at all.)
+each surface must enforce its own gate: `/v1/*` rejects anything except the exact
+`BRIDGE_API_TOKEN`; `/mcp` rejects anything except a provider-issued OAuth token bound to the owner,
+resource, expiry, and `mealprep:read`; `/authorize` additionally requires the signed owner-only
+Access assertion. `/mcp/` and `/mcp-evil` do not enter the protected MCP handler. The well-known
+metadata and token endpoint must remain public so ChatGPT can discover and complete account
+linking. This describes the reviewed candidate configuration, not a deployed TASK-068 state.
 
 ## Required secrets
 
@@ -106,17 +158,24 @@ Set with `wrangler secret put <NAME>` before any real deploy — never committed
 
 | Secret | Purpose |
 |---|---|
-| `BRIDGE_API_TOKEN` | Static bearer token the caller (ChatGPT) presents. |
+| `BRIDGE_API_TOKEN` | Static bearer token existing REST clients present; never used for MCP. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Full service-account JSON (`client_email`, `private_key`, ...). |
 | `FIRESTORE_PROJECT_ID` | The Firebase project id (same project the app already uses). |
 | `TARGET_UID` | The single Firebase Auth uid this Worker is scoped to. |
+| `ACCESS_TEAM_DOMAIN` | Exact HTTPS Access issuer origin, such as `https://<team>.cloudflareaccess.com`. |
+| `ACCESS_POLICY_AUD` | Audience tag of the path-specific `/authorize` Access application. |
+| `MCP_AUTHORIZED_OWNER_SUBJECT` | Exact stable Access `sub` for the one authorized owner. |
+
+The OAuth provider also requires a KV namespace binding named `OAUTH_KV`. A KV binding is not a
+secret, but its namespace id must not be added until the separately authorized provisioning step.
+TASK-068 deliberately leaves it out of `wrangler.jsonc`; no live namespace exists yet.
 
 ## Local tests
 
 From the repository root:
 
 ```powershell
-node --test workers/conversational-bridge/test/mcp.node.js
+node --test workers/conversational-bridge/test/mcp-auth.node.js workers/conversational-bridge/test/mcp.node.js
 npm run test:bridge
 ```
 
@@ -127,12 +186,13 @@ cd workers/conversational-bridge
 npm test
 ```
 
-Every test runs against an in-memory fake Firestore (`test/support/fakeFirestore.js`) and a
-throwaway RSA test keypair (`test/support/fixtures.js`) — no network call, no real credential, no
-production data, ever. Coverage: typed-value codec round-trips, the auth boundary (bearer +
-service-account JWT signing), every domain operation's validation/idempotency rules, the full
-chaos/security matrix from TASK-065, and an app<->bridge consistency suite proving there is one
-shared canonical store.
+Every test runs against an in-memory fake Firestore and throwaway RSA test keys — no real
+credential, production data, or production Firestore call. TASK-068 coverage includes provider
+configuration, signed Access assertion validation, every required adverse token/owner/scope/
+resource case, escaped consent, fixed read-only grants, per-tool metadata, canonical read results/
+revisions/stable ids, zero-mutation assertions, REST/OAuth credential crossing, and exact/near-path
+routing. The existing bridge codec, domain, chaos/security, and app<->bridge consistency suites
+still run unchanged.
 
 Worker deployment dry run (does not require secrets to be set, since `--dry-run` doesn't execute):
 
@@ -143,8 +203,7 @@ npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.js
 ## REST endpoint contract
 
 Every `/v1/*` REST request requires `Authorization: Bearer <BRIDGE_API_TOKEN>`. Missing/wrong ->
-`401`. The separate TASK-067 `/mcp` feasibility endpoint is intentionally unauthenticated and has
-no product-data or mutation path.
+`401`. The exact `/mcp` endpoint uses OAuth instead and never accepts the REST bearer.
 
 | Method | Path | Notes |
 |---|---|---|
@@ -213,10 +272,9 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 ## Not in v1 (by design — see D-082)
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
-UI). No Plan/Shop/Prep writes. No recipe generation. No real meal-prep MCP tools. TASK-067 adds
-only the two static, no-op feasibility probes documented above; it does not expose these domain
-operations over MCP. No natural-language parsing inside the Worker — its REST surface accepts
-resolved, typed operations only.
+UI). No Plan/Shop/Prep tools. No recipe generation. No MCP write tool and no `mealprep:write`
+scope. The two TASK-068 MCP tools are read-only adapters over existing deterministic operations;
+there is no natural-language parsing inside the Worker.
 
 ## Operations: rotation, revocation, emergency stop
 
@@ -237,8 +295,8 @@ ability to run it were not exercised in checkpoint A (only `secret put` was).
   Delete any temporary key file the moment the secret is stored.
 - **Remove a Worker secret:** `wrangler secret delete <NAME> --config ...` (untested here). A
   Worker missing `BRIDGE_API_TOKEN` rejects every `/v1/*` REST request with `401`; missing
-  Firestore secrets produce a sanitized `infrastructure_error`, never data. The static `/mcp`
-  feasibility probes do not read either secret.
+  Firestore secrets produce a sanitized `infrastructure_error`, never data. Missing MCP owner
+  configuration makes authorization and protected tool calls fail closed.
 - **Disable or delete the Worker:** turning off its workers.dev route or deleting it needs a
   credential above per-Worker Editor (Editor cannot delete): use the Cloudflare dashboard as the
   account owner.
@@ -251,6 +309,11 @@ ability to run it were not exercised in checkpoint A (only `secret put` was).
   (4) disable or delete the Worker in the dashboard; (5) review what the Worker's requests did.
   Step 1 needs GCP access (`gcloud`); step 2 needs only the per-Worker Editor token; step 4 needs
   the Cloudflare dashboard.
+- **Revoke MCP access after TASK-068 is provisioned:** revoke/delete the provider grant in
+  `OAUTH_KV` (or rotate/delete the namespace when retiring all grants), remove or deny the Access
+  policy, and disconnect the ChatGPT app. Removing the owner subject secret makes authorization
+  and protected tool calls fail closed. Short-lived access tokens still expire after 15 minutes;
+  do not treat expiry alone as incident response.
 
 Accepted limits, stated plainly: the IAM role is not document-scoped, so a stolen service-account
 key can get and update any existing Firestore document in this project, not only
@@ -268,10 +331,50 @@ Checkpoint A is complete and read-only production access is live:
   only `datastore.entities.get` and `datastore.entities.update`; it is not Owner or Editor.
 - [x] Authenticated read-only smoke completed against the real account's inventory and ready food.
 - [x] Zero bridge production writes were performed.
-- [ ] ChatGPT is not configured or connected.
+- [x] TASK-067 live feasibility passed and MCP was selected as the preferred adapter.
+- [ ] TASK-068 has not been deployed; ChatGPT is not configured for private tools.
+- [ ] No live Access application, OAuth KV namespace/binding, or private OAuth grant exists yet.
 - [ ] Checkpoint B remains unapproved. The first controlled write, write-permission proof, and
   ChatGPT connection require a separate explicit owner decision.
 
 Firestore IAM has no per-document restriction: the service-account credential can reach every
 document its role permits in the database. The fixed `TARGET_UID` is an application-level boundary,
 not an IAM boundary. `TASKS.md` TASK-066 contains the detailed checkpoint A evidence.
+
+## Future TASK-068 provisioning plan (create nothing before independent review PASS)
+
+The following is an exact plan, not evidence that any resource exists.
+
+1. **Source fact — provider storage:** `@cloudflare/workers-oauth-provider` requires a Cloudflare KV
+   namespace bound as `OAUTH_KV`. **Project decision:** create one namespace dedicated to this
+   Worker's OAuth clients, grants, authorization codes, and opaque tokens; then add its id to
+   `wrangler.jsonc`. Do not reuse an application-data namespace.
+2. **Source fact — owner authentication:** a path-specific Access application can protect a
+   `workers.dev` path and emits a signed application JWT. **Project decision:** create a
+   self-hosted Access application for exactly
+   `meal-prep-conversational-bridge.shinyamadasan.workers.dev/authorize`, with an owner-only Allow
+   policy. Do not protect the whole Worker: ChatGPT must reach discovery, `/oauth/token`, and
+   `/mcp`. Do not enable Access Managed OAuth for this application.
+3. **Project decision — owner configuration:** after the owner signs into that Access application,
+   validate its application token and obtain the stable `sub` without logging or committing the
+   full token. Store the Access issuer origin, application AUD tag, and exact owner subject as
+   Worker secrets `ACCESS_TEAM_DOMAIN`, `ACCESS_POLICY_AUD`, and
+   `MCP_AUTHORIZED_OWNER_SUBJECT`. No email or display name is an authorization key.
+4. **Source fact — OAuth endpoints/client:** deployment publishes the RFC 9728 document at
+   `/.well-known/oauth-protected-resource/mcp`, RFC 8414 metadata at
+   `/.well-known/oauth-authorization-server`, authorization at `/authorize`, and token/revocation
+   at `/oauth/token`. CIMD needs the committed `global_fetch_strictly_public` compatibility flag.
+   **Project decision:** use CIMD and public-client `none`; create no DCR endpoint, predefined
+   client id, client secret, or separate OAuth application.
+5. **Source fact — ChatGPT redirect:** an issuer-identifying server uses the stable current redirect
+   `https://chatgpt.com/connector_platform_oauth_redirect` and stable CIMD client
+   `https://chatgpt.com/oauth/client.json`; ChatGPT's management page is authoritative for the
+   connection. **Project decision:** verify and record the exact values shown there before linking.
+6. Deploy only the independently reviewed commit. Confirm both discovery documents advertise the
+   exact production issuer/resource, only `mealprep:read`, PKCE `S256`, CIMD support, and a
+   token-endpoint method intersecting ChatGPT's CIMD (`none`). Confirm an unauthenticated `/mcp`
+   response has `WWW-Authenticate` with the production `resource_metadata` URL.
+7. Connect the owner's ChatGPT account and perform only `get_inventory` and `get_ready_food`.
+   Record the Firestore revision before and after and require it to remain unchanged. Do not expose
+   or request a write scope/tool. The first production write remains a separate owner decision
+   after this read-only live verification succeeds.

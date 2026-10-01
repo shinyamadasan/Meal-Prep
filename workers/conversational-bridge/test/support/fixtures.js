@@ -43,7 +43,10 @@ export function testEnv(overrides = {}) {
     BRIDGE_API_TOKEN: 'test-bridge-token',
     FIREBASE_SERVICE_ACCOUNT_JSON: FAKE_SERVICE_ACCOUNT_JSON,
     FIRESTORE_PROJECT_ID: 'meal-prep-test',
-    TARGET_UID: 'test-uid-1'
+    TARGET_UID: 'test-uid-1',
+    ACCESS_TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
+    ACCESS_POLICY_AUD: 'test-access-policy-audience',
+    MCP_AUTHORIZED_OWNER_SUBJECT: 'test-owner-subject'
   }, overrides);
 }
 

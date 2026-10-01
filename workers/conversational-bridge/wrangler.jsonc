@@ -3,13 +3,13 @@
   "name": "meal-prep-conversational-bridge",
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["global_fetch_strictly_public"],
   "workers_dev": true,
   "preview_urls": false,
   "observability": {
     "enabled": true
   }
-  // Secrets (never committed, never in `vars`): set with `wrangler secret put <NAME>` before any
-  // real deploy. See README.md "Required secrets". This file intentionally carries no `vars` block
-  // — unlike recipe-import's ALLOWED_ORIGINS, every configuration value this Worker needs is
-  // sensitive (bearer token, service-account credential, target uid).
+  // Secrets and owner identity configuration (never committed, never in `vars`) are listed in
+  // README.md "Required secrets". The separately authorized TASK-068 provisioning step must add
+  // the non-secret OAUTH_KV namespace binding after independent review; no live namespace exists.
 }

@@ -5,6 +5,47 @@
 
 ---
 
+## TASK-068 — done (branch: task-068)
+changed:
+  - workers/conversational-bridge/src/oauth.js (Cloudflare Workers OAuth Provider integration,
+    CIMD-only read-scope configuration, Access-gated owner consent, and fixed owner/resource grant
+    properties; 142 loc)
+  - workers/conversational-bridge/src/mcpAuth.js (RS256 Access assertion validation plus exact
+    issuer/audience/time/scope/resource/owner checks and sanitized MCP challenges; 117 loc)
+  - workers/conversational-bridge/src/mcp.js (replaces feasibility probes with exactly
+    `get_inventory` and `get_ready_food`, delegates to `getUserDocument()` plus the existing
+    canonical list functions, declares read-only OAuth metadata, and contains no mutation path;
+    141 added / 35 removed loc)
+  - workers/conversational-bridge/src/index.js (keeps REST bearer routing separate from the exact
+    OAuth-protected `/mcp` route and fails near paths closed; 14 added / 5 removed loc)
+  - workers/conversational-bridge/test/mcp-auth.node.js and test/mcp.node.js (16 focused provider,
+    assertion, owner, challenge, tool contract, zero-mutation, credential-crossing, and routing
+    tests; 404 current loc)
+  - workers/conversational-bridge/test/support/fixtures.js (fake Access issuer/audience/owner values
+    only; 4 added / 1 removed loc)
+  - workers/conversational-bridge/package.json and package-lock.json (pins only
+    `@cloudflare/workers-oauth-provider@1.2.1` and `jose@6.2.12`; 19 added loc)
+  - workers/conversational-bridge/wrangler.jsonc (enables CIMD's SSRF-safe
+    `global_fetch_strictly_public` flag and records that `OAUTH_KV` is a later provisioning binding;
+    4 added / 4 removed loc)
+  - workers/conversational-bridge/README.md (provider/source evidence, OAuth/resource/redirect
+    contract, deterministic owner mapping, credential separation, rollback, and exact future
+    Access/KV/secrets/ChatGPT provisioning plan; 167 added / 64 removed loc)
+tests: focused OAuth/MCP 16/16 pass; full bridge 84/84 pass; full local Playwright 711/711 pass;
+  7 changed/new JavaScript syntax checks pass; Wrangler 4.145.0 dry-run bundles successfully;
+  npm audit reports 0 vulnerabilities; Verify-Decisions 110/110; git diff and delta secret scan
+  clean; complete evidence in TEST_REPORT.md
+blockers: none
+deviations: TASK-067 live feasibility passed and MCP is selected, but TASK-068 remains local-only:
+  no production deployment, Access application, OAuth KV namespace/binding, private ChatGPT
+  connection, production Firestore access, or production write occurred. The first production
+  write and `mealprep:write` remain unapproved. Check-DocsConsistency still reports the same 51
+  pre-existing candidates from unchanged app/docs inputs; TASK-068 introduces zero scanned-file
+  drift.
+→ status set to `review` in TASKS.md
+
+---
+
 ## TASK-067 — done (branch: task-067)
 changed:
   - workers/conversational-bridge/src/mcp.js (new stateless `/mcp` adapter using the official
