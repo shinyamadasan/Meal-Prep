@@ -105,14 +105,16 @@ async function finishAuthorization(request, oauth, ownerSubject, deps) {
     return new Response(null, { status: 302, headers: denied.headers });
   }
 
-  const approved = await oauth.approveConsent(request, handle, { scope: [MCP_SCOPE] });
-  requireExactAuthorizationScope(approved.request.scope, approved.request);
+  // Omitting a scope override preserves the original stored request for policy validation.
+  const approved = await oauth.approveConsent(request, handle);
+  const scope = requireExactAuthorizationScope(approved.request.scope, approved.request);
+  const approvedRequest = { ...approved.request, scope };
   const issuedAt = deps.nowSeconds == null ? Math.floor(Date.now() / 1000) : deps.nowSeconds;
   const { redirectTo } = await oauth.completeAuthorization({
-    request: approved.request,
+    request: approvedRequest,
     userId: ownerSubject,
     metadata: {},
-    scope: [MCP_SCOPE],
+    scope,
     props: {
       ownerSubject,
       issuer: MCP_ISSUER,

@@ -193,8 +193,8 @@ async function beginAuthorization(worker, env, options = {}) {
   return { response, html, handle, cookie };
 }
 
-async function approveAuthorization(worker, env, transaction) {
-  const response = await worker.fetch(new Request(MCP_ISSUER + '/authorize', {
+async function submitAuthorizationApproval(worker, env, transaction) {
+  return worker.fetch(new Request(MCP_ISSUER + '/authorize', {
     method: 'POST',
     headers: {
       'Cf-Access-Jwt-Assertion': await accessAssertion(),
@@ -203,6 +203,10 @@ async function approveAuthorization(worker, env, transaction) {
     },
     body: new URLSearchParams({ handle: transaction.handle, decision: 'approve' })
   }), env, {});
+}
+
+async function approveAuthorization(worker, env, transaction) {
+  const response = await submitAuthorizationApproval(worker, env, transaction);
   assert.equal(response.status, 302);
   const redirect = new URL(response.headers.get('Location'));
   const code = redirect.searchParams.get('code');
@@ -307,6 +311,38 @@ test('actual provider authorization path enforces the exact deduplicated read sc
     assert.equal(new URL(result.response.headers.get('Location')).searchParams.get('error'), 'invalid_scope');
     assert.equal((await env.OAUTH_PROVIDER.listUserGrants(OWNER)).items.length, 0);
   }
+});
+
+test('actual provider rejects stale unsupported stored consent scope without issuing a grant or code', async () => {
+  cimdDocuments = new Map([[CLIENT_ID, expectedCimd()]]);
+  const env = integrationEnv();
+  const worker = integrationWorker();
+  const bootstrap = await beginAuthorization(worker, env);
+  assert.equal(bootstrap.response.status, 200);
+
+  const original = await env.OAUTH_PROVIDER.parseAuthRequest(new Request(authorizationUrl()));
+  for (const scope of [['mealprep:write'], [MCP_SCOPE, 'mealprep:write']]) {
+    const consent = await env.OAUTH_PROVIDER.beginConsent({ ...original, scope });
+    const response = await submitAuthorizationApproval(worker, env, {
+      handle: consent.handle,
+      cookie: consent.headers.get('Set-Cookie').split(';')[0]
+    });
+    assert.equal(response.status, 302, scope.join(' '));
+    const redirect = new URL(response.headers.get('Location'));
+    assert.equal(redirect.searchParams.get('error'), 'invalid_scope');
+    assert.equal(redirect.searchParams.get('code'), null);
+    assert.equal((await env.OAUTH_PROVIDER.listUserGrants(OWNER)).items.length, 0);
+    const storedKeys = (await env.OAUTH_KV.list()).keys.map(({ name }) => name);
+    assert.equal(storedKeys.some((name) => name.startsWith('grant:') || name.startsWith('token:')), false);
+  }
+
+  const consent = await env.OAUTH_PROVIDER.beginConsent({ ...original, scope: [MCP_SCOPE] });
+  const code = await approveAuthorization(worker, env, {
+    handle: consent.handle,
+    cookie: consent.headers.get('Set-Cookie').split(';')[0]
+  });
+  assert.equal(typeof code, 'string');
+  assert.equal((await env.OAUTH_PROVIDER.listUserGrants(OWNER)).items.length, 1);
 });
 
 test('actual provider CIMD negotiation selects none and rejects incompatible metadata, Basic auth, and wrong redirect', async () => {

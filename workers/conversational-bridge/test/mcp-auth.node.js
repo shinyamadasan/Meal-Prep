@@ -237,7 +237,8 @@ test('authorization POST grants only mealprep:read to the configured owner and f
     nowSeconds: NOW
   });
   assert.equal(response.status, 302);
-  assert.deepEqual(approvedOptions, { scope: [MCP_SCOPE] });
+  assert.equal(approvedOptions, undefined);
+  assert.deepEqual(completedOptions.request.scope, [MCP_SCOPE]);
   assert.equal(completedOptions.userId, 'test-owner-subject');
   assert.deepEqual(completedOptions.scope, [MCP_SCOPE]);
   assert.deepEqual(completedOptions.props, {

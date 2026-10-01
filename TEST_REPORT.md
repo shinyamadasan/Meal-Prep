@@ -5,6 +5,45 @@
 
 ---
 
+## TASK-068 second fix-first correction · 2026-10-01
+suite: `node --test --test-isolation=none test/mcp-auth.node.js
+  test/oauth-provider-integration.node.js`; `node --test --test-isolation=none test/auth.node.js
+  test/mcp-auth.node.js test/oauth-provider-integration.node.js`; `npm run test:bridge`; `npm test`;
+  `node --check` on all 3 changed JavaScript files; `npm audit --omit=dev` from the bridge;
+  `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`;
+  `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`; `git diff --check`; complete-diff
+  secret/QA scan
+result:
+  - Focused OAuth/provider: 17/17 passed, 0 failed/skipped. The installed
+    `@cloudflare/workers-oauth-provider@1.2.1` regression stores write-only and mixed read/write
+    consent requests with the provider's supported `beginConsent()` API, posts each through the
+    real production `finishAuthorization()` path, and gets `invalid_scope` with no redirect code,
+    grant, or token state. A stored exact-read request still returns a code and creates one grant.
+  - Scope provenance: the supported `approveConsent(request, handle)` call omits `options.scope`,
+    so provider v1.2.1 returns its original stored request unchanged. The existing
+    `requireExactAuthorizationScope()` validator runs on that scope before
+    `completeAuthorization()`; only its normalized `[mealprep:read]` result reaches the request and
+    grant scope. The mock seam independently asserts no provider scope override was supplied.
+  - Explicit REST/auth/provider subset: 24/24 passed, 0 failed/skipped. Existing GET scope policy,
+    exact consent display, Access assertions, REST bearer behavior, PKCE/resource/bearer defenses,
+    discovery, and complete revocation remain green.
+  - Full bridge: 95/95 passed, 0 failed/skipped. Full local Playwright: 711/711 passed, 0
+    failed/skipped (`npm test`, 1.9 minutes).
+  - Syntax: all 3 changed JavaScript files passed `node --check`. Dependency audit: 0
+    vulnerabilities. Wrangler 4.146.0 dry-run bundled at 1544.70 KiB / gzip 281.25 KiB, found no
+    configured binding, and exited without deployment.
+  - Verify-Decisions: all 110 pointers hold. Check-DocsConsistency: exit 1 with the same 51
+    pre-existing candidates from unchanged scanned app/docs files; this correction changes none of
+    those inputs and introduces zero new drift.
+  - `git diff --check`, complete-diff secret scan, SELF_REVIEW code-health gate, and applicable QA
+    checks pass; "Would I ship this?" = yes.
+untested: live OAuth/Access/KV provisioning, production deployment, owner ChatGPT linking,
+  production Firestore, and every production write remain forbidden and were not attempted.
+  `DEPLOYED=false`; `LIVE_OAUTH_RESOURCES_CREATED=false`; `FIRESTORE_ACCESSED=false`;
+  `PRODUCTION_WRITE_COUNT=0`; `CHATGPT_PRIVATE_DATA_CONFIGURED=false`.
+
+---
+
 ## TASK-068 fix-first correction · 2026-10-01
 suite: `node --test workers/conversational-bridge/test/mcp-auth.node.js
   workers/conversational-bridge/test/oauth-provider-integration.node.js`; `npm run test:bridge`;

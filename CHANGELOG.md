@@ -5,6 +5,33 @@
 
 ---
 
+## TASK-068 — second fix-first correction (branch: task-068)
+base: reviewed candidate `b585569c67fff81978c1a4fa1a2040d365d26e38`; correction committed
+  separately, not amended
+changed:
+  - workers/conversational-bridge/src/oauth.js (`finishAuthorization()` resolves the stored consent
+    request without a provider scope override, validates its original scope with the existing exact
+    policy, and passes only normalized `[mealprep:read]` into grant creation; 6 added / 4 removed loc)
+  - workers/conversational-bridge/test/oauth-provider-integration.node.js (real provider v1.2.1
+    regression creates stored write-only and mixed-scope consent transactions through supported
+    APIs, proves both reject without a code/grant/token, and proves exact read still succeeds;
+    38 added / 2 removed loc)
+  - workers/conversational-bridge/test/mcp-auth.node.js (asserts no scope override reaches
+    `approveConsent()` and the completed request is normalized to exact read; 2 added / 1 removed loc)
+tests: focused OAuth/provider 17/17 pass; explicit REST/auth/provider 24/24 pass; full bridge 95/95
+  pass; full local Playwright 711/711 pass; 3 changed JavaScript syntax checks pass; Wrangler
+  4.146.0 dry-run bundles successfully; npm audit reports 0 vulnerabilities; Verify-Decisions
+  110/110; complete evidence in TEST_REPORT.md
+blockers: none
+deviations: none in implementation scope. README wording was not changed because its existing
+  exact-scope/reject-not-replace description remains accurate. TASK-068 remains local-only: no
+  deployment, live OAuth / Access / KV resource, private ChatGPT connection, production Firestore
+  access, or production write occurred. Check-DocsConsistency retains the same 51 pre-existing
+  candidates from unchanged app/docs inputs.
+→ TASK-068 remains `review` in TASKS.md for targeted re-review
+
+---
+
 ## TASK-068 — fix-first correction (branch: task-068)
 base: reviewed candidate `4253d0a8775e517ff36f39598ce9bf10f621d77d`; correction committed separately, not amended
 changed:
