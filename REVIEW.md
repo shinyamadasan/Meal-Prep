@@ -85,16 +85,44 @@ commit, the exact reviewed candidate preserved byte-for-byte. Confirmed `git rev
 Zero behavior change from integration itself (expected — pure fast-forward, no conflict
 resolution, no semantic change of any kind).
 
-### D-032 gate — `approved` (landed; deployment remains a separate, unopened phase)
+### D-032 gate — `approved` (merged, THEN deployed; first production write remains the one unopened phase)
 This task's own `TASKS.md` merge/deployment gate is explicit: implementation review PASS
 "authorizes nothing beyond itself — no deployment, no OAuth infrastructure, no production write,"
 and the landing status is deliberately `approved`, not `done`, "regardless of how clean the diff
-looks." That is honored literally here: **local implementation is now merged into `main`**, but
-`PRODUCTION_WRITE_COUNT` remains `0`, no Cloudflare resource was created or mutated, no OAuth/Access/
-KV secret was touched, no ChatGPT write-scope consent occurred, and no production Firestore access
-of any kind took place in this session. `done` is deliberately withheld — per this task's own gate
-language — for whatever later, separately-approved task actually deploys the Worker and performs
-the first controlled production write; this is not that task, and this status does not imply it.
+looks." Merging honored this literally, and so does this addendum after deployment.
+
+### Deployment addendum — 2026-10-02, owner-authorized ("Approve TASK-069 production deployment,
+no production write")
+Pre-deployment: independently verified live (not assumed) that `main == origin/main` and
+`workers/conversational-bridge/**` was byte-identical to the reviewed `2020a1a` candidate; recorded
+`ROLLBACK_VERSION = 03a9032d-02c9-47a5-95be-524d07c97281` from the live deployments list at 100%
+traffic (a first read of this via `Select-Object -Last 1` on the raw API array grabbed the oldest
+entry instead of the newest — caught and corrected by re-sorting on real timestamps before relying
+on it; the value used throughout was the independently-confirmed correct one); re-verified live
+bindings (`OAUTH_KV` + all 7 secrets by name) and script settings (`workers_dev: true`,
+`previews_enabled: false`, no custom routes) against repo policy.
+
+Deployed via the versioned workflow (`wrangler versions upload` then `wrangler versions deploy
+<id>@100`, never bare `wrangler deploy`), with zero traffic shift until the explicit cutover step:
+`NEW_VERSION = 0b94a570-b196-499a-b411-5e6082060894`, its bindings re-verified identical to the
+rollback version's before cutover. Post-cutover, independently re-confirmed via the Cloudflare API
+(explicitly sorted by timestamp): `ACTIVE_VERSION == NEW_VERSION`, `TRAFFIC_PERCENT == 100`.
+
+Non-mutating live verification, all passing: authorization-server `scopes_supported` now
+`["mealprep:read","mealprep:write"]`; protected-resource `scopes_supported` still `["mealprep:read"]`
+only — the three-way scope split (catalogue / baseline / per-tool step-up) landed in production
+exactly as the second fix-first correction specified; tokenless `/mcp` → `401` naming exactly
+`mealprep:read`; `/mcp/` and `/mcp-evil` both fail closed; REST unauthenticated endpoints and a
+REST-shaped bearer on `/mcp` all behave exactly as before. The optional read-only-OAuth write
+step-up smoke test was not run — no legitimate read-only OAuth credential was available to this
+session without extracting one from KV or asking the owner to act as a credential courier, and
+both were correctly out of scope rather than worked around.
+
+`PRODUCTION_WRITE_COUNT` remains `0`. No write grant was created, no ChatGPT re-consent occurred,
+no production Firestore access of any kind took place, and `record_ready_food` was never invoked.
+**`done` is still deliberately withheld** — per this task's own gate language — for whatever later,
+separately-approved task actually performs the first controlled production write; this deployment
+is not that approval, and this status does not imply it.
 
 ---
 ## Review TASK-068 — Authenticated MCP real-data read layer — PASS (STRICT) -> landed (Phase B1 provisioning in progress)

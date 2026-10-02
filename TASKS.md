@@ -5151,9 +5151,13 @@ merge/deployment gate:
 status: approved
 owner: codex
 landed: `2026-10-02`, fast-forwarded onto `main` at `2020a1a9b887d42c50344106ff59df2e21c18e4b` after
-  independent STRICT PASS (2 fix-first rounds) and explicit owner merge authorization. `approved`,
-  not `done`, by this task's own merge/deployment gate below: local implementation only — no
-  deployment, no production write. See REVIEW.md for the full landing record.
+  independent STRICT PASS (2 fix-first rounds) and explicit owner merge authorization.
+deployed: `2026-10-02`, owner-authorized, by Worker version `0b94a570-b196-499a-b411-5e6082060894`
+  at 100% production traffic (rollback target `03a9032d-02c9-47a5-95be-524d07c97281`). Live
+  verification confirmed the three-way scope split, REST/MCP isolation, and near-path closure all
+  landed correctly. Still `approved`, not `done` — this task's own merge/deployment gate reserves
+  `done` for completion of the first controlled production write, which remains separately gated
+  and has NOT occurred. `PRODUCTION_WRITE_COUNT=0`. See REVIEW.md and STATUS.md for the full record.
 source: direct owner governance transition, Phase B2A first-write approval (2026-10-01). This
   approval covers local implementation of exactly ONE real MCP write tool, its tests, and
   documentation. It does NOT authorize deployment, a real production write, additional write

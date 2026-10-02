@@ -5,6 +5,63 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-02 — TASK-069 DEPLOYED to production (`approved`, still NOT `done`): record_ready_food is live; first write remains separately gated
+
+**What happened:** the prior session's Cloudflare credential block turned out to be a stale
+process-level `cfut_` token sitting alongside an already-installed, correct account-owned `cfat_`
+token at the Windows User scope — not a permissions or account-ID problem. Refreshing the current
+process's env vars from the User scope fixed it immediately; confirmed via `GET /accounts/{id}/
+tokens/verify` (`success:true, status:active`) and a working `wrangler versions list` before
+touching anything.
+
+**Pre-deployment, verified live (not assumed):** `main == origin/main == 8c11317...`;
+`workers/conversational-bridge/**` byte-identical to reviewed candidate `2020a1a` (empty diff);
+`ROLLBACK_VERSION` determined from the live deployments list (not the historical default) —
+`03a9032d-02c9-47a5-95be-524d07c97281`, confirmed at 100% traffic before upload; its bindings
+re-verified by name (`OAUTH_KV` + all 7 secrets) and script settings (`workers_dev: true`,
+`previews_enabled: false`, no custom routes) all matched repo policy exactly.
+
+**Caught and corrected a real verification mistake before it mattered:** a first pass at reading
+"current 100% traffic version" via `Select-Object -Last 1` on the raw deployments array grabbed
+the OLDEST deployment, not the newest — the Cloudflare API returns that array newest-first. This
+would have been a wrong `ROLLBACK_VERSION` had it gone unchecked. Caught by re-printing every
+deployment with its real timestamp and re-sorting explicitly before relying on the answer; the
+correct value (`03a9032d...`) was confirmed from the original human-readable `wrangler deployments
+list` output, which was right all along — only the scripted re-check had the bug, and the
+production action downstream used the corrected value throughout.
+
+**Deployment (versioned workflow, no `wrangler deploy`):**
+- `wrangler versions upload` → `NEW_VERSION = 0b94a570-b196-499a-b411-5e6082060894`, zero traffic
+  shift (confirmed: still 100% on `03a9032d` immediately after upload).
+- New version's bindings independently re-verified identical to the rollback version's (same 7
+  secrets by name, same `OAUTH_KV`) before cutover.
+- `wrangler versions deploy 0b94a570...@100` → `SUCCESS`. Wrangler's own pre-deploy summary
+  confirmed the live baseline it was replacing was exactly `03a9032d` at 100%, matching the
+  independently-recorded rollback target.
+- Post-cutover, re-verified via the Cloudflare API (explicitly sorted by timestamp this time):
+  `ACTIVE_VERSION = 0b94a570...`, `TRAFFIC_PERCENT = 100`.
+
+**Non-mutating live verification, all passing:** authorization-server `scopes_supported` now
+`["mealprep:read","mealprep:write"]`; protected-resource `scopes_supported` still `["mealprep:read"]`
+only (the three-way scope split landed correctly in production); tokenless `/mcp` → `401` with
+`WWW-Authenticate` naming exactly `mealprep:read`; `/mcp/` and `/mcp-evil` both `401` (fail closed);
+`/v1/inventory` and `/v1/ready-food` unauthenticated → `401`; `/authorize` with no Access assertion
+→ `302` into the existing Access flow, unchanged; a REST-shaped bearer on `/mcp` → `401` (REST still
+cannot authorize MCP).
+
+**Explicitly NOT done:** no read-only OAuth smoke test or write-tool step-up check was run against
+the live grant — no legitimate read-only OAuth credential was available to this session without
+extracting one from KV or asking the owner to act as a credential courier, both of which were
+correctly out of scope. No write grant was created, no ChatGPT re-consent occurred, no production
+Firestore access of any kind took place, and `record_ready_food` was never invoked.
+**`PRODUCTION_WRITE_COUNT` remains `0`.**
+
+**`TASKS.md` status remains `approved`, deliberately not `done`** — deployment alone doesn't close
+this task; its own gate reserves `done` for completion of the first controlled production write,
+which remains a separate, unopened, future-gated decision.
+
+---
+
 ## 2026-10-02 — TASK-069 deployment attempted, BLOCKED by credential scope: no Cloudflare mutation occurred
 
 **What was attempted:** owner approval received ("Approve TASK-069 production deployment, no
