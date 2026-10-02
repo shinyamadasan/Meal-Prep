@@ -5148,8 +5148,12 @@ merge/deployment gate:
 ---
 
 ### TASK-069 · MCP FIRST-WRITE PILOT — authenticated `record_ready_food` write tool (Phase B2A)
-status: review
+status: approved
 owner: codex
+landed: `2026-10-02`, fast-forwarded onto `main` at `2020a1a9b887d42c50344106ff59df2e21c18e4b` after
+  independent STRICT PASS (2 fix-first rounds) and explicit owner merge authorization. `approved`,
+  not `done`, by this task's own merge/deployment gate below: local implementation only — no
+  deployment, no production write. See REVIEW.md for the full landing record.
 source: direct owner governance transition, Phase B2A first-write approval (2026-10-01). This
   approval covers local implementation of exactly ONE real MCP write tool, its tests, and
   documentation. It does NOT authorize deployment, a real production write, additional write

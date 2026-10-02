@@ -5,6 +5,43 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-02 — TASK-069 integrated into `main` (`approved`, NOT `done`): MCP write pilot merged, deployment still separately gated
+
+**What happened:** Codex's usage quota was exhausted mid-build, so the session's documented
+"Codex unavailable" fallback invoked headless Claude, which genuinely implemented TASK-069 (the
+`record_ready_food` MCP write tool). An independent external STRICT reviewer ran three rounds —
+FIX FIRST (OAuth discovery metadata, README live-state drift, unrun verification gates) -> FIX
+FIRST (a second metadata-semantics mistake: `requiredScopes` should name the resource's read-only
+baseline, not the full scope catalogue) -> **PASS** on `2020a1a`. The owner then explicitly
+approved merging (not deploying) that exact candidate.
+
+**Independently verified at every step, not relayed on faith:** re-ran the full bridge suite after
+the build (112/112, confirming genuine content despite the build orchestrator's own process having
+been force-killed on a 20-minute timeout and misreported as "FAILED"); ran the full root Playwright
+suite directly in this session (711/711 — closing the gap the autonomous builder's sandboxed
+session could not); read the installed `@cloudflare/workers-oauth-provider@1.2.1` source directly,
+twice, to confirm each reviewer claim about `scopesSupported`/`requiredScopes` semantics before
+applying either fix, rather than assuming the premise.
+
+**Integration:** verified `main == origin/main == a8ea1dfc281ca159d90ef579d117a10ca2f356fa` and
+`task-069` tip exactly `2020a1a9b887d42c50344106ff59df2e21c18e4b` before any mutation. Fast-forwarded
+`main` to `2020a1a` (`git merge --ff-only` — zero rewrite, exact candidate preserved). Post-merge
+on `main`: bridge 113/113, provider suite 10/10, write-tool suite 15/15, `node --check` clean.
+
+**`TASKS.md` status set to `approved`, not `done`** — this task's own merge/deployment gate is
+explicit that implementation review PASS "authorizes nothing beyond itself," and reserves `done`
+for whatever later, separately-approved task actually deploys the Worker and performs the first
+controlled production write. `PRODUCTION_WRITE_COUNT` remains `0`; no Cloudflare resource, OAuth/
+Access/KV secret, ChatGPT write-scope consent, or production Firestore access was touched.
+
+**Explicitly not done, by design:** no deployment, no `wrangler deploy`/`wrangler secret put`/
+Cloudflare Access/KV mutation, no production Firestore access, no ChatGPT write re-consent. All
+remain a separate, unopened, future-gated decision. Next step for TASK-069 (if/when the owner
+wants it) is a new Phase B2B-style task for deployment and the first controlled production write —
+not a continuation of this one.
+
+---
+
 ## 2026-10-01 — TASK-068 CLOSED `done`: owner completed real ChatGPT OAuth link, both read tools PASS in production
 
 **What closed it:** Following the Phase B1 deployment logged below, the owner completed the actual

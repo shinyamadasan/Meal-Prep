@@ -4,6 +4,99 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-069 — MCP first-write pilot (Phase B2A), record_ready_food — PASS (STRICT, 2 rounds) -> owner-authorized -> landed (local only, deployment separately gated)
+branch: `task-069`; final candidate reviewed `2020a1a9b887d42c50344106ff59df2e21c18e4b` (base `main`
+  before integration `a8ea1dfc281ca159d90ef579d117a10ca2f356fa`); two prior fix-first rounds on
+  `4bfdc34891056cbce5c8c3a189647981a2bf06a4` and `832b1dc48a21659bd13a039f1bc3ba122e6685db`
+date: 2026-10-02
+
+### Provenance — recorded from owner relay, not written by the reviewer
+The independent STRICT review ran outside this repository, across three candidates:
+- `4bfdc34891056cbce5c8c3a189647981a2bf06a4` — **FIX FIRST**: 3 bounded blockers — OAuth discovery
+  metadata (`scopesSupported`/`requiredScopes`) still advertised only `mealprep:read` even though
+  the Worker now accepted/enforced `mealprep:write`; README described TASK-068 as local-only/not-
+  connected when it is actually live in production; the Playwright/SELF_REVIEW/QA gates had not
+  actually been run (the autonomous builder's sandbox categorically blocked `npm`/`npx`/`.ps1`
+  process spawns). Plus one optional cleanup (project only canonical fields into
+  `recordCookedFood()` instead of the whole args object).
+- `832b1dc48a21659bd13a039f1bc3ba122e6685db` — **FIX FIRST**: 1 bounded blocker remained — the
+  previous fix widened BOTH `scopesSupported` AND `requiredScopes` to the full scope set, but the
+  installed `@cloudflare/workers-oauth-provider@1.2.1` gives them distinct discovery roles:
+  `scopesSupported` is the authorization server's full grant catalogue; `requiredScopes` is the
+  protected resource's own baseline requirement (and the default no-token challenge scope).
+  `requiredScopes` should have stayed at the resource's genuine read-only baseline, with
+  `mealprep:write` discoverable only via the catalogue and the write tool's own step-up challenge.
+- `2020a1a9b887d42c50344106ff59df2e21c18e4b` — **FINAL VERDICT: PASS**. Reviewer conclusion
+  (relayed in substance): architecture, revision/conflict handling, owner auth, stored-scope
+  validation, tool surface, Firestore mapping, and REST/MCP isolation all sound and not reopened
+  across either correction round. Its reports are not committed here.
+
+### Independent verification performed in this session (not relayed) — at every round, not just the end
+This session did not take any relayed verdict at face value, at any of the three rounds:
+- **Round 1 (`4bfdc34`):** independently re-ran the full bridge suite (confirmed 112/112, matching
+  the builder's claim) before concluding it was genuinely safe to act on, since the build
+  orchestrator's own process had been force-killed on a timeout and had misreported the run as
+  "FAILED" even though real work was committed — this session verified the actual committed content
+  rather than trusting either the builder's claim or the orchestrator's misleading failure message.
+- **Round 2 fix (`832b1dc`):** before applying the fix, read the installed
+  `@cloudflare/workers-oauth-provider@1.2.1` source directly (`dist/oauth-provider.js`) to confirm
+  `validateAccessToken()`/`approveConsent()` never gate on `scopesSupported`/`requiredScopes` (both
+  are pure discovery-metadata), rather than assuming the reviewer's premise. Also independently ran
+  the full root Playwright suite directly in this session — **711/711 passed** — closing the gap
+  the autonomous builder's sandbox could not.
+- **Round 3 fix (`2020a1a`):** before applying the second correction, independently re-verified the
+  specific claim that `requiredScopes` resolves into the protected-resource metadata's
+  `scopes_supported` (via `withRequiredScopes()`/`resolveRequiredScopes()`) and the default
+  tokenless `WWW-Authenticate` challenge (via `createBearerChallenge()`), by reading the same
+  provider source again — confirming the reviewer's three-way-split claim was accurate, not merely
+  asserted. Added a new end-to-end test proving the split live (authorization-server catalogue has
+  write, protected-resource baseline does not, a real token scoped to exactly `mealprep:read`
+  calling `record_ready_food` gets that tool's own `insufficient_scope` step-up naming
+  `mealprep:write`) rather than only asserting the config object's literal values.
+- At every round: ran `node --check` on every changed file, `git diff --check`, a manual
+  secret-pattern scan, and the full bridge suite directly in this session — never relied on a
+  relayed pass/fail count.
+
+No discrepancy found between the relayed verdicts and the actual code/tests at any round.
+
+### Landing
+Owner-authorized ("Approve TASK-069 merge"), scoped explicitly to **safe integration only** — NOT
+Cloudflare deployment, NOT production OAuth/write activation, NOT a ChatGPT write-scope re-consent,
+NOT production Firestore access, NOT a first production write, NOT additional MCP write tools.
+
+Pre-integration invariants independently verified before any mutation: `main == origin/main ==
+a8ea1dfc281ca159d90ef579d117a10ca2f356fa`; `task-069` tip exactly `2020a1a9b887d42c50344106ff59df2e21c18e4b`;
+`main` a direct ancestor of the candidate (`git merge-base main task-069` == `a8ea1df`, zero commits
+on `main` absent from the candidate); clean working tree except the preserved untracked
+`screenshots/`; no staged files; no destructive overlap.
+
+`main` **fast-forwarded** to `2020a1a` (`git merge --ff-only task-069`) — zero rewrite, zero new
+commit, the exact reviewed candidate preserved byte-for-byte. Confirmed `git rev-parse HEAD ==
+2020a1a9b887d42c50344106ff59df2e21c18e4b` immediately after.
+
+### Post-integration verification (this session, on merged `main`, before push)
+| Check | Result |
+|---|---|
+| `npm run test:bridge` (full bridge suite) | **113/113 pass** |
+| `node --test test/oauth-provider-integration.node.js` | **10/10 pass** |
+| `node --test test/mcp-write.node.js` | **15/15 pass** |
+| `node --check` on every `src/**/*.js` file | clean |
+
+Zero behavior change from integration itself (expected — pure fast-forward, no conflict
+resolution, no semantic change of any kind).
+
+### D-032 gate — `approved` (landed; deployment remains a separate, unopened phase)
+This task's own `TASKS.md` merge/deployment gate is explicit: implementation review PASS
+"authorizes nothing beyond itself — no deployment, no OAuth infrastructure, no production write,"
+and the landing status is deliberately `approved`, not `done`, "regardless of how clean the diff
+looks." That is honored literally here: **local implementation is now merged into `main`**, but
+`PRODUCTION_WRITE_COUNT` remains `0`, no Cloudflare resource was created or mutated, no OAuth/Access/
+KV secret was touched, no ChatGPT write-scope consent occurred, and no production Firestore access
+of any kind took place in this session. `done` is deliberately withheld — per this task's own gate
+language — for whatever later, separately-approved task actually deploys the Worker and performs
+the first controlled production write; this is not that task, and this status does not imply it.
+
+---
 ## Review TASK-068 — Authenticated MCP real-data read layer — PASS (STRICT) -> landed (Phase B1 provisioning in progress)
 branch: `task-068`; final candidate reviewed `fe49a3b8374ee08e2537edc7e443fca6378c3799` (base `main`
   before integration); two prior fix-first rounds on `4253d0a8775e517ff36f39598ce9bf10f621d77d` and
