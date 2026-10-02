@@ -5,6 +5,34 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-01 — TASK-068 CLOSED `done`: owner completed real ChatGPT OAuth link, both read tools PASS in production
+
+**What closed it:** Following the Phase B1 deployment logged below, the owner completed the actual
+ChatGPT OAuth link (Cloudflare Access + `mealprep:read` consent) and reports both `get_inventory`
+and `get_ready_food` succeeded against production, each returning `revision = 29473`. Recorded in
+`REVIEW.md` explicitly labeled as owner-attested, not independently re-verified by this session —
+doing so would require either the owner's own linked credential or direct production Firestore
+access, neither of which this session obtained or should obtain.
+
+**Independently re-verified before closing:** `main == origin/main` with a clean tree (only
+preserved untracked `screenshots/`); no additional/unexpected deployment occurred after the
+previously-verified cutover (still `03a9032d-02c9-47a5-95be-524d07c97281` at 100%, same timestamp,
+same total deployment count). `TASKS.md` status moved `approved` -> `done`; `REVIEW.md` D-032 gate
+closed `done`.
+
+**Explicitly not done, by design:** no write tool exists in deployed code (verified by source read,
+not inferred); Phase B2 (any real MCP write tool, production writes) remains a separate, unapproved
+decision — nothing in this session began that work. A relayed data-quality observation (freezer-item
+quantity/unit values resembling years) was deliberately NOT folded into TASK-068, not repaired, and
+not recorded as a confirmed bug — only the owner can confirm it against the live app, and this
+session has no independent way to do that.
+
+**No remaining blocker for TASK-068.** Next task is whatever the owner chooses to queue via
+`planning/BUILD_QUEUE.md` for Claude to plan — most likely Phase B2 scoping, if and when the owner
+wants to approve any production write capability.
+
+---
+
 ## 2026-10-01 — TASK-068 Phase B1 deployed to production: independent re-review PASS, OAuth infra live, awaiting real ChatGPT link
 
 **Context:** Picked up mid-flight via an owner-relayed operator brief (from an external AI tool, not a

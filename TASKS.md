@@ -4936,7 +4936,7 @@ decision: MCP is selected as the preferred thin ChatGPT adapter over the existin
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-068 · AUTHENTICATED MCP REAL-DATA READ LAYER
-status: approved
+status: done
 owner: codex
 source: direct owner governance transition after TASK-067's successful live feasibility result
   (2026-10-01). This is approved Phase B1 only; production writes remain unapproved.

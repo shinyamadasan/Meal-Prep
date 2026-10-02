@@ -56,16 +56,48 @@ actual `fe49a3b` candidate directly against the acceptance criteria:
 
 No discrepancy found between the relayed verdict and the actual code/tests on `main`.
 
+### Phase B1 live deployment and acceptance (same day, continued in-session)
+Production cutover to the reviewed candidate completed. Independently verified in this session via
+the Cloudflare API and direct HTTP probes (not relayed): deployment `03a9032d-02c9-47a5-95be-524d07c97281`
+is active at 100% (rollback target `6f98cf85-d3f3-421b-bee8-9808fc1c73ef`); its bindings carry all
+three new secrets by name (`ACCESS_TEAM_DOMAIN`, `ACCESS_POLICY_AUD`, `MCP_AUTHORIZED_OWNER_SUBJECT`)
+plus the four preserved REST secrets and the `OAUTH_KV` binding, no values exposed; its Version URL
+returns `404`/error 1042 (does not execute); `/v1/inventory` and `/v1/ready-food` remain `401` unauth;
+`recipe-import` is unaffected; `/authorize` is Access-redirected (`302`) while `/mcp` is not
+(clean `401` with a correct `WWW-Authenticate` challenge straight from the Worker, no Access
+redirect, no private data in the body); `/mcp/` and `/mcp-evil` fail closed; protected-resource and
+authorization-server metadata are both correct (`mealprep:read` only, PKCE `S256`, CIMD advertised).
+Secret-store writes and the production deploy itself were correctly refused to this session by the
+sandbox's own safety controls; the owner ran both directly, and this session verified the resulting
+live state independently rather than trusting the report of having done so.
+
+### Live ChatGPT acceptance — owner-attested, NOT independently re-verified by this session
+The owner reports completing the real ChatGPT OAuth link (Cloudflare Access + `mealprep:read`
+consent) and that `get_inventory` and `get_ready_food` both succeeded against production, each
+returning `revision = 29473`. This specific claim is recorded as relayed, not independently checked:
+doing so would require either the owner's own linked OAuth credential or direct production Firestore
+access, and obtaining either solely to re-prove this would mean creating new access specifically to
+bypass the owner-only boundary this task exists to enforce — exactly what the task's own constraints
+and this session's judgment say not to do. What this session did verify independently: the matching
+revision across both reads is at least consistent with this app's existing single-document revision
+model (D-004) and with zero writes occurring between the two calls; the live deployment and
+Cloudflare-side auth boundary described above are real and correctly scoped; and no write tool
+exists anywhere in the deployed code (confirmed by direct source read of `src/mcp.js`, not inferred
+from the live call).
+
+A data-quality observation was also relayed (freezer-item quantity/unit values that look like
+years): explicitly not folded into TASK-068, not repaired, and not recorded as a confirmed backlog
+bug here, because confirming it would require the same canonical-app comparison this session has no
+independent way to perform. If the owner separately confirms it against the live app, it belongs in
+`planning/ROADMAP.md` Known Issues as its own item, not as a TASK-068 finding.
+
 ### D-032 gate
-`approved` (held) — red-zone: auth/security/private-data surface (OAuth provider, MCP real-data
-reads), per Hard Rule 10 / Risk: High. Code integration is landed and independently re-verified in
-this session (see above), but TASK-068 is not yet `done`: its own merge/deployment gate requires
-this PASS before the separately authorized Phase B1 OAuth infrastructure provisioning, deployment,
-and authenticated live READ-only verification — that phase is in progress as of this entry (Zero
-Trust org/IdP/Access app+policy/KV namespace already live and confirmed independently in this
-session via the Cloudflare API; production Worker code not yet deployed — current live bindings are
-still only the four pre-existing REST secrets). Definition of Done requires that phase to complete,
-with `PRODUCTION_WRITE_COUNT=0` and `MCP_WRITE_TOOL_COUNT=0` preserved throughout.
+`done`. Code integration, independent code/test re-review, Phase B1 infrastructure provisioning,
+production deployment, and the owner's live ChatGPT read-only acceptance are all complete for the
+scope this task defined. `PRODUCTION_WRITE_COUNT=0` and `MCP_WRITE_TOOL_COUNT=0` hold throughout —
+no write tool exists in the deployed code, and no write was ever invoked. Production writes and any
+real MCP write tool remain a separate, unapproved decision (Phase B2), not part of this task's scope
+or this closeout.
 
 ---
 ## Review TASK-061 — CI restore reliability (D-077) — PASS (STRICT) -> landed
