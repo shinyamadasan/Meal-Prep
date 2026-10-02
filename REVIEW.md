@@ -4,6 +4,70 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-068 — Authenticated MCP real-data read layer — PASS (STRICT) -> landed (Phase B1 provisioning in progress)
+branch: `task-068`; final candidate reviewed `fe49a3b8374ee08e2537edc7e443fca6378c3799` (base `main`
+  before integration); two prior fix-first rounds on `4253d0a8775e517ff36f39598ce9bf10f621d77d` and
+  `b585569c67fff81978c1a4fa1a2040d365d26e38`
+date: 2026-10-01
+
+### Provenance — recorded from owner relay, not written by the reviewer
+The independent STRICT review ran outside this repository, across three candidates:
+- `4253d0a8775e517ff36f39598ce9bf10f621d77d` — **FIX FIRST**: authorization-request scope
+  enforcement, provider-level OAuth integration coverage, revocation guidance (all bounded).
+- `b585569c67fff81978c1a4fa1a2040d365d26e38` — **FIX FIRST**: one bounded blocker remained — the
+  provider's `approveConsent(..., {scope})` replaced the stored requested scope before validation.
+- `fe49a3b8374ee08e2537edc7e443fca6378c3799` — **FINAL VERDICT: PASS**. Reviewer conclusion (relayed
+  verbatim in substance): "clears the remaining FIX FIRST blocker and is ready for safe integration.
+  After integration, the next phase is bounded OAuth infrastructure provisioning and authenticated
+  production READ-only verification. Production writes remain unapproved. Real MCP write tools
+  remain unapproved." Its report is not committed here.
+
+### Landing
+Owner-authorized. `main` fast-forwarded to `fe49a3b` (reviewed SHA preserved, no rebase or new
+commit, no conflict resolution or semantic changes during integration) and pushed; independently
+confirmed in this session that `main == origin/main == fe49a3b8374ee08e2537edc7e443fca6378c3799`.
+
+### Independent verification performed in this session (not relayed)
+The relayed verdict above was not taken at face value. This session independently re-reviewed the
+actual `fe49a3b` candidate directly against the acceptance criteria:
+- Read `src/oauth.js`: confirmed `finishAuthorization()` calls `oauth.approveConsent(request, handle)`
+  with no scope override, then validates `approved.request.scope` via `requireExactAuthorizationScope`
+  (exactly one token, must equal `mealprep:read`) before `completeAuthorization()` — the exact
+  previously-reported scope-override bug is genuinely fixed, not just claimed fixed. Resource binding
+  (`resource` param on both `/authorize` and `/oauth/token`) is independently enforced.
+- Read `src/mcpAuth.js`: Access JWT verified via `jose` against configured issuer/audience with
+  `RS256`, required claims, zero clock tolerance; owner identity checked against
+  `MCP_AUTHORIZED_OWNER_SUBJECT` (a secret, not hard-coded) plus `payload.type === 'app'`.
+  `requireMcpReadContext()` re-validates audience/resource/issuer/expiry/notBefore/scope/owner on
+  every tool call, not only at initial auth.
+- Read `src/mcp.js` and `src/index.js`: confirmed exactly `get_inventory`/`get_ready_food` are
+  registered (no `probe_read`/`probe_write`/write tool), both pure reads of existing domain
+  functions, per-tool `securitySchemes`/`readOnlyHint`/`destructiveHint`/`openWorldHint` declared;
+  confirmed REST (`requireBearerToken`/`BRIDGE_API_TOKEN`) and MCP (OAuth) are fully separate code
+  paths, and `/mcp/`, `/mcp-*` near-paths route through the REST bearer check (fail closed, no MCP
+  data leak) rather than the OAuth/MCP handler.
+- Grepped and spot-checked `test/oauth-provider-integration.node.js`, `test/mcp-auth.node.js`,
+  `test/mcp.node.js`: real adversarial coverage exists for PKCE S256 accept/reject/replay,
+  `invalid_scope`, `invalid_target` (resource binding), malformed/expired/wrong-audience/wrong-owner
+  bearer rejection, exact tool-list assertion, REST-bearer-cannot-authorize-MCP (and reverse), and
+  secret/identity non-leakage assertions.
+- Ran `node --test test/*.node.js` directly in this session: **95/95 pass**, matching CHANGELOG.md's
+  claimed count exactly.
+
+No discrepancy found between the relayed verdict and the actual code/tests on `main`.
+
+### D-032 gate
+`approved` (held) — red-zone: auth/security/private-data surface (OAuth provider, MCP real-data
+reads), per Hard Rule 10 / Risk: High. Code integration is landed and independently re-verified in
+this session (see above), but TASK-068 is not yet `done`: its own merge/deployment gate requires
+this PASS before the separately authorized Phase B1 OAuth infrastructure provisioning, deployment,
+and authenticated live READ-only verification — that phase is in progress as of this entry (Zero
+Trust org/IdP/Access app+policy/KV namespace already live and confirmed independently in this
+session via the Cloudflare API; production Worker code not yet deployed — current live bindings are
+still only the four pre-existing REST secrets). Definition of Done requires that phase to complete,
+with `PRODUCTION_WRITE_COUNT=0` and `MCP_WRITE_TOOL_COUNT=0` preserved throughout.
+
+---
 ## Review TASK-061 — CI restore reliability (D-077) — PASS (STRICT) -> landed
 branch: `task-061-ci-restore-reliability`; reviewed f58bfe5 (base `main @ 207d262`)
 date: 2026-09-26

@@ -8,8 +8,14 @@
   "preview_urls": false,
   "observability": {
     "enabled": true
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "04b3e16f2de84bb6b6c0b3ef2ea971cd"
+    }
+  ]
   // Secrets and owner identity configuration (never committed, never in `vars`) are listed in
-  // README.md "Required secrets". The separately authorized TASK-068 provisioning step must add
-  // the non-secret OAUTH_KV namespace binding after independent review; no live namespace exists.
+  // README.md "Required secrets". TASK-068 adds only the independently reviewed, non-secret
+  // OAUTH_KV namespace binding here.
 }

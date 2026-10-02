@@ -5,6 +5,74 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-01 — TASK-068 Phase B1 deployed to production: independent re-review PASS, OAuth infra live, awaiting real ChatGPT link
+
+**Context:** Picked up mid-flight via an owner-relayed operator brief (from an external AI tool, not a
+prior Claude Code session in this repo) claiming TASK-068's external STRICT review had already
+passed and Phase B1 live provisioning was owner-approved. Did not take that at face value.
+
+**Independent verification performed, not relayed:**
+- Confirmed `main == origin/main == fe49a3b8374ee08e2537edc7e443fca6378c3799` matched the claim.
+- Found `TASKS.md`/`REVIEW.md`/`CHANGELOG.md` contradicted the "already reviewed" claim (`status:
+  review`, no `REVIEW.md` entry, CHANGELOG said "remains local-only"). Surfaced this to the owner
+  before proceeding.
+- Owner relayed the external review's substance (candidates/verdicts/final PASS on `fe49a3b`).
+  Rather than record that verbatim, re-reviewed the actual diff myself: read `src/oauth.js`,
+  `src/mcpAuth.js`, `src/mcp.js`, `src/index.js` against every acceptance criterion, confirmed the
+  specific previously-reported `approveConsent()` scope-override bug is genuinely fixed, and ran
+  `node --test test/*.node.js` directly — **95/95 pass**, matching CHANGELOG's claimed count. Logged
+  both the relayed provenance and this independent verification in `REVIEW.md`, then set `TASKS.md`
+  status `review` -> `approved` (D-032 held gate — red-zone/Risk:High; code was already
+  fast-forwarded onto `main` by the owner, so no merge action was needed here).
+- Independently confirmed via the Cloudflare API (read-only) that Phase B1 infra genuinely existed
+  live before touching anything: Zero Trust org, owner OTP IdP, Access app scoped to exactly
+  `/authorize` (not `/mcp`, not `/v1/*`), owner-only Access policy, `OAUTH_KV` namespace. Cross-
+  checked against the account audit log — real, owner-authenticated, same-day activity, not
+  fabricated.
+
+**Sandbox boundaries hit and respected (did not route around any of them):**
+- `/access/users` (would return identity PII) — blocked by the harness; did not retry via another
+  path. Had the owner retrieve `MCP_AUTHORIZED_OWNER_SUBJECT` from the Zero Trust dashboard instead.
+- Writing the three new Worker secrets (`ACCESS_TEAM_DOMAIN`, `ACCESS_POLICY_AUD`,
+  `MCP_AUTHORIZED_OWNER_SUBJECT`) via `wrangler secret put` — blocked as a Secret-Store Write. When a
+  later relayed brief proposed `wrangler versions upload --secrets-file` as a workaround, declined:
+  same outcome via a different door. Gave the owner a self-contained script to run themselves
+  instead (temp file, read from their own env, deleted in `finally`).
+- The actual production traffic cutover (`wrangler versions deploy ...@100`) — blocked as a
+  Production Deploy. Verified the uploaded version independently first (bindings by name only,
+  Version URL safety check: `404`/error 1042, does not execute), then handed the owner the exact
+  deploy command to run themselves.
+
+**Result, independently verified post-deploy (not relayed):** Production is confirmed live on
+version `03a9032d-02c9-47a5-95be-524d07c97281` at 100% (checked via the Cloudflare API directly).
+`/v1/inventory` and `/v1/ready-food` still `401` unauth, `recipe-import` unaffected. `/authorize`
+still Access-redirects (`302`); `/mcp` is NOT Access-protected and returns a clean `401` with a
+correct `WWW-Authenticate` challenge directly from the Worker. `/mcp/` and `/mcp-evil` fail closed
+(`401`, no data). Protected-resource and authorization-server metadata both correct: `mealprep:read`
+only, `code_challenge_methods_supported: ["S256"]`, `client_id_metadata_document_supported: true`.
+Exact tool surface (`get_inventory`/`get_ready_food` only, no probe/write tools) was confirmed by
+reading `src/mcp.js` directly, not by a live authenticated call (no owner credential was obtained
+for that, nor should one be). `FIRESTORE_WRITE_COUNT=0`, `MCP_WRITE_TOOL_COUNT=0`,
+`PRODUCTION_WRITE_COUNT=0` hold throughout.
+
+**Rollback target if ever needed:** `6f98cf85-d3f3-421b-bee8-9808fc1c73ef` (the prior 100% version).
+
+**Files changed:** `REVIEW.md` (TASK-068 entry), `TASKS.md` (status `review` -> `approved`),
+`workers/conversational-bridge/wrangler.jsonc` (resource-only: live `OAUTH_KV` namespace id,
+committed per the task's own config-delta instruction — no auth/source semantics changed, re-ran the
+full pre-deploy gate before committing). This entry.
+
+**Next task:** Owner performs the real ChatGPT OAuth link against
+`https://meal-prep-conversational-bridge.shinyamadasan.workers.dev/mcp`. After that, verify live
+`get_inventory`/`get_ready_food` reads with the real linked account, confirm Firestore
+revision/state unchanged, and only then does governance close TASK-068 to `done`. Production writes
+and real MCP write tools remain unapproved — no separate decision has been made on that.
+**Blockers:** none for Phase B1 as scoped. The three sandbox-enforced boundaries above are
+durable, not one-time — the same owner-hands-on-keyboard pattern applies to any future secret
+rotation or redeploy of this Worker, not just this session.
+
+---
+
 ## 2026-09-27 — TASK-065 planned (Conversational Control Bridge v1): Phase 0 discovery + D-082 architecture decision, no code written
 
 **Verified live state first:** `main` = `origin/main` = `07f4b41` (matches expected, no drift);
