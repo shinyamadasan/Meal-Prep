@@ -29,7 +29,7 @@ PASS of this local candidate.
 
 ```
 REST client                         ChatGPT connector
-Authorization: BRIDGE_API_TOKEN     OAuth 2.1 + PKCE S256, mealprep:read
+Authorization: BRIDGE_API_TOKEN     OAuth 2.1 + PKCE S256, scoped per tool
         |                                      |
         +------------------+-------------------+
                            v

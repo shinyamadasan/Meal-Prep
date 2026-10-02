@@ -5,6 +5,47 @@
 
 ---
 
+## TASK-069 final fix-first correction · 2026-10-02
+suite: `npm run test:bridge` (full bridge suite, `node --test test/*.node.js`); `node --test
+  test/oauth-provider-integration.node.js` (focused, isolated); `node --test
+  test/mcp-write.node.js` (focused, isolated, unaffected by this correction); `node --check` on
+  all 3 changed JavaScript files; `git diff --check`; manual secret-pattern scan over the
+  working-tree diff. Per the reviewer's explicit instruction, Playwright/npm audit/Verify-
+  Decisions/Check-DocsConsistency are not repeated here — none of those surfaces were touched by
+  this single-field correction; see the prior TASK-069 fix-first correction entry below for that
+  evidence (711/711, 0 vulnerabilities, 110/110, 51 pre-existing drift items).
+result:
+  - Full bridge suite: **113/113 passed, 0 failed** (same count as the prior correction — one
+    provider-integration test replaced by another of equal count, 0 regressions elsewhere).
+  - Provider integration suite in isolation: **10/10 passed**, including:
+    - the corrected discovery-metadata test: protected-resource `scopes_supported` is now exactly
+      `[mealprep:read]`; authorization-server `scopes_supported` remains
+      `[mealprep:read, mealprep:write]` (unchanged — driven by `scopesSupported`, not touched by
+      this correction); the default unauthenticated `/mcp` `WWW-Authenticate` challenge is now
+      exactly `scope="mealprep:read"`.
+    - the new step-up test: a token scoped to exactly `mealprep:read` is issued through the real
+      provider, its authorization-server metadata read (confirms write IS in the catalogue), its
+      protected-resource metadata read (confirms write is NOT in the baseline), then calls
+      `record_ready_food` directly — the tool's own handler returns `isError: true` with
+      `_meta['mcp/www_authenticate']` matching `insufficient_scope` and `scope="mealprep:write"`,
+      proving the write scope is discoverable only through the tool's own step-up, never the
+      resource-wide baseline.
+  - Write-tool suite in isolation: **15/15 passed**, unaffected — `record_ready_food`'s own
+    `WRITE_SECURITY_SCHEMES` (`{ type: 'oauth2', scopes: ['mealprep:write'] }`) and its
+    `mcpAuthChallenge(error, MCP_WRITE_SCOPE)` step-up path were not touched by this correction.
+  - `node --check`: `src/oauth.js`, `test/mcp-auth.node.js`, `test/oauth-provider-integration.node.js`
+    all pass.
+  - `git diff --check`: clean. Manual secret-pattern scan: clean (no real credential anywhere in
+    the diff).
+untested: none outstanding from this correction's own scope. The reviewer's single bounded
+  blocker (`requiredScopes` semantics) is closed above; the reviewer explicitly asked that
+  architecture, revision/conflict handling, owner auth, stored-scope validation, tool surface,
+  Firestore mapping, and REST/MCP isolation NOT be reopened, and none of them were touched.
+No production Firestore access occurred. No deployment, live OAuth/Access/KV resource mutation, or
+  ChatGPT connection change was made. `PRODUCTION_WRITE_COUNT` remains 0.
+
+---
+
 ## TASK-069 fix-first correction · 2026-10-02
 suite: `npm run test:bridge` (full bridge suite, `node --test test/*.node.js`); `node --check` on
   all 4 changed JavaScript files; `npm test` (root Playwright suite, run directly — not sandbox-

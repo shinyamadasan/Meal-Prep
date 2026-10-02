@@ -13,18 +13,27 @@ const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
 let oauthWorkerPromise = null;
 
-// TASK-069: scopesSupported/requiredScopes are pure discovery-metadata advertisement in this
-// provider — verified by reading its own validateAccessToken()/approveConsent() (we never pass a
-// scope override, so supportedScopes never filters a grant). Neither field gates token
-// validation or apiHandler invocation; actual enforcement is entirely requireMcpScopeContext()'s
-// allow-list below. Leaving mealprep:write off these fields after adding the write tool would
-// mean a real OAuth client can never discover it as requestable, defeating the point of adding
-// it, so both must name every scope the Worker actually supports.
+// TASK-069 (final correction): scopesSupported and requiredScopes serve two DIFFERENT discovery
+// roles in this provider (verified by reading its own source, not assumed — neither one gates
+// token validation or apiHandler invocation; actual enforcement is entirely
+// requireMcpScopeContext()'s allow-list below):
+//   - scopesSupported -> the authorization server's full grant catalogue
+//     (/.well-known/oauth-authorization-server `scopes_supported`): everything a client may ever
+//     request from this server.
+//   - requiredScopes -> this protected RESOURCE's own baseline requirement
+//     (/.well-known/oauth-protected-resource/mcp `scopes_supported`, and the default
+//     WWW-Authenticate challenge for a request carrying no token at all): what a caller needs
+//     just to reach `/mcp`.
+// Two of the three tools (get_inventory, get_ready_food) only ever need mealprep:read, so the
+// resource's baseline requirement is genuinely read-only. mealprep:write is per-tool elevated
+// authority: a client discovers it through record_ready_food's own `securitySchemes` and obtains
+// it via that tool's own insufficient_scope step-up challenge (mcpAuthChallenge() in
+// mcp.js/mcpAuth.js), never through the resource-wide baseline.
 export const OAUTH_PROVIDER_CONFIG = Object.freeze({
   authorizeEndpoint: '/authorize',
   tokenEndpoint: '/oauth/token',
   scopesSupported: [MCP_SCOPE, MCP_WRITE_SCOPE],
-  requiredScopes: [MCP_SCOPE, MCP_WRITE_SCOPE],
+  requiredScopes: [MCP_SCOPE],
   resourceMetadata: {
     resource: MCP_RESOURCE,
     authorization_servers: [MCP_ISSUER],

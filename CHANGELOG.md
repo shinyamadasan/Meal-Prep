@@ -5,6 +5,87 @@
 
 ---
 
+## TASK-069 — final fix-first correction (branch: task-069)
+base: reviewed candidate `832b1dc48a21659bd13a039f1bc3ba122e6685db`; correction committed
+  separately, not amended. Builder note: built by Claude under the AI Dev OS's "Codex unavailable"
+  exception (Codex usage quota exhausted; this correction follows the external reviewer's bounded
+  instructions directly).
+
+A second independent targeted re-review of `832b1dc` confirmed `record_ready_food`'s architecture,
+revision/conflict handling, owner auth, stored-scope validation, tool surface, Firestore mapping,
+and REST/MCP isolation all sound (none reopened here), and returned FIX FIRST on exactly 1 bounded
+blocker: the previous correction's `scopesSupported`/`requiredScopes` fix widened BOTH fields to
+`[mealprep:read, mealprep:write]`, but the installed `@cloudflare/workers-oauth-provider@1.2.1`
+gives them two distinct discovery roles, not one — `requiredScopes` should have stayed at the
+resource's own read-only baseline, with `mealprep:write` discoverable only via `scopesSupported`
+(the full catalogue) and the write tool's own step-up challenge.
+
+changed:
+  - workers/conversational-bridge/src/oauth.js (`requiredScopes` narrowed back from
+    `[mealprep:read, mealprep:write]` to `[mealprep:read]`; `scopesSupported` unchanged at
+    `[mealprep:read, mealprep:write]`; comment rewritten to document the three-way split —
+    authorization-server catalogue vs. protected-resource baseline vs. per-tool step-up — instead
+    of the previous, incorrect "both fields must name every scope" claim; 13 added / 6 removed loc)
+  - workers/conversational-bridge/test/mcp-auth.node.js (`OAUTH_PROVIDER_CONFIG.requiredScopes`
+    assertion corrected to `[MCP_SCOPE]`; test name and comment updated to state the split
+    explicitly; 6 added / 2 removed loc)
+  - workers/conversational-bridge/test/oauth-provider-integration.node.js (the discovery-metadata
+    test's protected-resource expectation corrected to `scopes_supported: [MCP_SCOPE]` only and
+    its default-challenge expectation corrected to `scope="mealprep:read"` only, since both are now
+    driven by the corrected `requiredScopes`; the authorization-server expectation is unchanged
+    (still both scopes — driven by `scopesSupported`, untouched); the test added by the PRIOR
+    correction (which incorrectly asserted protected-resource `scopes_supported` must also include
+    `mealprep:write`) is replaced by a new end-to-end test proving the three-way split is real: the
+    authorization-server catalogue includes write, the protected-resource baseline does not, and a
+    read-only-scoped token calling `record_ready_food` gets ITS OWN `insufficient_scope` step-up
+    challenge naming exactly `mealprep:write`; `mcpRequest()`'s test helper gained an optional
+    `toolName`/`toolArgs` parameter (defaulting to its exact prior `get_inventory`/`{}` behavior,
+    verified unchanged at every other of its 11 existing call sites) so this new test could target
+    `record_ready_food` without duplicating the helper; 34 added / 27 removed loc)
+  - workers/conversational-bridge/README.md (the architecture diagram's `ChatGPT connector` line
+    corrected from `OAuth 2.1 + PKCE S256, mealprep:read` to `OAuth 2.1 + PKCE S256, scoped per
+    tool`, since a single hardcoded scope no longer describes the connector accurately; no other
+    prose changed — the existing "`requiredScopes` option advertises rather than enforces scopes"
+    sentence was already accurate and needed no edit; 1 loc)
+
+why this is correct (verified against the installed provider source, same method as the prior
+correction — read `dist/oauth-provider.js` directly, not assumed): `options.scopesSupported` feeds
+`scopes_supported` on `/.well-known/oauth-authorization-server` (the AS's full grant catalogue).
+`options.requiredScopes` is resolved by `withRequiredScopes()`/`resolveRequiredScopes()` into the
+resource's OWN `resourceMetadata.scopes_supported`, which becomes BOTH the
+`/.well-known/oauth-protected-resource/mcp` `scopes_supported` field AND (via
+`createBearerChallenge()`) the default `WWW-Authenticate` challenge scope for a request carrying
+no token at all. Since `get_inventory`/`get_ready_food` never need write, the resource's genuine
+baseline requirement is read-only; advertising write there as well would have told a client it
+needs write just to reach `/mcp` at all, which is false and could prompt an unnecessarily broad
+consent request. `mealprep:write` remains fully discoverable — via the authorization-server
+catalogue for clients that read it up front, and via `record_ready_food`'s own `securitySchemes`
+and real-time `insufficient_scope` step-up challenge for any client that doesn't. Neither field
+gates token validation or `apiHandler` invocation in this provider (confirmed again, unchanged
+from the prior correction's finding); all actual enforcement remains
+`requireMcpScopeContext()`'s allow-list, untouched by either correction.
+
+tests: full bridge suite 113/113 pass (same count as before this correction — one
+  provider-integration test replaced by another, net 0 change; 0 regressions); provider suite
+  10/10 pass (incl. both the corrected discovery-metadata test and the new step-up test); write-tool
+  suite 15/15 pass, unaffected; `node --check` on all 3 changed JavaScript files passes; `git diff
+  --check` clean; manual secret-pattern scan clean. Per the reviewer's explicit instruction, the
+  already-passed Playwright 711/711, `npm audit`, `wrangler dry-run`, `Verify-Decisions`, and
+  `Check-DocsConsistency` baseline evidence from the prior correction are not re-run for this
+  single-field, test-and-comment-only change — none of those surfaces were touched.
+blockers: none
+deviations:
+  - No new `docs/DECISIONS.md` entry: this corrects a metadata-semantics mistake made in the prior
+    correction, not a new design decision.
+  - SELF_REVIEW.md / QA.md gates completed by code-trace, same basis as the prior correction's
+    entry: no duplicated logic, no magic numbers, no dead code, naming consistent, every changed
+    line traces to the reviewer's single blocker; QA's `[app]` items not applicable (backend-only).
+  - `PRODUCTION_WRITE_COUNT` remains 0; nothing deployed, merged, or written to production.
+→ status remains `review` in TASKS.md for one final targeted re-review (reviewer asked for this
+  scope only)
+
+---
+
 ## TASK-069 — fix-first correction (branch: task-069)
 base: reviewed candidate `4bfdc34891056cbce5c8c3a189647981a2bf06a4`; correction committed
   separately, not amended. Builder note: built by Claude under the AI Dev OS's "Codex unavailable"

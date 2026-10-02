@@ -251,9 +251,9 @@ async function issueTokens(worker, env, options = {}) {
   return response.json();
 }
 
-function mcpRequest(token, method = 'tools/list') {
+function mcpRequest(token, method = 'tools/list', toolName = 'get_inventory', toolArgs = {}) {
   const body = method === 'tools/call'
-    ? { jsonrpc: '2.0', id: 1, method, params: { name: 'get_inventory', arguments: {} } }
+    ? { jsonrpc: '2.0', id: 1, method, params: { name: toolName, arguments: toolArgs } }
     : { jsonrpc: '2.0', id: 1, method, params: {} };
   return new Request(MCP_RESOURCE, {
     method: 'POST',
@@ -538,16 +538,20 @@ test('actual provider bearer path rejects malformed, nonexistent, expired, wrong
   assert.equal(reads.count, 1);
 });
 
-test('actual provider publishes exact production discovery and unauthenticated challenge metadata — TASK-069 advertises both scopes', async () => {
+test('actual provider publishes exact production discovery metadata and the baseline unauthenticated challenge — TASK-069 final correction', async () => {
   cimdDocuments = new Map([[CLIENT_ID, expectedCimd()]]);
   const env = integrationEnv();
   const worker = integrationWorker();
+  // Protected-resource metadata is this RESOURCE's own baseline requirement (requiredScopes) —
+  // read-only, because 2 of the 3 tools behind /mcp only ever need mealprep:read. It is NOT the
+  // full catalogue of scopes this server can grant; that is the authorization-server metadata
+  // below (scopesSupported).
   const protectedResponse = await worker.fetch(new Request(MCP_RESOURCE_METADATA), env, {});
   assert.equal(protectedResponse.status, 200);
   assert.deepEqual(await protectedResponse.json(), {
     resource: MCP_RESOURCE,
     authorization_servers: [MCP_ISSUER],
-    scopes_supported: [MCP_SCOPE, MCP_WRITE_SCOPE],
+    scopes_supported: [MCP_SCOPE],
     bearer_methods_supported: ['header'],
     resource_name: 'Meal Prep Planner private data'
   });
@@ -570,36 +574,42 @@ test('actual provider publishes exact production discovery and unauthenticated c
     client_id_metadata_document_supported: true
   });
 
-  // Both fields are discovery-only in this provider (verified by reading its own
-  // validateAccessToken()/approveConsent() — see the OAUTH_PROVIDER_CONFIG comment in oauth.js);
-  // this test's job is catching drift in what a real OAuth client is TOLD it may request, not
-  // proving enforcement (that is requireMcpScopeContext()'s job, covered elsewhere).
+  // The default challenge for a request with NO token at all names only the resource's baseline
+  // requirement (mealprep:read) — never mealprep:write, which is discovered per-tool instead (see
+  // the write-tool step-up test below). Both fields are discovery-only in this provider (verified
+  // by reading its own validateAccessToken()/approveConsent() — see the OAUTH_PROVIDER_CONFIG
+  // comment in oauth.js); this test's job is catching drift in what a real OAuth client is TOLD,
+  // not proving enforcement (that is requireMcpScopeContext()'s job, covered elsewhere).
   const challenge = await worker.fetch(mcpRequest('', 'tools/list'), env, {});
   assert.equal(challenge.status, 401);
   assert.equal(
     challenge.headers.get('WWW-Authenticate'),
-    `Bearer realm="OAuth", resource_metadata="${MCP_RESOURCE_METADATA}", scope="${MCP_SCOPE} ${MCP_WRITE_SCOPE}"`
+    `Bearer realm="OAuth", resource_metadata="${MCP_RESOURCE_METADATA}", scope="${MCP_SCOPE}"`
   );
 });
 
-test('protected-resource and authorization-server metadata both list mealprep:write as requestable — TASK-069', async () => {
+test('a read-only token gets record_ready_food\'s own insufficient_scope step-up naming mealprep:write, never from the resource-wide baseline — TASK-069 final correction', async () => {
   cimdDocuments = new Map([[CLIENT_ID, expectedCimd()]]);
   const env = integrationEnv();
   const worker = integrationWorker();
 
+  // Confirms the three-way split is real, not just the two metadata documents: the authorization
+  // server's catalogue includes write (a client CAN request it), the resource's own baseline
+  // does not (a client isn't told it needs write just to reach /mcp), and the write tool's own
+  // step-up challenge is what actually names mealprep:write to a caller that lacks it.
   const protectedResource = await (await worker.fetch(new Request(MCP_RESOURCE_METADATA), env, {})).json();
-  assert.ok(protectedResource.scopes_supported.includes(MCP_SCOPE), 'protected-resource metadata must still list mealprep:read');
-  assert.ok(protectedResource.scopes_supported.includes(MCP_WRITE_SCOPE), 'protected-resource metadata must list mealprep:write so a client can discover it is requestable');
+  assert.deepEqual(protectedResource.scopes_supported, [MCP_SCOPE]);
 
   const authServer = await (await worker.fetch(new Request(MCP_ISSUER + '/.well-known/oauth-authorization-server'), env, {})).json();
-  assert.ok(authServer.scopes_supported.includes(MCP_SCOPE), 'authorization-server metadata must still list mealprep:read');
-  assert.ok(authServer.scopes_supported.includes(MCP_WRITE_SCOPE), 'authorization-server metadata must list mealprep:write so a client can discover it is requestable');
-
-  // A real OAuth client reads this exact field to construct the scope it requests — if it is
-  // missing mealprep:write here, a client that respects discovery metadata could never ask for
-  // it, regardless of what requireExactAuthorizationScope() would accept.
   assert.deepEqual(new Set(authServer.scopes_supported), new Set([MCP_SCOPE, MCP_WRITE_SCOPE]));
-  assert.deepEqual(new Set(protectedResource.scopes_supported), new Set([MCP_SCOPE, MCP_WRITE_SCOPE]));
+
+  const { access_token } = await issueTokens(worker, env, { scope: MCP_SCOPE });
+  const callResponse = await worker.fetch(mcpRequest('Bearer ' + access_token, 'tools/call', 'record_ready_food'), env, {});
+  assert.equal(callResponse.status, 200);
+  const message = await mcpMessage(callResponse);
+  assert.equal(message.result.isError, true);
+  assert.match(message.result._meta['mcp/www_authenticate'][0], /insufficient_scope/);
+  assert.match(message.result._meta['mcp/www_authenticate'][0], /scope="mealprep:write"/);
 });
 
 test('provider revokeGrant removes the grant and all access/refresh token state and invalidates issued credentials', async () => {

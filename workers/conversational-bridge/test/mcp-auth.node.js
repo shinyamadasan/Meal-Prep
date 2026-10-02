@@ -52,17 +52,19 @@ function authorizeRequest(token, { method = 'GET', body } = {}) {
   });
 }
 
-test('OAuth provider configuration is resource-bound and CIMD-first, and now advertises mealprep:write — TASK-069', () => {
+test('OAuth provider configuration is resource-bound and CIMD-first; scopesSupported is the full catalogue, requiredScopes is the resource baseline — TASK-069 final correction', () => {
   assert.equal(OAUTH_PROVIDER_CONFIG.authorizeEndpoint, '/authorize');
   assert.equal(OAUTH_PROVIDER_CONFIG.tokenEndpoint, '/oauth/token');
   assert.equal(OAUTH_PROVIDER_CONFIG.clientIdMetadataDocumentEnabled, true);
   assert.equal(OAUTH_PROVIDER_CONFIG.clientRegistrationEndpoint, undefined);
-  // TASK-068 pinned these to read-only; TASK-069 deliberately widens the advertised set to match
-  // the Worker's actual supported-scope allow-list (requireExactAuthorizationScope()/
-  // isSupportedMcpScopeSet()) — a real OAuth client must be able to discover mealprep:write as
-  // requestable, or it could never ask for it regardless of what the Worker would accept.
+  // scopesSupported (-> authorization-server metadata) is the full grant catalogue, so a client
+  // can discover mealprep:write as requestable at all. requiredScopes (-> protected-resource
+  // metadata + the default no-token challenge) is this resource's own baseline: read-only, since
+  // get_inventory/get_ready_food never need write. mealprep:write is per-tool elevated authority,
+  // obtained only through record_ready_food's own insufficient_scope step-up (see
+  // oauth-provider-integration.node.js), never through the resource-wide baseline.
   assert.deepEqual(OAUTH_PROVIDER_CONFIG.scopesSupported, [MCP_SCOPE, MCP_WRITE_SCOPE]);
-  assert.deepEqual(OAUTH_PROVIDER_CONFIG.requiredScopes, [MCP_SCOPE, MCP_WRITE_SCOPE]);
+  assert.deepEqual(OAUTH_PROVIDER_CONFIG.requiredScopes, [MCP_SCOPE]);
   assert.deepEqual(OAUTH_PROVIDER_CONFIG.resourceMetadata, {
     resource: MCP_RESOURCE,
     authorization_servers: [MCP_ISSUER],
