@@ -5,6 +5,82 @@
 
 ---
 
+## TASK-069 — review (branch: task-069)
+changed:
+  - workers/conversational-bridge/src/mcpAuth.js (`MCP_WRITE_SCOPE`; TASK-068's single-scope
+    `requireMcpReadContext()` generalized into a shared `requireMcpScopeContext()` plus a new
+    `requireMcpWriteContext()`, both checked against a deliberate read/write/combined allow-list
+    via the new exported `isSupportedMcpScopeSet()`; `mcpAuthChallenge()` takes the required scope
+    instead of hardcoding `mealprep:read`; 36 added / 9 removed loc)
+  - workers/conversational-bridge/src/oauth.js (`requireExactAuthorizationScope()` generalized to
+    the same allow-list, returning the normalized requested set instead of always `[mealprep:read]`;
+    the consent page now names exactly the requested scope(s) and the authority they grant instead
+    of a hardcoded read-only claim; 25 added / 6 removed loc)
+  - workers/conversational-bridge/src/mcp.js (new `record_ready_food` tool — the first real MCP
+    write tool — registered alongside the two TASK-068 read tools; its handler mirrors `index.js`'s
+    `POST /v1/ready-food/record` flow exactly: `requireMcpWriteContext()` -> an `expectedRevision`
+    shape check mirroring `index.js`'s own -> `getUserDocument()` -> compare `expectedRevision` ->
+    the existing `readyFood.recordCookedFood()` -> `patchUserDocument()`; no persistence or
+    business validation reimplemented; `tools/list`'s security-scheme decorator generalized from a
+    two-tool if-check to a name->scheme map; 121 added loc)
+  - workers/conversational-bridge/README.md (new "TASK-069 authenticated MCP write pilot" section;
+    corrected the now-stale TASK-068 exact-read-only scope/consent/"Not in v1" claims; a new judgment
+    call entry on the input schema's deliberate `z.unknown()` typing; 104 loc net)
+  - workers/conversational-bridge/test/mcp-auth.node.js (scope-normalization unit test updated to
+    the allow-list contract; the stored-unsupported-scope regression test's example scope swapped
+    from `mealprep:write` — now supported — to a genuinely unsupported one; two new tests: consent
+    page names write/combined authority accurately, and `requireMcpWriteContext()`'s own
+    fail-closed config check; 68 added loc)
+  - workers/conversational-bridge/test/oauth-provider-integration.node.js (the real-provider exact-
+    scope test extended to accept and display write/combined grants, with its unsupported-scope
+    list keeping only genuinely-unsupported examples; the stale-stored-consent regression test's
+    two `mealprep:write`-based examples swapped to genuinely-unsupported ones for the same reason;
+    one new end-to-end test issuing a real write-scoped token and proving it authorizes
+    `record_ready_food` but not the two read tools, and that a combined token authorizes both;
+    84 added loc)
+  - workers/conversational-bridge/test/mcp.node.js (the `tools/list` test updated for three tools
+    total with per-tool scheme/annotation assertions, and its "no probe/write-scope leak" assertion
+    narrowed to tool names only, since the write tool's own `mealprep:write` scheme and prose
+    description's word "removes" are now legitimately present; 26 loc net)
+  - workers/conversational-bridge/test/mcp-write.node.js (new; 15 focused tests: the read/write/
+    combined auth matrix, the full revision/conflict contract against the real in-memory fake
+    Firestore — success, stale revision, missing/malformed `expectedRevision`, a same-revision
+    race/retry producing exactly one record, the resulting `cookedMealId` reusable by
+    `get_ready_food` — the existing-validation-error-shape cases, and the over-posting/adversarial
+    cases; 296 loc)
+tests: full bridge suite (`npm run test:bridge` / `node --test test/*.node.js`) 112/112 pass (was
+  95/95 immediately before this task; +2 tests added to existing files, +15 in the new
+  test/mcp-write.node.js, 0 regressions); `node --check` on all 7 changed/new JavaScript files
+  passes; `git diff --check` clean; manual secret-pattern scan over the full diff clean; complete
+  evidence in TEST_REPORT.md
+blockers: none
+deviations:
+  - `OAUTH_PROVIDER_CONFIG.scopesSupported`/`requiredScopes` in oauth.js were deliberately left
+    unchanged (still advertise only `mealprep:read`). Per the installed `@cloudflare/
+    workers-oauth-provider` 1.2.1's own typings, these fields are "advertised only in authorization
+    server metadata" and are not used to validate or filter the scope this Worker's own
+    `approveConsent(request, handle)` call (no scope override, preserving TASK-068's `fe49a3b` /
+    `b585569` fix) actually grants — verified by reading `parseAuthRequest()`/`approveConsent()` in
+    the installed provider source, not assumed. Enforcement is entirely this Worker's own
+    `requireExactAuthorizationScope()`/`requireMcpScopeContext()` allow-list, exactly as TASK-068's
+    own README already documented ("its `requiredScopes` option advertises rather than enforces
+    scopes, so this Worker enforces the exact scope itself"). This also keeps the existing
+    "OAuth provider configuration is read-only, resource-bound, and CIMD-first" regression test
+    (which explicitly pins `mealprep:write` absent from that object) accurate without weakening it.
+  - Could not run in this sandbox (autonomous session, no interactive approval available for any
+    `npm`/`npx`/`.ps1` process spawn — confirmed categorically blocked, not specific to any one
+    command): `npx wrangler deploy --dry-run`, `npm audit` (the bridge's own dependency audit — no
+    new dependency was added; `zod`/`jose`/`@modelcontextprotocol/server`/
+    `@cloudflare/workers-oauth-provider` are all already-installed, already-reviewed TASK-068
+    dependencies, unchanged in `package.json`), `tools/Verify-Decisions.ps1`,
+    `tools/Check-DocsConsistency.ps1`, and the root `npm test` (Playwright) suite. `git status`/
+    `git diff` confirm no file under `app.js`, `index.html`, `style.css`, or `tests/` changed, which
+    is the specific property the Playwright run would have confirmed. These are flagged here, not
+    silently skipped, for the reviewer to run.
+→ status set to `review` in TASKS.md
+
+---
+
 ## TASK-068 — second fix-first correction (branch: task-068)
 base: reviewed candidate `b585569c67fff81978c1a4fa1a2040d365d26e38`; correction committed
   separately, not amended

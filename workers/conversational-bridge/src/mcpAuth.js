@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 export const MCP_SCOPE = 'mealprep:read';
+export const MCP_WRITE_SCOPE = 'mealprep:write';
 export const MCP_ISSUER = 'https://meal-prep-conversational-bridge.shinyamadasan.workers.dev';
 export const MCP_RESOURCE = MCP_ISSUER + '/mcp';
 export const MCP_RESOURCE_METADATA = MCP_ISSUER + '/.well-known/oauth-protected-resource/mcp';
@@ -77,7 +78,24 @@ export async function requireAccessOwner(request, env, deps = {}) {
   return { subject: ownerSubject };
 }
 
-export function requireMcpReadContext(env, ctx, nowSeconds = Math.floor(Date.now() / 1000)) {
+// TASK-069 (Phase B2A): TASK-068 shipped a single-scope assumption (exactly `mealprep:read`).
+// Adding a write tool requires a deliberate allow-list of supported scope combinations instead,
+// shared with oauth.js's authorization-request policy so both layers agree on what a token may
+// contain. A read-only, write-only, or combined token is each a distinct, intentional grant;
+// anything else (empty, unknown, or any other combination) is rejected.
+const SUPPORTED_MCP_SCOPE_SETS = [[MCP_SCOPE], [MCP_WRITE_SCOPE], [MCP_SCOPE, MCP_WRITE_SCOPE]];
+
+function scopeSetKey(tokens) {
+  return [...new Set(tokens)].sort().join(' ');
+}
+
+const SUPPORTED_MCP_SCOPE_KEYS = new Set(SUPPORTED_MCP_SCOPE_SETS.map(scopeSetKey));
+
+export function isSupportedMcpScopeSet(tokens) {
+  return Array.isArray(tokens) && tokens.length > 0 && SUPPORTED_MCP_SCOPE_KEYS.has(scopeSetKey(tokens));
+}
+
+function requireMcpScopeContext(env, ctx, requiredScope, nowSeconds) {
   const ownerSubject = configuredValue(env, 'MCP_AUTHORIZED_OWNER_SUBJECT');
   const auth = ctx && ctx.auth;
   const props = ctx && ctx.props;
@@ -94,7 +112,7 @@ export function requireMcpReadContext(env, ctx, nowSeconds = Math.floor(Date.now
   if (!Number.isFinite(props.notBefore) || props.notBefore > nowSeconds) {
     throw new McpAuthError('token_not_yet_valid');
   }
-  if (!Array.isArray(auth.scope) || auth.scope.length !== 1 || auth.scope[0] !== MCP_SCOPE) {
+  if (!isSupportedMcpScopeSet(auth.scope) || !auth.scope.includes(requiredScope)) {
     throw new McpAuthError('scope_missing');
   }
   if (auth.userId !== ownerSubject || props.ownerSubject !== ownerSubject) {
@@ -103,12 +121,20 @@ export function requireMcpReadContext(env, ctx, nowSeconds = Math.floor(Date.now
   return { subject: ownerSubject };
 }
 
-export function mcpAuthChallenge(error) {
+export function requireMcpReadContext(env, ctx, nowSeconds = Math.floor(Date.now() / 1000)) {
+  return requireMcpScopeContext(env, ctx, MCP_SCOPE, nowSeconds);
+}
+
+export function requireMcpWriteContext(env, ctx, nowSeconds = Math.floor(Date.now() / 1000)) {
+  return requireMcpScopeContext(env, ctx, MCP_WRITE_SCOPE, nowSeconds);
+}
+
+export function mcpAuthChallenge(error, requiredScope = MCP_SCOPE) {
   const insufficientScope = error instanceof McpAuthError && error.code === 'scope_missing';
   const code = insufficientScope ? 'insufficient_scope' : 'invalid_token';
-  const description = insufficientScope ? 'The mealprep:read scope is required.' : 'Authentication is required.';
+  const description = insufficientScope ? ('The ' + requiredScope + ' scope is required.') : 'Authentication is required.';
   const challenge = 'Bearer resource_metadata="' + MCP_RESOURCE_METADATA + '", error="' + code +
-    '", error_description="' + description + '", scope="' + MCP_SCOPE + '"';
+    '", error_description="' + description + '", scope="' + requiredScope + '"';
   return {
     content: [{ type: 'text', text: description }],
     isError: true,

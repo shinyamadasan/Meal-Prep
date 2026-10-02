@@ -5,6 +5,80 @@
 
 ---
 
+## TASK-069 MCP first-write pilot (Phase B2A) · 2026-10-01
+suite: `node --test test/*.node.js` (full bridge suite, also `npm run test:bridge` / `npm test`
+  from `workers/conversational-bridge`); `node --test test/mcp-write.node.js` (new file, isolated);
+  `node --check` on all 7 changed/new JavaScript files; `git diff --check`; manual secret-pattern
+  scan (`AIza`/`AKIA`/`-----BEGIN`/`service_account`/`xox[baprs]-`/`ghp_`/`github_pat_`/`sk-...`)
+  over the complete diff; `git status`/`git diff --stat` to confirm no app/UI/root-Playwright file
+  changed.
+result:
+  - Full bridge suite: 112/112 passed, 0 failed/skipped (baseline immediately before this task was
+    95/95; +2 tests added to existing files, +15 new in test/mcp-write.node.js, 0 regressions).
+  - `test/mcp-write.node.js` in isolation: 15/15 passed — read-only grant denied `record_ready_food`
+    with `insufficient_scope`/`scope="mealprep:write"`; write-only grant denied both read tools;
+    combined grant authorizes all three; wrong owner denied; missing/empty/unsupported scope
+    rejected before any Firestore access (0 token/read/write/fetch calls in every case); correct
+    revision creates exactly one record and returns `{ ok, revision, item }`; stale revision
+    rejected with zero mutation; missing/malformed (`1.5`, `-1`, `'0'`, `true`, `null`)
+    `expectedRevision` each rejected before any Firestore read; two same-revision calls (race and
+    exact-retry framing) each produce exactly one record, second fails `revision_conflict`; the
+    resulting `cookedMealId` is reusable by a subsequent `get_ready_food` call; missing/malformed
+    `name`/`servings`/`storage`/`cookedDate` each rejected with the exact REST
+    (`recordCookedFood()`) validation message, zero mutation; `uid`/`owner`/`path`/`collection`/
+    `document`/`TARGET_UID`/`cookedMealId` over-posting rejected pre-handler with 0 Firestore calls;
+    an existing `cookedMeals` record and pantry are both left byte-for-byte untouched by a
+    successful call.
+  - `test/mcp.node.js`'s `tools/list` test: confirms exactly three tools
+    (`get_inventory`, `get_ready_food`, `record_ready_food`); the two read tools' schemes/
+    annotations/input schema unchanged; `record_ready_food` carries
+    `{ type: 'oauth2', scopes: ['mealprep:write'] }`, `{ readOnlyHint: false, destructiveHint:
+    false, idempotentHint: false, openWorldHint: false }`, and exactly the six declared input keys;
+    no delete/remove/clear/patch/execute/probe tool name present.
+  - `test/mcp-auth.node.js`: `requireExactAuthorizationScope()` now accepts a deduplicated read,
+    write, or combined set (including space- and duplicate-token normalization) and rejects empty/
+    unknown/any-other-combination exactly as before; the consent page names `mealprep:write` and
+    `mealprep:read mealprep:write` accurately (no "read-only access" claim for a write-only grant);
+    `requireMcpWriteContext()` fails closed the same way `requireMcpReadContext()` does when
+    `MCP_AUTHORIZED_OWNER_SUBJECT` is unconfigured; the stored-unsupported-scope regression
+    (TASK-068's `fe49a3b`/`b585569` fix) still holds, now proven against an actually-unsupported
+    scope instead of the now-supported `mealprep:write`.
+  - `test/oauth-provider-integration.node.js` (real installed `@cloudflare/workers-oauth-provider`
+    1.2.1, no mocks): the exact-scope test now accepts and correctly displays `mealprep:read`,
+    `mealprep:write`, and the combined set, while still rejecting empty/unknown/any-other-
+    combination with `invalid_scope` and zero grants created; a new end-to-end test issues a real
+    write-scoped token through the actual authorize -> consent -> token exchange flow and proves
+    it authorizes `record_ready_food` (real write against a scripted fake persistence layer) but
+    is denied `get_inventory` with `insufficient_scope`, and that a combined-scope token authorizes
+    both. All other existing provider-integration tests (CIMD, PKCE/replay, resource binding,
+    bearer denial, production discovery metadata, complete `revokeGrant()`) remain green,
+    unmodified.
+  - Syntax: all 7 changed/new JavaScript files (`src/mcp.js`, `src/mcpAuth.js`, `src/oauth.js`,
+    `test/mcp.node.js`, `test/mcp-auth.node.js`, `test/oauth-provider-integration.node.js`,
+    `test/mcp-write.node.js`) pass `node --check`.
+  - `git diff --check`: clean (no whitespace/conflict-marker issues). Manual secret-pattern scan
+    over the full diff: clean, no match. `git status`/`git diff --stat`: only files under
+    `workers/conversational-bridge/{src,test}` and `workers/conversational-bridge/README.md` plus
+    this task's root `CHANGELOG.md`/`TEST_REPORT.md`/`TASKS.md` entries changed — no `app.js`,
+    `index.html`, `style.css`, or root `tests/` (Playwright) file touched.
+untested / could not run in this sandbox: this is an autonomous, unattended session with no
+  interactive approval available for any `npm`/`npx`/PowerShell-script (`.ps1`) process spawn —
+  confirmed categorically blocked (even `npm --version` and a plain `Verify-Decisions.ps1`
+  invocation require approval that cannot be granted here), not specific to one command or flag.
+  Could not run: `npx wrangler deploy --dry-run --config workers/conversational-bridge/
+  wrangler.jsonc` (config/`wrangler.jsonc` itself was not touched by this task); `npm audit
+  --omit=dev` from the bridge directory (no dependency was added or changed —
+  `package.json`/`package-lock.json` are untouched; the audit surface is identical to TASK-068's
+  own, already-clean, already-recorded result); `tools/Verify-Decisions.ps1`;
+  `tools/Check-DocsConsistency.ps1`; the root `npm test` (Playwright) suite. The specific property
+  that last run would have proven — that this task changed no app/UI/Playwright file — is instead
+  confirmed directly above via `git status`/`git diff --stat`. These gaps are flagged here for the
+  reviewer to close, not silently assumed clean.
+No production Firestore access occurred. No deployment, live OAuth/Access/KV resource, or
+  ChatGPT connection was created or touched. `PRODUCTION_WRITE_COUNT` remains 0.
+
+---
+
 ## TASK-068 second fix-first correction · 2026-10-01
 suite: `node --test --test-isolation=none test/mcp-auth.node.js
   test/oauth-provider-integration.node.js`; `node --test --test-isolation=none test/auth.node.js

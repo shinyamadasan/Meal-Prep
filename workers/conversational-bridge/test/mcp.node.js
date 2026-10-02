@@ -84,7 +84,7 @@ test('MCP initialize handshake succeeds for an authenticated owner context', asy
   assert.equal(message.result.serverInfo.name, 'meal-prep-private-reads');
 });
 
-test('tools/list exposes exactly the two read tools with OAuth and read-only annotations', async () => {
+test('tools/list exposes exactly three tools total — two read, one write — with correct annotations', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(2, 'tools/list')),
     testEnv(),
@@ -92,8 +92,10 @@ test('tools/list exposes exactly the two read tools with OAuth and read-only ann
     validContext()
   );
   const message = await responseMessage(response);
-  assert.deepEqual(message.result.tools.map((tool) => tool.name), ['get_inventory', 'get_ready_food']);
-  for (const tool of message.result.tools) {
+  assert.deepEqual(message.result.tools.map((tool) => tool.name), ['get_inventory', 'get_ready_food', 'record_ready_food']);
+
+  const [getInventory, getReadyFood, recordReadyFood] = message.result.tools;
+  for (const tool of [getInventory, getReadyFood]) {
     assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
     assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
     assert.deepEqual(tool.annotations, {
@@ -104,7 +106,23 @@ test('tools/list exposes exactly the two read tools with OAuth and read-only ann
     assert.deepEqual(tool.inputSchema.properties, {});
     assert.equal(tool.inputSchema.additionalProperties, false);
   }
-  assert.doesNotMatch(JSON.stringify(message), /probe_read|probe_write|mealprep:write/);
+
+  assert.deepEqual(recordReadyFood.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
+  assert.deepEqual(recordReadyFood._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
+  assert.deepEqual(recordReadyFood.annotations, {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false
+  });
+  assert.equal(recordReadyFood.inputSchema.additionalProperties, false);
+  assert.deepEqual(
+    new Set(Object.keys(recordReadyFood.inputSchema.properties)),
+    new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'expectedRevision'])
+  );
+
+  const toolNames = message.result.tools.map((tool) => tool.name).join(' ');
+  assert.doesNotMatch(toolNames, /probe_read|probe_write|delete|remove|clear|patch|execute/i);
 });
 
 test('get_inventory preserves the canonical revision and stable ingredient ids without mutation', async () => {

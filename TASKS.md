@@ -5148,7 +5148,7 @@ merge/deployment gate:
 ---
 
 ### TASK-069 · MCP FIRST-WRITE PILOT — authenticated `record_ready_food` write tool (Phase B2A)
-status: codex
+status: review
 owner: codex
 source: direct owner governance transition, Phase B2A first-write approval (2026-10-01). This
   approval covers local implementation of exactly ONE real MCP write tool, its tests, and

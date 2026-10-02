@@ -17,8 +17,13 @@ detailed evidence.
 **Local candidate status (TASK-068): authenticated real-data MCP reads now exist in source only.**
 TASK-067's live ChatGPT feasibility check passed, so MCP is the selected conversational adapter.
 This candidate has not been deployed, no OAuth/Access/KV resource has been created, and ChatGPT has
-not been connected to private tools. Production writes and the `mealprep:write` scope remain
-unapproved.
+not been connected to private tools.
+
+**Local candidate status (TASK-069, Phase B2A): one authenticated MCP write tool
+(`record_ready_food`) now exists in source only.** This is the first real MCP write candidate.
+Nothing in this phase has been deployed; `PRODUCTION_WRITE_COUNT` remains 0. The first controlled
+production write requires a separate owner decision after an independent STRICT review PASS of
+this local candidate.
 
 ## Architecture
 
@@ -52,7 +57,8 @@ The authentication domains are deliberately separate:
 1. REST caller -> Worker: `BRIDGE_API_TOKEN`, compared in constant time by `src/auth.js`.
 2. MCP caller -> Worker: provider-issued OAuth bearer, validated by
    `@cloudflare/workers-oauth-provider`, then independently checked for the exact resource,
-   expiry, `mealprep:read`, and configured owner subject by `src/mcpAuth.js`.
+   expiry, an allow-listed `mealprep:read`/`mealprep:write`/combined scope, and configured owner
+   subject by `src/mcpAuth.js`.
 3. Browser owner -> `/authorize`: a Cloudflare Access application assertion, whose RS256
    signature, issuer, audience, `exp`, `nbf`, token type, and stable `sub` are validated by the
    Worker before consent can be completed.
@@ -118,12 +124,13 @@ Project decisions:
 - Canonical protected resource: the same origin plus `/mcp`; metadata is at
   `/.well-known/oauth-protected-resource/mcp` and authorization-server metadata is at
   `/.well-known/oauth-authorization-server`.
-- Authorization requests must contain a scope set equal to exactly `{ mealprep:read }` before a
-  consent transaction is created and again before a grant is written. OAuth's ASCII-space
-  delimiters are normalized and exact duplicate `mealprep:read` tokens are deduplicated; missing, empty, unknown,
-  write, or mixed scope sets are rejected rather than replaced with read access. The consent page
-  displays the exact `mealprep:read` scope. `mealprep:write` is neither configured nor accepted as
-  a substitute.
+- Authorization requests must contain a scope set equal to exactly `{ mealprep:read }`,
+  `{ mealprep:write }`, or `{ mealprep:read, mealprep:write }` (TASK-069) before a consent
+  transaction is created and again before a grant is written. OAuth's ASCII-space delimiters are
+  normalized and exact duplicate tokens are deduplicated; missing, empty, unknown, or any other
+  combination is rejected rather than replaced with a supported set. The consent page names
+  exactly the requested scope(s) and the authority they grant — a write-capable request is never
+  described to the owner as read-only.
 - Client registration is CIMD only; DCR is not enabled. The provider accepts the public-client
   `none` token-endpoint method with PKCE. Because the provider advertises RFC 9207 issuer
   identification, the expected current ChatGPT values are client id
@@ -132,8 +139,9 @@ Project decisions:
   client document and redirect URI shown in ChatGPT's management page; do not assume a stale value.
 - The provider issues short-lived (15-minute) opaque access tokens and fixed-lifetime 14-day
   refresh grants. It validates token existence, expiry, and exact audience from KV before invoking
-  MCP. The MCP handler then rechecks expiry, exact resource, exact one-scope set, issuer/resource
-  properties fixed at authorization, and both copies of the configured owner subject.
+  MCP. The MCP handler then rechecks expiry, exact resource, an allow-listed scope set containing
+  the scope the called tool requires, issuer/resource properties fixed at authorization, and both
+  copies of the configured owner subject.
 - The canonical `resource` is required explicitly on both authorization-code authorization and
   token/refresh requests; missing, alternate-host, and other-resource values fail closed.
 - Owner sign-in is independently gated by a path-specific Access policy and by Worker validation
@@ -141,6 +149,36 @@ Project decisions:
   email, display fields, field order, and caller form values cannot select the owner.
 - REST `/v1/*` remains on `BRIDGE_API_TOKEN`. OAuth bearer tokens do not authorize REST, and the
   REST bearer does not authorize MCP.
+
+## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
+
+Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
+write/delete/patch/execute tool exists anywhere in the diff):
+
+| Tool | Existing canonical mapping | Result |
+|---|---|---|
+| `record_ready_food` | `readyFood.recordCookedFood()` -> the same `patchUserDocument()` path `POST /v1/ready-food/record` uses | `{ ok, revision, item }`, including the new stable `cookedMealId`. |
+
+`record_ready_food` requires the new `mealprep:write` scope (a read-only grant is denied with
+`insufficient_scope`, matching the existing missing-scope challenge shape). It declares OAuth
+`mealprep:write` security schemes and `readOnlyHint: false`, `destructiveHint: false`,
+`idempotentHint: false`, `openWorldHint: false`. `idempotentHint` is `false` because
+`recordCookedFood()` mints a fresh random `cookedMealId` on every call — conflict-safety under
+`expectedRevision` is not the same property as idempotence.
+
+The tool is a thin adapter, not a second implementation: it reuses `recordCookedFood()`'s existing
+validation and record shape and the same read -> compare `expectedRevision` -> write path
+`index.js`'s REST route already uses, including the exact `409`-equivalent `revision_conflict`
+semantics (surfaced as a tool error, never silently retried) and the exact REST validation error
+text for a malformed `name`/`servings`/`storage`/`cookedDate`. Its input schema is a strict
+allow-list of exactly `name`, `servings`, `storage`, `cookedDate`, `recipeId` (optional), and
+`expectedRevision` — no UID, Firestore path, collection name, or existing record id of any kind is
+accepted, so the tool cannot be used to reach `consume`, `finish`, or any inventory mutation.
+`consume` and `finish` were considered and rejected for this pilot (see `TASKS.md` TASK-069):
+both operate on an *existing* record and are strictly more destructive than a pure append.
+
+`PRODUCTION_WRITE_COUNT` remains 0 through this candidate's entire lifecycle, including review.
+Nothing here is deployed; see "Production enablement checklist" below.
 
 ## Public exposure (workers.dev)
 
@@ -152,7 +190,8 @@ subdomain). Version/Preview URLs (`<version>-<name>.shinyamadasan.workers.dev`) 
 disabled. There is no custom domain, no route, and no DNS change. Being publicly reachable means
 each surface must enforce its own gate: `/v1/*` rejects anything except the exact
 `BRIDGE_API_TOKEN`; `/mcp` rejects anything except a provider-issued OAuth token bound to the owner,
-resource, expiry, and `mealprep:read`; `/authorize` additionally requires the signed owner-only
+resource, expiry, and the scope the called tool requires (`mealprep:read` or `mealprep:write`);
+`/authorize` additionally requires the signed owner-only
 Access assertion. `/mcp/` and `/mcp-evil` do not enter the protected MCP handler. The well-known
 metadata and token endpoint must remain public so ChatGPT can discover and complete account
 linking. This describes the reviewed candidate configuration, not a deployed TASK-068 state.
@@ -197,11 +236,16 @@ credential, production data, or production Firestore call. The provider integrat
 the installed `@cloudflare/workers-oauth-provider` implementation and exercises its real request
 path for production-origin discovery/challenges, CIMD negotiation, redirect validation, exact
 scope/resource policy, authorization-code + PKCE exchange, code replay, opaque bearer validation,
-and complete `revokeGrant()` behavior. The remaining TASK-068 coverage includes signed Access
-assertion edge cases, owner/scope checks, per-tool metadata, canonical read results/revisions/stable
-ids, zero-mutation assertions, REST/OAuth credential crossing, and exact/near-path routing. The
-existing bridge codec, domain, chaos/security, and app<->bridge consistency suites still run
-unchanged.
+and complete `revokeGrant()` behavior, now including the TASK-069 write-scoped token round trip
+against the real provider. The remaining TASK-068 coverage includes signed Access assertion edge
+cases, owner/scope checks, per-tool metadata, canonical read results/revisions/stable ids,
+zero-mutation assertions, REST/OAuth credential crossing, and exact/near-path routing.
+`test/mcp-write.node.js` adds the focused TASK-069 coverage: the read/write/combined scope matrix
+for `record_ready_food`, the full revision/conflict contract against the real in-memory fake
+Firestore (success, stale revision, missing/malformed `expectedRevision`, a same-revision
+race/retry producing exactly one record), the existing-field validation error shapes, and the
+over-posting/adversarial cases. The existing bridge codec, domain, chaos/security, and
+app<->bridge consistency suites still run unchanged.
 
 Worker deployment dry run (does not require secrets to be set, since `--dry-run` doesn't execute):
 
@@ -277,13 +321,24 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 - **`ready-food/record` never deducts pantry ingredients** the way `_doMarkCooked()` does
   client-side — D-082 forbids a single write from touching both `pantry` and `cookedMeals`.
   Recording cooked food through the bridge intentionally does not shrink pantry stock.
+- **`record_ready_food`'s business-field input schema is deliberately untyped (`z.unknown()`),
+  not `z.string()`/`z.number()` (TASK-069).** The object shape itself — exactly `name`,
+  `servings`, `storage`, `cookedDate`, `recipeId`, `expectedRevision`, no more — is still a strict
+  allow-list. But typing the *values* would make the MCP SDK reject a malformed one with a generic
+  schema error before `recordCookedFood()` ever runs, producing a different error message than the
+  REST route gives for the exact same mistake. Leaving them untyped lets every malformed value
+  reach `recordCookedFood()`'s own validation, so MCP and REST fail identically. `expectedRevision`
+  is checked the same way, by a small helper mirroring `index.js`'s own shape check, so both
+  surfaces reject it with the same message before any Firestore read.
 
-## Not in v1 (by design — see D-082)
+## Not in v1 (by design — see D-082) / not in Phase B2A (by design — see TASKS.md TASK-069)
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
-UI). No Plan/Shop/Prep tools. No recipe generation. No MCP write tool and no `mealprep:write`
-scope. The two TASK-068 MCP tools are read-only adapters over existing deterministic operations;
-there is no natural-language parsing inside the Worker.
+UI). No Plan/Shop/Prep tools. No recipe generation. There is no natural-language parsing inside
+the Worker. Beyond the single TASK-069 `record_ready_food` pilot, no `consume`, `finish`, or
+inventory write is exposed as an MCP tool, and no second write tool exists — one write tool only,
+for this phase. No generic "execute"/"patch"/"update document" tool exists or is planned; no
+caller-selected Firestore field or path is accepted under any name.
 
 ## Operations: rotation, revocation, emergency stop
 
@@ -354,6 +409,11 @@ Checkpoint A is complete and read-only production access is live:
 - [ ] No live Access application, OAuth KV namespace/binding, or private OAuth grant exists yet.
 - [ ] Checkpoint B remains unapproved. The first controlled write, write-permission proof, and
   ChatGPT connection require a separate explicit owner decision.
+- [ ] TASK-069 (Phase B2A) has not been deployed; `record_ready_food` and the `mealprep:write`
+  scope exist in source only. `PRODUCTION_WRITE_COUNT` remains 0.
+- [ ] The first real production write requires an independent STRICT review PASS of TASK-069
+  followed by a separate owner decision — implementation review alone authorizes neither
+  deployment nor a production write.
 
 Firestore IAM has no per-document restriction: the service-account credential can reach every
 document its role permits in the database. The fixed `TARGET_UID` is an application-level boundary,

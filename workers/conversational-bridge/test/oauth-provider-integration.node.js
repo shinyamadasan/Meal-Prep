@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync } from 'node:crypto';
 import { registerHooks } from 'node:module';
 import { createLocalJWKSet, exportJWK, SignJWT } from 'jose';
-import { MCP_ISSUER, MCP_RESOURCE, MCP_RESOURCE_METADATA, MCP_SCOPE } from '../src/mcpAuth.js';
+import { MCP_ISSUER, MCP_RESOURCE, MCP_RESOURCE_METADATA, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { createOAuthWorker } from '../src/oauth.js';
 import { testEnv } from './support/fixtures.js';
 
@@ -285,24 +285,30 @@ async function accessTokenRecord(env, accessToken) {
   };
 }
 
-test('actual provider authorization path enforces the exact deduplicated read scope and displays it', async () => {
+test('actual provider authorization path enforces the deduplicated read/write/combined allow-list and displays it — TASK-069', async () => {
   cimdDocuments = new Map([[CLIENT_ID, expectedCimd()]]);
-  const accepted = [MCP_SCOPE, MCP_SCOPE + ' ' + MCP_SCOPE];
-  for (const scope of accepted) {
+  const accepted = [
+    { scope: MCP_SCOPE, label: /<code>mealprep:read<\/code>/ },
+    { scope: MCP_SCOPE + ' ' + MCP_SCOPE, label: /<code>mealprep:read<\/code>/ },
+    { scope: MCP_WRITE_SCOPE, label: /<code>mealprep:write<\/code>/ },
+    { scope: MCP_WRITE_SCOPE + ' ' + MCP_WRITE_SCOPE, label: /<code>mealprep:write<\/code>/ },
+    { scope: MCP_SCOPE + ' ' + MCP_WRITE_SCOPE, label: /<code>mealprep:read mealprep:write<\/code>/ }
+  ];
+  for (const { scope, label } of accepted) {
     const env = integrationEnv();
     const transaction = await beginAuthorization(integrationWorker(), env, { scope });
     assert.equal(transaction.response.status, 200, scope);
-    assert.match(transaction.html, /<code>mealprep:read<\/code>/);
+    assert.match(transaction.html, label, scope);
     assert.equal((await env.OAUTH_PROVIDER.listUserGrants(OWNER)).items.length, 0);
   }
 
   const rejected = [
     { includeScope: false },
     { scope: '' },
-    { scope: 'mealprep:write' },
     { scope: 'unknown' },
-    { scope: MCP_SCOPE + ' mealprep:write' },
-    { scope: MCP_SCOPE + ' unknown' }
+    { scope: MCP_SCOPE + ' unknown' },
+    { scope: MCP_WRITE_SCOPE + ' unknown' },
+    { scope: MCP_SCOPE + ' ' + MCP_WRITE_SCOPE + ' unknown' }
   ];
   for (const options of rejected) {
     const env = integrationEnv();
@@ -321,7 +327,7 @@ test('actual provider rejects stale unsupported stored consent scope without iss
   assert.equal(bootstrap.response.status, 200);
 
   const original = await env.OAUTH_PROVIDER.parseAuthRequest(new Request(authorizationUrl()));
-  for (const scope of [['mealprep:write'], [MCP_SCOPE, 'mealprep:write']]) {
+  for (const scope of [['unknown'], [MCP_SCOPE, 'unknown'], [MCP_WRITE_SCOPE, 'unknown']]) {
     const consent = await env.OAUTH_PROVIDER.beginConsent({ ...original, scope });
     const response = await submitAuthorizationApproval(worker, env, {
       handle: consent.handle,
@@ -343,6 +349,66 @@ test('actual provider rejects stale unsupported stored consent scope without iss
   });
   assert.equal(typeof code, 'string');
   assert.equal((await env.OAUTH_PROVIDER.listUserGrants(OWNER)).items.length, 1);
+});
+
+function writeIntegrationWorker() {
+  let revision = 7;
+  let updateTime = '2026-01-01T00:00:00.000000Z';
+  let cookedMeals = [];
+  return createOAuthWorker(OAuthProvider, async () => new Response('not found', { status: 404 }), {
+    jwks,
+    currentDate: new Date(NOW * 1000),
+    nowSeconds: NOW,
+    mcp: {
+      nowSeconds: NOW,
+      getFirestoreAccessToken: async () => 'fake-firestore-token',
+      getUserDocument: async () => ({ revision, updateTime, pantry: [], cookedMeals }),
+      patchUserDocument: async (_env, _token, { fields, nextVersion }) => {
+        cookedMeals = fields.cookedMeals;
+        revision = nextVersion;
+        updateTime = '2026-01-01T00:0' + revision + ':00.000000Z';
+        return { revision, updateTime, pantry: [], cookedMeals };
+      },
+      fetchImpl: async () => { throw new Error('network access must not occur'); }
+    }
+  });
+}
+
+test('actual provider issues a write-scoped token that authorizes record_ready_food but not the read tools — TASK-069', async () => {
+  cimdDocuments = new Map([[CLIENT_ID, expectedCimd()]]);
+  const env = integrationEnv();
+  const worker = writeIntegrationWorker();
+  const tokens = await issueTokens(worker, env, { scope: MCP_WRITE_SCOPE });
+
+  const writeCall = await worker.fetch(new Request(MCP_RESOURCE, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + tokens.access_token,
+      Host: new URL(MCP_ISSUER).host,
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'record_ready_food', arguments: { name: 'Chili', servings: 2, storage: 'fridge', cookedDate: '2026-01-15', expectedRevision: 7 } }
+    })
+  }), env, {});
+  const writeMessage = await mcpMessage(writeCall);
+  assert.equal(writeCall.status, 200);
+  assert.equal(writeMessage.result.isError, undefined);
+  assert.equal(writeMessage.result.structuredContent.item.name, 'Chili');
+
+  const deniedRead = await worker.fetch(mcpRequest('Bearer ' + tokens.access_token, 'tools/call'), env, {});
+  const deniedMessage = await mcpMessage(deniedRead);
+  assert.equal(deniedRead.status, 200);
+  assert.equal(deniedMessage.result.isError, true);
+  assert.match(deniedMessage.result._meta['mcp/www_authenticate'][0], /insufficient_scope/);
+
+  const combined = await issueTokens(worker, env, { scope: MCP_SCOPE + ' ' + MCP_WRITE_SCOPE });
+  const combinedRead = await worker.fetch(mcpRequest('Bearer ' + combined.access_token, 'tools/call'), env, {});
+  assert.equal((await mcpMessage(combinedRead)).result.isError, undefined);
 });
 
 test('actual provider CIMD negotiation selects none and rejects incompatible metadata, Basic auth, and wrong redirect', async () => {

@@ -7,9 +7,11 @@ import {
   MCP_RESOURCE,
   MCP_RESOURCE_METADATA,
   MCP_SCOPE,
+  MCP_WRITE_SCOPE,
   McpAuthError,
   requireAccessOwner,
-  requireMcpReadContext
+  requireMcpReadContext,
+  requireMcpWriteContext
 } from '../src/mcpAuth.js';
 import { OAUTH_PROVIDER_CONFIG, handleDefaultRequest, requireExactAuthorizationScope } from '../src/oauth.js';
 import { testEnv } from './support/fixtures.js';
@@ -144,13 +146,25 @@ test('missing authorized-owner configuration fails closed', async () => {
     }, NOW),
     (error) => error instanceof McpAuthError && error.code === 'auth_configuration_missing'
   );
+  assert.throws(
+    () => requireMcpWriteContext(env, {
+      auth: { token: 'opaque', audience: MCP_RESOURCE, expiresAt: NOW + 300, scope: [MCP_WRITE_SCOPE], userId: 'test-owner-subject' },
+      props: { ownerSubject: 'test-owner-subject', issuer: MCP_ISSUER, resource: MCP_RESOURCE, notBefore: NOW - 5 }
+    }, NOW),
+    (error) => error instanceof McpAuthError && error.code === 'auth_configuration_missing'
+  );
 });
 
-test('authorization scope normalization accepts only the deduplicated mealprep:read set', () => {
+test('authorization scope normalization accepts a deduplicated read, write, or combined set — TASK-069 allow-list', () => {
   assert.deepEqual(requireExactAuthorizationScope(['mealprep:read']), ['mealprep:read']);
   assert.deepEqual(requireExactAuthorizationScope(['mealprep:read', 'mealprep:read']), ['mealprep:read']);
   assert.deepEqual(requireExactAuthorizationScope('  mealprep:read  mealprep:read  '), ['mealprep:read']);
-  for (const scope of [undefined, '', [], 'mealprep:read\tmealprep:read', ['mealprep:write'], ['unknown'], ['mealprep:read', 'mealprep:write'], ['mealprep:read', 'unknown']]) {
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:write']), ['mealprep:write']);
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:write', 'mealprep:write']), ['mealprep:write']);
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:write', 'mealprep:read']), ['mealprep:read', 'mealprep:write']);
+  assert.deepEqual(requireExactAuthorizationScope(['mealprep:read', 'mealprep:write', 'mealprep:read']), ['mealprep:read', 'mealprep:write']);
+  assert.deepEqual(requireExactAuthorizationScope('mealprep:read mealprep:write'), ['mealprep:read', 'mealprep:write']);
+  for (const scope of [undefined, '', [], 'mealprep:read\tmealprep:read', ['unknown'], ['mealprep:read', 'unknown'], ['mealprep:write', 'unknown'], ['mealprep:read', 'mealprep:write', 'unknown']]) {
     assert.throws(() => requireExactAuthorizationScope(scope), (error) => error.name === 'AuthorizationError');
   }
 });
@@ -209,6 +223,52 @@ test('authorization GET requires the signed owner before parsing client metadata
   assert.deepEqual(calls, []);
 });
 
+test('authorization GET names write and combined authority exactly as requested — TASK-069', async () => {
+  function oauthFor(scope) {
+    return {
+      parseAuthRequest: async () => ({
+        clientId: 'https://chatgpt.com/oauth/client.json',
+        redirectUri: 'https://chatgpt.com/connector_platform_oauth_redirect',
+        scope,
+        resource: MCP_RESOURCE,
+        state: 'test-state',
+        issuer: MCP_ISSUER
+      }),
+      describeConsent: async () => ({
+        clientName: 'ChatGPT',
+        clientDomain: 'chatgpt.com',
+        redirectHost: 'chatgpt.com',
+        redirectIsLoopback: false,
+        scope
+      }),
+      beginConsent: async () => ({ handle: 'safe-handle', headers: new Headers() })
+    };
+  }
+
+  const token = await accessAssertion();
+  const writeResponse = await handleDefaultRequest(authorizeRequest(token), testEnv(), {
+    oauth: oauthFor([MCP_WRITE_SCOPE]),
+    jwks,
+    currentDate: new Date(NOW * 1000)
+  });
+  const writeHtml = await writeResponse.text();
+  assert.equal(writeResponse.status, 200);
+  assert.match(writeHtml, /<code>mealprep:write<\/code>/);
+  assert.doesNotMatch(writeHtml, /read-only access/);
+  assert.match(writeHtml, /record one new ready-to-eat batch/);
+
+  const combinedResponse = await handleDefaultRequest(authorizeRequest(token), testEnv(), {
+    oauth: oauthFor([MCP_SCOPE, MCP_WRITE_SCOPE]),
+    jwks,
+    currentDate: new Date(NOW * 1000)
+  });
+  const combinedHtml = await combinedResponse.text();
+  assert.equal(combinedResponse.status, 200);
+  assert.match(combinedHtml, /<code>mealprep:read mealprep:write<\/code>/);
+  assert.match(combinedHtml, /read-only access/);
+  assert.match(combinedHtml, /record one new ready-to-eat batch/);
+});
+
 test('authorization POST grants only mealprep:read to the configured owner and fixed resource', async () => {
   let approvedOptions;
   let completedOptions;
@@ -257,7 +317,7 @@ test('authorization POST rejects a stored unsupported request before grant creat
       request: {
         clientId: 'https://chatgpt.com/oauth/client.json',
         redirectUri: 'https://chatgpt.com/connector_platform_oauth_redirect',
-        scope: ['mealprep:write'],
+        scope: ['unknown'],
         resource: MCP_RESOURCE,
         state: 'test-state',
         issuer: MCP_ISSUER

@@ -8,10 +8,18 @@ import {
 } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
-import { getUserDocument } from './firestore.js';
+import { getUserDocument, patchUserDocument, RevisionConflictError } from './firestore.js';
+import { ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
-import { MCP_SCOPE, McpAuthError, mcpAuthChallenge, requireMcpReadContext } from './mcpAuth.js';
+import {
+  MCP_SCOPE,
+  MCP_WRITE_SCOPE,
+  McpAuthError,
+  mcpAuthChallenge,
+  requireMcpReadContext,
+  requireMcpWriteContext
+} from './mcpAuth.js';
 
 const MAX_MCP_BODY_BYTES = 8 * 1024;
 const PRODUCTION_HOSTNAME = 'meal-prep-conversational-bridge.shinyamadasan.workers.dev';
@@ -22,6 +30,17 @@ const READ_SECURITY_SCHEMES = [{ type: 'oauth2', scopes: [MCP_SCOPE] }];
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
+  openWorldHint: false
+};
+
+const WRITE_SECURITY_SCHEMES = [{ type: 'oauth2', scopes: [MCP_WRITE_SCOPE] }];
+// idempotentHint is deliberately false: recordCookedFood() mints a fresh random cookedMealId on
+// every call, so two calls made with two different (sequentially valid) expectedRevision values
+// create two distinct records. Conflict-safety under expectedRevision is not idempotence.
+const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
   openWorldHint: false
 };
 
@@ -43,6 +62,22 @@ function inventoryItemSchema() {
     stockLevel: z.enum(['full', 'ok', 'low', 'empty']).nullable(),
     storage: z.string().nullable(),
     updatedAt: z.string().nullable()
+  });
+}
+
+// Business-field values are deliberately left as z.unknown() rather than typed: a malformed
+// name/servings/storage/cookedDate must fail with recordCookedFood()'s own validation error
+// shape (matching the REST route), not a generic schema error. The object shape itself (exactly
+// these keys, no more) is still enforced by strictObject — no UID, path, collection, or document
+// field can ever reach the domain function.
+function recordReadyFoodInputSchema() {
+  return z.strictObject({
+    name: z.unknown().optional(),
+    servings: z.unknown().optional(),
+    storage: z.unknown().optional(),
+    cookedDate: z.unknown().optional(),
+    recipeId: z.unknown().optional(),
+    expectedRevision: z.unknown().optional()
   });
 }
 
@@ -107,7 +142,78 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     }))
   );
 
+  server.registerTool(
+    'record_ready_food',
+    {
+      title: 'Record ready food',
+      description: 'Create exactly one new ready-to-eat (cooked) food record. Append-only: ' +
+        'never edits, removes, or finishes any existing record.',
+      inputSchema: recordReadyFoodInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: readyFoodItemSchema()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async (args) => recordReadyFoodTool(env, deps, ctx, args)
+  );
+
   return server;
+}
+
+// Mirrors index.js's POST /v1/ready-food/record flow exactly: auth -> expectedRevision shape ->
+// read -> compare expectedRevision -> recordCookedFood() (the one, already-reviewed
+// validation+record-shape function) -> write. No persistence or business validation is
+// reimplemented here (D-082 decision 7 / TASK-069).
+async function recordReadyFoodTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    requireValidExpectedRevision(args ? args.expectedRevision : undefined);
+
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+
+    if (args.expectedRevision !== doc.revision) {
+      throw new RevisionConflictError(doc);
+    }
+
+    const r = readyFood.recordCookedFood(args);
+    const nextMeals = (doc.cookedMeals || []).concat([r.record]);
+    const written = await writeDoc(env, accessToken, {
+      fieldPaths: ['cookedMeals'],
+      fields: { cookedMeals: nextMeals },
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }, fetchImpl);
+
+    return toolResult({ ok: true, revision: written.revision, item: r.item });
+  } catch (error) {
+    if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
+    if (error instanceof RevisionConflictError) {
+      return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
+    }
+    if (error instanceof ValidationError) {
+      return { content: [{ type: 'text', text: error.message }], isError: true };
+    }
+    return { content: [{ type: 'text', text: 'The ready-food record could not be created.' }], isError: true };
+  }
+}
+
+// Mirrors index.js's validateBody() expectedRevision shape check exactly (same message, code,
+// and field) so MCP and REST reject a missing/malformed expectedRevision identically, before any
+// Firestore read.
+function requireValidExpectedRevision(value) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ValidationError('expectedRevision must be a non-negative integer.', { field: 'expectedRevision' });
+  }
 }
 
 async function readTool(env, deps, ctx, selectResult) {
@@ -140,6 +246,12 @@ export async function handleMcpRequest(request, env = {}, deps = {}, ctx = {}) {
   return addToolSecuritySchemes(response);
 }
 
+const TOOL_SECURITY_SCHEMES = {
+  get_inventory: READ_SECURITY_SCHEMES,
+  get_ready_food: READ_SECURITY_SCHEMES,
+  record_ready_food: WRITE_SECURITY_SCHEMES
+};
+
 async function addToolSecuritySchemes(response) {
   // @modelcontextprotocol/server 2.2 emits the compatibility mirror in `_meta` but its standard
   // Tool schema drops OpenAI's top-level extension. Decorate only tools/list wire responses so
@@ -153,8 +265,9 @@ async function addToolSecuritySchemes(response) {
     const tools = message && message.result && message.result.tools;
     if (!Array.isArray(tools)) return message;
     for (const tool of tools) {
-      if (tool && (tool.name === 'get_inventory' || tool.name === 'get_ready_food')) {
-        tool.securitySchemes = READ_SECURITY_SCHEMES;
+      const schemes = tool && TOOL_SECURITY_SCHEMES[tool.name];
+      if (schemes) {
+        tool.securitySchemes = schemes;
         changed = true;
       }
     }

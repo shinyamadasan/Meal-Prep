@@ -3,7 +3,9 @@ import {
   MCP_ISSUER,
   MCP_RESOURCE,
   MCP_SCOPE,
+  MCP_WRITE_SCOPE,
   McpAuthError,
+  isSupportedMcpScopeSet,
   requireAccessOwner
 } from './mcpAuth.js';
 
@@ -126,6 +128,8 @@ async function finishAuthorization(request, oauth, ownerSubject, deps) {
   return new Response(null, { status: 302, headers: approved.headers });
 }
 
+// TASK-069: the requested scope now determines what the owner is told, instead of a hardcoded
+// read-only claim — a write-capable grant must never be described to the owner as read-only.
 function consentPage(details, handle) {
   const name = escapeHtml(details.clientName);
   const clientOrigin = details.clientDomain
@@ -134,12 +138,21 @@ function consentPage(details, handle) {
   const localWarning = details.redirectIsLoopback
     ? '<p><strong>This sends access to an app on this computer. Continue only if you started this sign-in.</strong></p>'
     : '';
+  const scope = [...new Set(Array.isArray(details.scope) ? details.scope : [])].sort();
+  const hasRead = scope.includes(MCP_SCOPE);
+  const hasWrite = scope.includes(MCP_WRITE_SCOPE);
+  const authorityDescription = hasRead && hasWrite
+    ? 'read-only access to inventory and ready food, AND the ability to record one new ready-to-eat batch. It cannot edit, remove, or finish any existing record.'
+    : hasWrite
+      ? 'the ability to record one new ready-to-eat batch. It cannot read, edit, remove, or finish any existing record.'
+      : 'read-only access to inventory and ready food. It cannot write or delete data.';
+  const scopeLabel = scope.map(escapeHtml).join(' ');
   return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>Authorize ' + name + '</title></head><body><main><h1>Allow ' + name + ' to read your meal-prep data?</h1>' +
+    '<title>Authorize ' + name + '</title></head><body><main><h1>Allow ' + name + ' to access your meal-prep data?</h1>' +
     '<p>' + clientOrigin + ' Access will be sent to <strong>' + escapeHtml(details.redirectHost) + '</strong>.</p>' +
-    localWarning + '<p>This grants scope <code>' + MCP_SCOPE + '</code>: read-only access to inventory and ready food. It cannot write or delete data.</p>' +
+    localWarning + '<p>This grants scope <code>' + scopeLabel + '</code>: ' + authorityDescription + '</p>' +
     '<form method="post"><input type="hidden" name="handle" value="' + escapeHtml(handle) + '">' +
-    '<button name="decision" value="approve">Allow read access</button> ' +
+    '<button name="decision" value="approve">Allow access</button> ' +
     '<button name="decision" value="deny">Deny</button></form></main></body></html>';
 }
 
@@ -148,10 +161,10 @@ export function requireExactAuthorizationScope(requestedScope, authRequest = {})
     .flatMap((value) => typeof value === 'string' ? value.split(' ') : [])
     .filter(Boolean);
   const unique = [...new Set(tokens)];
-  if (unique.length !== 1 || unique[0] !== MCP_SCOPE) {
-    throw authorizationPolicyError('invalid_scope', 'Exactly mealprep:read must be requested.', authRequest);
+  if (!isSupportedMcpScopeSet(unique)) {
+    throw authorizationPolicyError('invalid_scope', 'Only mealprep:read, mealprep:write, or both together may be requested.', authRequest);
   }
-  return [MCP_SCOPE];
+  return unique.sort();
 }
 
 function requireExactAuthorizationRequest(request, authRequest) {
