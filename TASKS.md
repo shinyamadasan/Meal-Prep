@@ -5147,6 +5147,214 @@ merge/deployment gate:
 
 ---
 
+### TASK-069 · MCP FIRST-WRITE PILOT — authenticated `record_ready_food` write tool (Phase B2A)
+status: codex
+owner: codex
+source: direct owner governance transition, Phase B2A first-write approval (2026-10-01). This
+  approval covers local implementation of exactly ONE real MCP write tool, its tests, and
+  documentation. It does NOT authorize deployment, a real production write, additional write
+  tools, delete/remove operations, or broad write rollout. The first controlled production write
+  remains a separate owner gate after implementation AND an independent STRICT review PASS.
+depends-on: TASK-068 (`done`). Builds on its OAuth/MCP read-layer architecture, `mealprep:read`
+  scope, and owner-authorization model; does not reopen or weaken any of it.
+files: workers/conversational-bridge/** (MCP adapter/auth/resource-server code, focused tests,
+  directly required dependency metadata if actually needed, and bridge README); CHANGELOG.md;
+  TEST_REPORT.md; TASKS.md status field only during Builder execution. Do not touch app/UI files,
+  existing Playwright specs, Firestore rules, another Worker, or unrelated root metadata.
+branch: task-069 (branch from the verified planning commit on main)
+
+objective:
+  Add exactly ONE authenticated MCP write tool, proving ChatGPT can make one conflict-safe,
+  owner-authorized meal-prep mutation without broadening the write surface beyond that single
+  tool. MCP remains an adapter only:
+
+    ChatGPT
+        ↓ authenticated MCP (OAuth 2.1; owner + `mealprep:write` required)
+    thin MCP adapter
+        ↓
+    existing reviewed `readyFood.recordCookedFood()` domain function (unchanged)
+        ↓
+    Firestore (`TARGET_UID` remains server-controlled)
+
+  Do not duplicate mutation logic inside MCP; do not invent a new domain operation.
+
+selected first-write operation (do not substitute):
+  Canonical inspection of `workers/conversational-bridge/src/operations/readyFood.js` and its
+  existing REST route `POST /v1/ready-food/record` (`src/index.js`) confirms `recordCookedFood()`
+  is the correct candidate:
+  - already typed and validated (name, servings 1-99, storage enum, real-calendar-date
+    `cookedDate`)
+  - already revision/conflict-guarded at the REST layer (`index.js` requires `expectedRevision`,
+    returns `revision_conflict` 409 on mismatch — the same mechanism this tool must reuse, not
+    reimplement)
+  - pure creation: appends one new `cookedMeals` record; touches no other collection, no existing
+    record, and performs no delete/remove/tombstone write
+  - reversible through existing product semantics: the owner (or a later, separately approved
+    tool) can finish the created batch via the existing `finish` operation
+  `consume` and `finish` were considered and rejected for this pilot: both operate on an
+  *existing* record (removal or a tombstone-producing decrement) and are strictly more destructive
+  than a pure append. Do not select either for Phase B2A.
+
+authorization model:
+  Preserve the TASK-068 authentication architecture (Cloudflare Access + OAuth 2.1, PKCE S256,
+  owner-subject comparison, `TARGET_UID` fixed, `/mcp` resource/audience unchanged). Introduce
+  `mealprep:write` alongside the existing `mealprep:read`. Current code requires generalizing two
+  exact-match checks found by live inspection — do not leave either as a silent single-scope
+  assumption:
+  - `src/oauth.js`: `requireExactAuthorizationScope()` currently requires the request scope be
+    *exactly* `mealprep:read` (`"Exactly mealprep:read must be requested."`). Must become a
+    deliberate allow-list of supported scope combinations.
+  - `src/mcpAuth.js`: `requireMcpReadContext()` currently requires `auth.scope.length === 1 &&
+    auth.scope[0] === MCP_SCOPE`. Must accept a write-authorized token for the new write tool
+    while continuing to reject a write-only or malformed token for the two existing read tools.
+  Supported request sets (verify against current OAuth/MCP client behavior before finalizing — do
+  not assume): `mealprep:read`, `mealprep:write`, `mealprep:read mealprep:write`. Any other scope
+  string is rejected.
+  Hard requirements, matching the TASK-068 scope-rewrite fix (`fe49a3b`, `b585569`) exactly — do
+  not reintroduce that defect:
+  - Unsupported/malformed scopes are rejected before grant creation.
+  - Duplicate scope tokens normalize deterministically (no silent dedup surprises).
+  - The original stored authorization request is revalidated before grant creation — no silent
+    narrowing or widening of what was actually requested.
+  - Consent UI names read vs write authority exactly as requested; a write-capable grant is never
+    created from a request that did not include `mealprep:write`.
+  - Owner identity, `TARGET_UID`, OAuth resource/audience, and the REST `BRIDGE_API_TOKEN`
+    boundary are all unchanged. Do not build a second auth system.
+
+write tool contract:
+  Register exactly one new model-visible tool, naming it to match the existing `get_inventory` /
+  `get_ready_food` verb_noun convention and the REST route it wraps:
+
+  `record_ready_food` — maps directly to `POST /v1/ready-food/record` / `readyFood.recordCookedFood()`.
+  - requires `mealprep:write` (a read-only token must be rejected the same way a missing-scope
+    request is rejected today)
+  - requires the authenticated configured owner (reuses the existing owner-subject check; no new
+    identity path)
+  - input: `name`, `servings`, `storage`, `cookedDate`, `recipeId` (optional), `expectedRevision`
+    (required) — no UID, document id, collection name, or Firestore path input of any kind
+  - calls the existing `recordCookedFood()` plus the existing Firestore read-modify-write path
+    exactly as REST does; does not reimplement validation or persistence inside `mcp.js`
+  - rejects a stale/missing/malformed `expectedRevision` the same way the REST route does (409
+    `revision_conflict` semantics surfaced as a tool error, not silently retried)
+  - returns the resulting canonical `get_ready_food`-shaped item plus the resulting `revision`
+  - performs exactly one domain mutation per call; never auto-retries a conflict as last-write-wins
+
+mcp write safety annotations:
+  - `readOnlyHint: false`
+  - `destructiveHint: false` (bounded, non-delete, append-only)
+  - `idempotentHint: false` — `recordCookedFood()` mints a fresh random `cm_<timestamp>_<rand>` id
+    on every call; two calls made with two different (sequentially valid) `expectedRevision`
+    values create two distinct records. Conflict-safety under `expectedRevision` is NOT the same
+    property as idempotence; do not claim it is.
+  - `openWorldHint: false`
+  - No generic "execute"/"patch"/"update document" tool; no caller-selected Firestore field or
+    path, under any name.
+
+revision/conflict contract (tests must prove, not just assert):
+  - correct `expectedRevision` → success, revision increments by exactly 1, response reports the
+    new revision
+  - stale `expectedRevision` → `revision_conflict`, zero mutation
+  - missing `expectedRevision` → rejected before any Firestore read/write
+  - malformed `expectedRevision` (non-integer, negative, string) → rejected before any Firestore
+    read/write
+  - two concurrent calls racing the same `expectedRevision`: exactly one succeeds, the other gets
+    `revision_conflict`; no silent overwrite
+  - the tool never reads the current revision internally and silently retries the mutation under
+    it — the caller (ChatGPT) is expected to read via `get_ready_food` first and write against
+    that known revision
+
+acceptance:
+  AUTH
+  - [ ] A `mealprep:read`-only grant can still call `get_inventory`/`get_ready_food` and is denied
+        `record_ready_food` with correct insufficient-scope challenge metadata.
+  - [ ] A `mealprep:write` (or combined) grant can call `record_ready_food`; verify against real
+        client behavior (don't assume) whether a write-only grant without `read` is denied the two
+        read tools, matching whatever TASK-068 already does for a missing-scope request.
+  - [ ] Wrong owner is denied `record_ready_food` the same way it is already denied the two read
+        tools.
+  - [ ] Missing/wrong/unsupported/duplicate scope tokens are each rejected with the correct error,
+        before any grant is created.
+  - [ ] Stored-scope revalidation before grant creation still holds (TASK-068's fix is not
+        reopened); add a regression test asserting it explicitly for the new scope combinations.
+  - [ ] REST `BRIDGE_API_TOKEN` and MCP OAuth credentials remain mutually non-authorizing.
+
+  WRITE TOOL
+  - [ ] `record_ready_food` input maps 1:1 onto `recordCookedFood()`'s existing fields; no extra
+        field reaches the domain function un-validated.
+  - [ ] Correct-revision call succeeds and returns the new canonical item + revision.
+  - [ ] Stale-revision call is rejected with zero mutation.
+  - [ ] Missing/malformed `expectedRevision`, `name`, `servings`, `storage`, or `cookedDate` is
+        rejected before any Firestore write, using the existing validation error shapes.
+  - [ ] Exactly one `cookedMeals` record is created per successful call; no unrelated field in the
+        user document changes.
+  - [ ] The resulting `cookedMealId` is stable and reusable by a later `get_ready_food` call.
+
+  ADVERSARIAL
+  - [ ] Caller cannot supply a UID, Firebase user path, or Firestore collection/path in any field;
+        over-posting any such field is ignored or rejected, never honored.
+  - [ ] Caller cannot reach `consume`, `finish`, or any inventory mutation through
+        `record_ready_food`'s input, extra fields, or any other exposed surface.
+  - [ ] A transport-level retry of the exact same request (same `expectedRevision`) cannot produce
+        a second record — the second attempt observes the already-advanced revision and fails
+        `revision_conflict`; it does not silently duplicate.
+  - [ ] `tools/list` exposes exactly three tools total: `get_inventory`, `get_ready_food`,
+        `record_ready_food`. No delete/remove/clear/patch/execute tool appears anywhere.
+
+  REGRESSION
+  - [ ] `get_inventory` and `get_ready_food` behavior, schemas, and annotations are unchanged
+        except where scope-check generalization strictly requires touching shared code.
+  - [ ] Existing REST `/v1/ready-food/*` and `/v1/inventory/*` mutations are unchanged.
+  - [ ] All TASK-068 OAuth/MCP tests remain green; focused new tests are additive, not
+        replacements.
+  - [ ] No delete/remove MCP tool exists anywhere in the diff, including as a disabled/test-only
+        helper that could become model-visible.
+
+constraints:
+  - LOCAL IMPLEMENTATION ONLY. Do not deploy; do not alter Cloudflare Access/Zero Trust
+    infrastructure; do not create a second OAuth system; do not perform a production Firestore
+    read or write; do not reconnect the real ChatGPT plugin; do not add a second write tool.
+  - `PRODUCTION_WRITE_COUNT` remains 0 through this task's entire lifecycle, including review.
+  - Do not select, implement, or expose `consume`, `finish`, or any inventory write as a
+    model-visible tool in this task. One write tool only.
+  - Reuse deterministic code for scope checks, routing, and validation; do not use an LLM for
+    auth decisions, routing, retries, or data transforms.
+  - If the current OAuth/MCP client scope-combination model cannot be verified against real
+    ChatGPT/MCP behavior, or if generalizing the two exact-match scope checks would require
+    materially weakening either, set `status: blocked` with the exact gap rather than guessing.
+
+verification:
+  - [ ] Run focused new scope-combination + write-tool-auth tests covering every AUTH/ADVERSARIAL
+        case above; record exact command and pass/fail count.
+  - [ ] Run focused `record_ready_food` contract tests against the existing fake Firestore/auth
+        seams; prove the revision/conflict matrix above.
+  - [ ] Run `npm run test:bridge`; record the exact full bridge pass/fail count (must be ≥
+        TASK-068's 95 passing plus the new focused tests, 0 regressions).
+  - [ ] Run the repo-required `npm test` Playwright suite; this task must not change app or
+        existing Playwright files.
+  - [ ] Run `node --check` on every changed/new JavaScript file.
+  - [ ] Run `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`;
+        validate only, do not deploy.
+  - [ ] Run the appropriate dependency audit from `workers/conversational-bridge`; no unresolved
+        high/critical issue in the touched auth/MCP dependency path.
+  - [ ] Run `tools/Verify-Decisions.ps1` and `tools/Check-DocsConsistency.ps1`; report any existing
+        baseline failure separately from anything this task caused.
+  - [ ] Run `git diff --check` and a secret scan over the complete diff/changed files; both clean.
+  - [ ] Complete `SELF_REVIEW.md` and `QA.md` gates before handoff. No production Firestore access
+        is required or permitted for any local verification.
+
+merge/deployment gate:
+  Hand off at `status: review`. Because this touches Firestore write capability, OAuth scope
+  authorization, and the automation/write surface, this is red-zone under D-032: a NEW
+  independent STRICT reviewer must return PASS, and the landing status must be `approved` (held
+  for owner merge), never `done` (auto-merge), regardless of how clean the diff looks.
+  Implementation review PASS authorizes nothing beyond itself — no deployment, no OAuth
+  infrastructure, no production write. The first controlled production write (read current state
+  → write once → read back → verify expected revision progression and no unrelated field changes
+  → reverse only via existing product semantics if explicitly planned) remains a separate owner
+  gate, granted only after this task's STRICT review PASS.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
