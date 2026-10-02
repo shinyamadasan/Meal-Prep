@@ -5,6 +5,56 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-02 — TASK-069 deployment attempted, BLOCKED by credential scope: no Cloudflare mutation occurred
+
+**What was attempted:** owner approval received ("Approve TASK-069 production deployment, no
+production write") to deploy the already-integrated `main` (`50e3549`, containing reviewed
+candidate `2020a1a`) as a new Worker version and cut 100% production traffic to it.
+
+**Verified before touching anything:** `main == origin/main == 50e3549ad3b506e5be2b738979587a088e7504e6`,
+clean tree except preserved `screenshots/`. Ran the full bounded pre-deployment gate directly in
+this session: `npm run test:bridge` 113/113, provider integration suite 10/10, `mcp-write` suite
+15/15, `node --check` clean on every `src/**/*.js` file, `git diff --check` clean, `wrangler deploy
+--dry-run` bundles successfully (1549.86 KiB, `OAUTH_KV` binding resolved) — all purely local, no
+Cloudflare API call. Integrated source is deploy-ready.
+
+**Blocked at the first live Cloudflare API call.** This session's `CLOUDFLARE_API_TOKEN` resolves
+account ID successfully (`user/tokens/verify` → active) but every attempted read against Workers
+resources failed: `GET .../workers/scripts/meal-prep-conversational-bridge/deployments` → "No
+access to the specified resource"; same for `.../versions` and `.../settings`; `GET
+.../storage/kv/namespaces` → "Authentication error" (a different, more basic failure). `GET
+.../workers/scripts` (list all) returned `success:true` with an empty array, which cannot be the
+real state of the account. Four independent read-only probes, four denials/non-answers — this is a
+genuine credential-scope limitation, not a harness-level block (the TASK-068 "Production Deploy
+blocked" and "Secret-Store Write blocked" findings were sandbox/approval-gate denials *before* any
+Cloudflare call; these responses come *from* Cloudflare itself, as real structured API errors). No
+attempt was made to find a workaround, use a different token, or otherwise route around this —
+only more read-only diagnostic probes to characterize it precisely before stopping.
+
+**Consequence:** this session cannot read current deployment/version/traffic-percentage state,
+cannot determine `ROLLBACK_VERSION` independently, cannot upload a new version, and cannot cut
+over traffic. None of that was attempted past the diagnostic probes above. Zero Cloudflare
+resources were created, read in detail, or mutated; zero production Firestore access; zero MCP
+write-scope grant; `PRODUCTION_WRITE_COUNT` remains `0`.
+
+**What IS confirmed, via plain public HTTPS (no credential needed) — current LIVE state, still
+TASK-068's code, pre-TASK-069-deployment baseline:** `/v1/inventory` and `/v1/ready-food` both
+`401` unauth; `.well-known/oauth-authorization-server` and `.well-known/oauth-protected-resource/
+mcp` both still advertise `mealprep:read` only (`resource_name: "Meal Prep Planner private
+reads"`) — confirms TASK-069 is genuinely not live yet; tokenless `/mcp` → `401` with
+`WWW-Authenticate` challenging `mealprep:read`; `/mcp/` and `/mcp-evil` near-paths both fail closed
+(`401`); `/authorize` with no Access assertion still `302`s into the Access flow; a REST-shaped
+bearer on `/mcp` is still `401` (REST cannot authorize MCP). No secret value was sent, printed, or
+logged in any of these checks.
+
+**Handoff needed:** the owner (or whichever credential actually has `Workers Scripts:Edit` +
+`Read` on this account) needs to run the version-upload/inspect/cutover steps directly. Exact
+commands and the required `ROLLBACK_VERSION` safety step are in this session's reply; not
+duplicated here. `TASKS.md` TASK-069 status is unchanged at `approved` — deployment did not
+happen, so nothing about its governance state changed.
+
+---
+
 ## 2026-10-02 — TASK-069 integrated into `main` (`approved`, NOT `done`): MCP write pilot merged, deployment still separately gated
 
 **What happened:** Codex's usage quota was exhausted mid-build, so the session's documented
