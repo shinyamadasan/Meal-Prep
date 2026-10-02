@@ -13,16 +13,23 @@ const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
 let oauthWorkerPromise = null;
 
+// TASK-069: scopesSupported/requiredScopes are pure discovery-metadata advertisement in this
+// provider — verified by reading its own validateAccessToken()/approveConsent() (we never pass a
+// scope override, so supportedScopes never filters a grant). Neither field gates token
+// validation or apiHandler invocation; actual enforcement is entirely requireMcpScopeContext()'s
+// allow-list below. Leaving mealprep:write off these fields after adding the write tool would
+// mean a real OAuth client can never discover it as requestable, defeating the point of adding
+// it, so both must name every scope the Worker actually supports.
 export const OAUTH_PROVIDER_CONFIG = Object.freeze({
   authorizeEndpoint: '/authorize',
   tokenEndpoint: '/oauth/token',
-  scopesSupported: [MCP_SCOPE],
-  requiredScopes: [MCP_SCOPE],
+  scopesSupported: [MCP_SCOPE, MCP_WRITE_SCOPE],
+  requiredScopes: [MCP_SCOPE, MCP_WRITE_SCOPE],
   resourceMetadata: {
     resource: MCP_RESOURCE,
     authorization_servers: [MCP_ISSUER],
     bearer_methods_supported: ['header'],
-    resource_name: 'Meal Prep Planner private reads'
+    resource_name: 'Meal Prep Planner private data'
   },
   clientIdMetadataDocumentEnabled: true,
   accessTokenTTL: ACCESS_TOKEN_TTL_SECONDS,

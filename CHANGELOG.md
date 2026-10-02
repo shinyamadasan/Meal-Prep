@@ -5,6 +5,83 @@
 
 ---
 
+## TASK-069 — fix-first correction (branch: task-069)
+base: reviewed candidate `4bfdc34891056cbce5c8c3a189647981a2bf06a4`; correction committed
+  separately, not amended. Builder note: built by Claude under the AI Dev OS's "Codex unavailable"
+  exception (Codex usage quota exhausted; owner-confirmed before this correction started).
+
+An independent external STRICT review of `4bfdc348` confirmed the architecture, scope model,
+revision/conflict contract, and tool surface sound, and returned FIX FIRST on 3 bounded blockers
+(plus one optional cleanup). All 4 addressed here; nothing else touched.
+
+changed:
+  - workers/conversational-bridge/src/oauth.js (`OAUTH_PROVIDER_CONFIG.scopesSupported` and
+    `.requiredScopes` widened from `[mealprep:read]` to `[mealprep:read, mealprep:write]`;
+    `resourceMetadata.resource_name` corrected from "Meal Prep Planner private reads" to
+    "Meal Prep Planner private data" now that the resource advertises write capability too;
+    8 added / 2 removed loc)
+  - workers/conversational-bridge/src/mcp.js (`recordReadyFoodTool()` now projects only the five
+    canonical business fields `recordCookedFood()` destructures — `name`, `servings`, `storage`,
+    `cookedDate`, `recipeId` — instead of passing the whole validated `args` object, so
+    `expectedRevision` (already consumed above, not a business field) can never reach the domain
+    function even incidentally; 7 added / 1 removed loc, no behavior change)
+  - workers/conversational-bridge/test/mcp-auth.node.js (the TASK-068-era config-pinning test
+    updated to the new scope/resource_name values, and its `doesNotMatch(/mealprep:write/)`
+    assertion removed — that assertion encoded the OLD, now-corrected behavior; 8 added /
+    4 removed loc)
+  - workers/conversational-bridge/test/oauth-provider-integration.node.js (the discovery-metadata
+    test updated to the new scope/resource_name values and the new combined WWW-Authenticate
+    challenge scope string; one new test asserting both the protected-resource and
+    authorization-server metadata's `scopes_supported` include `mealprep:write`, so a real OAuth
+    client can actually discover it as requestable; 29 added / 6 removed loc)
+  - workers/conversational-bridge/README.md (corrected TASK-068 live-state drift across 5
+    locations: "Production status" now states TASK-068 is closed `done` and live — OAuth/Access/
+    `OAUTH_KV` provisioned, owner-verified ChatGPT reads passed in production — rather than
+    "source only"/"not connected"; the TASK-068 section header, "Public exposure" closing note,
+    "Required secrets" `OAUTH_KV` note, and "Production enablement checklist" all updated to match;
+    the "Future TASK-068 provisioning plan" section is relabeled "completed; kept verbatim as the
+    audit trail" rather than rewritten, since the plan's own reasoning remains valid history;
+    TASK-069 itself is unaffected — still explicitly local-only/not-deployed throughout; ~45 loc
+    net)
+
+why `scopesSupported`/`requiredScopes` were safe to widen (verified, not assumed): read the
+installed `@cloudflare/workers-oauth-provider@1.2.1` source directly (`dist/oauth-provider.js`).
+Neither field gates `validateAccessToken()` (it only checks audience/expiry/returns the token's
+actual granted scope) nor `approveConsent()` (which only consults its `supportedScopes` parameter
+when the caller passes an explicit `options.scope` override — this Worker's `finishAuthorization()`
+never does, preserving TASK-068's `fe49a3b`/`b585569` no-silent-narrowing-or-widening fix exactly).
+Both fields are pure discovery-metadata advertisement: `scopesSupported` feeds the authorization-
+server metadata's `scopes_supported`; `requiredScopes` (via `withRequiredScopes()`/
+`resolveRequiredScopes()`) feeds the protected-resource metadata's `scopes_supported` and the
+default `WWW-Authenticate` challenge scope list for a request with no token at all. Leaving them at
+`[mealprep:read]` after adding a write tool meant a real OAuth client reading discovery metadata
+could never learn `mealprep:write` was requestable — a real functional gap, not cosmetic. All
+actual enforcement remains exactly `requireMcpScopeContext()`'s allow-list, unchanged by this fix.
+
+tests: full bridge suite 113/113 pass (was 112/112 before this correction; +1 new metadata test,
+  0 regressions); root Playwright suite 711/711 pass (run directly this time — not sandbox-blocked);
+  `node --check` on all 4 changed JavaScript files passes; `git diff --check` clean; manual
+  secret-pattern scan clean; `npm audit --omit=dev` (bridge) 0 vulnerabilities; `wrangler deploy
+  --dry-run` validates cleanly; `Verify-Decisions.ps1` 110/110; `Check-DocsConsistency.ps1` 51
+  drift items, independently confirmed identical and pre-existing on `BASE_SHA` (unrelated to this
+  task); complete evidence in TEST_REPORT.md.
+blockers: none
+deviations:
+  - No new `docs/DECISIONS.md` entry: this corrects discovery-metadata to match an already-decided
+    architecture (TASK-069's own write-scope decision), not a new design decision or convention.
+  - SELF_REVIEW.md / QA.md gates completed by code-trace against this diff (both are generic
+    process checklists, not per-task logs): no duplicated logic, no magic numbers, no unnecessary
+    complexity/state, no dead code/TODOs, naming consistent with surrounding code, every changed
+    line traces to one of the 3 reviewer blockers or the 1 optional cleanup. QA's `[app]` items
+    (recipe-id handlers, `:root`, colors, AppState fields) are not applicable — this diff touches
+    only the Worker's own backend code, never app.js/index.html/style.css. Git hygiene: code + docs
+    committed together, conventional message, no secrets in the diff (verified above).
+  - `PRODUCTION_WRITE_COUNT` remains 0 throughout; nothing deployed, merged, or written to
+    production Firestore during this correction.
+→ status remains `review` in TASKS.md for targeted re-review (reviewer asked for this scope only)
+
+---
+
 ## TASK-069 — review (branch: task-069)
 changed:
   - workers/conversational-bridge/src/mcpAuth.js (`MCP_WRITE_SCOPE`; TASK-068's single-scope

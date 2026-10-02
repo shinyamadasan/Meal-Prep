@@ -5,25 +5,25 @@ read and write the SAME canonical `pantry` (raw inventory) and `cookedMeals` (re
 state the app itself uses — never a competing model, never raw Firestore CRUD. Full design
 rationale: `docs/DECISIONS.md` D-082. Operation contract: `TASKS.md` TASK-065.
 
-**Production status (TASK-066 checkpoint A, 2026-09-28): deployed and provisioned, READ-ONLY
-verified only.**
-The Worker exists at the workers.dev URL below with its four secrets installed. Only authenticated
-GET requests have been made against production; no bridge write has ever been performed and
-ChatGPT is not connected. The write path (`update` permission sufficiency, first controlled write)
-and the ChatGPT connection are checkpoint B and need a separate owner decision. The "Production
-enablement checklist" below records the current checkpoint status; see `TASKS.md` TASK-066 for the
-detailed evidence.
+**Production status (TASK-066 checkpoint A, 2026-09-28): REST deployed and provisioned,
+READ-ONLY verified only.** The Worker exists at the workers.dev URL below with its four REST
+secrets installed. No bridge write has ever been performed through either the REST or MCP surface.
+The write path (`update` permission sufficiency, first controlled write) remains checkpoint B and
+needs a separate owner decision. See `TASKS.md` TASK-066 for the detailed checkpoint A evidence.
 
-**Local candidate status (TASK-068): authenticated real-data MCP reads now exist in source only.**
-TASK-067's live ChatGPT feasibility check passed, so MCP is the selected conversational adapter.
-This candidate has not been deployed, no OAuth/Access/KV resource has been created, and ChatGPT has
-not been connected to private tools.
+**Production status (TASK-068, closed `done` 2026-10-01): authenticated real-data MCP reads are
+LIVE in production.** TASK-067's live ChatGPT feasibility check passed, so MCP is the selected
+conversational adapter; OAuth/Access/`OAUTH_KV` are provisioned (see "Required secrets" and
+`wrangler.jsonc`), and the owner completed the real ChatGPT OAuth link and confirmed both
+`get_inventory` and `get_ready_food` succeeded against production (see `STATUS.md` 2026-10-01).
+No write tool exists in deployed production code; that remains exactly the TASK-069 candidate
+below, which is local-only.
 
 **Local candidate status (TASK-069, Phase B2A): one authenticated MCP write tool
-(`record_ready_food`) now exists in source only.** This is the first real MCP write candidate.
-Nothing in this phase has been deployed; `PRODUCTION_WRITE_COUNT` remains 0. The first controlled
-production write requires a separate owner decision after an independent STRICT review PASS of
-this local candidate.
+(`record_ready_food`) now exists in source only — NOT deployed.** This is the first real MCP write
+candidate. Nothing in this phase has been deployed; `PRODUCTION_WRITE_COUNT` remains 0. The first
+controlled production write requires a separate owner decision after an independent STRICT review
+PASS of this local candidate.
 
 ## Architecture
 
@@ -74,7 +74,7 @@ Firestore credential. `src/auth.js` still owns these two unrelated REST/Firestor
 The Worker is hardcoded to exactly one Firestore document (`TARGET_UID`, a secret). No route
 accepts a caller-supplied uid, collection name, or document path.
 
-## TASK-068 authenticated MCP read candidate (local only)
+## TASK-068 authenticated MCP read layer (live in production)
 
 `/mcp` retains the official `@modelcontextprotocol/server` v2 Web-standard Streamable HTTP
 transport. The public TASK-067 probes have been removed from the model-visible surface. Exactly two
@@ -194,7 +194,8 @@ resource, expiry, and the scope the called tool requires (`mealprep:read` or `me
 `/authorize` additionally requires the signed owner-only
 Access assertion. `/mcp/` and `/mcp-evil` do not enter the protected MCP handler. The well-known
 metadata and token endpoint must remain public so ChatGPT can discover and complete account
-linking. This describes the reviewed candidate configuration, not a deployed TASK-068 state.
+linking. This describes the current live TASK-068 configuration: reads only in production;
+the TASK-069 write pilot below remains a local candidate, not deployed.
 
 ## Required secrets
 
@@ -212,8 +213,8 @@ Set with `wrangler secret put <NAME>` before any real deploy — never committed
 | `MCP_AUTHORIZED_OWNER_SUBJECT` | Exact stable Access `sub` for the one authorized owner. |
 
 The OAuth provider also requires a KV namespace binding named `OAUTH_KV`. A KV binding is not a
-secret, but its namespace id must not be added until the separately authorized provisioning step.
-TASK-068 deliberately leaves it out of `wrangler.jsonc`; no live namespace exists yet.
+secret; its namespace id is committed in `wrangler.jsonc` (TASK-068's independently reviewed,
+separately authorized provisioning step) and the namespace is live in production.
 
 ## Local tests
 
@@ -394,21 +395,25 @@ key can get and update any existing Firestore document in this project, not only
 
 ## Production enablement checklist
 
-Checkpoint A is complete and read-only production access is live:
+Checkpoint A (REST, read-only) and TASK-068 (OAuth MCP reads) are both complete and live:
 
 - [x] Worker deployed to the production workers.dev endpoint.
 - [x] Production workers.dev endpoint is live; Version/Preview URLs are disabled.
-- [x] All four Worker secrets are installed: `BRIDGE_API_TOKEN`,
+- [x] All four REST Worker secrets are installed: `BRIDGE_API_TOKEN`,
   `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIRESTORE_PROJECT_ID`, and `TARGET_UID`.
 - [x] A dedicated GCP service account and custom Firestore role were provisioned. The role contains
   only `datastore.entities.get` and `datastore.entities.update`; it is not Owner or Editor.
-- [x] Authenticated read-only smoke completed against the real account's inventory and ready food.
+- [x] Authenticated read-only smoke completed against the real account's inventory and ready food
+  (both REST and, after TASK-068, MCP).
 - [x] Zero bridge production writes were performed.
 - [x] TASK-067 live feasibility passed and MCP was selected as the preferred adapter.
-- [ ] TASK-068 has not been deployed; ChatGPT is not configured for private tools.
-- [ ] No live Access application, OAuth KV namespace/binding, or private OAuth grant exists yet.
-- [ ] Checkpoint B remains unapproved. The first controlled write, write-permission proof, and
-  ChatGPT connection require a separate explicit owner decision.
+- [x] TASK-068 is deployed; the Access application, `OAUTH_KV` namespace/binding, and the owner's
+  real ChatGPT OAuth link all exist in production (see `STATUS.md` 2026-10-01 entries).
+- [x] The owner connected the real ChatGPT account and confirmed `get_inventory` and
+  `get_ready_food` both succeeded against production.
+- [ ] Checkpoint B / any MCP write capability in production remains unapproved. The first
+  controlled write, write-permission proof, and any write-scoped ChatGPT grant require a separate
+  explicit owner decision.
 - [ ] TASK-069 (Phase B2A) has not been deployed; `record_ready_food` and the `mealprep:write`
   scope exist in source only. `PRODUCTION_WRITE_COUNT` remains 0.
 - [ ] The first real production write requires an independent STRICT review PASS of TASK-069
@@ -419,9 +424,12 @@ Firestore IAM has no per-document restriction: the service-account credential ca
 document its role permits in the database. The fixed `TARGET_UID` is an application-level boundary,
 not an IAM boundary. `TASKS.md` TASK-066 contains the detailed checkpoint A evidence.
 
-## Future TASK-068 provisioning plan (create nothing before independent review PASS)
+## TASK-068 provisioning plan (completed; kept verbatim as the audit trail)
 
-The following is an exact plan, not evidence that any resource exists.
+**Status: executed.** This was written as a forward plan before TASK-068 deployed; every step
+below was independently reviewed and then actually carried out — see `STATUS.md` 2026-10-01
+entries for the live, independently-verified evidence. Left unedited below so the plan and its
+reasoning remain readable as history, not rewritten into a past-tense summary.
 
 1. **Source fact — provider storage:** `@cloudflare/workers-oauth-provider` requires a Cloudflare KV
    namespace bound as `OAUTH_KV`. **Project decision:** create one namespace dedicated to this

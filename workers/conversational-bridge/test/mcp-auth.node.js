@@ -52,24 +52,28 @@ function authorizeRequest(token, { method = 'GET', body } = {}) {
   });
 }
 
-test('OAuth provider configuration is read-only, resource-bound, and CIMD-first', () => {
+test('OAuth provider configuration is resource-bound and CIMD-first, and now advertises mealprep:write — TASK-069', () => {
   assert.equal(OAUTH_PROVIDER_CONFIG.authorizeEndpoint, '/authorize');
   assert.equal(OAUTH_PROVIDER_CONFIG.tokenEndpoint, '/oauth/token');
   assert.equal(OAUTH_PROVIDER_CONFIG.clientIdMetadataDocumentEnabled, true);
   assert.equal(OAUTH_PROVIDER_CONFIG.clientRegistrationEndpoint, undefined);
-  assert.deepEqual(OAUTH_PROVIDER_CONFIG.scopesSupported, ['mealprep:read']);
-  assert.deepEqual(OAUTH_PROVIDER_CONFIG.requiredScopes, ['mealprep:read']);
+  // TASK-068 pinned these to read-only; TASK-069 deliberately widens the advertised set to match
+  // the Worker's actual supported-scope allow-list (requireExactAuthorizationScope()/
+  // isSupportedMcpScopeSet()) — a real OAuth client must be able to discover mealprep:write as
+  // requestable, or it could never ask for it regardless of what the Worker would accept.
+  assert.deepEqual(OAUTH_PROVIDER_CONFIG.scopesSupported, [MCP_SCOPE, MCP_WRITE_SCOPE]);
+  assert.deepEqual(OAUTH_PROVIDER_CONFIG.requiredScopes, [MCP_SCOPE, MCP_WRITE_SCOPE]);
   assert.deepEqual(OAUTH_PROVIDER_CONFIG.resourceMetadata, {
     resource: MCP_RESOURCE,
     authorization_servers: [MCP_ISSUER],
     bearer_methods_supported: ['header'],
-    resource_name: 'Meal Prep Planner private reads'
+    resource_name: 'Meal Prep Planner private data'
   });
   assert.equal(OAUTH_PROVIDER_CONFIG.allowTokenExchangeGrant, false);
   assert.equal(MCP_RESOURCE_METADATA, MCP_ISSUER + '/.well-known/oauth-protected-resource/mcp');
   assert.equal(OAUTH_PROVIDER_CONFIG.accessTokenTTL, 15 * 60);
   assert.equal(OAUTH_PROVIDER_CONFIG.refreshTokenTTL, 14 * 24 * 60 * 60);
-  assert.doesNotMatch(JSON.stringify(OAUTH_PROVIDER_CONFIG), /mealprep:write|clientRegistrationEndpoint/);
+  assert.doesNotMatch(JSON.stringify(OAUTH_PROVIDER_CONFIG), /clientRegistrationEndpoint/);
 });
 
 test('valid signed owner assertion passes regardless of email/display claim changes or field order', async () => {

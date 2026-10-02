@@ -5,6 +5,52 @@
 
 ---
 
+## TASK-069 fix-first correction · 2026-10-02
+suite: `npm run test:bridge` (full bridge suite, `node --test test/*.node.js`); `node --check` on
+  all 4 changed JavaScript files; `npm test` (root Playwright suite, run directly — not sandbox-
+  blocked this time); `git diff --check`; manual secret-pattern scan over the working-tree diff;
+  `npm audit --omit=dev` from `workers/conversational-bridge`; `npx wrangler deploy --dry-run
+  --config workers/conversational-bridge/wrangler.jsonc`; `tools/Verify-Decisions.ps1`;
+  `tools/Check-DocsConsistency.ps1` (run twice: once against this candidate, once against
+  `BASE_SHA` `a8ea1dfc281ca159d90ef579d117a10ca2f356fa` detached, for baseline comparison).
+result:
+  - Full bridge suite: **113/113 passed, 0 failed** (was 112/112 immediately before this
+    correction; +1 new test in `test/oauth-provider-integration.node.js` asserting both discovery
+    endpoints list `mealprep:write`; 0 regressions).
+  - **Root Playwright suite: 711/711 passed** in ~2.0 minutes, run directly in this session (the
+    prior TASK-069 build attempt's sandbox categorically blocked `npm`/`npx`/`.ps1` process spawns
+    and could not run this; this correction explicitly closes that gap rather than treating
+    "no UI files changed" as a substitute, per the reviewer's instruction). Count matches the
+    711/711 baseline recorded in TASK-068's own evidence — zero regressions anywhere in the app.
+  - `node --check`: `src/oauth.js`, `src/mcp.js`, `test/mcp-auth.node.js`,
+    `test/oauth-provider-integration.node.js` all pass.
+  - `git diff --check`: clean (no whitespace/conflict-marker issues).
+  - Manual secret-pattern scan over the working-tree diff: clean — every match is prose (the word
+    "secret"/"secrets" in README section headers and sentences, e.g. "Required secrets", "its
+    namespace id is committed"), not an actual credential/key/token.
+  - `npm audit --omit=dev` (workers/conversational-bridge): 0 vulnerabilities. No dependency was
+    added, removed, or version-changed by this correction.
+  - `npx wrangler deploy --dry-run`: validates and bundles cleanly (Total Upload 1549.88 KiB / gzip
+    282.10 KiB, `env.OAUTH_KV` binding resolved); exits at `--dry-run: exiting now.` without
+    deploying anything.
+  - `tools/Verify-Decisions.ps1`: all 110 `Verify:` pointers across `docs/DECISIONS.md` hold true.
+  - `tools/Check-DocsConsistency.ps1`: reports the same 51 drift item(s) as before this correction.
+    **Independently confirmed pre-existing and unrelated**: ran the identical script against
+    `BASE_SHA` (`a8ea1dfc281ca159d90ef579d117a10ca2f356fa`, checked out detached) before returning
+    to this branch — identical 51 items, same identifiers (`TARGET_UID`, `expectedRevision`,
+    `ready_food_record`, etc.). This check only scans `app.js`/`index.html`/`style.css`; it has no
+    visibility into `workers/conversational-bridge/`, so any doc text referencing bridge-only
+    identifiers drifts by this script's definition regardless of what this task changed.
+  - SELF_REVIEW.md / QA.md: completed by code-trace against the diff — see CHANGELOG.md's
+    deviations entry for the itemized result. No AI-checkable item failed; QA's `[app]`-tagged
+    items (frontend-specific) are not applicable to this backend-only Worker diff.
+untested: none outstanding from this correction's own scope. The three blockers the external
+  reviewer raised (metadata advertisement, README drift, verification gates) are all closed above.
+No production Firestore access occurred. No deployment, live OAuth/Access/KV resource mutation, or
+  ChatGPT connection change was made. `PRODUCTION_WRITE_COUNT` remains 0.
+
+---
+
 ## TASK-069 MCP first-write pilot (Phase B2A) · 2026-10-01
 suite: `node --test test/*.node.js` (full bridge suite, also `npm run test:bridge` / `npm test`
   from `workers/conversational-bridge`); `node --test test/mcp-write.node.js` (new file, isolated);

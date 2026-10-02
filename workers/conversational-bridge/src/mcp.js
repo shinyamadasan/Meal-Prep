@@ -185,7 +185,15 @@ async function recordReadyFoodTool(env, deps, ctx, args) {
       throw new RevisionConflictError(doc);
     }
 
-    const r = readyFood.recordCookedFood(args);
+    // Project only the canonical business fields recordCookedFood() actually destructures —
+    // expectedRevision (already validated above, not a business field) must never reach it.
+    const r = readyFood.recordCookedFood({
+      name: args.name,
+      servings: args.servings,
+      storage: args.storage,
+      cookedDate: args.cookedDate,
+      recipeId: args.recipeId
+    });
     const nextMeals = (doc.cookedMeals || []).concat([r.record]);
     const written = await writeDoc(env, accessToken, {
       fieldPaths: ['cookedMeals'],
