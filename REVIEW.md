@@ -4,6 +4,33 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-070 — MCP ready-food consumption (Phase B2B), consume_ready_food — PASS (STRICT, 3 rounds) -> owner-authorized integration -> approved (Worker deployment separately gated)
+branch: `task-070`; reviewed tip `1c4b20b621a1ef59adb2f6c12376af4a70c77b55` (review base `bc176789c4e7e7f7e2261a061c59b192e630f98a`);
+  integrated into `main` by merge `--no-ff` on `49750e019d2b7387c885ffaf55e4d8373dc284f9`
+date: 2026-10-03
+
+### Provenance — recorded from owner relay, not written by the reviewer
+The independent STRICT review ran outside this repository: `e035b00` FIX FIRST (5 bounded blockers:
+untruthful `z.unknown()` input schema, extra top-level `cookedMealId` in the result, no true
+concurrent same-revision test, README "whole number" servings wording, Playwright/SELF_REVIEW/QA
+gates not closed) -> `646bcb8` FIX FIRST (1 blocker: floor-then-range servings wording) -> `1c4b20b`
+PASS. Evidence: bridge suite 140/140, root Playwright 711/711 (on `646bcb8`; the later delta is
+docs/comment/test only), `npm audit --omit=dev` 0, Wrangler dry-run only, Verify-Decisions 110 hold,
+Check-DocsConsistency 51 identical to base.
+
+### Integration (owner approval: "Approve TASK-070 integration and main push")
+Merged without conflicts; the three reviewed commits are preserved. The merged tree differs from
+the reviewed tip only by `captures/replies/OUTBOX.md` (an unrelated automation note); every
+Worker, test, README and package file is identical. Post-merge bridge suite: 140/140.
+
+### Gate and remaining state
+Landing status **`approved`, not `done`** (D-032 red-zone: Firestore write capability, the
+tombstone/deletion machinery, a destructive write-tool surface). Not yet done: Cloudflare Worker
+deployment, and a controlled production acceptance. Both are separate owner gates. The first
+production consume must target a disposable record created via `record_ready_food`, and a final
+serving is irreversible. `PRODUCTION_CONSUME_COUNT` is 0.
+
+---
 ## Review TASK-069 — MCP first-write pilot (Phase B2A), record_ready_food — PASS (STRICT, 2 rounds) -> owner-authorized -> landed (local only, deployment separately gated)
 branch: `task-069`; final candidate reviewed `2020a1a9b887d42c50344106ff59df2e21c18e4b` (base `main`
   before integration `a8ea1dfc281ca159d90ef579d117a10ca2f356fa`); two prior fix-first rounds on
