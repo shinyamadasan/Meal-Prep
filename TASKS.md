@@ -5368,7 +5368,7 @@ merge/deployment gate:
 ---
 
 ### TASK-070 · MCP READY-FOOD CONSUMPTION — authenticated `consume_ready_food` write tool (Phase B2B)
-status: todo
+status: codex
 owner: claude (planning) → codex (on owner build authorization)
 hold: PLANNING ONLY. Implementation is NOT authorized by this entry. The owner flips `status:` to
   `codex` (or tells Claude to) to release it to the Builder; until then `Next` will report it as a
