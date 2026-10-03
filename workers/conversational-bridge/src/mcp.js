@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
 import { getUserDocument, patchUserDocument, RevisionConflictError } from './firestore.js';
-import { ValidationError } from './errors.js';
+import { InsufficientServingsError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
 import {
@@ -40,6 +40,18 @@ const WRITE_SECURITY_SCHEMES = [{ type: 'oauth2', scopes: [MCP_WRITE_SCOPE] }];
 const WRITE_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
+// consume_ready_food has its own annotations: consuming the final serving removes the record and
+// writes a deletion tombstone, so destructiveHint is true (the tool's worst case). idempotentHint
+// is false: replaying with a freshly re-read revision consumes AGAIN. A replay with the SAME
+// revision is safe only because the first success advanced it (revision_conflict) — conflict-safety
+// is not idempotence, and transport/model replay of this tool is unsafe.
+const CONSUME_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
   idempotentHint: false,
   openWorldHint: false
 };
@@ -78,6 +90,19 @@ function recordReadyFoodInputSchema() {
     cookedDate: z.unknown().optional(),
     recipeId: z.unknown().optional(),
     expectedRevision: z.unknown().optional()
+  });
+}
+
+// Typed and required, so the public tool schema truthfully advertises the contract. servings is
+// deliberately z.number() and NOT .int(): consumePortions() floors the value first (2.9 consumes
+// 2, 99.9 consumes 99) and then rejects a floored value outside 1..99 with its own validation
+// error, so the domain stays authoritative for consumption semantics. strictObject guarantees no uid/path/collection/
+// operation key can reach the domain function.
+function consumeReadyFoodInputSchema() {
+  return z.strictObject({
+    cookedMealId: z.string().min(1),
+    servings: z.number(),
+    expectedRevision: z.number().int().nonnegative()
   });
 }
 
@@ -160,7 +185,84 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => recordReadyFoodTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'consume_ready_food',
+    {
+      title: 'Consume ready food',
+      description: 'Consume N servings from one existing ready-to-eat record, identified by ' +
+        'cookedMealId (from get_ready_food). Consuming the final serving permanently removes the ' +
+        'record. NOT safe to replay: calling again with a freshly read revision consumes again. ' +
+        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+      inputSchema: consumeReadyFoodInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: readyFoodItemSchema().nullable(),
+        removed: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: CONSUME_ANNOTATIONS
+    },
+    async (args) => consumeReadyFoodTool(env, deps, ctx, args)
+  );
+
   return server;
+}
+
+// Mirrors index.js's POST /v1/ready-food/consume flow: auth (input shape was already enforced by
+// consumeReadyFoodInputSchema()) -> read -> compare expectedRevision (no retry, no re-read) ->
+// consumePortions() (unchanged domain function) -> write with the same fieldPaths split as REST.
+async function consumeReadyFoodTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+
+    if (args.expectedRevision !== doc.revision) {
+      throw new RevisionConflictError(doc);
+    }
+
+    // Project only the two business fields consumePortions() destructures.
+    const r = readyFood.consumePortions(doc.cookedMeals, doc.deletions.cookedMeals || {}, {
+      cookedMealId: args.cookedMealId,
+      servings: args.servings
+    });
+    const write = r.removed
+      ? { fieldPaths: ['cookedMeals', 'deletions.cookedMeals'], fields: { cookedMeals: r.cookedMeals, deletions: { cookedMeals: r.deletionsCookedMeals } } }
+      : { fieldPaths: ['cookedMeals'], fields: { cookedMeals: r.cookedMeals } };
+    const written = await writeDoc(env, accessToken, Object.assign(write, {
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }), fetchImpl);
+
+    return toolResult({
+      ok: true,
+      revision: written.revision,
+      item: r.item,
+      removed: r.removed
+    });
+  } catch (error) {
+    if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
+    if (error instanceof RevisionConflictError) {
+      return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
+    }
+    if (error instanceof InsufficientServingsError) {
+      return { content: [{ type: 'text', text: 'insufficient_servings: ' + error.message + ' (remaining: ' + error.detail.remaining + ')' }], isError: true };
+    }
+    if (error instanceof NotFoundError) {
+      return { content: [{ type: 'text', text: 'not_found: ' + error.message }], isError: true };
+    }
+    if (error instanceof ValidationError) {
+      return { content: [{ type: 'text', text: error.message }], isError: true };
+    }
+    return { content: [{ type: 'text', text: 'The ready-food record could not be consumed.' }], isError: true };
+  }
 }
 
 // Mirrors index.js's POST /v1/ready-food/record flow exactly: auth -> expectedRevision shape ->
@@ -257,7 +359,8 @@ export async function handleMcpRequest(request, env = {}, deps = {}, ctx = {}) {
 const TOOL_SECURITY_SCHEMES = {
   get_inventory: READ_SECURITY_SCHEMES,
   get_ready_food: READ_SECURITY_SCHEMES,
-  record_ready_food: WRITE_SECURITY_SCHEMES
+  record_ready_food: WRITE_SECURITY_SCHEMES,
+  consume_ready_food: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {

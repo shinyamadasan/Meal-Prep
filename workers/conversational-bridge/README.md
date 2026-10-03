@@ -150,6 +150,44 @@ Project decisions:
 - REST `/v1/*` remains on `BRIDGE_API_TOKEN`. OAuth bearer tokens do not authorize REST, and the
   REST bearer does not authorize MCP.
 
+## TASK-070 authenticated MCP ready-food consumption (Phase B2B, local only — NOT deployed)
+
+One new model-visible tool, `consume_ready_food`, bringing the surface to exactly four:
+`get_inventory`, `get_ready_food`, `record_ready_food`, `consume_ready_food`. No `finish`, inventory
+write, or generic mutation tool exists.
+
+| Tool | Existing canonical mapping | Result |
+|---|---|---|
+| `consume_ready_food` | `readyFood.consumePortions()` -> the same `patchUserDocument()` path and fieldPaths split `POST /v1/ready-food/consume` uses | `{ ok, revision, item, removed }` |
+
+- Input: exactly three required keys — `cookedMealId` (non-empty string), `servings` (a number),
+  and `expectedRevision` (non-negative integer). The schema is a strict object, so a `uid`, path,
+  collection, document, operation selector, or caller-supplied deletion map is rejected before any
+  Firestore access, and a non-numeric `servings` or a malformed `expectedRevision` is rejected by
+  the tool schema (an "input validation error") before any Firestore access.
+- `servings` semantics come from `consumePortions()` and are unchanged: the value must be a finite
+  number, the domain floors it first, and the floored value must be between 1 and 99 inclusive.
+  So for positive input, 1 <= servings < 100 is accepted (2.9 consumes 2; 99.9 consumes 99), while
+  anything below 1 or 100 and above is rejected with the domain validation error. `servings` is
+  therefore advertised as a plain number, not an integer.
+- Result: `item` is the resulting canonical ready-food item (including its stable `cookedMealId`)
+  after a partial consume, and `null` when the final serving removed the record (`removed: true`).
+- Auth: unchanged. Requires `mealprep:write` via `requireMcpWriteContext`; the OAuth layer was not
+  touched.
+- Partial consume: same `cookedMealId`, `portionsRemaining` reduced, only `cookedMeals` written,
+  `removed: false`, `item` is the updated record.
+- Final serving: the record is removed from `cookedMeals` and `deletions.cookedMeals[<id>]` gets an
+  ISO timestamp tombstone (both fieldPaths written); `removed: true`, `item: null`. The id is
+  retired — a later `get_ready_food` no longer lists it and a later consume returns `not_found`.
+- Errors surface as tool errors with `isError: true`: `revision_conflict`, `insufficient_servings`
+  (with the remaining count), `not_found`, and the domain validation message (including untracked
+  batches). Anything else gets the tool-specific "could not be consumed" fallback.
+- Annotations: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: false`,
+  `openWorldHint: false`. They are a separate constant from `record_ready_food`'s. **Replay is
+  unsafe.** Re-sending a request with the same `expectedRevision` fails `revision_conflict` only
+  because the first success advanced the revision; a replay with a freshly re-read revision
+  consumes again. There is no automatic retry or reread-and-reapply inside the tool.
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
