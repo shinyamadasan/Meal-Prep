@@ -4,6 +4,31 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-071 — consume_ready_food mealConsumptions parity — PASS (STRICT) -> owner-authorized integration -> approved (Worker deployment and parity acceptance separately pending)
+branch: `task-071`; reviewed candidate `30a3123229689ee2dec46df98579ef85c586a8e7` (planning commit `d9fa050`);
+  integrated into `main` by merge `--no-ff` on `21e48eaa5ea1e0d700851f7b09dba9eda7a22602`
+date: 2026-10-03
+
+### Provenance — recorded from owner relay, not written by the reviewer
+The independent STRICT review ran outside this repository and returned PASS on the candidate above.
+The reviewer's own report is not in this repo; only the owner's relay is. Candidate-side evidence
+(Builder's own run, see TEST_REPORT.md): bridge suite 169/169, root Playwright 711/711,
+`npm audit --omit=dev` 0, Wrangler dry-run only, Verify-Decisions 110 hold, Check-DocsConsistency 51
+identical to main.
+
+### Integration (owner: "go ahead", bounded end-to-end authorization)
+Merged without conflicts; the reviewed commits are preserved. The merged tree is identical to the
+reviewed candidate (empty `git diff 30a3123 HEAD`). Post-merge bridge suite: 169/169; node --check,
+git diff --check and delta secret scan clean.
+
+### Gate and remaining state
+Landing status **`approved`, not `done`** (D-032 red-zone: Firestore write path, cross-field atomic
+persistence, destructive final-serving path). Code review PASS. Production deployment pending;
+production parity acceptance pending (one disposable record, one consume, verify exactly one
+mealConsumptions fact). No historical backfill is authorized: the pre-fix consume
+`cm_1791045734557_839` stays without a fact. TASK-065 untouched.
+
+---
 ## Review TASK-070 — MCP ready-food consumption (Phase B2B), consume_ready_food — PASS (STRICT, 3 rounds) -> owner-authorized integration -> approved (Worker deployment separately gated)
 branch: `task-070`; reviewed tip `1c4b20b621a1ef59adb2f6c12376af4a70c77b55` (review base `bc176789c4e7e7f7e2261a061c59b192e630f98a`);
   integrated into `main` by merge `--no-ff` on `49750e019d2b7387c885ffaf55e4d8373dc284f9`
