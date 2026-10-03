@@ -5,6 +5,16 @@
 
 ---
 
+## TASK-070 — MCP `consume_ready_food` write tool (branch: task-070)
+changed:
+  - workers/conversational-bridge/src/mcp.js (new `consume_ready_food` tool + `consumeReadyFoodTool` handler, own `CONSUME_ANNOTATIONS`, strict input schema, `TOOL_SECURITY_SCHEMES` entry; error mapping adds `NotFoundError`/`InsufficientServingsError`, ~115 loc)
+  - workers/conversational-bridge/test/mcp-consume.node.js (new, 22 focused tests)
+  - workers/conversational-bridge/test/mcp.node.js (tools/list assertion: three -> four tools, plus consume annotations/schema checks)
+  - workers/conversational-bridge/README.md (TASK-070 section)
+unchanged by design: src/oauth.js, src/mcpAuth.js, src/index.js, src/operations/readyFood.js, src/firestore.js, app/UI files, Firestore rules, Cloudflare config, dependency metadata.
+notes: `consume_ready_food` calls `readyFood.consumePortions()` unchanged and writes the same fieldPaths split as REST (`cookedMeals`; plus `deletions.cookedMeals` on final serving). Local only: not deployed, no Firestore access, PRODUCTION_WRITE_COUNT 0.
+→ status set to `review` in TASKS.md
+
 ## TASK-069 — final fix-first correction (branch: task-069)
 base: reviewed candidate `832b1dc48a21659bd13a039f1bc3ba122e6685db`; correction committed
   separately, not amended. Builder note: built by Claude under the AI Dev OS's "Codex unavailable"

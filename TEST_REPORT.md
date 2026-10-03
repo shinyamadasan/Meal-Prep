@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-070 · 2026-10-02
+suite: `node --test test/mcp-consume.node.js` (22/22 pass); `npm test` in workers/conversational-bridge (135 tests, 135 pass, 0 fail, 0 skipped); `node --check` on src/mcp.js and test/mcp-consume.node.js; `npm audit --omit=dev` (0 vulnerabilities); `npx wrangler deploy --dry-run --config wrangler.jsonc` (validated, not deployed); `tools/Verify-Decisions.ps1` (110 pointers hold); `git diff --check` (clean apart from the CRLF warning).
+result: pass. Covers auth (read-only/wrong owner/missing scope/unauthenticated), partial and final-serving consume with tombstone, stale/replay/no-retry, missing and malformed input, over-consume, not-found, untracked batch, over-posting, four-tool surface, and an end-to-end record-then-consume run. Provider/OAuth tests and the TASK-069 tests are inside the 135 and stayed green.
+untested: root Playwright suite (backend-only delta; it has a long-standing timeout history in this report) and `tools/Check-DocsConsistency.ps1` reports pre-existing docs/DECISIONS.md pointer misses unrelated to this change. No deployed or production behavior was exercised; production consume count is 0.
+
 ## TASK-069 final fix-first correction · 2026-10-02
 suite: `npm run test:bridge` (full bridge suite, `node --test test/*.node.js`); `node --test
   test/oauth-provider-integration.node.js` (focused, isolated); `node --test

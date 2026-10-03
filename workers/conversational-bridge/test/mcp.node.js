@@ -84,7 +84,7 @@ test('MCP initialize handshake succeeds for an authenticated owner context', asy
   assert.equal(message.result.serverInfo.name, 'meal-prep-private-reads');
 });
 
-test('tools/list exposes exactly three tools total — two read, one write — with correct annotations', async () => {
+test('tools/list exposes exactly four tools total — two read, two write — with correct annotations', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(2, 'tools/list')),
     testEnv(),
@@ -92,9 +92,9 @@ test('tools/list exposes exactly three tools total — two read, one write — w
     validContext()
   );
   const message = await responseMessage(response);
-  assert.deepEqual(message.result.tools.map((tool) => tool.name), ['get_inventory', 'get_ready_food', 'record_ready_food']);
+  assert.deepEqual(message.result.tools.map((tool) => tool.name), ['get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food']);
 
-  const [getInventory, getReadyFood, recordReadyFood] = message.result.tools;
+  const [getInventory, getReadyFood, recordReadyFood, consumeReadyFood] = message.result.tools;
   for (const tool of [getInventory, getReadyFood]) {
     assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
     assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:read'] }]);
@@ -119,6 +119,20 @@ test('tools/list exposes exactly three tools total — two read, one write — w
   assert.deepEqual(
     new Set(Object.keys(recordReadyFood.inputSchema.properties)),
     new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'expectedRevision'])
+  );
+
+  assert.deepEqual(consumeReadyFood.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
+  assert.deepEqual(consumeReadyFood._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
+  assert.deepEqual(consumeReadyFood.annotations, {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false
+  });
+  assert.equal(consumeReadyFood.inputSchema.additionalProperties, false);
+  assert.deepEqual(
+    new Set(Object.keys(consumeReadyFood.inputSchema.properties)),
+    new Set(['cookedMealId', 'servings', 'expectedRevision'])
   );
 
   const toolNames = message.result.tools.map((tool) => tool.name).join(' ');
