@@ -25,10 +25,18 @@ Worker, test, README and package file is identical. Post-merge bridge suite: 140
 
 ### Gate and remaining state
 Landing status **`approved`, not `done`** (D-032 red-zone: Firestore write capability, the
-tombstone/deletion machinery, a destructive write-tool surface). Not yet done: Cloudflare Worker
-deployment, and a controlled production acceptance. Both are separate owner gates. The first
-production consume must target a disposable record created via `record_ready_food`, and a final
-serving is irreversible. `PRODUCTION_CONSUME_COUNT` is 0.
+tombstone/deletion machinery, a destructive write-tool surface). Worker deployment and a controlled
+production acceptance were separate owner gates; both are now complete (below).
+
+### Closeout — production acceptance PASS -> `done` (2026-10-03)
+Worker version `f2bff101-a701-4890-8dcc-ac103718fa10` at 100%. Owner-reported acceptance, not re-run
+by this session: revision `29474` -> `29475` (`record_ready_food` created disposable
+`cm_1791045734557_839`, name="TASK-070 MCP production test", servings 1, fridge, 2026-10-03,
+no recipeId; present exactly once before consume) -> `29476` (`consume_ready_food`: `removed=true`,
+`item=null`, record absent on canonical read-back). Pre-existing ready-food unchanged; inventory
+compared item-for-item against a retained snapshot and exactly unchanged. 2 production write
+attempts, 0 retries, 0 other writes, no cleanup write. The final-serving path uses the reviewed
+canonical tombstone semantics; a separate production tombstone read was not performed.
 
 ---
 ## Review TASK-069 — MCP first-write pilot (Phase B2A), record_ready_food — PASS (STRICT, 2 rounds) -> owner-authorized -> landed (local only, deployment separately gated)

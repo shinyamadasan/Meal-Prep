@@ -5,6 +5,26 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-03 — TASK-070 CLOSED `done`: production acceptance completed
+
+**What closed it:** Worker version `f2bff101-a701-4890-8dcc-ac103718fa10` (deployed at 100%) passed a
+controlled production acceptance, reported by the owner from the real ChatGPT connection (not
+re-run by this session). Revision `29474` -> `29475` (`record_ready_food` created disposable
+`cookedMealId cm_1791045734557_839`: name="TASK-070 MCP production test", servings 1, storage
+fridge, cookedDate 2026-10-03, no recipeId; present exactly once before consume) -> `29476`
+(`consume_ready_food`: `removed=true`, `item=null`; disposable record absent on canonical
+read-back). Pre-existing ready-food records unchanged; pantry/inventory compared item-for-item
+against a retained pre-write snapshot and exactly unchanged. Exactly 2 production write attempts
+(1 record, 1 consume), 0 retries, 0 other production writes. No cleanup write needed or made.
+
+**Evidence note:** the final-serving path uses the reviewed canonical tombstone semantics; acceptance
+confirmed removal and read-back. A separate production tombstone read was not performed.
+
+**This closeout:** docs/governance only (TASKS.md `approved` -> `done`, REVIEW.md, planning/DONE.md).
+No implementation file touched; no Worker redeploy; TASK-065 untouched.
+
+---
+
 ## 2026-10-02 — TASK-069 CLOSED `done`: owner performed the first controlled production write
 
 **What closed it:** following the deployment logged below, the owner reports performing the first
