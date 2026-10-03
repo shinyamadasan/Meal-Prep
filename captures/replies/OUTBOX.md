@@ -9,3 +9,10 @@ note: cleared a stale automation lock because its owning process (PID 51940) had
 2026-09-23T15:42:38.9088665-07:00
 
 note: cleared a stale automation lock because its owning process (PID 43156) had already exited without cleaning up. If a /go, /build, /review, or /merge from around then seemed to vanish, resend it.
+
+---
+
+## auto-recovery-20261002T201239Z
+2026-10-02T20:12:39.9180692-07:00
+
+note: cleared a stale automation lock because its owning process (PID 3788) had already exited without cleaning up. If a /go, /build, /review, or /merge from around then seemed to vanish, resend it.
