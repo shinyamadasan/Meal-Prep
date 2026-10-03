@@ -5367,6 +5367,186 @@ merge/deployment gate:
 
 ---
 
+### TASK-070 · MCP READY-FOOD CONSUMPTION — authenticated `consume_ready_food` write tool (Phase B2B)
+status: todo
+owner: claude (planning) → codex (on owner build authorization)
+hold: PLANNING ONLY. Implementation is NOT authorized by this entry. The owner flips `status:` to
+  `codex` (or tells Claude to) to release it to the Builder; until then `Next` will report it as a
+  `todo`. Deployment and any production write are separate, later owner gates.
+source: direct owner governance transition after TASK-069 `done` (2026-10-02) — "NEXT PHASE —
+  READY-FOOD CONSUMPTION MCP TOOL". Lets ChatGPT handle "I ate one serving of the chicken." through
+  exactly ONE existing canonical mutation.
+depends-on: TASK-069 (`done`), TASK-068 (`done`). Reuses their Worker, OAuth, `mealprep:write`
+  scope, owner authorization, `expectedRevision` conflict handling, `TARGET_UID` boundary, and MCP
+  adapter pattern. No new infrastructure.
+files: workers/conversational-bridge/src/mcp.js (new tool registration + handler, error mapping,
+  `TOOL_SECURITY_SCHEMES` entry); workers/conversational-bridge/test/mcp-write.node.js and
+  test/mcp.node.js (new focused tests; the existing "exactly three tools" assertion becomes
+  "exactly four"); test/oauth-provider-integration.node.js only if its tool-count/scope assertions
+  require it; workers/conversational-bridge/README.md; CHANGELOG.md; TEST_REPORT.md; TASKS.md
+  status field only during Builder execution. Expected ZERO changes to `src/oauth.js`,
+  `src/mcpAuth.js`, `src/index.js`, `src/operations/readyFood.js`, `src/firestore.js`. Do not touch
+  app/UI files, Playwright specs, Firestore rules, another Worker, or unrelated root metadata.
+branch: task-070 (branch from the verified planning commit on main)
+
+live-inspection findings (verified against `main` @ 669463e, not assumed):
+  - Existing typed domain operation: `readyFood.consumePortions(cookedMeals,
+    deletionsCookedMeals, { cookedMealId, servings })`.
+  - Existing REST route: `POST /v1/ready-food/consume` (route name `readyFood.consume`); body
+    schema `required: [cookedMealId, servings, expectedRevision]`, `optional: []`.
+  - Input contract: `servings` must be a JS number, whole 1..99 (`validateServings`, floored);
+    `cookedMealId` matched by `String(m.id) === String(cookedMealId)`.
+  - servings remaining > 0 after consume: record kept, `portionsRemaining` decremented,
+    `updatedAt` refreshed; write touches `cookedMeals` only; returns the updated item,
+    `removed: false`.
+  - servings reach exactly 0: the record is REMOVED from `cookedMeals` and an explicit tombstone
+    `deletions.cookedMeals[<id>] = <ISO now>` is written (no zero-portion record is left behind);
+    write touches `cookedMeals` AND `deletions.cookedMeals`; returns `item: null, removed: true`.
+  - Over-consume (`servings > portionsRemaining`): `InsufficientServingsError` (REST 422
+    `insufficient_servings`), zero mutation. Untracked batch (no `portionsRemaining`):
+    `ValidationError` directing the caller to `finish`. Unknown id: `NotFoundError` (REST 404
+    `not_found`).
+  - Revision behavior: REST requires integer `expectedRevision >= 0`; mismatch against the doc's
+    `version` → `RevisionConflictError` (409), zero write; a successful write advances `version`
+    by exactly 1 (`nextVersion: doc.revision + 1`), guarded by `expectedUpdateTime`.
+  - Stable-ID behavior: partial consume keeps the same `cookedMealId`; exact-remainder consume
+    retires the id permanently (tombstone) — a later `get_ready_food` will no longer list it.
+  Invariant held: the existing operation cleanly represents "consume N servings from an existing
+  cookedMealId". No new domain operation is needed or permitted.
+
+objective:
+  Register exactly ONE new model-visible tool, `consume_ready_food`, mapping 1:1 onto
+  `readyFood.consumePortions()` / `POST /v1/ready-food/consume`. The name matches the live domain
+  vocabulary (`consumePortions`, route `/consume`) and the existing verb_noun convention
+  (`record_ready_food`). MCP remains a thin adapter: do not reimplement consumption, tombstone,
+  validation, or persistence semantics in `mcp.js`.
+
+    ChatGPT → authenticated MCP (owner + `mealprep:write`) → thin adapter
+      → existing `readyFood.consumePortions()` (unchanged) → Firestore (`TARGET_UID` server-fixed)
+
+  Model-visible surface afterward: `get_inventory`, `get_ready_food`, `record_ready_food`,
+  `consume_ready_food` — exactly four. NO `finish` tool, NO inventory write, NO generic mutation
+  tool.
+
+tool contract:
+  - input: `cookedMealId` (string), `servings` (number), `expectedRevision` (required). Nothing
+    else: no UID, document path, collection, arbitrary field, or operation selector. Over-posted
+    keys are never honored.
+  - flow mirrors `recordReadyFoodTool` and the REST handler exactly: `requireMcpWriteContext` →
+    `requireValidExpectedRevision` (reject before any Firestore read) → read doc → compare
+    `expectedRevision` to `doc.revision` (mismatch → `RevisionConflictError`, no write, NO retry)
+    → `consumePortions(doc.cookedMeals, doc.deletions.cookedMeals || {}, { cookedMealId,
+    servings })` → write using the SAME fieldPaths split as REST (`['cookedMeals']` when the
+    record survives; `['cookedMeals', 'deletions.cookedMeals']` with
+    `fields.deletions = { cookedMeals: ... }` when `removed`) → `nextVersion: doc.revision + 1`.
+  - result: `{ ok: true, revision, item, removed }` (item is the updated `get_ready_food`-shaped
+    item, or `null` when `removed: true`).
+  - error mapping must surface, as tool errors (`isError: true`) with the existing messages:
+    `revision_conflict`, `ValidationError`, `NotFoundError`, and `InsufficientServingsError`
+    (the current `record_ready_food` catch block only maps the first two plus a generic fallback;
+    `NotFoundError`/`InsufficientServingsError` must not collapse into the generic "could not be
+    created" message — give this tool its own accurate fallback text).
+  - never auto-retries; never re-reads the revision and silently re-applies.
+
+mcp annotations (derived from live semantics, not convenience):
+  - `readOnlyHint: false`
+  - `destructiveHint: true` — consuming the final serving removes the record and writes a
+    tombstone, a meaningful (non-conceptually-reversible-by-the-tool) deletion. Partial
+    consumption alone would be non-destructive, but the annotation describes the tool's worst case.
+    Do NOT label it `false`. This needs its own annotations constant; `WRITE_ANNOTATIONS`
+    (`destructiveHint: false`) must remain untouched for `record_ready_food`.
+  - `idempotentHint: false` — replaying a call decrements again (or fails). Retry/replay is
+    UNSAFE. Document this in the tool description and README: a transport-level retry with the
+    SAME `expectedRevision` is safe only because the first success advanced the revision and the
+    replay then fails `revision_conflict`; a replay with a freshly re-read revision consumes
+    AGAIN. Conflict-safety is not idempotence.
+  - `openWorldHint: false`
+
+authorization:
+  ZERO OAuth-layer changes. Reuse `mealprep:write` via `requireMcpWriteContext`.
+  `scopesSupported`, `requiredScopes`, `SUPPORTED_MCP_SCOPE_SETS`, owner authorization, and
+  stored-consent behavior are untouched. If live implementation evidence shows any change is
+  actually required, STOP, set `status: blocked`, and record the exact gap — do not widen the
+  OAuth layer on a hunch. A `TOOL_SECURITY_SCHEMES` entry for `consume_ready_food` with
+  `WRITE_SECURITY_SCHEMES` is the only auth-adjacent edit expected.
+
+acceptance:
+  AUTH
+  - [ ] `mealprep:read`-only grant is denied `consume_ready_food` with the same
+        insufficient-scope challenge as `record_ready_food`; read tools still work.
+  - [ ] `mealprep:write` and combined grants can call it; wrong owner is denied identically to
+        the existing tools; REST `BRIDGE_API_TOKEN` and MCP credentials remain mutually
+        non-authorizing.
+  - [ ] No change to any OAuth scope list, requirement, or consent behavior (diff proves it).
+
+  REVISION / CONFLICT
+  - [ ] Correct `expectedRevision` → exactly one canonical consume mutation; revision +1;
+        reported revision matches written revision.
+  - [ ] Stale `expectedRevision` → `revision_conflict`, zero mutation, no retry.
+  - [ ] Missing / non-integer / negative / string `expectedRevision` → rejected before any
+        Firestore read or write.
+  - [ ] Exact retry with the old revision cannot consume twice (second attempt →
+        `revision_conflict`); two racing calls on one revision → exactly one succeeds.
+
+  DOMAIN FIDELITY (via the unchanged domain function)
+  - [ ] Partial consume: requested servings subtracted exactly; `servingsRemaining` correct;
+        same `cookedMealId`; write touches `cookedMeals` only.
+  - [ ] Final-serving consume: record removed, `deletions.cookedMeals[<id>]` tombstone written,
+        `removed: true`, `item: null`; both fieldPaths written.
+  - [ ] Over-consume → insufficient-servings error, zero mutation. Invalid `servings` (0, 100,
+        negative, non-number, NaN) → existing validation error, zero mutation. Untracked batch →
+        existing validation error. Unknown `cookedMealId` → existing not-found behavior.
+  - [ ] Unrelated `cookedMeals` records, `pantry`, and every other doc field are byte-for-byte
+        unchanged after a successful consume.
+
+  ADVERSARIAL / SURFACE
+  - [ ] Over-posted `uid`/`path`/`collection`/`operation`/extra keys never reach Firestore or the
+        domain function.
+  - [ ] `tools/list` exposes exactly four tools: `get_inventory`, `get_ready_food`,
+        `record_ready_food`, `consume_ready_food`. No finish, inventory-write, delete, patch, or
+        execute tool anywhere in the diff, including disabled/test-only helpers.
+  - [ ] Annotations on `consume_ready_food` exactly as specified above.
+
+  REGRESSION
+  - [ ] `record_ready_food` behavior, schema, and annotations unchanged; `get_inventory` and
+        `get_ready_food` unchanged; REST `/v1/*` behavior unchanged.
+  - [ ] All existing OAuth provider and MCP tests remain green; new tests are additive (the single
+        "three tools" assertion update is the only permitted edit to an existing assertion).
+
+constraints:
+  - LOCAL IMPLEMENTATION ONLY once released. No deployment, no production Firestore read or
+    write, no OAuth grant change, no reconnecting the real ChatGPT plugin, no second write tool.
+    `PRODUCTION_WRITE_COUNT` stays 0 through the task's lifecycle, including review.
+  - Do not redesign consume semantics. If the domain contract proves not to fit (e.g. the
+    tombstone path cannot be written through the existing seam), STOP: `status: blocked`.
+  - Deterministic code only for auth, routing, validation, retries; no LLM in any decision path.
+  - Governance note: TASK-065 still reads `status: review` and sits earlier in the review FIFO.
+    It is unrelated and untouched here; if it blocks automated review routing, report separately.
+
+verification:
+  - [ ] Focused new tests covering every acceptance line above; record exact command and counts.
+  - [ ] `npm run test:bridge` — record exact full pass/fail (must be ≥ the current TASK-069
+        baseline plus the new tests, 0 regressions).
+  - [ ] `npm test` (Playwright) — task must not change app or existing Playwright files.
+  - [ ] `node --check` on every changed/new JS file.
+  - [ ] `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`
+        (validate only, do not deploy).
+  - [ ] Dependency audit from `workers/conversational-bridge`; no unresolved high/critical.
+  - [ ] `tools/Verify-Decisions.ps1` and `tools/Check-DocsConsistency.ps1`; report baseline
+        failures separately.
+  - [ ] `git diff --check` and secret scan clean; `SELF_REVIEW.md` and `QA.md` gates complete.
+
+merge/deployment gate:
+  Hand off at `status: review`. Red-zone under D-032 (Firestore write capability, tombstone/
+  deletion machinery, write-tool surface): a NEW independent STRICT reviewer must return PASS and
+  the landing status must be `approved` (held for owner merge), never `done`. Review PASS
+  authorizes nothing beyond itself — deployment and the first controlled production consume are
+  separate owner gates, and that first production consume must be planned as irreversible if it
+  takes the final serving (tombstone), so it should target a disposable record created via
+  `record_ready_food` first.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
