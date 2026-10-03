@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-070 — strict-review fix-first corrections (branch: task-070, on top of e035b00)
+changed:
+  - workers/conversational-bridge/src/mcp.js (consume input schema now typed and required: `cookedMealId` non-empty string, `servings` plain number (not integer, so fractional >= 1 stays valid), `expectedRevision` non-negative integer; result shape is exactly `{ ok, revision, item, removed }` (top-level `cookedMealId` removed); redundant hand-rolled input checks deleted because the schema now enforces them)
+  - workers/conversational-bridge/test/mcp-consume.node.js (result-shape updates; schema advertisement test; non-numeric vs out-of-range servings split; 2 deterministic barrier-based concurrent same-revision tests, partial and final-serving; now 26 tests)
+  - workers/conversational-bridge/README.md (servings language corrected to the real `consumePortions()` semantics; result shape)
+unchanged by design: oauth.js, mcpAuth.js, index.js, readyFood.js, firestore.js, package metadata, wrangler config, app/UI, Firestore rules.
+notes: malformed `servings` type / `expectedRevision` / `cookedMealId` now fail with the MCP input-validation error instead of the REST validation text (accepted per the fix-first brief). Values outside 1..99 or below 1 still get the domain message. Local only; PRODUCTION_WRITE_COUNT 0.
+→ status remains `review` in TASKS.md
+
 ## TASK-070 — MCP `consume_ready_food` write tool (branch: task-070)
 changed:
   - workers/conversational-bridge/src/mcp.js (new `consume_ready_food` tool + `consumeReadyFoodTool` handler, own `CONSUME_ANNOTATIONS`, strict input schema, `TOOL_SECURITY_SCHEMES` entry; error mapping adds `NotFoundError`/`InsufficientServingsError`, ~115 loc)

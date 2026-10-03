@@ -93,14 +93,16 @@ function recordReadyFoodInputSchema() {
   });
 }
 
-// Same approach as recordReadyFoodInputSchema(): values stay z.unknown() so a bad servings value
-// fails with consumePortions()'s own validation message (matching REST); strictObject still
-// guarantees no uid/path/collection/operation key can reach the domain function.
+// Typed and required, so the public tool schema truthfully advertises the contract. servings is
+// deliberately z.number() and NOT .int(): consumePortions() floors fractional values >= 1 (2.9
+// consumes 2) and rejects values outside 1..99 with its own validation error, so the domain stays
+// authoritative for consumption semantics. strictObject guarantees no uid/path/collection/
+// operation key can reach the domain function.
 function consumeReadyFoodInputSchema() {
   return z.strictObject({
-    cookedMealId: z.unknown().optional(),
-    servings: z.unknown().optional(),
-    expectedRevision: z.unknown().optional()
+    cookedMealId: z.string().min(1),
+    servings: z.number(),
+    expectedRevision: z.number().int().nonnegative()
   });
 }
 
@@ -195,9 +197,8 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
-        cookedMealId: z.string(),
-        removed: z.boolean(),
-        item: readyFoodItemSchema().nullable()
+        item: readyFoodItemSchema().nullable(),
+        removed: z.boolean()
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
       annotations: CONSUME_ANNOTATIONS
@@ -208,20 +209,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
   return server;
 }
 
-// Mirrors index.js's POST /v1/ready-food/consume flow exactly: auth -> body shape +
-// expectedRevision shape -> read -> compare expectedRevision (no retry, no re-read) ->
+// Mirrors index.js's POST /v1/ready-food/consume flow: auth (input shape was already enforced by
+// consumeReadyFoodInputSchema()) -> read -> compare expectedRevision (no retry, no re-read) ->
 // consumePortions() (unchanged domain function) -> write with the same fieldPaths split as REST.
 async function consumeReadyFoodTool(env, deps, ctx, args) {
   try {
     requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const input = args || {};
-    const missing = ['cookedMealId', 'servings', 'expectedRevision'].filter((key) => input[key] === undefined);
-    if (missing.length) throw new ValidationError('Missing required field(s): ' + missing.join(', ') + '.', { fields: missing });
-    requireValidExpectedRevision(input.expectedRevision);
-    if (typeof input.cookedMealId !== 'string' || input.cookedMealId === '') {
-      throw new ValidationError('cookedMealId must be a non-empty string.', { field: 'cookedMealId' });
-    }
-
     const fetchImpl = deps.fetchImpl || fetch;
     const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
     const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
@@ -231,14 +224,14 @@ async function consumeReadyFoodTool(env, deps, ctx, args) {
     const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
     const doc = await readDoc(env, accessToken, fetchImpl);
 
-    if (input.expectedRevision !== doc.revision) {
+    if (args.expectedRevision !== doc.revision) {
       throw new RevisionConflictError(doc);
     }
 
     // Project only the two business fields consumePortions() destructures.
     const r = readyFood.consumePortions(doc.cookedMeals, doc.deletions.cookedMeals || {}, {
-      cookedMealId: input.cookedMealId,
-      servings: input.servings
+      cookedMealId: args.cookedMealId,
+      servings: args.servings
     });
     const write = r.removed
       ? { fieldPaths: ['cookedMeals', 'deletions.cookedMeals'], fields: { cookedMeals: r.cookedMeals, deletions: { cookedMeals: r.deletionsCookedMeals } } }
@@ -251,9 +244,8 @@ async function consumeReadyFoodTool(env, deps, ctx, args) {
     return toolResult({
       ok: true,
       revision: written.revision,
-      cookedMealId: input.cookedMealId,
-      removed: r.removed,
-      item: r.item
+      item: r.item,
+      removed: r.removed
     });
   } catch (error) {
     if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);

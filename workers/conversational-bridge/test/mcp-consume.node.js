@@ -143,7 +143,7 @@ test('partial consume subtracts exactly the requested servings, keeps the id, bu
   const out = message.result.structuredContent;
   assert.equal(out.ok, true);
   assert.equal(out.revision, 1);
-  assert.equal(out.cookedMealId, 'meal-1');
+  assert.deepEqual(Object.keys(out).sort(), ['item', 'ok', 'removed', 'revision']);
   assert.equal(out.removed, false);
   assert.equal(out.item.cookedMealId, 'meal-1');
   assert.equal(out.item.servingsRemaining, 1);
@@ -164,7 +164,7 @@ test('consuming the final serving removes the record, writes exactly one tombsto
   const { fake, call } = seeded();
   const message = await responseMessage(await call({ cookedMealId: 'meal-1', servings: 3, expectedRevision: 0 }));
   assert.equal(message.result.isError, undefined, JSON.stringify(message));
-  assert.deepEqual(message.result.structuredContent, { ok: true, revision: 1, cookedMealId: 'meal-1', removed: true, item: null });
+  assert.deepEqual(message.result.structuredContent, { ok: true, revision: 1, item: null, removed: true });
 
   const f = fake.store.fields;
   assert.equal(f.version, 1);
@@ -222,6 +222,74 @@ test('the tool never retries internally: a stale call performs exactly one read 
   assert.deepEqual(calls, { read: 1, write: 0 });
 });
 
+// Deterministic race: the fetch wrapper holds every document PATCH until BOTH calls have completed
+// their document GET, so both calls provably start from the same revision/updateTime. The
+// persistence seam (Firestore currentDocument.updateTime precondition) must then admit exactly one
+// write. No sleeps: the barrier is a promise released by the second GET.
+function racingBridge(initialFields) {
+  const fake = createFakeFirestore({ fields: initialFields });
+  const stats = { docGets: 0, patches: 0, patchOk: 0, patchPreconditions: [] };
+  let release;
+  const barrier = new Promise((resolve) => { release = resolve; });
+  const fetchImpl = async (url, init = {}) => {
+    const method = (init.method || 'GET').toUpperCase();
+    const isDoc = new URL(url).pathname.includes('/documents/users/');
+    if (isDoc && method === 'GET') {
+      stats.docGets += 1;
+      const response = await fake.fetch(url, init);
+      if (stats.docGets === 2) release();
+      return response;
+    }
+    if (isDoc && method === 'PATCH') {
+      stats.patches += 1;
+      stats.patchPreconditions.push(new URL(url).searchParams.get('currentDocument.updateTime'));
+      await barrier;
+      const response = await fake.fetch(url, init);
+      if (response.ok) stats.patchOk += 1;
+      return response;
+    }
+    return fake.fetch(url, init);
+  };
+  const env = testEnv();
+  const deps = { nowSeconds: NOW, fetchImpl, cryptoImpl: globalThis.crypto };
+  const call = (args) => routeRequest(
+    mcpRequest(toolCall(1, 'consume_ready_food', args)), env, deps, contextWithScope([MCP_WRITE_SCOPE])
+  );
+  return { fake, stats, call };
+}
+
+for (const [label, servings, expectRemoved] of [['partial consume', 1, false], ['final-serving consume', 3, true]]) {
+  test('two concurrent ' + label + ' calls from the same expectedRevision: exactly one mutation wins, the other is revision_conflict', async () => {
+    const { fake, stats, call } = racingBridge({ version: 0, pantry: PANTRY, cookedMeals: [MEAL, OTHER] });
+    const args = { cookedMealId: 'meal-1', servings, expectedRevision: 0 };
+    const [a, b] = await Promise.all([call(args), call(args)]);
+    const messages = [await responseMessage(a), await responseMessage(b)];
+    const successes = messages.filter((m) => m.result.isError === undefined);
+    const conflicts = messages.filter((m) => m.result.isError === true && /^revision_conflict/.test(m.result.content[0].text));
+
+    assert.equal(successes.length, 1);
+    assert.equal(conflicts.length, 1);
+    assert.equal(successes[0].result.structuredContent.removed, expectRemoved);
+    assert.equal(successes[0].result.structuredContent.revision, 1);
+
+    // Both writers reached the persistence seam against the same snapshot...
+    assert.equal(stats.patches, 2);
+    assert.equal(stats.patchPreconditions[0], stats.patchPreconditions[1]);
+    // ...but only one mutation landed: no last-write-wins and no retry (no third PATCH).
+    assert.equal(stats.patchOk, 1);
+    assert.equal(fake.store.fields.version, 1, 'revision advanced exactly once');
+    const f = fake.store.fields;
+    if (expectRemoved) {
+      assert.deepEqual(f.cookedMeals, [OTHER]);
+      assert.deepEqual(Object.keys(f.deletions.cookedMeals), ['meal-1'], 'exactly one tombstone');
+    } else {
+      assert.equal(f.cookedMeals[0].portionsRemaining, 2, 'exactly one serving consumed');
+      assert.deepEqual(f.deletions, {});
+    }
+    assert.deepEqual(f.pantry, PANTRY);
+  });
+}
+
 // ── INPUT VALIDATION ─────────────────────────────────────────────────────────
 
 test('missing or malformed expectedRevision is rejected before any Firestore access', async () => {
@@ -230,6 +298,7 @@ test('missing or malformed expectedRevision is rejected before any Firestore acc
     if (expectedRevision !== undefined) args.expectedRevision = expectedRevision;
     const { message, calls } = await rejected(args, contextWithScope([MCP_WRITE_SCOPE]));
     assert.equal(message.result.isError, true, JSON.stringify(expectedRevision));
+    assert.match(message.result.content[0].text, /input validation error/i, JSON.stringify(expectedRevision));
     assert.match(message.result.content[0].text, /expectedRevision/, JSON.stringify(expectedRevision));
     assert.deepEqual(calls, NO_ACCESS, JSON.stringify(expectedRevision));
   }
@@ -250,8 +319,17 @@ test('missing or malformed cookedMealId and missing servings are rejected before
   }
 });
 
-test('invalid servings (0, negative, 100, string, null, boolean, <1 fraction) follow the domain validation error with zero mutation', async () => {
-  for (const servings of [0, -1, 100, '2', null, true, 0.5]) {
+test('non-numeric servings (string, null, boolean, object) are rejected by the public tool schema before any Firestore access', async () => {
+  for (const servings of ['2', null, true, {}]) {
+    const { message, calls } = await rejected({ cookedMealId: 'meal-1', servings, expectedRevision: 0 }, contextWithScope([MCP_WRITE_SCOPE]));
+    assert.equal(message.result.isError, true, JSON.stringify(servings));
+    assert.match(message.result.content[0].text, /input validation error/i, JSON.stringify(servings));
+    assert.deepEqual(calls, NO_ACCESS, JSON.stringify(servings));
+  }
+});
+
+test('servings outside the domain range (0, negative, 100, <1 fraction) follow the domain validation error with zero mutation', async () => {
+  for (const servings of [0, -1, 100, 0.5]) {
     const { fake, call } = seeded();
     const before = JSON.stringify(fake.store.fields);
     const message = await responseMessage(await call({ cookedMealId: 'meal-1', servings, expectedRevision: 0 }));
@@ -332,6 +410,22 @@ test('tools/list is exactly the four reviewed tools; no finish/remove/delete/inv
   assert.doesNotMatch(names.join(' '), /finish|remove|delete|patch|execute|set_|mark_/i);
 });
 
+test('consume_ready_food advertises typed, required, strict input and the exact result shape', async () => {
+  const response = await routeRequest(
+    mcpRequest(rpcRequest(2, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
+  );
+  const tool = (await responseMessage(response)).result.tools.find((t) => t.name === 'consume_ready_food');
+  const input = tool.inputSchema;
+  assert.equal(input.additionalProperties, false);
+  assert.deepEqual([...input.required].sort(), ['cookedMealId', 'expectedRevision', 'servings']);
+  assert.equal(input.properties.cookedMealId.type, 'string');
+  assert.equal(input.properties.cookedMealId.minLength, 1);
+  assert.equal(input.properties.servings.type, 'number', 'servings must stay a plain number so fractional >= 1 remains valid');
+  assert.equal(input.properties.expectedRevision.type, 'integer');
+  assert.equal(input.properties.expectedRevision.minimum, 0);
+  assert.deepEqual(Object.keys(tool.outputSchema.properties).sort(), ['item', 'ok', 'removed', 'revision']);
+});
+
 test('record_ready_food stays non-destructive while consume_ready_food is destructive (separate annotation constants)', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(2, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
@@ -350,7 +444,8 @@ test('a record created by record_ready_food can be consumed to exhaustion end to
   const id = rec.result.structuredContent.item.cookedMealId;
   const one = await run(2, 'consume_ready_food', { cookedMealId: id, servings: 1, expectedRevision: 1 });
   assert.equal(one.result.structuredContent.removed, false);
+  assert.equal(one.result.structuredContent.item.cookedMealId, id);
   const last = await run(3, 'consume_ready_food', { cookedMealId: id, servings: 1, expectedRevision: 2 });
-  assert.deepEqual(last.result.structuredContent, { ok: true, revision: 3, cookedMealId: id, removed: true, item: null });
+  assert.deepEqual(last.result.structuredContent, { ok: true, revision: 3, item: null, removed: true });
   assert.deepEqual(fake.store.fields.cookedMeals, []);
 });
