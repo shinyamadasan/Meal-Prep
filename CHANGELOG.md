@@ -5,6 +5,21 @@
 
 ---
 
+## TASK-071 — consume_ready_food mealConsumptions parity (branch: task-071, on top of d9fa050)
+changed:
+  - workers/conversational-bridge/src/operations/readyFood.js (new canonical `consumeReadyFood()` + `consumeWriteSpec()`; `consumePortions()` takes one shared instant and returns the consumed `amount`)
+  - workers/conversational-bridge/src/firestore.js (read mask + `mealConsumptions` decode on read/patch/404 shell)
+  - workers/conversational-bridge/src/index.js (REST consume route delegates to the canonical op)
+  - workers/conversational-bridge/src/mcp.js (consume tool delegates to the canonical op; schema, annotations, scopes unchanged)
+  - workers/conversational-bridge/test/consume-parity.node.js (new, 26 tests), test/firestore.node.js (+3)
+  - workers/conversational-bridge/README.md (TASK-071 section)
+- one guarded PATCH now writes cookedMeals + mealConsumptions (+ deletions.cookedMeals on the final serving); revision +1 once
+- N servings = ONE fact (portionsConsumed = floored N); snapshots taken before removal; mc_<UUID> id; closed six-field schema
+- REST parity: changed (same canonical op). MCP tool surface: unchanged (four tools). OAuth: unchanged. Not deployed.
+- pre-fix production consume `cm_1791045734557_839` is NOT backfilled (no safe reconstruction)
+blockers: none
+→ status set to `review` in TASKS.md
+
 ## TASK-070 — strict-review fix-first corrections (branch: task-070, on top of e035b00)
 changed:
   - workers/conversational-bridge/src/mcp.js (consume input schema now typed and required: `cookedMealId` non-empty string, `servings` plain number (not integer, so fractional >= 1 stays valid), `expectedRevision` non-negative integer; result shape is exactly `{ ok, revision, item, removed }` (top-level `cookedMealId` removed); redundant hand-rolled input checks deleted because the schema now enforces them)

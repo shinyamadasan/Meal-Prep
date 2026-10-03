@@ -117,7 +117,7 @@ export function recordCookedFood({ name, recipeId, servings, storage, cookedDate
 
 // Decrements portionsRemaining. Consuming exactly the remainder removes the record via an
 // explicit tombstone (see module note) rather than leaving a zero-portion record behind.
-export function consumePortions(cookedMeals, deletionsCookedMeals, { cookedMealId, servings }) {
+export function consumePortions(cookedMeals, deletionsCookedMeals, { cookedMealId, servings }, nowIso = new Date().toISOString()) {
   const index = findMealIndex(cookedMeals, cookedMealId);
   if (index === -1) throw new NotFoundError('No cooked-meal record with cookedMealId "' + cookedMealId + '".');
 
@@ -133,14 +133,84 @@ export function consumePortions(cookedMeals, deletionsCookedMeals, { cookedMealI
   const remaining = meal.portionsRemaining - amount;
   if (remaining === 0) {
     const nextMeals = cookedMeals.filter((_, i) => i !== index);
-    const nextDeletions = Object.assign({}, deletionsCookedMeals, { [String(cookedMealId)]: new Date().toISOString() });
-    return { cookedMeals: nextMeals, deletionsCookedMeals: nextDeletions, item: null, removed: true };
+    const nextDeletions = Object.assign({}, deletionsCookedMeals, { [String(cookedMealId)]: nowIso });
+    return { cookedMeals: nextMeals, deletionsCookedMeals: nextDeletions, item: null, removed: true, amount };
   }
 
   const next = cookedMeals.slice();
-  const updated = Object.assign({}, meal, { portionsRemaining: remaining, updatedAt: new Date().toISOString() });
+  const updated = Object.assign({}, meal, { portionsRemaining: remaining, updatedAt: nowIso });
   next[index] = updated;
-  return { cookedMeals: next, deletionsCookedMeals, item: toReadyFoodItem(updated), removed: false };
+  return { cookedMeals: next, deletionsCookedMeals, item: toReadyFoodItem(updated), removed: false, amount };
+}
+
+const MEAL_CONSUMPTION_ID_ATTEMPTS = 10;
+
+function newMealConsumptionId() {
+  return 'mc_' + globalThis.crypto.randomUUID();
+}
+
+// THE canonical "I ate it" operation for the bridge (TASK-071) — the server-side twin of app.js's
+// useCookedPortion() + recordMealConsumption(). REST and MCP both call this and nothing else, so
+// there is exactly one place that decides what a consume writes:
+//   - decrement / remove the cookedMeals batch (+ tombstone on the final serving), and
+//   - append ONE immutable mealConsumptions fact (closed six-field schema, see LEDGER_CONTRACT.md).
+// N servings in one command is ONE fact with portionsConsumed = N (the ledger contract allows
+// 1..99 per fact), never N facts. recipeId/mealName snapshots come from the PRE-mutation batch.
+// Pure: returns the next state; the caller persists all three fields in ONE guarded PATCH.
+// Existing facts are passed through untouched (append-only: no canonicalize, dedupe or reorder).
+export function consumeReadyFood({ cookedMeals, deletionsCookedMeals, mealConsumptions }, { cookedMealId, servings }, { now = () => new Date(), newId = newMealConsumptionId } = {}) {
+  if (!Array.isArray(mealConsumptions)) {
+    throw new Error('mealConsumptions is present but not an array; refusing to overwrite it.');
+  }
+  const nowIso = now().toISOString();
+  const before = cookedMeals[findMealIndex(cookedMeals, cookedMealId)];
+
+  // Validates id/tracked/servings/sufficiency and throws before anything is built.
+  const r = consumePortions(cookedMeals, deletionsCookedMeals, { cookedMealId, servings }, nowIso);
+
+  // Same refusal as app.js recordMealConsumption(): a batch the closed schema cannot describe
+  // must not be consumed without its fact. Thrown before any caller write.
+  if (typeof before.name !== 'string') {
+    throw new ValidationError('cookedMealId "' + cookedMealId + '" has no name, so a consumption fact cannot be recorded.', { field: 'cookedMealId' });
+  }
+  const used = new Set(mealConsumptions.map((f) => (f && f.id != null ? String(f.id) : null)));
+  let id = null;
+  for (let attempt = 0; attempt < MEAL_CONSUMPTION_ID_ATTEMPTS && id == null; attempt++) {
+    const candidate = newId();
+    if (!used.has(candidate)) id = candidate;
+  }
+  if (id == null) throw new Error('Unable to generate a unique meal consumption id.');
+
+  const consumption = {
+    id,
+    cookedMealId: String(before.id),
+    recipeId: before.recipeId != null ? String(before.recipeId) : null,
+    mealName: before.name,
+    portionsConsumed: r.amount,
+    consumedAt: nowIso
+  };
+  return {
+    cookedMeals: r.cookedMeals,
+    deletionsCookedMeals: r.deletionsCookedMeals,
+    mealConsumptions: mealConsumptions.concat([consumption]),
+    consumption,
+    item: r.item,
+    removed: r.removed
+  };
+}
+
+// The single atomic write spec for consumeReadyFood(): shared by REST and MCP so the field-path
+// split cannot drift between them.
+export function consumeWriteSpec(r) {
+  return r.removed
+    ? {
+        fieldPaths: ['cookedMeals', 'deletions.cookedMeals', 'mealConsumptions'],
+        fields: { cookedMeals: r.cookedMeals, deletions: { cookedMeals: r.deletionsCookedMeals }, mealConsumptions: r.mealConsumptions }
+      }
+    : {
+        fieldPaths: ['cookedMeals', 'mealConsumptions'],
+        fields: { cookedMeals: r.cookedMeals, mealConsumptions: r.mealConsumptions }
+      };
 }
 
 // Removes the record regardless of servings remaining, mirroring finishCookedMeal(). Same
