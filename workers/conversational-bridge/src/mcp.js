@@ -211,7 +211,8 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
 
 // Mirrors index.js's POST /v1/ready-food/consume flow: auth (input shape was already enforced by
 // consumeReadyFoodInputSchema()) -> read -> compare expectedRevision (no retry, no re-read) ->
-// consumePortions() (unchanged domain function) -> write with the same fieldPaths split as REST.
+// readyFood.consumeReadyFood() (the canonical op shared with REST, TASK-071) -> ONE guarded write
+// of cookedMeals + mealConsumptions (+ tombstone), same field-path spec as REST.
 async function consumeReadyFoodTool(env, deps, ctx, args) {
   try {
     requireMcpWriteContext(env, ctx, deps.nowSeconds);
@@ -228,14 +229,12 @@ async function consumeReadyFoodTool(env, deps, ctx, args) {
       throw new RevisionConflictError(doc);
     }
 
-    // Project only the two business fields consumePortions() destructures.
-    const r = readyFood.consumePortions(doc.cookedMeals, doc.deletions.cookedMeals || {}, {
-      cookedMealId: args.cookedMealId,
-      servings: args.servings
-    });
-    const write = r.removed
-      ? { fieldPaths: ['cookedMeals', 'deletions.cookedMeals'], fields: { cookedMeals: r.cookedMeals, deletions: { cookedMeals: r.deletionsCookedMeals } } }
-      : { fieldPaths: ['cookedMeals'], fields: { cookedMeals: r.cookedMeals } };
+    // Project only the two business fields the canonical operation destructures.
+    const r = readyFood.consumeReadyFood(
+      { cookedMeals: doc.cookedMeals, deletionsCookedMeals: doc.deletions.cookedMeals || {}, mealConsumptions: doc.mealConsumptions },
+      { cookedMealId: args.cookedMealId, servings: args.servings }
+    );
+    const write = readyFood.consumeWriteSpec(r);
     const written = await writeDoc(env, accessToken, Object.assign(write, {
       expectedUpdateTime: doc.updateTime,
       nextVersion: doc.revision + 1

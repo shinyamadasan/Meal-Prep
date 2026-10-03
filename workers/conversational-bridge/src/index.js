@@ -117,11 +117,11 @@ const ROUTES = [
   {
     method: 'POST', path: '/v1/ready-food/consume', name: 'readyFood.consume',
     handler: (doc, body) => {
-      const r = readyFood.consumePortions(doc.cookedMeals, doc.deletions.cookedMeals || {}, body);
-      const write = r.removed
-        ? { fieldPaths: ['cookedMeals', 'deletions.cookedMeals'], fields: { cookedMeals: r.cookedMeals, deletions: { cookedMeals: r.deletionsCookedMeals } } }
-        : { fieldPaths: ['cookedMeals'], fields: { cookedMeals: r.cookedMeals } };
-      return { body: { item: r.item, unchanged: false, removed: r.removed }, write };
+      const r = readyFood.consumeReadyFood(
+        { cookedMeals: doc.cookedMeals, deletionsCookedMeals: doc.deletions.cookedMeals || {}, mealConsumptions: doc.mealConsumptions },
+        body
+      );
+      return { body: { item: r.item, unchanged: false, removed: r.removed }, write: readyFood.consumeWriteSpec(r) };
     }
   },
   {

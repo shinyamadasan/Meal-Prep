@@ -1,14 +1,14 @@
 // Firestore REST v1 transport: typed-value codec + a narrow client scoped to the single
 // `users/{uid}` document this bridge is allowed to touch. No arbitrary path/collection ever
 // reaches this module — callers pass only `env.TARGET_UID` (baked in by auth.js) and a fixed
-// field mask (`pantry`, `cookedMeals`, `deletions`, `version`).
+// field mask (`pantry`, `cookedMeals`, `mealConsumptions`, `deletions`, `version`).
 //
 // Firestore REST represents every value as a typed wrapper (stringValue, integerValue as a
 // STRING, doubleValue, booleanValue, nullValue, arrayValue, mapValue). encodeValue/decodeValue
 // round-trip plain JS <-> that wire shape so the operations layer never has to think about it.
 
 const FIRESTORE_HOST = 'https://firestore.googleapis.com';
-const BRIDGE_FIELD_PATHS = ['pantry', 'cookedMeals', 'deletions', 'version'];
+const BRIDGE_FIELD_PATHS = ['pantry', 'cookedMeals', 'mealConsumptions', 'deletions', 'version'];
 
 export class InfrastructureError extends Error {
   constructor(message, cause) {
@@ -92,6 +92,12 @@ async function readErrorBody(response) {
   }
 }
 
+// Absent -> []. Present but not an array is passed through as-is (NOT coerced to []) so a consume
+// can refuse to overwrite it rather than silently destroy unexpected data.
+function decodeMealConsumptions(value) {
+  return value == null ? [] : value;
+}
+
 // Reads the bridge-scoped slice of the user's document. A missing document (never yet saved
 // by the app) decodes as an empty, version-0 shell rather than an error — there is nothing to
 // read or conflict with yet.
@@ -106,7 +112,7 @@ export async function getUserDocument(env, accessToken, fetchImpl = fetch) {
   }
 
   if (response.status === 404) {
-    return { exists: false, revision: 0, updateTime: null, pantry: [], cookedMeals: [], deletions: {} };
+    return { exists: false, revision: 0, updateTime: null, pantry: [], cookedMeals: [], mealConsumptions: [], deletions: {} };
   }
   if (!response.ok) {
     const status = await readErrorBody(response);
@@ -126,6 +132,7 @@ export async function getUserDocument(env, accessToken, fetchImpl = fetch) {
     updateTime: doc.updateTime || null,
     pantry: Array.isArray(fields.pantry) ? fields.pantry : [],
     cookedMeals: Array.isArray(fields.cookedMeals) ? fields.cookedMeals : [],
+    mealConsumptions: decodeMealConsumptions(fields.mealConsumptions),
     deletions: fields.deletions && typeof fields.deletions === 'object' ? fields.deletions : {}
   };
 }
@@ -181,6 +188,7 @@ export async function patchUserDocument(env, accessToken, { fieldPaths, fields, 
     updateTime: doc.updateTime || null,
     pantry: Array.isArray(decoded.pantry) ? decoded.pantry : [],
     cookedMeals: Array.isArray(decoded.cookedMeals) ? decoded.cookedMeals : [],
+    mealConsumptions: decodeMealConsumptions(decoded.mealConsumptions),
     deletions: decoded.deletions && typeof decoded.deletions === 'object' ? decoded.deletions : {}
   };
 }

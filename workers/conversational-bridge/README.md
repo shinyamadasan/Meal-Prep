@@ -158,7 +158,7 @@ write, or generic mutation tool exists.
 
 | Tool | Existing canonical mapping | Result |
 |---|---|---|
-| `consume_ready_food` | `readyFood.consumePortions()` -> the same `patchUserDocument()` path and fieldPaths split `POST /v1/ready-food/consume` uses | `{ ok, revision, item, removed }` |
+| `consume_ready_food` | `readyFood.consumeReadyFood()` (TASK-071) -> the same `patchUserDocument()` path and `consumeWriteSpec()` field paths `POST /v1/ready-food/consume` uses | `{ ok, revision, item, removed }` |
 
 - Input: exactly three required keys — `cookedMealId` (non-empty string), `servings` (a number),
   and `expectedRevision` (non-negative integer). The schema is a strict object, so a `uid`, path,
@@ -174,10 +174,10 @@ write, or generic mutation tool exists.
   after a partial consume, and `null` when the final serving removed the record (`removed: true`).
 - Auth: unchanged. Requires `mealprep:write` via `requireMcpWriteContext`; the OAuth layer was not
   touched.
-- Partial consume: same `cookedMealId`, `portionsRemaining` reduced, only `cookedMeals` written,
-  `removed: false`, `item` is the updated record.
+- Partial consume: same `cookedMealId`, `portionsRemaining` reduced, `cookedMeals` and the new
+  `mealConsumptions` fact written (TASK-071), `removed: false`, `item` is the updated record.
 - Final serving: the record is removed from `cookedMeals` and `deletions.cookedMeals[<id>]` gets an
-  ISO timestamp tombstone (both fieldPaths written); `removed: true`, `item: null`. The id is
+  ISO timestamp tombstone (plus the `mealConsumptions` fact, all in one write); `removed: true`, `item: null`. The id is
   retired — a later `get_ready_food` no longer lists it and a later consume returns `not_found`.
 - Errors surface as tool errors with `isError: true`: `revision_conflict`, `insufficient_servings`
   (with the remaining count), `not_found`, and the domain validation message (including untracked
@@ -187,6 +187,37 @@ write, or generic mutation tool exists.
   unsafe.** Re-sending a request with the same `expectedRevision` fails `revision_conflict` only
   because the first success advanced the revision; a replay with a freshly re-read revision
   consumes again. There is no automatic retry or reread-and-reapply inside the tool.
+
+## TASK-071 consume parity with `mealConsumptions` (local only — NOT deployed)
+
+Before TASK-071, `consume_ready_food` and `POST /v1/ready-food/consume` decremented / removed the
+cooked meal but wrote no consumption fact, so those consumes never reached the Life Ledger. They now
+match the app's "I ate / Used 1" path (`useCookedPortion()` + `recordMealConsumption()`).
+
+- ONE canonical operation, `readyFood.consumeReadyFood()`, owns validation, the serving count, the
+  pre-mutation snapshot, the fact, the decrement/removal and the tombstone. REST and MCP both call
+  it and `consumeWriteSpec()`; there is no second path. No new MCP tool, no input/result change,
+  no OAuth change (still `mealprep:write`).
+- Fact: the app's closed six-field schema `{ id, cookedMealId, recipeId, mealName,
+  portionsConsumed, consumedAt }` — no provenance field. `id` is `mc_<crypto.randomUUID()>`
+  (collision-checked against existing ids, 10 attempts, then fails loud). `consumedAt` is one ISO
+  instant generated once per command (the same instant is used for the tombstone).
+  `cookedMealId`, `recipeId` and `mealName` come from the batch BEFORE removal.
+- N servings in one command is ONE fact with `portionsConsumed = N` (the floored count: 2.9 -> 2),
+  never N facts (MEAL_LEDGER_SOURCE_CONTRACT_V1 allows 1..99 per fact -> `portionCount`).
+- Atomic write, one update-time-guarded PATCH and one revision +1. Partial: `cookedMeals`,
+  `mealConsumptions`. Final serving: `cookedMeals`, `deletions.cookedMeals`, `mealConsumptions`.
+  Any failure (conflict, validation, not found, insufficient servings, untracked batch, persistence)
+  leaves zero change — no fact, no tombstone — and nothing is retried.
+- Append-only: the bridge reads the whole `mealConsumptions` array (the read mask gained exactly
+  `mealConsumptions`), passes every existing record through untouched (no canonicalising, deduping
+  or reordering) and appends one. A present-but-non-array value is never overwritten; the consume
+  fails instead. A batch without a string `name` cannot be described by the closed schema, so (like
+  the app) it is refused rather than consumed without its fact.
+- **Known gap, not backfilled:** the one pre-fix production consume, the disposable TASK-070
+  acceptance record `cm_1791045734557_839`, has no matching fact. Current ready-food state is
+  correct; no safe historical reconstruction was attempted. Repo evidence does not prove it was the
+  only production consume.
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
