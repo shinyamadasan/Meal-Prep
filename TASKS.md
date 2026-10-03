@@ -5547,6 +5547,85 @@ merge/deployment gate:
 
 ---
 
+### TASK-071 · consume_ready_food mealConsumptions parity
+status: codex
+owner: claude (planning) → codex (implementation)
+risk: STRICT (red-zone, D-032): canonical append-only history, cross-field atomic persistence,
+  destructive final-serving path, stable event identity, revision/concurrency semantics,
+  Firestore field-mask expansion.
+source: owner "TASK-071 — MCP CONSUME PARITY WITH mealConsumptions" (2026-10-03). Supersedes the
+  earlier uncommitted `set_inventory_quantity` TASK-071 plan, which was never committed. That tool
+  is the next planned inventory task AFTER this one (no task id reserved yet).
+depends-on: TASK-069, TASK-070 (both `done`).
+files: workers/conversational-bridge/src/operations/readyFood.js (canonical operation);
+  src/firestore.js (read mask + `mealConsumptions` decode); src/index.js (REST consume route uses
+  the canonical op); src/mcp.js (adapter delegates to the canonical op); test/operations.node.js,
+  test/firestore.node.js, test/mcp-consume.node.js, test/mcp.node.js, test/consistency.node.js
+  and test/support/* only as needed; workers/conversational-bridge/README.md; CHANGELOG.md;
+  TEST_REPORT.md; TASKS.md status field. Expected ZERO changes to src/oauth.js, src/mcpAuth.js,
+  app UI, OAuth scopes, Cloudflare routing, secrets, dependencies.
+branch: task-071 (isolated worktree, from the planning commit on main)
+
+live-inspection findings (verified against `main` @ d81e103):
+  - The app's canonical "Used 1" path (`useCookedPortion` -> `recordMealConsumption`) appends one
+    immutable fact `{id, cookedMealId, recipeId, mealName, portionsConsumed, consumedAt}` together
+    with the batch decrement/removal. Closed six-field schema (`canonicalizeMealConsumption`);
+    `portionsConsumed` integer 1..99; id `mc_<crypto.randomUUID()>`; recipeId/mealName snapshotted
+    from the batch BEFORE removal. LEDGER_CONTRACT.md + ChronaSense
+    MEAL_LEDGER_SOURCE_CONTRACT_V1.md allow `portionsConsumed` 1..99 as ONE fact -> `portionCount`.
+  - The bridge `consumePortions()` mutated cookedMeals (+ tombstone) but wrote NO consumption
+    fact: MCP/REST consumes were invisible to the Life Ledger. That is the defect.
+  - The bridge field mask was `pantry, cookedMeals, deletions, version`; `mealConsumptions` was
+    neither read nor written.
+  - Exactly one known pre-fix production consume: disposable acceptance record
+    `cm_1791045734557_839` (TASK-070 acceptance). NOT backfilled; its fact stays absent.
+
+objective:
+  ONE canonical Worker operation owns: validate the batch, resolve the canonical consumed serving
+  count, snapshot cookedMealId/recipeId/mealName from the PRE-mutation record, create ONE
+  `mealConsumptions` fact (mc_<UUID>, one ISO instant generated once), decrement/remove
+  cookedMeals, and tombstone on the final serving. REST `/v1/ready-food/consume` and MCP
+  `consume_ready_food` both delegate to it. No second business-logic path, no new MCP tool, no
+  contract change to `consume_ready_food` input/result, no OAuth change.
+
+semantics:
+  - N servings in one command -> ONE fact, `portionsConsumed` = floored/validated N (2.9 -> 2).
+  - Success is ONE update-time-guarded PATCH and ONE revision +1.
+    Partial: fieldPaths `cookedMeals`, `mealConsumptions` (+ version).
+    Final:   fieldPaths `cookedMeals`, `deletions.cookedMeals`, `mealConsumptions` (+ version).
+  - Append-only: existing facts are passed through untouched (no canonicalize/dedupe/reorder);
+    exactly one fact appended; a collision-checked new id (<=10 attempts, then fail loud).
+  - A present-but-non-array `mealConsumptions` is NOT overwritten: the op fails, zero mutation.
+  - Any failure (conflict, validation, not found, insufficient, untracked, persistence) -> zero
+    cookedMeals / tombstone / fact change. No retries. No backfill.
+
+acceptance:
+  - [ ] Partial, multi-serving (2.9 -> one fact, portionsConsumed=2), final-serving (snapshot taken
+        pre-removal, tombstone, item=null/removed=true) all write exactly one fact, correct id
+        convention, valid ISO consumedAt, prior facts preserved byte-for-byte, revision +1.
+  - [ ] Concurrency: two same-revision calls -> one success, one conflict, exactly one fact, <=1
+        tombstone, revision +1 once, no retry.
+  - [ ] Stale revision / not found / insufficient / invalid input / untracked / persistence failure
+        -> zero new facts, zero mutation.
+  - [ ] Field mask gains exactly `mealConsumptions`; REST and MCP share the canonical operation.
+  - [ ] Four-tool MCP surface, record_ready_food, reads, OAuth unchanged.
+
+constraints: LOCAL ONLY. No push, deploy, production Firestore access, production consume, OAuth
+  change or backfill. Deterministic code only.
+
+verification:
+  - [ ] Focused parity, history, final-serving, concurrency, zero-fact tests; `npm run test:bridge`;
+        root `npm test` if AGENTS.md requires; `node --check`; `npm audit --omit=dev`; Wrangler
+        `--dry-run` only; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1` with
+        baseline comparison; `git diff --check`; delta secret scan; SELF_REVIEW.md; QA.md.
+
+merge/deployment gate:
+  Hand off at `status: review`. Red-zone under D-032: independent STRICT review; landing status
+  `approved` (held for owner merge), never `done`. Deployment and any production verification are
+  separate owner gates.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
