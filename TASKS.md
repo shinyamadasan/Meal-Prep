@@ -5148,16 +5148,20 @@ merge/deployment gate:
 ---
 
 ### TASK-069 · MCP FIRST-WRITE PILOT — authenticated `record_ready_food` write tool (Phase B2A)
-status: approved
+status: done
 owner: codex
 landed: `2026-10-02`, fast-forwarded onto `main` at `2020a1a9b887d42c50344106ff59df2e21c18e4b` after
   independent STRICT PASS (2 fix-first rounds) and explicit owner merge authorization.
 deployed: `2026-10-02`, owner-authorized, by Worker version `0b94a570-b196-499a-b411-5e6082060894`
   at 100% production traffic (rollback target `03a9032d-02c9-47a5-95be-524d07c97281`). Live
   verification confirmed the three-way scope split, REST/MCP isolation, and near-path closure all
-  landed correctly. Still `approved`, not `done` — this task's own merge/deployment gate reserves
-  `done` for completion of the first controlled production write, which remains separately gated
-  and has NOT occurred. `PRODUCTION_WRITE_COUNT=0`. See REVIEW.md and STATUS.md for the full record.
+  landed correctly.
+closed: `2026-10-02`, after the owner reports performing the first controlled production write
+  through the real ChatGPT connection — revision `29473` -> `29474`, one new `cookedMealId
+  cm_1790984064952_501`. **Owner-attested, NOT independently re-verified by this session**: doing
+  so would require either the owner's own linked OAuth credential or direct production Firestore
+  access, neither of which this session obtained or should obtain. See REVIEW.md and STATUS.md for
+  the full record, including the explicit limitation on the inventory-preservation evidence.
 source: direct owner governance transition, Phase B2A first-write approval (2026-10-01). This
   approval covers local implementation of exactly ONE real MCP write tool, its tests, and
   documentation. It does NOT authorize deployment, a real production write, additional write

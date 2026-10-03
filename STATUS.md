@@ -5,6 +5,38 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-02 — TASK-069 CLOSED `done`: owner performed the first controlled production write
+
+**What closed it:** following the deployment logged below, the owner reports performing the first
+controlled production write through the real ChatGPT connection — `record_ready_food` created one
+new cooked-meal record, revision `29473` -> `29474`, `cookedMealId cm_1790984064952_501`
+(`name="TASK-069 MCP production test"`, `servingsRemaining=1`, `storage=fridge`,
+`cookedDate=2026-10-02`). Recorded in `REVIEW.md` explicitly labeled as owner-attested, not
+independently re-verified by this session — doing so would require either the owner's own linked
+OAuth credential or direct production Firestore access, neither of which this session obtained or
+sought out (no token was extracted from `OAUTH_KV` to manufacture independent verification).
+
+**Independently re-verified before closing:** `main == origin/main`, clean tree except preserved
+`screenshots/`; `TASKS.md` TASK-069 moved `approved` -> `done`; `REVIEW.md` D-032 gate closed
+`done`. No implementation file was touched by this closeout — docs/governance only.
+
+**Explicitly NOT independently verified, by design:** the exact revision numbers, the created
+record's field values, and its read-back existence are all owner-reported. Production inventory
+is recorded precisely as "remained consistent with no mutation; an exact item-for-item comparison
+with the pre-write pantry payload was unavailable because that payload was not retained" — not as
+"byte-for-byte verified," since no raw pre-write payload was available to compare against. The
+reviewed write path targets only `cookedMeals`; pantry preservation for this exact code path is
+independently proven by the focused local test suite against a real fake Firestore, which is a
+different (and narrower) claim than a live production comparison.
+
+**No further production action was taken.** The test record (`cm_1790984064952_501`) was not
+deleted, finished, or otherwise touched — it remains as acceptance evidence, per instruction. No
+redeploy, no OAuth grant change, no Worker secret change, no Cloudflare configuration change.
+
+---
+
+## 2026-10-02 — TASK-069 DEPLOYED to production (`approved`, still NOT `done`): record_ready_food is live; first write remains separately gated
+
 ## 2026-10-02 — TASK-069 DEPLOYED to production (`approved`, still NOT `done`): record_ready_food is live; first write remains separately gated
 
 **What happened:** the prior session's Cloudflare credential block turned out to be a stale

@@ -118,11 +118,49 @@ step-up smoke test was not run — no legitimate read-only OAuth credential was 
 session without extracting one from KV or asking the owner to act as a credential courier, and
 both were correctly out of scope rather than worked around.
 
-`PRODUCTION_WRITE_COUNT` remains `0`. No write grant was created, no ChatGPT re-consent occurred,
-no production Firestore access of any kind took place, and `record_ready_food` was never invoked.
-**`done` is still deliberately withheld** — per this task's own gate language — for whatever later,
-separately-approved task actually performs the first controlled production write; this deployment
-is not that approval, and this status does not imply it.
+`PRODUCTION_WRITE_COUNT` remains `0` as of this deployment addendum. No write grant was created, no
+ChatGPT re-consent occurred, no production Firestore access of any kind took place, and
+`record_ready_food` was never invoked **by this session**. `done` was deliberately withheld here —
+per this task's own gate language — pending the one remaining, separately-approved step: the first
+controlled production write itself.
+
+### Closeout addendum — 2026-10-02, first controlled production write — OWNER-ATTESTED, NOT
+INDEPENDENTLY RE-VERIFIED BY THIS SESSION
+The owner reports performing the first controlled production write through the real ChatGPT
+connection (the separate, write-scoped consent this task always reserved as a distinct owner
+decision, never something this session was authorized to exercise itself):
+- revision `29473` -> `29474`
+- one new `cookedMealId cm_1790984064952_501`: `name="TASK-069 MCP production test"`,
+  `servingsRemaining=1`, `trackedPortions=true`, `storage=fridge`, `cookedDate=2026-10-02`,
+  `recipeId=null`
+- read-back: current revision `29474`; the created `cookedMealId` exists exactly once; values
+  match the requested write; the pre-existing "Chicken w/ taco seasoning" record remains present;
+  no second write and no retry occurred
+
+**This specific claim is recorded as relayed, not independently checked** — the same posture this
+file already took for TASK-068's live ChatGPT read acceptance. Independently verifying it would
+require either the owner's own linked OAuth access token or direct production Firestore access;
+this session has neither, was never given one, and did not seek one out (in particular, did not
+extract or reuse any token from `OAUTH_KV` to manufacture its own verification — that would defeat
+the owner-only boundary this task exists to enforce). No read-only OAuth smoke test was available
+either, for the identical reason recorded in the deployment addendum above.
+
+**Production inventory evidence, stated precisely rather than overclaimed:** production inventory
+remained consistent with no mutation; an exact item-for-item comparison with the pre-write pantry
+payload was unavailable because that payload was not retained in available context. The reviewed
+write path (`recordReadyFoodTool()` in `mcp.js`) targets only `fieldPaths: ['cookedMeals']`, never
+`pantry`, and the focused local test suite (`test/mcp-write.node.js`, "record_ready_food only ever
+appends — an existing cookedMeals record and pantry are both left untouched") independently proves
+pantry preservation for this exact code path against a real in-memory fake Firestore. This is not
+a byte-for-byte production comparison, and is not represented as one.
+
+### D-032 gate — `done`
+All of this task's own completion conditions are now satisfied: implementation independently
+reviewed (PASS, 2 fix-first rounds), merged, deployed, and the first controlled production write
+succeeded with a verified (owner-attested) read-back. `TASKS.md` TASK-069 moves `approved` ->
+`done`. The test record created above (`cm_1790984064952_501`) is retained as acceptance evidence
+and was NOT deleted, finished, or otherwise touched by this closeout — no further production
+action was taken in this session beyond the documentation recorded here.
 
 ---
 ## Review TASK-068 — Authenticated MCP real-data read layer — PASS (STRICT) -> landed (Phase B1 provisioning in progress)
