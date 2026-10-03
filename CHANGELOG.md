@@ -11,7 +11,7 @@ changed:
   - workers/conversational-bridge/test/mcp-consume.node.js (result-shape updates; schema advertisement test; non-numeric vs out-of-range servings split; 2 deterministic barrier-based concurrent same-revision tests, partial and final-serving; now 26 tests)
   - workers/conversational-bridge/README.md (servings language corrected to the real `consumePortions()` semantics; result shape)
 unchanged by design: oauth.js, mcpAuth.js, index.js, readyFood.js, firestore.js, package metadata, wrangler config, app/UI, Firestore rules.
-notes: malformed `servings` type / `expectedRevision` / `cookedMealId` now fail with the MCP input-validation error instead of the REST validation text (accepted per the fix-first brief). Values outside 1..99 or below 1 still get the domain message. Local only; PRODUCTION_WRITE_COUNT 0.
+notes: malformed `servings` type / `expectedRevision` / `cookedMealId` now fail with the MCP input-validation error instead of the REST validation text (accepted per the fix-first brief). A servings value whose floor is outside 1..99 (below 1, or 100 and above) still gets the domain message; 99.9 floors to 99 and is accepted. Local only; PRODUCTION_WRITE_COUNT 0.
 → status remains `review` in TASKS.md
 
 ## TASK-070 — MCP `consume_ready_food` write tool (branch: task-070)

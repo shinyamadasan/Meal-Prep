@@ -346,6 +346,16 @@ test('fractional servings >= 1 are floored by the domain exactly as REST does (2
   assert.equal(fake.store.fields.cookedMeals[0].portionsRemaining, 1);
 });
 
+test('upper edge: 99.9 floors to 99 before the 1..99 check and consumes 99 (record of 99 is fully consumed)', async () => {
+  const big = Object.assign({}, MEAL, { id: 'meal-big', portionsRemaining: 99 });
+  const { fake, call } = bridge({ version: 0, pantry: PANTRY, cookedMeals: [big, OTHER] });
+  const message = await responseMessage(await call({ cookedMealId: 'meal-big', servings: 99.9, expectedRevision: 0 }));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message));
+  assert.deepEqual(message.result.structuredContent, { ok: true, revision: 1, item: null, removed: true });
+  assert.deepEqual(fake.store.fields.cookedMeals, [OTHER]);
+  assert.deepEqual(Object.keys(fake.store.fields.deletions.cookedMeals), ['meal-big']);
+});
+
 // ── ERROR MAPPING ────────────────────────────────────────────────────────────
 
 test('over-consume maps to insufficient_servings with the remaining count and zero mutation', async () => {

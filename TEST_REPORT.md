@@ -5,6 +5,10 @@
 
 ---
 
+## TASK-070 servings-wording correction · 2026-10-03
+suite: `node --test test/mcp-consume.node.js` (27/27); `npm test` in workers/conversational-bridge (140 tests, 140 pass, 0 fail, 0 skipped); `node --check` on src/mcp.js and test/mcp-consume.node.js; `git diff --check`; delta secret scan.
+result: pass. Docs/comment/test-only correction: servings is floored first, then the floored value must be 1..99 (99.9 consumes 99, 100 rejected). New edge test proves 99.9 -> 99. No runtime change. Root Playwright (711) not rerun: no app, UI or Playwright file is touched.
+
 ## TASK-070 fix-first corrections · 2026-10-02
 suite: `node --test test/mcp-consume.node.js` (26/26); `npm test` in workers/conversational-bridge (139 tests, 139 pass, 0 fail, 0 skipped); root `npm test` = `playwright test --project=local` (711 passed, 0 failed, 0 skipped, 0 flaky, 2.1m); `node --check` on src/mcp.js and test/mcp-consume.node.js; `npm audit --omit=dev` (0 vulnerabilities); `npx wrangler deploy --dry-run --config wrangler.jsonc` (validate only, not deployed); `tools/Verify-Decisions.ps1` (110 pointers hold); `tools/Check-DocsConsistency.ps1` (51 findings on the branch and 51 on base bc17678, output byte-identical, so pre-existing); `git diff --check` clean; delta secret scan clean.
 concurrency: two tests (partial and final-serving) start two consume calls from expectedRevision 0 behind a promise barrier that holds every document PATCH until both document GETs finish. Observed: 2 PATCHes with the same currentDocument.updateTime precondition, 1 successful, 1 revision_conflict, revision advanced 0 -> 1 exactly once, one serving consumed (partial) or one tombstone (final), no third PATCH (no retry), pantry and unrelated record unchanged. No sleeps.

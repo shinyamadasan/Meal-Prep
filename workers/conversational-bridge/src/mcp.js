@@ -94,9 +94,9 @@ function recordReadyFoodInputSchema() {
 }
 
 // Typed and required, so the public tool schema truthfully advertises the contract. servings is
-// deliberately z.number() and NOT .int(): consumePortions() floors fractional values >= 1 (2.9
-// consumes 2) and rejects values outside 1..99 with its own validation error, so the domain stays
-// authoritative for consumption semantics. strictObject guarantees no uid/path/collection/
+// deliberately z.number() and NOT .int(): consumePortions() floors the value first (2.9 consumes
+// 2, 99.9 consumes 99) and then rejects a floored value outside 1..99 with its own validation
+// error, so the domain stays authoritative for consumption semantics. strictObject guarantees no uid/path/collection/
 // operation key can reach the domain function.
 function consumeReadyFoodInputSchema() {
   return z.strictObject({

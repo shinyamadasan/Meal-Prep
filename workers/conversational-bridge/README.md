@@ -165,10 +165,11 @@ write, or generic mutation tool exists.
   collection, document, operation selector, or caller-supplied deletion map is rejected before any
   Firestore access, and a non-numeric `servings` or a malformed `expectedRevision` is rejected by
   the tool schema (an "input validation error") before any Firestore access.
-- `servings` semantics come from `consumePortions()` and are unchanged: the value must be a number
-  of at least 1 and at most 99; a fractional value of 1 or more is floored (2.9 consumes 2); a value
-  below 1 (or above 99) is rejected with the domain validation error. `servings` is therefore
-  advertised as a plain number, not an integer.
+- `servings` semantics come from `consumePortions()` and are unchanged: the value must be a finite
+  number, the domain floors it first, and the floored value must be between 1 and 99 inclusive.
+  So for positive input, 1 <= servings < 100 is accepted (2.9 consumes 2; 99.9 consumes 99), while
+  anything below 1 or 100 and above is rejected with the domain validation error. `servings` is
+  therefore advertised as a plain number, not an integer.
 - Result: `item` is the resulting canonical ready-food item (including its stable `cookedMealId`)
   after a partial consume, and `null` when the final serving removed the record (`removed: true`).
 - Auth: unchanged. Requires `mealprep:write` via `requireMcpWriteContext`; the OAuth layer was not
