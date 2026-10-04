@@ -5626,6 +5626,119 @@ merge/deployment gate:
 
 ---
 
+### TASK-072 · MCP STOCK-STATE TOOLS — authenticated `mark_out_of_stock` + `mark_in_stock`
+status: todo
+owner: claude (planning) → codex (on owner build authorization)
+hold: PLANNING ONLY. Implementation is NOT authorized by this entry. The owner flips `status:` to
+  `codex` to release it. Deployment and any production write/verification are separate owner gates.
+risk: STRICT (red-zone, D-032): first pantry WRITE reachable from ChatGPT; one tool can tombstone a
+  real inventory row; widens what the existing `mealprep:write` scope can do.
+source: owner "NEXT PHASE — FRICTION-FIRST INVENTORY + LEFTOVERS / OUTSIDE-FOOD AUDIT" (2026-10-03),
+  selected by chaos-test evidence: "We're out of milk." / "I threw the expired milk away." /
+  "I used the last of <non-staple|staple>." / "I restocked the rice." — five chaos cases that need
+  ZERO new domain behavior, because both canonical operations already exist and are reviewed.
+depends-on: TASK-065 (REST `inventory.markOutOfStock` / `inventory.markInStock` operations are on
+  `main`; this task does NOT touch TASK-065's status), TASK-069, TASK-070, TASK-071 (all `done`).
+files: workers/conversational-bridge/src/mcp.js (two tool registrations + handlers + error mapping);
+  test/mcp-*.node.js (new `mcp-stock-state.node.js`), test/mcp.node.js (tool-list assertion
+  four -> six), test/support/* only as needed; workers/conversational-bridge/README.md;
+  docs/DECISIONS.md (one addendum to D-082, see constraints); CHANGELOG.md; TEST_REPORT.md;
+  TASKS.md status field. Expected ZERO changes to src/operations/inventory.js, src/firestore.js,
+  src/index.js REST routes, src/oauth.js, src/mcpAuth.js, app.js/index.html/style.css, OAuth
+  scopes, Cloudflare routing, secrets, dependencies.
+branch: task-072 (isolated worktree off the planning commit on main)
+
+live-inspection findings (verified against `main` @ 7e6bd12):
+  - `operations/inventory.js` already implements `markOutOfStock(pantry, deletionsPantry, {ingredientId})`
+    (staple -> `stockLevel:'empty'`; non-staple -> remove + explicit `deletions.pantry` tombstone;
+    already-empty / already-tombstoned -> deterministic `unchanged:true` success; staple flag absent
+    and category != 'pantry' -> `AmbiguousError`, refuse) and `markInStock(pantry, {ingredientId})`
+    (staples only; non-staple -> `ValidationError`; already full -> `unchanged:true`).
+  - REST routes `/v1/inventory/mark-out-of-stock` and `/v1/inventory/mark-in-stock` (index.js
+    ROUTES) already write via ONE guarded PATCH: `['pantry']` or `['pantry','deletions.pantry']`.
+  - The MCP surface is exactly four tools today (get_inventory, get_ready_food, record_ready_food,
+    consume_ready_food). No inventory write is reachable from ChatGPT.
+  - `mcp.js` error mapping handles RevisionConflict / InsufficientServings / NotFound / Validation
+    only. `AmbiguousError` (code `ambiguous`) would fall through to the generic failure string.
+    That MUST be mapped explicitly — it is the safety signal for "ask the user", not an outage.
+  - The firestore field mask already includes `pantry` and `deletions`; no firestore.js change.
+  - Client side effects NOT reproduced (by design, D-082 #4 one-collection rule): the client's
+    `correctKitchenStock()` also clears `groceryList[].stocked` receipts and calls
+    `syncStapleToGrocery()`. The app's load-time `checkAndReplenishLowStock()` + `saveData()`
+    reconciles the grocery list on next open. This is eventual, accepted, and must be documented.
+
+objective:
+  Expose the two EXISTING canonical stock-state operations as two thin MCP adapters, with the same
+  adapter pattern TASK-069/070 used (auth -> expectedRevision shape -> read -> compare revision ->
+  call the canonical operation -> ONE guarded write -> sanitized result). No business logic in
+  mcp.js. Two separate semantic tools; NO generic `mutate_inventory`.
+
+tool contracts:
+  - `mark_out_of_stock`  input `{ ingredientId: string(min 1), expectedRevision: int>=0 }` (strict).
+    Result `{ ok:true, revision, item: inventoryItem|null, unchanged: boolean, removed: boolean }`.
+    Annotations: readOnlyHint false, destructiveHint TRUE (non-staple removal tombstones the row),
+    idempotentHint TRUE (replay converges: staple already empty -> unchanged; row already
+    tombstoned -> unchanged+removed), openWorldHint false.
+  - `mark_in_stock`      input `{ ingredientId: string(min 1), expectedRevision: int>=0 }` (strict).
+    Result `{ ok:true, revision, item: inventoryItem, unchanged: boolean }`.
+    Annotations: destructiveHint false, idempotentHint true. This is the inverse of the staple path
+    of mark_out_of_stock and is included so a mistaken "out of" on a staple is reversible through
+    the same surface (a non-staple removal is NOT reversible through any tool — say so in the
+    mark_out_of_stock description).
+  - Descriptions must tell the model: take `ingredientId` ONLY from `get_inventory`; never guess
+    or fuzzy-match; if more than one row matches the user's words (e.g. two "chicken" rows) ASK
+    which; on `ambiguous` ask the user to set the staple flag in the app; on `revision_conflict`
+    re-read before deciding whether to retry; non-staple removal is permanent from ChatGPT.
+
+acceptance:
+  - [ ] Tool list is exactly six: get_inventory, get_ready_food, record_ready_food,
+        consume_ready_food, mark_out_of_stock, mark_in_stock. Schemas strict; unknown keys
+        (uid/path/collection/quantity/unit) rejected before any Firestore read.
+  - [ ] Both tools call `inventory.markOutOfStock` / `inventory.markInStock` unchanged; a grep-level
+        test proves mcp.js contains no staple classification, tombstone, or pantry-array logic.
+  - [ ] Parity matrix, MCP vs REST, byte-identical results and write specs for: staple -> empty;
+        staple already empty (unchanged, NO write, NO revision bump); non-staple -> removed +
+        tombstone (`deletions.pantry[id]` ISO string, field paths `pantry`+`deletions.pantry`);
+        already tombstoned -> unchanged+removed; unknown id -> `not_found`; staple flag absent +
+        category not pantry -> `ambiguous` mapped to a distinct, model-actionable message,
+        zero write; mark_in_stock on non-staple -> validation error, zero write; already full ->
+        unchanged, zero write.
+  - [ ] Concurrency: two same-revision calls -> exactly one success, one `revision_conflict`,
+        revision +1 once, at most one tombstone, no retry. Stale revision -> zero mutation.
+  - [ ] Chaos: duplicate-name rows (two "chicken" rows) — the tool acts on exactly the named id and
+        leaves the other row byte-identical; numeric/float pantry ids round-trip through
+        `ingredientId`; Firestore persistence failure -> zero mutation, sanitized message.
+  - [ ] Auth: read-scope-only token rejected with the write-scope challenge for both tools; no
+        token -> 401 challenge; no OAuth/scope/discovery change (mcpAuth.js, oauth.js diff empty).
+  - [ ] REST routes and the four existing MCP tools behave exactly as before (existing suites green).
+  - [ ] README documents: six tools, the eventual grocery-list reconciliation on next app open,
+        the permanence of non-staple removal, and that `mealprep:write` now also covers pantry
+        stock-state writes.
+
+constraints: LOCAL ONLY. No push, deploy, production Firestore access, production write, OAuth
+  change or secret change. Deterministic code only; no natural-language parsing in the Worker.
+  The owner-visible scope decision is RECORDED, not re-litigated: keep the single existing
+  `mealprep:write` scope (single-account personal Worker; a new scope would force an OAuth re-link
+  and change provider tests) — add a short D-082 addendum stating the scope now spans cookedMeals
+  AND pantry stock-state writes. If the Builder believes a separate scope is required, STOP and
+  set `status: blocked` rather than deciding. Do not add `set_inventory_quantity`, add/consume
+  stock, create-item, or any leftovers/external-meal behavior (separate future tasks).
+
+verification:
+  - [ ] Focused new suite + `npm run test:bridge` (record exact pass/fail; must be >= current
+        baseline); `node --check` on touched files; `npm audit --omit=dev`; Wrangler `--dry-run`
+        only; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1` with baseline
+        comparison; `git diff --check`; delta secret scan; root `npm test` if AGENTS.md requires;
+        SELF_REVIEW.md; QA.md.
+
+merge/deployment gate:
+  Hand off at `status: review`. Red-zone under D-032: independent STRICT review; landing status
+  `approved` (held for owner merge), never `done`. Deployment, ChatGPT tool-list refresh and any
+  production acceptance (use a DISPOSABLE staple/non-staple row, never a real one) are separate
+  owner gates.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
