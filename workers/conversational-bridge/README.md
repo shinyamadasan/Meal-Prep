@@ -219,6 +219,41 @@ match the app's "I ate / Used 1" path (`useCookedPortion()` + `recordMealConsump
   correct; no safe historical reconstruction was attempted. Repo evidence does not prove it was the
   only production consume.
 
+## TASK-072 authenticated MCP pantry stock state (local only — NOT deployed)
+
+Two model-visible tools expose the existing canonical pantry stock-state operations, bringing the
+surface to exactly six: `get_inventory`, `get_ready_food`, `record_ready_food`,
+`consume_ready_food`, `mark_out_of_stock`, and `mark_in_stock`.
+
+| Tool | Existing canonical mapping | Result |
+|---|---|---|
+| `mark_out_of_stock` | `inventory.markOutOfStock()` -> the same guarded pantry / deletion-field write used by `POST /v1/inventory/mark-out-of-stock` | `{ ok, revision, item, unchanged, removed }` |
+| `mark_in_stock` | `inventory.markInStock()` -> the same guarded pantry write used by `POST /v1/inventory/mark-in-stock` | `{ ok, revision, item, unchanged }` |
+
+- Both accept exactly `ingredientId` (a non-empty string copied from `get_inventory`) and
+  `expectedRevision` (a non-negative integer). Their strict schemas reject caller-selected uid,
+  path, collection, document, staple flag, fields, operation, quantity, unit, and other extras
+  before Firestore access.
+- Both require the existing `mealprep:write` scope. That scope now covers cooked-meal writes and
+  pantry stock-state writes; OAuth scope names, discovery, consent, and grant behavior are
+  unchanged.
+- `mark_out_of_stock` keeps a staple row and sets its stock state to empty. A non-staple row is
+  permanently removed from the ChatGPT tool surface and receives a pantry tombstone; no MCP tool
+  can recreate it. An unresolved staple classification returns `ambiguous` without writing and
+  tells the caller to have the user set the staple flag in the app.
+- `mark_in_stock` applies only to an existing staple and sets its stock state to full. It does not
+  create items, restore removed non-staples, change quantities, or remove tombstones.
+- Already-empty, already-tombstoned, and already-full requests preserve the canonical unchanged
+  result: no patch and no revision bump. Mutations use one update-time-guarded patch and one
+  revision increment; stale requests return `revision_conflict` and are never retried.
+- The app's `correctKitchenStock()` also clears matching grocery purchase receipts and runs staple
+  grocery reconciliation. MCP deliberately touches only the canonical pantry/deletion fields;
+  `checkAndReplenishLowStock()` plus `saveData()` reconciles the grocery list when the app next
+  opens. This eventual reconciliation is the accepted D-082 one-collection boundary.
+- Both tools declare `idempotentHint: true`: replay with a freshly read revision converges to the
+  canonical unchanged state; replay with the old revision conflicts. `mark_out_of_stock` is
+  destructive because its non-staple path removes and tombstones the row; `mark_in_stock` is not.
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
@@ -401,14 +436,14 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
   is checked the same way, by a small helper mirroring `index.js`'s own shape check, so both
   surfaces reject it with the same message before any Firestore read.
 
-## Not in v1 (by design — see D-082) / not in Phase B2A (by design — see TASKS.md TASK-069)
+## Not in v1 (by design — see D-082)
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
 UI). No Plan/Shop/Prep tools. No recipe generation. There is no natural-language parsing inside
-the Worker. Beyond the single TASK-069 `record_ready_food` pilot, no `consume`, `finish`, or
-inventory write is exposed as an MCP tool, and no second write tool exists — one write tool only,
-for this phase. No generic "execute"/"patch"/"update document" tool exists or is planned; no
-caller-selected Firestore field or path is accepted under any name.
+the Worker. No `set_inventory_quantity`, add-stock, consume-stock, finish, create-item, shopping,
+or generic inventory-mutation tool is exposed through MCP. No generic "execute"/"patch"/"update
+document" tool exists or is planned; no caller-selected Firestore field or path is accepted under
+any name.
 
 ## Operations: rotation, revocation, emergency stop
 
