@@ -5,6 +5,20 @@
 
 ---
 
+## TASK-073 — review (branch: task-073)
+changed:
+  - workers/conversational-bridge/src/mcp.js (registered strict `set_inventory_quantity` tool: write-scope auth, revision guard, one guarded pantry write, sanitized errors via the shared stock-state mapper incl. `ambiguous`)
+  - workers/conversational-bridge/src/operations/inventory.js (additive `setCountedQuantity()` wrapper: quantity > 0, existing row, non-staple only, no unit passed; delegates to the unchanged `setQuantity()`)
+  - workers/conversational-bridge/test/mcp-set-quantity.node.js (17 focused auth, schema, over-posting, zero/staple/ambiguous, unit-preservation, revision, race, same-value, parity, persistence-failure and no-logic-in-mcp.js cases)
+  - workers/conversational-bridge/test/mcp.node.js, test/mcp-stock-state.node.js, test/mcp-consume.node.js (tool-list assertions six -> seven only)
+  - workers/conversational-bridge/README.md, docs/DECISIONS.md (D-082 absolute-count addendum)
+decisions made here:
+  - same-value set verified as a real write (updatedAt stamp + revision +1), so it is NOT collapsed into an unchanged no-op; this keeps REST parity.
+  - annotations: readOnly false, destructive false (overwrite only; no delete/tombstone), idempotent true (absolute target converges; old-revision replay conflicts), openWorld false.
+  - staple and ambiguous rows refused; zero refused (no silent translation to out-of-stock); no unit input.
+not changed: setQuantity() body, REST routes, firestore.js, oauth.js, mcpAuth.js, scopes, app UI/CSS, dependencies, config, secrets.
+not done by design: no merge, push, deploy, production access or production write.
+
 ## TASK-072 — done (branch: task-072)
 changed:
   - workers/conversational-bridge/src/mcp.js (registered strict `mark_out_of_stock` and `mark_in_stock` tools; write-scope auth, revision guard, canonical operation delegation, guarded writes, no-op handling, sanitized errors, and explicit `ambiguous` mapping)
