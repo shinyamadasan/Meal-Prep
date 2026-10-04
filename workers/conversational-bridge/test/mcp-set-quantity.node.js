@@ -12,7 +12,7 @@ const NAME = 'set_inventory_quantity';
 const READY_FOOD = [{ id: 'meal-1', name: 'Chili', portionsRemaining: 2, storage: 'fridge' }];
 const HISTORY = [{ id: 'mc-1', cookedMealId: 'meal-1', portionsConsumed: 1 }];
 const EGGS = { id: 'eggs', name: 'Eggs', quantity: 12, unit: 'pcs', staple: false, updatedAt: '2026-01-01T00:00:00.000Z' };
-const VALID = { ingredientId: 'eggs', quantity: 7, expectedRevision: 0 };
+const VALID = { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: 0 };
 const NO_ACCESS = { token: 0, read: 0, write: 0, fetch: 0 };
 
 function mcpRequest(body, { authorization = 'Bearer oauth-test-token' } = {}) {
@@ -109,7 +109,7 @@ function text(message) {
   return message.result.content[0].text;
 }
 
-test('tools/list exposes exactly seven tools; set_inventory_quantity has a strict unit-less schema', async () => {
+test('tools/list exposes exactly seven tools; set_inventory_quantity has a strict schema with an expectedUnit precondition and no unit', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(1, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
   );
@@ -125,14 +125,18 @@ test('tools/list exposes exactly seven tools; set_inventory_quantity has a stric
   assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'ingredientId', 'quantity']);
-  assert.deepEqual([...tool.inputSchema.required].sort(), ['expectedRevision', 'ingredientId', 'quantity']);
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
+  assert.deepEqual([...tool.inputSchema.required].sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
   assert.equal(tool.inputSchema.properties.quantity.exclusiveMinimum, 0);
   assert.equal(tool.inputSchema.properties.expectedRevision.minimum, 0);
-  assert.deepEqual(tool.annotations, { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+  assert.deepEqual(tool.annotations, { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false });
   assert.match(tool.description, /ABSOLUTE/);
   assert.match(tool.description, /mark_out_of_stock/);
   assert.match(tool.description, /never converts/);
+  assert.match(tool.description, /expectedUnit/);
+  assert.match(tool.description, /0\.65kg chicken" -> do NOT send quantity=0\.65/);
+  assert.match(tool.description, /unit_mismatch/);
+  assert.equal(tool.inputSchema.properties.expectedUnit.minLength, 1);
   assert.match(tool.description, /I bought\/used\/added N" is NOT supported/);
   assert.match(tool.description, /revision_conflict/);
 });
@@ -173,19 +177,19 @@ test('over-posting and malformed inputs are rejected before Firestore access', a
     assert.deepEqual(result.calls, NO_ACCESS, field);
   }
   for (const args of [
-    { quantity: 7, expectedRevision: 0 },
-    { ingredientId: 'eggs', expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: 7 },
-    { ingredientId: 'eggs', quantity: 7, expectedRevision: -1 },
-    { ingredientId: 'eggs', quantity: 7, expectedRevision: 0.5 },
-    { ingredientId: 'eggs', quantity: 7, expectedRevision: '0' },
-    { ingredientId: '', quantity: 7, expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: 0, expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: -3, expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: '7', expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: { value: 7 }, expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: null, expectedRevision: 0 },
-    { ingredientId: 'eggs', quantity: [7], expectedRevision: 0 }
+    { quantity: 7, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs' },
+    { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: -1 },
+    { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: 0.5 },
+    { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: '0' },
+    { ingredientId: '', quantity: 7, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: 0, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: -3, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: '7', expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: { value: 7 }, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: null, expectedUnit: 'pcs', expectedRevision: 0 },
+    { ingredientId: 'eggs', quantity: [7], expectedUnit: 'pcs', expectedRevision: 0 }
   ]) {
     const result = await rejected(NAME, args, contextWithScope([MCP_WRITE_SCOPE]));
     assert.match(text(result.message), /input validation error/i, JSON.stringify(args));
@@ -194,7 +198,7 @@ test('over-posting and malformed inputs are rejected before Firestore access', a
 });
 
 test('zero steers to mark_out_of_stock; non-finite numbers never reach Firestore', async () => {
-  const zero = await rejected(NAME, { ingredientId: 'eggs', quantity: 0, expectedRevision: 0 }, contextWithScope([MCP_WRITE_SCOPE]));
+  const zero = await rejected(NAME, { ingredientId: 'eggs', quantity: 0, expectedUnit: 'pcs', expectedRevision: 0 }, contextWithScope([MCP_WRITE_SCOPE]));
   assert.match(text(zero.message), /mark_out_of_stock/);
   assert.deepEqual(zero.calls, NO_ACCESS);
 
@@ -235,25 +239,99 @@ test('valid set changes only that quantity, preserves id/unit/other rows, and bu
   assert.equal(JSON.stringify(fake.store.fields.deletions), deletions);
 });
 
-test('stored unit is preserved for g rows and null-unit rows; float quantity and numeric ids round-trip', async () => {
+test('stored unit is preserved; expectedUnit is never persisted; float quantity and numeric ids round-trip', async () => {
   const chicken = { id: 12.5, name: 'Chicken', quantity: 500, unit: 'g', staple: false };
-  const bare = { id: 'bare', name: 'Mystery', quantity: null, staple: false };
-  const { fake, call } = bridge({ pantry: [chicken, bare] });
-  const a = await responseMessage(await call(NAME, { ingredientId: '12.5', quantity: 650.5, expectedRevision: 0 }));
+  const { fake, call } = bridge({ pantry: [chicken] });
+  const a = await responseMessage(await call(NAME, { ingredientId: '12.5', quantity: 650.5, expectedUnit: 'g', expectedRevision: 0 }));
   assert.equal(a.result.structuredContent.item.unit, 'g');
   assert.equal(a.result.structuredContent.item.quantity, 650.5);
-  assert.equal(fake.store.fields.pantry[0].unit, 'g');
-  const b = await responseMessage(await call(NAME, { ingredientId: 'bare', quantity: 2, expectedRevision: 1 }));
-  assert.equal(b.result.structuredContent.item.unit, null);
-  assert.equal(Object.prototype.hasOwnProperty.call(fake.store.fields.pantry[1], 'unit'), false);
-  assert.equal(fake.store.fields.version, 2);
+  const row = fake.store.fields.pantry[0];
+  assert.equal(row.unit, 'g');
+  assert.equal(Object.prototype.hasOwnProperty.call(row, 'expectedUnit'), false);
+  assert.deepEqual(Object.keys(row).sort(), ['id', 'name', 'quantity', 'staple', 'unit', 'updatedAt']);
+  assert.equal(JSON.stringify(fake.store).includes('expectedUnit'), false);
+  assert.equal(fake.store.fields.version, 1);
+});
+
+test('unit precondition: only an exact stored-unit match writes; every mismatch is zero mutation', async () => {
+  const cases = [
+    ['A', 'g', 'g', true],
+    ['B', 'g', 'kg', false],
+    ['C', 'kg', 'g', false],
+    ['D', 'ml', 'L', false],
+    ['E', 'pieces', 'cans', false],
+    ['case', 'g', 'G', false],
+    ['space', 'g', ' g', false],
+    ['H stale chat assumption', 'g', 'lb', false]
+  ];
+  for (const [label, stored, expected, ok] of cases) {
+    const b = bridge({ pantry: [{ id: 'x', name: 'Item', quantity: 500, unit: stored, staple: false }] });
+    const before = JSON.stringify(b.fake.store);
+    const message = await responseMessage(await b.call(NAME, { ingredientId: 'x', quantity: 650, expectedUnit: expected, expectedRevision: 0 }));
+    if (ok) {
+      assert.equal(message.result.structuredContent.item.unit, stored, label);
+      assert.equal(b.fake.store.fields.pantry[0].quantity, 650, label);
+    } else {
+      assert.equal(message.result.isError, true, label);
+      assert.match(text(message), /^unit_mismatch:/, label);
+      assert.equal(JSON.stringify(b.fake.store), before, label);
+    }
+  }
+});
+
+test('F: blank, null, missing and non-string stored units are rejected with zero mutation', async () => {
+  for (const unit of [undefined, null, '', '   ', 7]) {
+    const row = { id: 'x', name: 'Item', quantity: 5, staple: false };
+    if (unit !== undefined) row.unit = unit;
+    for (const expectedUnit of ['pcs', 'g']) {
+      const b = bridge({ pantry: [row] });
+      const before = JSON.stringify(b.fake.store);
+      const message = await responseMessage(await b.call(NAME, { ingredientId: 'x', quantity: 2, expectedUnit, expectedRevision: 0 }));
+      assert.match(text(message), /^unit_mismatch:.*no stored unit/, String(unit));
+      assert.equal(JSON.stringify(b.fake.store), before);
+    }
+  }
+});
+
+test('I/J: unit mismatch with a current revision mutates nothing; correct unit with a stale revision is revision_conflict', async () => {
+  const b = bridge({ version: 3, pantry: [Object.assign({}, EGGS)] });
+  const before = JSON.stringify(b.fake.store);
+  const bad = await responseMessage(await b.call(NAME, { ingredientId: 'eggs', quantity: 7, expectedUnit: 'cans', expectedRevision: 3 }));
+  assert.match(text(bad), /^unit_mismatch:/);
+  assert.equal(JSON.stringify(b.fake.store), before);
+  const stale = await responseMessage(await b.call(NAME, { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: 2 }));
+  assert.match(text(stale), /^revision_conflict:/);
+  assert.equal(JSON.stringify(b.fake.store), before);
+});
+
+test('G: missing, empty and non-string expectedUnit fail the schema before Firestore; unit key is still rejected', async () => {
+  for (const extra of [{}, { expectedUnit: '' }, { expectedUnit: 5 }, { expectedUnit: null }, { expectedUnit: ['g'] }]) {
+    const args = Object.assign({ ingredientId: 'eggs', quantity: 7, expectedRevision: 0 }, extra);
+    const result = await rejected(NAME, args, contextWithScope([MCP_WRITE_SCOPE]));
+    assert.match(text(result.message), /input validation error/i, JSON.stringify(extra));
+    assert.deepEqual(result.calls, NO_ACCESS);
+  }
+  const withUnit = await rejected(NAME, Object.assign({}, VALID, { unit: 'kg' }), contextWithScope([MCP_WRITE_SCOPE]));
+  assert.match(text(withUnit.message), /input validation error/i);
+  assert.deepEqual(withUnit.calls, NO_ACCESS);
+});
+
+test('idempotentHint reasoning: an exact replay with the SAME arguments (same expectedRevision) has no additional effect', async () => {
+  const b = bridge({ pantry: [Object.assign({}, EGGS)] });
+  const args = { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: 0 };
+  const first = await responseMessage(await b.call(NAME, args));
+  assert.equal(first.result.structuredContent.revision, 1);
+  const afterFirst = JSON.stringify(b.fake.store);
+  const replay = await responseMessage(await b.call(NAME, args));
+  assert.match(text(replay), /^revision_conflict:/);
+  assert.equal(JSON.stringify(b.fake.store), afterFirst);
 });
 
 test('duplicate-name rows: only the named id changes', async () => {
   const a = { id: 'a', name: 'Chicken', quantity: 1, unit: 'lb', staple: false };
   const b = { id: 'b', name: 'Chicken', quantity: 650, unit: 'g', staple: false };
   const { fake, call } = bridge({ pantry: [a, b] });
-  await call(NAME, { ingredientId: 'b', quantity: 700, expectedRevision: 0 });
+  await call(NAME, { ingredientId: 'b', quantity: 700, expectedUnit: 'g', expectedRevision: 0 });
   assert.deepEqual(fake.store.fields.pantry[0], a);
   assert.equal(fake.store.fields.pantry[1].quantity, 700);
 });
@@ -273,7 +351,7 @@ test('staple, ambiguous and unknown rows are refused with distinct messages and 
     assert.equal(JSON.stringify(b.fake.store), before);
   }
   const unknown = bridge({ pantry: [] });
-  const message = await responseMessage(await unknown.call(NAME, { ingredientId: 'ghost', quantity: 1, expectedRevision: 0 }));
+  const message = await responseMessage(await unknown.call(NAME, { ingredientId: 'ghost', quantity: 1, expectedUnit: 'pcs', expectedRevision: 0 }));
   assert.match(text(message), /^not_found:/);
   assert.equal(unknown.fake.store.fields.version, 0);
 });
@@ -302,8 +380,8 @@ test('stale revision fails with zero mutation and an old-revision replay is a co
 test('same-revision race: exactly one write succeeds, one revision_conflict, no retry', async () => {
   const b = bridge({ pantry: [Object.assign({}, EGGS)] });
   const messages = await Promise.all([
-    b.call(NAME, { ingredientId: 'eggs', quantity: 7, expectedRevision: 0 }).then(responseMessage),
-    b.call(NAME, { ingredientId: 'eggs', quantity: 9, expectedRevision: 0 }).then(responseMessage)
+    b.call(NAME, { ingredientId: 'eggs', quantity: 7, expectedUnit: 'pcs', expectedRevision: 0 }).then(responseMessage),
+    b.call(NAME, { ingredientId: 'eggs', quantity: 9, expectedUnit: 'pcs', expectedRevision: 0 }).then(responseMessage)
   ]);
   assert.equal(messages.filter((m) => m.result.structuredContent).length, 1);
   assert.equal(messages.filter((m) => /^revision_conflict:/.test(m.result.content?.[0]?.text || '')).length, 1);
@@ -352,7 +430,7 @@ test('MCP set matches REST /v1/inventory/set-quantity persistence for the same a
     const rest = bridge({ pantry });
     const mcpResult = (await responseMessage(await mcp.call(NAME, VALID))).result.structuredContent;
     const restResult = await (await routeRequest(
-      request('/v1/inventory/set-quantity', { method: 'POST', body: VALID }), rest.env, rest.deps
+      request('/v1/inventory/set-quantity', { method: 'POST', body: { ingredientId: 'eggs', quantity: 7, expectedRevision: 0 } }), rest.env, rest.deps
     )).json();
     assert.deepEqual(mcp.fake.store, rest.fake.store);
     assert.deepEqual(mcpResult, { ok: restResult.ok, revision: restResult.revision, item: restResult.item });
@@ -376,6 +454,6 @@ test('mcp.js holds no classification, conversion or pantry-array logic; setCount
   assert.doesNotMatch(source, /stockLevel\s*===|category\s*===|\.staple\b|pantry\.(filter|map|splice|push)\(|toGrams|getUnitConversion|normalizeUnit/);
   const domain = await readFile(new URL('../src/operations/inventory.js', import.meta.url), 'utf8');
   const wrapper = domain.slice(domain.indexOf('export function setCountedQuantity'), domain.indexOf('// Mirrors correctKitchenStock()'));
-  assert.doesNotMatch(wrapper, /toGrams|getUnitConversion|normalizeUnit|unit\s*[:,]/);
+  assert.doesNotMatch(wrapper, /toGrams|getUnitConversion|normalizeUnit/);
   assert.match(wrapper, /return setQuantity\(pantry, \{ ingredientId, quantity \}\);/);
 });

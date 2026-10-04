@@ -5,7 +5,15 @@
 
 ---
 
-## TASK-073 — review (branch: task-073)
+## TASK-073 — review (branch: task-073), fix-first round 1
+fix (reviewer FIX FIRST, base 4c32dee, old candidate 1c4a9f3):
+  - mcp.js + inventory.js setCountedQuantity(): mandatory expectedUnit precondition (non-empty string; exact equality with the stored unit; blank/null/non-string stored unit rejected; distinct unit_mismatch error; zero mutation). Never forwarded to setQuantity(), never persisted. No trimming, case folding or conversion helpers.
+  - destructiveHint false -> true (overwrite is not additive). idempotentHint deliberately KEPT true: MCP defines it over identical arguments and expectedRevision is an argument, so an exact replay is a revision_conflict with zero mutation (asserted by test); owner/reviewer may overrule explicitly.
+  - Tool description now states the 5-step flow and the g / 0.65kg example.
+  - tests: +5 focused (exact-match matrix A-E + case/space + stale assumption H, blank/null F, I/J, schema G, idempotence replay); existing cases updated for the new required field.
+original entry follows.
+
+## TASK-073 — original round (branch: task-073)
 changed:
   - workers/conversational-bridge/src/mcp.js (registered strict `set_inventory_quantity` tool: write-scope auth, revision guard, one guarded pantry write, sanitized errors via the shared stock-state mapper incl. `ambiguous`)
   - workers/conversational-bridge/src/operations/inventory.js (additive `setCountedQuantity()` wrapper: quantity > 0, existing row, non-staple only, no unit passed; delegates to the unchanged `setQuantity()`)

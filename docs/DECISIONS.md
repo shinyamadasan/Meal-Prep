@@ -3364,12 +3364,13 @@ next open rather than MCP writing shopping state.
 set_inventory_quantity is the one counted-quantity MCP tool and extends the TASK-072 statement
 above that MCP exposes no quantity tool. It stays under the existing mealprep:write scope. Its
 contract is deliberately narrower than REST inventory.setQuantity: an ABSOLUTE count ("I have 7")
-for an existing, non-staple row, quantity strictly > 0, no caller-supplied unit. The narrowing
+for an existing, non-staple row, quantity strictly > 0, with a mandatory expectedUnit precondition
+(exact match to the stored unit, never persisted, never a replacement) and no replacement unit. The narrowing
 lives in one additive wrapper, setCountedQuantity() in operations/inventory.js, which delegates
 to the unchanged setQuantity(); mcp.js holds no classification. Zero is refused, not translated:
 "none left" is mark_out_of_stock. Staples (tracked by stock level) and unclassifiable rows
 (ambiguous) are refused rather than given invented counted semantics. The row's stored unit is
-preserved because setQuantity() can relabel a unit without conversion (500 g -> 500 kg) and the
+preserved and asserted because setQuantity() can relabel a unit without conversion (500 g -> 500 kg) and the
 bridge's unit helpers make unsafe chat assumptions (cup = 240 g, pieces = 100 g); no conversion
 engine is added. Delta semantics (bought / used / add N) remain future, separate tools.
 

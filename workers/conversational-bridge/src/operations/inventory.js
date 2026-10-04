@@ -92,7 +92,7 @@ export function setQuantity(pantry, { ingredientId, quantity, unit }) {
 // relabelled (500 g -> 500 kg). Zero is refused here, not translated: "none left" is
 // markOutOfStock(). Staples are modelled by stockLevel, not by a count, so they are refused; an
 // unclassifiable row is refused for the same reason markOutOfStock() refuses it.
-export function setCountedQuantity(pantry, { ingredientId, quantity }) {
+export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUnit }) {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
     throw new ValidationError('quantity must be a finite number > 0. For none left, use mark_out_of_stock.', { field: 'quantity' });
   }
@@ -110,6 +110,16 @@ export function setCountedQuantity(pantry, { ingredientId, quantity }) {
       'Set an explicit staple value on this record (in the app) before retrying.',
       { field: 'ingredientId', category: pantry[index].category != null ? pantry[index].category : null }
     );
+  }
+  // expectedUnit is an immutable PRECONDITION: exact equality with the stored unit, no trimming,
+  // case folding or conversion (g != kg, ml != L, pieces != cans). It is never forwarded, so it
+  // cannot relabel the row or be persisted.
+  const storedUnit = pantry[index].unit;
+  if (typeof storedUnit !== 'string' || !storedUnit.trim()) {
+    throw new ValidationError('unit_mismatch: ingredientId "' + ingredientId + '" has no stored unit, so a count cannot be set safely. Re-read get_inventory and clarify with the user.', { field: 'expectedUnit' });
+  }
+  if (typeof expectedUnit !== 'string' || expectedUnit !== storedUnit) {
+    throw new ValidationError('unit_mismatch: the stored unit for ingredientId "' + ingredientId + '" is "' + storedUnit + '", not the asserted unit. Re-read get_inventory and state the quantity in the stored unit, or clarify with the user.', { field: 'expectedUnit', storedUnit });
   }
   return setQuantity(pantry, { ingredientId, quantity });
 }
