@@ -5,6 +5,19 @@
 
 ---
 
+## TASK-072 — done (branch: task-072)
+changed:
+  - workers/conversational-bridge/src/mcp.js (registered strict `mark_out_of_stock` and `mark_in_stock` tools; write-scope auth, revision guard, canonical operation delegation, guarded writes, no-op handling, sanitized errors, and explicit `ambiguous` mapping)
+  - workers/conversational-bridge/test/mcp-stock-state.node.js (15 focused auth, schema, stock-state, tombstone, concurrency, replay, parity, isolation, and failure-sanitization cases)
+  - workers/conversational-bridge/test/mcp.node.js and test/mcp-consume.node.js (exact six-tool surface assertions; four existing tools remain unchanged)
+  - workers/conversational-bridge/README.md (six-tool contract, pantry-write scope, non-staple permanence, and next-open grocery reconciliation)
+  - docs/DECISIONS.md D-082 (task-scoped scope addendum)
+tests: workers/conversational-bridge/test/mcp-stock-state.node.js (15 cases, all pass); full bridge 184/184; root Playwright 711/711
+blockers: none
+deviations: none
+deployment: none; production writes: 0
+→ status set to `review` in TASKS.md
+
 ## TASK-071 — consume_ready_food mealConsumptions parity (branch: task-071, on top of d9fa050)
 changed:
   - workers/conversational-bridge/src/operations/readyFood.js (new canonical `consumeReadyFood()` + `consumeWriteSpec()`; `consumePortions()` takes one shared instant and returns the consumed `amount`)

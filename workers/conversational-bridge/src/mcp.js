@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
 import { getUserDocument, patchUserDocument, RevisionConflictError } from './firestore.js';
-import { InsufficientServingsError, NotFoundError, ValidationError } from './errors.js';
+import { AmbiguousError, InsufficientServingsError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
 import {
@@ -53,6 +53,20 @@ const CONSUME_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: false,
+  openWorldHint: false
+};
+
+const MARK_OUT_OF_STOCK_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
+const MARK_IN_STOCK_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
   openWorldHint: false
 };
 
@@ -102,6 +116,13 @@ function consumeReadyFoodInputSchema() {
   return z.strictObject({
     cookedMealId: z.string().min(1),
     servings: z.number(),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+function inventoryStockInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -206,7 +227,139 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => consumeReadyFoodTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'mark_out_of_stock',
+    {
+      title: 'Mark inventory item out of stock',
+      description: 'Mark one existing pantry item out of stock using ingredientId from ' +
+        'get_inventory. Never guess or fuzzy-match an id; if multiple rows match the user\'s ' +
+        'words, ask which row. Staples remain as empty; non-staples are permanently removed ' +
+        'from ChatGPT. On ambiguous, ask the user to set the staple flag in the app. Requires ' +
+        'expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+      inputSchema: inventoryStockInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: inventoryItemSchema().nullable(),
+        unchanged: z.boolean(),
+        removed: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: MARK_OUT_OF_STOCK_ANNOTATIONS
+    },
+    async (args) => markOutOfStockTool(env, deps, ctx, args)
+  );
+
+  server.registerTool(
+    'mark_in_stock',
+    {
+      title: 'Mark staple inventory item in stock',
+      description: 'Mark one existing staple pantry item in stock using ingredientId from ' +
+        'get_inventory. Never guess or fuzzy-match an id; if multiple rows match the user\'s ' +
+        'words, ask which row. This does not create an item or restore a removed non-staple. ' +
+        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+      inputSchema: inventoryStockInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: inventoryItemSchema(),
+        unchanged: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: MARK_IN_STOCK_ANNOTATIONS
+    },
+    async (args) => markInStockTool(env, deps, ctx, args)
+  );
+
   return server;
+}
+
+async function markOutOfStockTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
+
+    const r = inventory.markOutOfStock(doc.pantry, doc.deletions.pantry || {}, {
+      ingredientId: args.ingredientId
+    });
+    if (r.unchanged) {
+      return toolResult({ ok: true, revision: doc.revision, item: r.item, unchanged: true, removed: r.removed });
+    }
+
+    const write = r.removed
+      ? { fieldPaths: ['pantry', 'deletions.pantry'], fields: { pantry: r.pantry, deletions: { pantry: r.deletionsPantry } } }
+      : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } };
+    const written = await writeDoc(env, accessToken, Object.assign(write, {
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }), fetchImpl);
+
+    return toolResult({
+      ok: true,
+      revision: written.revision,
+      item: r.item,
+      unchanged: false,
+      removed: r.removed
+    });
+  } catch (error) {
+    return inventoryStockError(error, 'The inventory item could not be marked out of stock.');
+  }
+}
+
+async function markInStockTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
+
+    const r = inventory.markInStock(doc.pantry, { ingredientId: args.ingredientId });
+    if (r.unchanged) {
+      return toolResult({ ok: true, revision: doc.revision, item: r.item, unchanged: true });
+    }
+
+    const written = await writeDoc(env, accessToken, {
+      fieldPaths: ['pantry'],
+      fields: { pantry: r.pantry },
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }, fetchImpl);
+
+    return toolResult({ ok: true, revision: written.revision, item: r.item, unchanged: false });
+  } catch (error) {
+    return inventoryStockError(error, 'The inventory item could not be marked in stock.');
+  }
+}
+
+function inventoryStockError(error, fallback) {
+  if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
+  if (error instanceof RevisionConflictError) {
+    return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
+  }
+  if (error instanceof AmbiguousError) {
+    return { content: [{ type: 'text', text: 'ambiguous: ' + error.message }], isError: true };
+  }
+  if (error instanceof NotFoundError) {
+    return { content: [{ type: 'text', text: 'not_found: ' + error.message }], isError: true };
+  }
+  if (error instanceof ValidationError) {
+    return { content: [{ type: 'text', text: error.message }], isError: true };
+  }
+  return { content: [{ type: 'text', text: fallback }], isError: true };
 }
 
 // Mirrors index.js's POST /v1/ready-food/consume flow: auth (input shape was already enforced by
@@ -359,7 +512,9 @@ const TOOL_SECURITY_SCHEMES = {
   get_inventory: READ_SECURITY_SCHEMES,
   get_ready_food: READ_SECURITY_SCHEMES,
   record_ready_food: WRITE_SECURITY_SCHEMES,
-  consume_ready_food: WRITE_SECURITY_SCHEMES
+  consume_ready_food: WRITE_SECURITY_SCHEMES,
+  mark_out_of_stock: WRITE_SECURITY_SCHEMES,
+  mark_in_stock: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {

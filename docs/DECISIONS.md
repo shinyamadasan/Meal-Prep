@@ -3348,6 +3348,17 @@ credential.
   acceptance criteria) — this decision authorizes building and locally testing a candidate, not
   exposing it.
 
+### MCP stock-state scope addendum (2026-10-03, TASK-072)
+
+The existing mealprep:write OAuth scope now authorizes both cooked-meal mutations and the two
+reviewed pantry stock-state mutations (mark out of stock and mark in stock). A separate pantry
+scope was rejected for this single-account Worker because it would force a new OAuth link while
+adding no owner boundary. This does not widen the domain contract: MCP remains a thin adapter over
+the canonical operations, accepts stable ids only from the inventory read tool, and exposes no
+quantity, add/consume-stock, item-creation, or generic mutation tool. The pantry mutation stays
+within D-082's one-collection rule; the app reconciles grocery-list receipts and staple rows on its
+next open rather than MCP writing shopping state.
+
 Supersedes: nothing. Extends the platform choice `workers/recipe-import` already established;
 does not revisit or reverse D-058's caution about scheduled/always-on backends, because this
 bridge is not one.
