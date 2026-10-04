@@ -5627,7 +5627,7 @@ merge/deployment gate:
 ---
 
 ### TASK-072 · MCP STOCK-STATE TOOLS — authenticated `mark_out_of_stock` + `mark_in_stock`
-status: review
+status: approved
 owner: claude (planning) → codex (on owner build authorization)
 hold: PLANNING ONLY. Implementation is NOT authorized by this entry. The owner flips `status:` to
   `codex` to release it. Deployment and any production write/verification are separate owner gates.
