@@ -5739,6 +5739,84 @@ merge/deployment gate:
 
 ---
 
+### TASK-073 · MCP ABSOLUTE INVENTORY COUNT — authenticated `set_inventory_quantity`
+status: todo
+owner: claude (planning) → claude (builder; owner explicitly directed the build in an isolated
+  worktree in the TASK-073 request, same exception TASK-069..072 used) — no Codex relay
+risk: STRICT (red-zone, D-032): pantry WRITE from ChatGPT that overwrites a stored quantity.
+source: owner "TASK-073 — CONVERSATIONAL INVENTORY QUANTITY RECONCILIATION" (2026-10-04) —
+  "I have 7 eggs." / "Chicken is 650g." / "Only 2 cans of tuna left." Absolute count only.
+depends-on: TASK-069, TASK-070, TASK-071, TASK-072 (all `done`). Does NOT touch TASK-065's status.
+files: workers/conversational-bridge/src/mcp.js (one tool + handler); src/operations/inventory.js
+  (ONE additive exported wrapper that enforces the narrower MCP contract and delegates to the
+  unchanged `setQuantity`); test/mcp-set-quantity.node.js (new); test/mcp.node.js and
+  test/mcp-stock-state.node.js (tool-list assertion six -> seven only); README.md; docs/DECISIONS.md
+  (one D-082 addendum); CHANGELOG.md; TEST_REPORT.md; TASKS.md status field.
+  Expected ZERO changes to `setQuantity`, REST routes, src/firestore.js, src/oauth.js,
+  src/mcpAuth.js, app.js/index.html/style.css, OAuth scopes, Cloudflare routing, secrets, deps.
+branch: task-073 (isolated worktree off the release commit on main)
+
+live-inspection findings (verified against `main` @ 959ad21):
+  - `inventory.setQuantity(pantry, {ingredientId, quantity, unit})` is existing-row-only
+    (NotFoundError otherwise), absolute, `quantity` finite >= 0, optional `unit` that OVERWRITES the
+    row unit with no conversion; writes pantry only; no tombstone; always stamps `updatedAt` and
+    returns `unchanged:false` — a same-value call is a real write (revision +1), not a no-op.
+  - It has NO staple handling: a staple row would silently get a `quantity` while `stockLevel`
+    stays authoritative for stocked-ness. REST route `/v1/inventory/set-quantity` stays as is.
+  - `classifyStaple()` is module-private to inventory.js, so a wrapper in mcp.js cannot classify
+    without duplicating it. The narrower contract therefore lives as a thin exported wrapper in
+    inventory.js next to its siblings; mcp.js keeps zero classification logic (same grep-test
+    discipline as TASK-072).
+
+contract:
+  - Tool `set_inventory_quantity`, input (strict) `{ ingredientId: string(min 1),
+    quantity: number > 0 (finite), expectedRevision: int >= 0 }`. NO `unit` input.
+  - Result `{ ok:true, revision, item: inventoryItem }`.
+  - quantity 0 / negative / non-finite -> rejected; the message points to `mark_out_of_stock`.
+    Never translated to out-of-stock inside the tool.
+  - Explicit staple row -> ValidationError directing to mark_in_stock / mark_out_of_stock.
+    Ambiguous classification (no flag, category != pantry) -> `ambiguous`, refuse (same safety
+    signal as TASK-072). Missing id -> `not_found`.
+  - Row's existing unit is preserved (wrapper passes no `unit`). No conversion helpers used.
+  - One canonical write: ONE guarded PATCH of `['pantry']`; stale revision -> `revision_conflict`,
+    zero mutation, no retry. Annotations: readOnly false, destructive false, idempotent per
+    verified behavior (decided and recorded in the CHANGELOG entry), openWorld false.
+  - Surface after this task is exactly seven tools. No add/consume stock, create-item,
+    conversion, shopping, leftovers, or generic mutate tool.
+
+acceptance:
+  - [ ] Seven-tool list; strict schema; uid/owner/path/collection/unit/staple/etc. rejected before
+        any Firestore access; missing/malformed expectedRevision rejected before Firestore.
+  - [ ] Write scope required; read-only / wrong-owner / no-token touch no Firestore;
+        oauth.js and mcpAuth.js diff empty.
+  - [ ] Valid set: quantity changes, id stable, unit preserved, other rows / cookedMeals /
+        mealConsumptions / deletions byte-identical, revision +1.
+  - [ ] Zero / negative / NaN-shaped / string / object rejected; staple + ambiguous rejected with
+        zero mutation; unknown id `not_found`.
+  - [ ] Same-revision race: exactly one success, one `revision_conflict`; stale -> zero mutation;
+        persistence failure sanitized, source untouched.
+  - [ ] Parity with REST for the same absolute set (state + item); mcp.js contains no classification
+        or pantry-array logic; `setQuantity` body unchanged.
+  - [ ] Existing six tools and REST behave exactly as before; README documents absolute-only
+        semantics, zero -> mark_out_of_stock, no unit input, staple policy, same-value behavior.
+
+constraints: LOCAL ONLY. No merge, push, deploy, production access or production write. No
+  natural-language parsing in the Worker. If live source contradicts the staple or unit policy:
+  STOP — INVARIANT DIFFERED.
+
+verification:
+  - [ ] Focused suite + `npm run test:bridge` (>= baseline); `node --check`; `npm audit --omit=dev`;
+        Wrangler `--dry-run` only; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`
+        vs baseline; `git diff --check`; delta secret scan; root `npm test` if AGENTS.md requires;
+        SELF_REVIEW.md; QA.md.
+
+merge/deployment gate:
+  Hand off at `status: review`. Red-zone under D-032: independent STRICT review; landing status
+  `approved` (held for owner merge), never `done`. Deploy / ChatGPT refresh / production acceptance
+  (disposable row only) are separate owner gates.
+
+---
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
