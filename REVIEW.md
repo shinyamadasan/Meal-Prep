@@ -4,7 +4,7 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
-## Review TASK-072 — MCP stock-state tools (mark_out_of_stock + mark_in_stock) — PASS (STRICT) -> owner-authorized integration -> approved (Worker deployment and production pilot separately pending)
+## Review TASK-072 — MCP stock-state tools (mark_out_of_stock + mark_in_stock) — PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)
 branch: `task-072`; reviewed candidate `0098bd73fa5d5056a30274a69262a6bf96e03ebf` (review base `0aeab896bac2ca882abccc01d0f23d45d7351e33`, planning `3b8577ec2bf5f89c257a9c160ff33a5ad143526b`);
   integrated into `main` by merge `--no-ff` on `60b1f3e19737830a40e726e206dbeced74e60baf`
 date: 2026-10-04
@@ -22,6 +22,10 @@ focused stock-state suite 15/15, full bridge suite 184/184, `node --check src/mc
 ### Gate and remaining state
 Landing status **`approved`, not `done`** (D-032 red-zone: first pantry write reachable from ChatGPT,
 non-staple removal tombstones). Worker deployment and the one reversible staple pilot are pending.
+
+### Closeout (2026-10-04)
+Landed `approved` per D-032, then closed `done` after the owner-reported production pilot (details in
+STATUS.md). Worker `a7c7d71c-017a-4989-922c-671ab371b3e3` at 100%. Closeout is docs only.
 
 ---
 ## Review TASK-071 — consume_ready_food mealConsumptions parity — PASS (STRICT) -> owner-authorized integration -> approved -> done (production parity acceptance PASS)

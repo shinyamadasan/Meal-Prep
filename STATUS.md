@@ -5,6 +5,31 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-04 — TASK-072 CLOSED `done`: stock-state MCP tools accepted in production
+
+**What closed it:** Worker version `a7c7d71c-017a-4989-922c-671ab371b3e3` (deployed at 100%; rollback
+version `7a3430cc-aa5f-4387-a6eb-5c37e22b0d9d`) carries `mark_out_of_stock` and `mark_in_stock`.
+Integrated from reviewed candidate `0098bd73fa5d5056a30274a69262a6bf96e03ebf` (independent STRICT
+review PASS) via merge `60b1f3e19737830a40e726e206dbeced74e60baf`; approved-status commit `a1c84be`.
+Local checks on the integration tip: focused suite 15/15, bridge suite 184/184.
+
+**Discovery note:** right after deploy ChatGPT listed only four tools. A read-only trace found the
+source registers all six unconditionally (no scope filtering at discovery). The owner reports the
+connector then showed exactly six tools after a refresh/reconnect; the cause was not proven
+(most likely a stale connector tool snapshot). Not independently re-observed by this session.
+
+**Production pilot (owner-reported from the authenticated ChatGPT Meal Prep MCP session; this
+session did not inspect Firestore or call MCP):** staple `Rolled Oats`, stable id
+`buy_1789967883242_uv52t`, `full` -> `empty` -> `full`. Revisions `29511` -> `29512` -> `29513`.
+1 `mark_out_of_stock` attempt, 1 `mark_in_stock` attempt, 0 recovery attempts. Unrelated inventory
+and ready food reported unchanged. Exactly 2 production writes, 0 others.
+
+**Not tested:** no non-staple production deletion (tombstone path covered by local tests only).
+**Unchanged:** no OAuth, secrets, Access, routes or Cloudflare config changes; no redeploy during
+closeout; TASK-065 untouched. Closeout is docs/governance only.
+
+---
+
 ## 2026-10-03 — TASK-071 CLOSED `done`: production parity acceptance passed
 
 **What closed it:** Worker version `7a3430cc-aa5f-4387-a6eb-5c37e22b0d9d` passed a controlled production
