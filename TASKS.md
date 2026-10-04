@@ -5548,7 +5548,7 @@ merge/deployment gate:
 ---
 
 ### TASK-071 · consume_ready_food mealConsumptions parity
-status: approved
+status: done
 owner: claude (planning) → codex (implementation)
 risk: STRICT (red-zone, D-032): canonical append-only history, cross-field atomic persistence,
   destructive final-serving path, stable event identity, revision/concurrency semantics,

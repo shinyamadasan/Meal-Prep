@@ -5,6 +5,24 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-03 — TASK-071 CLOSED `done`: production parity acceptance passed
+
+**What closed it:** Worker version `7a3430cc-aa5f-4387-a6eb-5c37e22b0d9d` passed a controlled production
+acceptance, owner-reported (not re-run by this session). Revision `29476` -> `29477` (`record_ready_food`,
+1 attempt) -> `29478` (`consume_ready_food`, 1 attempt), 0 retries. Disposable
+`cookedMealId cm_1791052147993_134`. Owner-visible Firebase Console screenshot confirmed the canonical
+`mealConsumptions` fact `mc_3d596310-3e8b-45c1-9d15-8f2cfc4241f7` (cookedMealId
+`cm_1791052147993_134`, recipeId null, portionsConsumed 1, consumedAt 2026-10-03T18:31:35.645Z).
+
+**Evidence boundary:** the screenshot proves the expected fact exists; it did not enumerate the whole
+array, so duplicate count is not independently proven. No backfill for `cm_1791045734557_839`.
+
+**This closeout:** docs/governance only (TASKS.md `approved` -> `done`, REVIEW.md, STATUS.md,
+planning/DONE.md). No implementation file touched; no Worker redeploy; no production write by this
+session; TASK-065 untouched.
+
+---
+
 ## 2026-10-03 — TASK-070 CLOSED `done`: production acceptance completed
 
 **What closed it:** Worker version `f2bff101-a701-4890-8dcc-ac103718fa10` (deployed at 100%) passed a

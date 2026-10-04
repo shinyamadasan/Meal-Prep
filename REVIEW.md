@@ -4,7 +4,7 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
-## Review TASK-071 — consume_ready_food mealConsumptions parity — PASS (STRICT) -> owner-authorized integration -> approved (Worker deployment and parity acceptance separately pending)
+## Review TASK-071 — consume_ready_food mealConsumptions parity — PASS (STRICT) -> owner-authorized integration -> approved -> done (production parity acceptance PASS)
 branch: `task-071`; reviewed candidate `30a3123229689ee2dec46df98579ef85c586a8e7` (planning commit `d9fa050`);
   integrated into `main` by merge `--no-ff` on `21e48eaa5ea1e0d700851f7b09dba9eda7a22602`
 date: 2026-10-03
@@ -27,6 +27,17 @@ persistence, destructive final-serving path). Code review PASS. Production deplo
 production parity acceptance pending (one disposable record, one consume, verify exactly one
 mealConsumptions fact). No historical backfill is authorized: the pre-fix consume
 `cm_1791045734557_839` stays without a fact. TASK-065 untouched.
+
+### Closeout — production acceptance PASS -> `done` (2026-10-03)
+Worker version `7a3430cc-aa5f-4387-a6eb-5c37e22b0d9d`. Owner-reported acceptance, not re-run by this
+session: revision `29476` -> `29477` (`record_ready_food`, attempts=1) -> `29478` (`consume_ready_food`,
+attempts=1); 0 retries. Disposable `cookedMealId cm_1791052147993_134`. Owner-visible Firebase Console
+screenshot confirmed the canonical fact exists: id `mc_3d596310-3e8b-45c1-9d15-8f2cfc4241f7`,
+cookedMealId `cm_1791052147993_134`, recipeId `null`, mealName "TASK-071 parity production test",
+portionsConsumed 1, consumedAt `2026-10-03T18:31:35.645Z`.
+Evidence boundary: the screenshot directly proves the expected fact exists; it did NOT enumerate the
+whole `mealConsumptions` array, so it is not claimed as independent proof of the duplicate count.
+No backfill was performed for `cm_1791045734557_839`. TASK-065 untouched.
 
 ---
 ## Review TASK-070 — MCP ready-food consumption (Phase B2B), consume_ready_food — PASS (STRICT, 3 rounds) -> owner-authorized integration -> approved (Worker deployment separately gated)
