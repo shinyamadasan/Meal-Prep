@@ -294,6 +294,104 @@ test('Add-meals picker: + Add and favorite never open the recipe detail', async 
   expect(await page.evaluate(() => AppState.plannedBatches.map((b) => b.recipeId))).toEqual(['r_longlife']);
 });
 
+// ── Recipe inspection follow-up: the whole non-action info area is the target, and
+// each click opens the detail exactly once. Counted via a wrapper around the one
+// authoritative openEditRecipeModal, so a double-fire (button + bubbling) would show.
+
+async function countDetailOpens(page) {
+  await page.evaluate(() => {
+    window.__detailOpens = [];
+    const orig = window.openEditRecipeModal;
+    window.openEditRecipeModal = function(id) { window.__detailOpens.push(String(id)); return orig(id); };
+  });
+}
+const detailOpens = (page) => page.evaluate(() => window.__detailOpens.slice());
+
+test('Add-meals picker: title and the meta/blank info area each open the detail exactly once; Add, Added and favorite never do', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await countDetailOpens(page);
+  await page.evaluate(() => { showTab('planner'); openBatchPickerModal(); });
+  await page.fill('#batch-picker-search', 'Long Life');
+  const row = page.locator('#batch-picker-results .batch-result', { hasText: 'Test Long Life Rice' });
+
+  await row.locator('.batch-name-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  expect(await detailOpens(page)).toEqual(['r_longlife']);
+  await page.locator('#cancel-btn').click();
+
+  await row.locator('.batch-meta').click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  await expect(page.locator('#ingredients-list input').first()).toHaveValue('Test Rice');
+  await expect(page.locator('#instructions')).toHaveValue('Cook.');
+  expect(await detailOpens(page)).toEqual(['r_longlife', 'r_longlife']);
+  await page.locator('#cancel-btn').click();
+  await expect(page.locator('#batch-picker-modal')).toBeVisible();
+  await expect(page.locator('#batch-picker-search')).toHaveValue('Long Life');
+  expect(await page.evaluate(() => AppState.plannedBatches)).toEqual([]); // inspecting never adds
+
+  await row.locator('.recipe-fav-btn').click();
+  await row.locator('.batch-add-btn').click();
+  await row.locator('.batch-picker-added').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await detailOpens(page)).toHaveLength(2);
+  expect(await page.evaluate(() => AppState.plannedBatches.map((b) => b.recipeId))).toEqual(['r_longlife']);
+  expect(await page.evaluate(() => AppState.recipes.find((r) => r.id === 'r_longlife').favorite)).toBe(true);
+});
+
+test('Plan tab batches: title and meta each open the detail exactly once; stepper, servings count and remove never do; plan state is kept', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await countDetailOpens(page);
+  await page.evaluate(() => {
+    addPlannedBatch('r_longlife');
+    AppState.weeklyPlan.Monday.lunch = 'r_shortlife';
+    showTab('planner');
+  });
+  const row = page.locator('#planned-batches-list .batch-row');
+
+  await row.locator('.batch-name-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  expect(await detailOpens(page)).toEqual(['r_longlife']);
+  await page.locator('#recipe-modal .modal-close').click();
+
+  await row.locator('.batch-meta').click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  await expect(page.locator('#recipe-name')).toHaveValue('Test Long Life Rice');
+  expect(await detailOpens(page)).toEqual(['r_longlife', 'r_longlife']);
+  await page.locator('#cancel-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  await expect(page.locator('#planner')).toBeVisible();
+
+  await row.locator('.batch-step-btn', { hasText: '+' }).click();
+  await row.locator('.batch-servings').click();
+  await row.locator('.batch-step-btn', { hasText: '−' }).click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await detailOpens(page)).toHaveLength(2);
+  expect(await page.evaluate(() => ({
+    servings: AppState.plannedBatches.map((b) => b.servings),
+    monday: AppState.weeklyPlan.Monday.lunch
+  }))).toEqual({ servings: [2], monday: 'r_shortlife' });
+
+  await row.locator('.batch-remove-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await detailOpens(page)).toHaveLength(2);
+  expect(await page.evaluate(() => AppState.plannedBatches)).toEqual([]);
+});
+
+test('Plan tab: a batch whose recipe was deleted is not inspectable', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await countDetailOpens(page);
+  await page.evaluate(() => {
+    AppState.plannedBatches = [{ id: 'pb_gone', recipeId: 'r_missing', servings: 2, addedAt: null }];
+    showTab('planner');
+    renderPlannedBatches();
+  });
+  const row = page.locator('#planned-batches-list .batch-row');
+  await expect(row.locator('.batch-name-btn')).toHaveCount(0);
+  await row.locator('.batch-meta').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await detailOpens(page)).toEqual([]);
+});
+
 test('closing another modal does not run the recipe modal close handler', async ({ page }) => {
   await loadWithPlanRecipes(page);
   // Regression guard: the recipe modal's close was bound via the document's FIRST .modal-close.

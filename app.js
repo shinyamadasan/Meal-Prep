@@ -10163,13 +10163,15 @@ function renderBatchPickerResults() {
     var addBtn = alreadyPlanned
       ? '<span class="batch-picker-added">Added ✓</span>'
       : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
-    // Three distinct controls, none of which mutate another: title inspects (reuses the
-    // same recipe edit/detail modal as the Plan tab's batch list), the heart reuses the
-    // existing Recipes-tab favorite toggle exactly, and +Add/Added is unchanged (TASK-064).
-    var nameBtn = '<button type="button" class="batch-name batch-name-btn" onclick="openEditRecipeModal(\'' + escJ(String(r.id)) + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
+    // Three distinct controls, none of which mutate another: the info area (title, meta,
+    // and its blank space) inspects via the same recipe edit/detail modal as the Plan
+    // tab's batch list, the heart reuses the existing Recipes-tab favorite toggle exactly,
+    // and +Add/Added is unchanged (TASK-064). The title button carries no handler of its
+    // own — its click (mouse or keyboard) bubbles to .batch-info, so it opens once.
+    var nameBtn = '<button type="button" class="batch-name batch-name-btn" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
     var favBtn = '<button type="button" class="recipe-fav-btn' + (r.favorite ? ' active' : '') + '" onclick="toggleFavorite(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()" title="' + (r.favorite ? 'Remove from favorites' : 'Add to favorites') + '" aria-label="' + (r.favorite ? 'Remove ' + escapeHtml(r.name) + ' from favorites' : 'Add ' + escapeHtml(r.name) + ' to favorites') + '">♥</button>';
     return '<div class="batch-result">' +
-      '<div class="batch-info">' + nameBtn +
+      '<div class="batch-info batch-info--inspect" onclick="openEditRecipeModal(\'' + escJ(String(r.id)) + '\')">' + nameBtn +
       (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
       favBtn +
       addBtn +
@@ -10199,11 +10201,16 @@ function plannedBatchRowHtml(b, mode) {
   // Recipe title is inspectable only on the Plan tab's own batch list, and only when
   // the recipe still exists — reuses the existing edit/detail modal by stable recipeId,
   // never a display-name lookup (TASK-064). Prep tab and picker rows are unchanged.
-  var nameHtml = (mode !== 'prep' && recipe)
-    ? '<button type="button" class="batch-name batch-name-btn" onclick="openEditRecipeModal(\'' + escJ(String(recipe.id)) + '\')" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
+  // The whole info area (title + meta) is the target; stepper/remove sit outside it.
+  var inspectable = mode !== 'prep' && recipe;
+  var nameHtml = inspectable
+    ? '<button type="button" class="batch-name batch-name-btn" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
     : '<span class="batch-name">' + escapeHtml(name) + '</span>';
+  var infoOpen = inspectable
+    ? '<div class="batch-info batch-info--inspect" onclick="openEditRecipeModal(\'' + escJ(String(recipe.id)) + '\')">'
+    : '<div class="batch-info">';
   return '<div class="batch-row" data-batch-id="' + escapeHtml(b.id) + '">' +
-    '<div class="batch-info">' + nameHtml +
+    infoOpen + nameHtml +
     '<span class="batch-meta">' + escapeHtml(servingsText) + '</span></div>' +
     controls + '</div>';
 }
