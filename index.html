@@ -137,164 +137,8 @@
                         <div class="skeleton-card"><div class="sk sk-photo"></div><div class="sk sk-line sk-line--lg"></div><div class="sk sk-line"></div><div class="sk sk-line sk-line--sm"></div></div>
                     </div>
 
-                    <!-- Add Recipe Modal -->
-                    <div id="recipe-modal" class="modal hidden">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3 id="modal-title">Add New Recipe</h3>
-                                <button class="modal-close">&times;</button>
-                            </div>
-                            <form id="recipe-form" class="modal-body">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label">Recipe Name</label>
-                                        <input type="text" class="form-control" id="recipe-name" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Category</label>
-                                        <select class="form-control" id="recipe-category" required>
-                                            <option value="">Select Category</option>
-                                            <option value="Breakfast">Breakfast</option>
-                                            <option value="Main Dish">Main Dish</option>
-                                            <option value="Snack">Snack</option>
-                                            <option value="Dessert">Dessert</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label">Prep Time (minutes)</label>
-                                        <input type="number" class="form-control" id="prep-time" min="0" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Cook Time (minutes)</label>
-                                        <input type="number" class="form-control" id="cook-time" min="0" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Servings</label>
-                                        <input type="number" class="form-control" id="servings" min="1" required>
-                                    </div>
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label">Fridge Life (days)</label>
-                                        <input type="number" class="form-control" id="fridge-life" min="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Freezer Life (days)</label>
-                                        <input type="number" class="form-control" id="freezer-life" min="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Estimated Cost (₱)</label>
-                                        <input type="number" class="form-control" id="estimated-cost" min="0" step="0.01" placeholder="0.00">
-                                    </div>
-                                </div>
-
-                                <div class="lowfx-form">
-                                    <div class="lowfx-form-head">
-                                        <span class="form-label">How you cook it</span>
-                                        <span class="lowfx-optional">all optional</span>
-                                    </div>
-
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label class="form-label" for="recipe-effort">Effort</label>
-                                            <select class="form-control" id="recipe-effort"></select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="form-label" for="recipe-active-time">Active time (min)</label>
-                                            <input type="number" class="form-control" id="recipe-active-time" min="0" placeholder="hands-on only">
-                                        </div>
-                                        <div class="form-group">
-                                            <span class="form-label">Includes</span>
-                                            <div class="lowfx-chips">
-                                                <label class="lowfx-check"><input type="checkbox" id="balance-protein" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Protein</label>
-                                                <label class="lowfx-check"><input type="checkbox" id="balance-vegetables" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Veg</label>
-                                                <label class="lowfx-check"><input type="checkbox" id="balance-carb" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Carb</label>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <span class="form-label">Cooking method</span>
-                                        <div class="lowfx-chips" id="recipe-equipment-chips"></div>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <span class="form-label">Tags</span>
-                                        <div class="lowfx-chips" id="recipe-tag-chips"></div>
-                                    </div>
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label class="form-label">Calories / serving</label>
-                                        <input type="number" class="form-control" id="nutrition-calories" min="0" placeholder="e.g. 450">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Protein (g)</label>
-                                        <input type="number" class="form-control" id="nutrition-protein" min="0" placeholder="e.g. 35">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Carbs (g)</label>
-                                        <input type="number" class="form-control" id="nutrition-carbs" min="0" placeholder="e.g. 20">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Fat (g)</label>
-                                        <input type="number" class="form-control" id="nutrition-fat" min="0" placeholder="e.g. 15">
-                                    </div>
-                                </div>
-
-                                <div class="nutrition-db-search">
-                                    <div class="nutrition-db-header">
-                                        <span><span class="ic" data-icon="search"></span> Look up nutrition data</span>
-                                        <small>USDA Food Database</small>
-                                    </div>
-                                    <div class="nutrition-db-input-row">
-                                        <input type="text" id="nutrition-db-query" class="form-control" placeholder="Search e.g. chicken breast, white rice, banana…" onkeydown="if(event.key==='Enter'){event.preventDefault();searchNutritionDB();}">
-                                        <button type="button" class="btn btn--outline btn--sm" onclick="searchNutritionDB()">Search</button>
-                                    </div>
-                                    <div id="nutrition-db-results" class="nutrition-db-results hidden"></div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Recipe Photo</label>
-                                    <div class="photo-upload-container">
-                                        <input type="file" class="form-control" id="recipe-photo" accept="image/*" onchange="handlePhotoUpload(event)">
-                                        <div class="photo-preview" id="photo-preview" style="display: none;">
-                                            <img id="preview-image" src="" alt="Recipe preview">
-                                            <button type="button" class="remove-photo" onclick="removePhoto()">×</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Storage Notes</label>
-                                    <textarea class="form-control" id="storage-notes" rows="2"></textarea>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Ingredients</label>
-                                    <div class="ingredients-header">
-                                        <button type="button" class="btn btn--outline btn--sm" id="add-ingredient-btn">Add Ingredient</button>
-                                    </div>
-                                    <div id="ingredients-list"></div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Instructions</label>
-                                    <textarea class="form-control" id="instructions" rows="4" required></textarea>
-                                </div>
-
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn--outline" id="cancel-btn">Cancel</button>
-                                    <button type="submit" class="btn btn--primary" id="recipe-submit-btn">Save Recipe</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    <!-- Add/Edit Recipe Modal lives at top level (after the Batch Picker) so it
+                         can open from any tab, including the Plan tab's batch list and picker. -->
                 </section>
 
                 <!-- Weekly Planner Tab -->
@@ -1086,6 +930,166 @@
             <div class="modal-footer">
                 <button class="btn btn--outline" onclick="closeBatchPickerModal()">Done</button>
             </div>
+        </div>
+    </div>
+    <!-- Add/Edit Recipe Modal. Top level, not inside the Recipes tab: a hidden tab section
+         would hide it on every other tab. Placed after the Batch Picker so a recipe opened
+         from the picker stacks above it, and closing it returns to the picker unchanged. -->
+    <div id="recipe-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Add New Recipe</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="recipe-form" class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Recipe Name</label>
+                        <input type="text" class="form-control" id="recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select class="form-control" id="recipe-category" required>
+                            <option value="">Select Category</option>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Main Dish">Main Dish</option>
+                            <option value="Snack">Snack</option>
+                            <option value="Dessert">Dessert</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Prep Time (minutes)</label>
+                        <input type="number" class="form-control" id="prep-time" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cook Time (minutes)</label>
+                        <input type="number" class="form-control" id="cook-time" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Servings</label>
+                        <input type="number" class="form-control" id="servings" min="1" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Fridge Life (days)</label>
+                        <input type="number" class="form-control" id="fridge-life" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Freezer Life (days)</label>
+                        <input type="number" class="form-control" id="freezer-life" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Estimated Cost (₱)</label>
+                        <input type="number" class="form-control" id="estimated-cost" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="lowfx-form">
+                    <div class="lowfx-form-head">
+                        <span class="form-label">How you cook it</span>
+                        <span class="lowfx-optional">all optional</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="recipe-effort">Effort</label>
+                            <select class="form-control" id="recipe-effort"></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="recipe-active-time">Active time (min)</label>
+                            <input type="number" class="form-control" id="recipe-active-time" min="0" placeholder="hands-on only">
+                        </div>
+                        <div class="form-group">
+                            <span class="form-label">Includes</span>
+                            <div class="lowfx-chips">
+                                <label class="lowfx-check"><input type="checkbox" id="balance-protein" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Protein</label>
+                                <label class="lowfx-check"><input type="checkbox" id="balance-vegetables" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Veg</label>
+                                <label class="lowfx-check"><input type="checkbox" id="balance-carb" onchange="this.parentNode.classList.toggle('is-on', this.checked)"> Carb</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <span class="form-label">Cooking method</span>
+                        <div class="lowfx-chips" id="recipe-equipment-chips"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <span class="form-label">Tags</span>
+                        <div class="lowfx-chips" id="recipe-tag-chips"></div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Calories / serving</label>
+                        <input type="number" class="form-control" id="nutrition-calories" min="0" placeholder="e.g. 450">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Protein (g)</label>
+                        <input type="number" class="form-control" id="nutrition-protein" min="0" placeholder="e.g. 35">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Carbs (g)</label>
+                        <input type="number" class="form-control" id="nutrition-carbs" min="0" placeholder="e.g. 20">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fat (g)</label>
+                        <input type="number" class="form-control" id="nutrition-fat" min="0" placeholder="e.g. 15">
+                    </div>
+                </div>
+
+                <div class="nutrition-db-search">
+                    <div class="nutrition-db-header">
+                        <span><span class="ic" data-icon="search"></span> Look up nutrition data</span>
+                        <small>USDA Food Database</small>
+                    </div>
+                    <div class="nutrition-db-input-row">
+                        <input type="text" id="nutrition-db-query" class="form-control" placeholder="Search e.g. chicken breast, white rice, banana…" onkeydown="if(event.key==='Enter'){event.preventDefault();searchNutritionDB();}">
+                        <button type="button" class="btn btn--outline btn--sm" onclick="searchNutritionDB()">Search</button>
+                    </div>
+                    <div id="nutrition-db-results" class="nutrition-db-results hidden"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Recipe Photo</label>
+                    <div class="photo-upload-container">
+                        <input type="file" class="form-control" id="recipe-photo" accept="image/*" onchange="handlePhotoUpload(event)">
+                        <div class="photo-preview" id="photo-preview" style="display: none;">
+                            <img id="preview-image" src="" alt="Recipe preview">
+                            <button type="button" class="remove-photo" onclick="removePhoto()">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Storage Notes</label>
+                    <textarea class="form-control" id="storage-notes" rows="2"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ingredients</label>
+                    <div class="ingredients-header">
+                        <button type="button" class="btn btn--outline btn--sm" id="add-ingredient-btn">Add Ingredient</button>
+                    </div>
+                    <div id="ingredients-list"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Instructions</label>
+                    <textarea class="form-control" id="instructions" rows="4" required></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn--outline" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn--primary" id="recipe-submit-btn">Save Recipe</button>
+                </div>
+            </form>
         </div>
     </div>
     <!-- Prep Mode Modal -->

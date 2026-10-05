@@ -214,6 +214,102 @@ test('Plan tab: a batch row recipe title opens the recipe detail modal by stable
   expect(stillThere).toEqual([{ id, recipeId: 'r_longlife', servings: 3, addedAt: stillThere[0].addedAt }]);
 });
 
+// The recipe modal used to live inside the Recipes tab section, so on the Plan tab it
+// had its "hidden" class removed but stayed invisible (display:none ancestor). These
+// assert real visibility and clickability, not just the class.
+
+test('Plan tab: batch title opens a visible recipe detail (ingredients + instructions), via mouse and keyboard', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { addPlannedBatch('r_longlife'); showTab('planner'); });
+
+  const nameLink = page.locator('#planned-batches-list .batch-name-btn');
+  await nameLink.click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  await expect(page.locator('#recipe-name')).toHaveValue('Test Long Life Rice');
+  await expect(page.locator('#ingredients-list input').first()).toHaveValue('Test Rice');
+  await expect(page.locator('#instructions')).toHaveValue('Cook.');
+  await page.locator('#cancel-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  await expect(page.locator('#planner')).toBeVisible(); // still on the Plan tab
+
+  await nameLink.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  expect(await page.evaluate(() => String(AppState.currentEditingRecipe))).toBe('r_longlife');
+});
+
+test('Plan tab: servings −/+ and remove never open the recipe detail', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { addPlannedBatch('r_longlife'); showTab('planner'); });
+  const row = page.locator('#planned-batches-list .batch-row');
+
+  await row.locator('.batch-step-btn', { hasText: '+' }).click();
+  await row.locator('.batch-step-btn', { hasText: '−' }).click();
+  await row.locator('.batch-step-btn', { hasText: '+' }).click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await page.evaluate(() => AppState.plannedBatches[0].servings)).toBe(3);
+
+  await row.locator('.batch-remove-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  expect(await page.evaluate(() => AppState.plannedBatches)).toEqual([]);
+});
+
+test('Add-meals picker: title opens a visible recipe detail above the picker; closing it returns to the picker with search and plan intact', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { showTab('planner'); openBatchPickerModal(); });
+  await page.fill('#batch-picker-search', 'Long Life');
+
+  const row = page.locator('#batch-picker-results .batch-result', { hasText: 'Test Long Life Rice' });
+  await row.locator('.batch-name-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  await expect(page.locator('#ingredients-list input').first()).toHaveValue('Test Rice');
+  await expect(page.locator('#instructions')).toHaveValue('Cook.');
+  expect(await page.evaluate(() => AppState.plannedBatches)).toEqual([]); // inspecting never adds
+
+  // Playwright refuses to click an obscured element, so this proves the detail stacks above the picker.
+  await page.locator('#cancel-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  await expect(page.locator('#batch-picker-modal')).toBeVisible();
+  await expect(page.locator('#batch-picker-search')).toHaveValue('Long Life');
+  await expect(row.locator('.batch-add-btn')).toBeVisible();
+
+  // Keyboard: Enter on the focused title opens the same detail.
+  await row.locator('.batch-name-btn').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#recipe-modal')).toBeVisible();
+  await page.locator('#recipe-modal .modal-close').click();
+  await expect(page.locator('#batch-picker-modal')).toBeVisible();
+});
+
+test('Add-meals picker: + Add and favorite never open the recipe detail', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { showTab('planner'); openBatchPickerModal(); });
+  const row = page.locator('#batch-picker-results .batch-result', { hasText: 'Test Long Life Rice' });
+
+  await row.locator('.recipe-fav-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  await row.locator('.batch-add-btn').click();
+  await expect(page.locator('#recipe-modal')).toBeHidden();
+  await expect(row.locator('.batch-picker-added')).toHaveText('Added ✓');
+  expect(await page.evaluate(() => AppState.plannedBatches.map((b) => b.recipeId))).toEqual(['r_longlife']);
+});
+
+test('closing another modal does not run the recipe modal close handler', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  // Regression guard: the recipe modal's close was bound via the document's FIRST .modal-close.
+  await page.evaluate(() => openEditRecipeModal('r_longlife'));
+  const clickedOther = await page.evaluate(() => {
+    document.getElementById('recipe-modal').classList.add('hidden'); // hide without clearing the form
+    const first = document.querySelector('.modal-close');
+    if (first.closest('#recipe-modal')) return false;
+    first.closest('.modal').classList.remove('hidden');
+    first.click();
+    return true;
+  });
+  expect(clickedOther).toBe(true); // recipe modal is no longer the first modal in the document
+  await expect(page.locator('#recipe-name')).toHaveValue('Test Long Life Rice');
+});
+
 test('a long recipe name in the batch list wraps instead of overflowing horizontally', async ({ page }) => {
   await loadWithPlanRecipes(page);
   await page.evaluate(() => {

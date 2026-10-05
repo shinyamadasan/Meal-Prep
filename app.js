@@ -3822,7 +3822,7 @@ function setupEventListeners() {
   document.getElementById('add-recipe-btn').addEventListener('click', openAddRecipeModal);
   document.getElementById('recipe-form').addEventListener('submit', saveRecipe);
   document.getElementById('cancel-btn').addEventListener('click', closeRecipeModal);
-  document.querySelector('.modal-close').addEventListener('click', closeRecipeModal);
+  document.querySelector('#recipe-modal .modal-close').addEventListener('click', closeRecipeModal);
   document.getElementById('add-ingredient-btn').addEventListener('click', addIngredientField);
   
   // Storage guide search and filter
