@@ -4,6 +4,36 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-073 — MCP set_inventory_quantity — FIX FIRST -> targeted re-review PASS (STRICT) -> owner-authorized integration -> approved (Worker deployment and production pilot separately pending)
+branch: `task-073`; reviewed candidate `42fef1892e5d3e92d4424ede60fea6d4d9aae11c` (earlier candidate `1c4a9f3f31c9d2ef27c9909ffa17b83d3f7eba84` returned FIX FIRST; review base `4c32dee2d0db47f377acfe6ab1d6c62543447655`, planning `64fe27cdaf66bd04ae3d9f8b212edb474a4a274a`);
+  integrated into `main` by merge `--no-ff` on `62b5c17bd95953c796b05142edceadc0f4e47eeb`
+date: 2026-10-05
+
+### Provenance — recorded from owner relay, not written by the reviewer
+Both independent STRICT reviews ran outside this repository. The first returned FIX FIRST (add an
+immutable unit precondition; destructiveHint true; idempotentHint questioned). The targeted
+re-review of the fix returned PASS. The reviewers' own reports are not in this repo; only the owner's
+relay is.
+
+### Fix round outcome (recorded from the builder's own changelog)
+expectedUnit became a mandatory assertion-only precondition (exact stored-unit equality, never
+forwarded or persisted, blank stored unit rejected, no conversion). destructiveHint is true.
+idempotentHint stays true on exact-argument replay semantics (same expectedRevision replay is a
+revision_conflict with zero further mutation, asserted by test); the owner relay records the targeted
+re-review accepted this.
+
+### Integration (owner: bounded end-to-end TASK-073 authorization)
+`origin/main` had not moved (`959ad21`) since TASK-072 closeout; the merge was conflict-free and the
+merged tree is identical to the reviewed candidate (empty tree diff against `42fef18`). Post-merge on
+the integration tip: focused suite 22/22, TASK-072 stock-state suite 15/15, full bridge suite 206/206,
+`node --check` on the two changed source files and `git diff --check` clean. No Firestore, OAuth or
+REST change.
+
+### Gate and remaining state
+Landing status **`approved`, not `done`** (D-032 red-zone: pantry quantity overwrite reachable from
+ChatGPT). Worker deployment and one reversible production quantity pilot are pending.
+
+---
 ## Review TASK-072 — MCP stock-state tools (mark_out_of_stock + mark_in_stock) — PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)
 branch: `task-072`; reviewed candidate `0098bd73fa5d5056a30274a69262a6bf96e03ebf` (review base `0aeab896bac2ca882abccc01d0f23d45d7351e33`, planning `3b8577ec2bf5f89c257a9c160ff33a5ad143526b`);
   integrated into `main` by merge `--no-ff` on `60b1f3e19737830a40e726e206dbeced74e60baf`

@@ -5740,7 +5740,7 @@ merge/deployment gate:
 ---
 
 ### TASK-073 · MCP ABSOLUTE INVENTORY COUNT — authenticated `set_inventory_quantity`
-status: review
+status: approved
 owner: claude (planning) → claude (builder; owner explicitly directed the build in an isolated
   worktree in the TASK-073 request, same exception TASK-069..072 used) — no Codex relay
 risk: STRICT (red-zone, D-032): pantry WRITE from ChatGPT that overwrites a stored quantity.
