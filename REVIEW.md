@@ -4,7 +4,7 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
-## Review TASK-073 — MCP set_inventory_quantity — FIX FIRST -> targeted re-review PASS (STRICT) -> owner-authorized integration -> approved (Worker deployment and production pilot separately pending)
+## Review TASK-073 — MCP set_inventory_quantity — FIX FIRST -> targeted re-review PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)
 branch: `task-073`; reviewed candidate `42fef1892e5d3e92d4424ede60fea6d4d9aae11c` (earlier candidate `1c4a9f3f31c9d2ef27c9909ffa17b83d3f7eba84` returned FIX FIRST; review base `4c32dee2d0db47f377acfe6ab1d6c62543447655`, planning `64fe27cdaf66bd04ae3d9f8b212edb474a4a274a`);
   integrated into `main` by merge `--no-ff` on `62b5c17bd95953c796b05142edceadc0f4e47eeb`
 date: 2026-10-05
@@ -32,6 +32,10 @@ REST change.
 ### Gate and remaining state
 Landing status **`approved`, not `done`** (D-032 red-zone: pantry quantity overwrite reachable from
 ChatGPT). Worker deployment and one reversible production quantity pilot are pending.
+
+### Closeout (2026-10-05)
+Landed `approved` per D-032, then closed `done` after the owner-reported production pilot (details in
+STATUS.md). Worker `154b5f14-6f53-4265-b49b-6adf2b5362f2` at 100%. Closeout is docs only.
 
 ---
 ## Review TASK-072 — MCP stock-state tools (mark_out_of_stock + mark_in_stock) — PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)

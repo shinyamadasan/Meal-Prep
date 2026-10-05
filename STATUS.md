@@ -5,6 +5,42 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-05 — TASK-073 CLOSED `done`: absolute inventory count MCP tool accepted in production
+
+**What closed it:** Worker version `154b5f14-6f53-4265-b49b-6adf2b5362f2` (deployed at 100%; rollback
+version `a7c7d71c-017a-4989-922c-671ab371b3e3`) carries `set_inventory_quantity`. Integrated from
+reviewed candidate `42fef1892e5d3e92d4424ede60fea6d4d9aae11c` via merge
+`62b5c17bd95953c796b05142edceadc0f4e47eeb`; approved-status commit `47bb082b421a50a2b9f1e311cd8c99cedffa6939`.
+Review history: first candidate `1c4a9f3` returned FIX FIRST (add an assertion-only `expectedUnit`
+precondition, `destructiveHint` true); the targeted STRICT re-review of `42fef18` returned PASS
+(owner-relayed; the reviewers' reports are not in this repo). `idempotentHint` stays true on
+exact-argument replay semantics. Local checks on the integration tip: focused suite 22/22, bridge
+suite 206/206.
+
+**Contract:** existing non-staple item only; absolute quantity > 0; mandatory `expectedUnit` must
+equal the stored unit exactly; no unit conversion; zero goes to `mark_out_of_stock`. That
+`expectedUnit` is never persisted is an implementation and review invariant, not a production-read
+observation.
+
+**Deployment smoke (this session, non-mutating HTTP checks, 2026-10-05):** auth-server metadata and
+scopes unchanged, protected-resource metadata correct, tokenless `/mcp` returned a 401 challenge,
+`/authorize` redirected to Cloudflare Access, unauthenticated REST returned 401. This session had no
+authenticated MCP session, so the live tool list was not observed here. The owner reports the live
+MCP surface is exactly seven tools: `get_inventory`, `get_ready_food`, `record_ready_food`,
+`consume_ready_food`, `mark_out_of_stock`, `mark_in_stock`, `set_inventory_quantity`.
+
+**Production pilot (owner-reported from the authenticated ChatGPT Meal Prep MCP session; this
+session did not inspect Firestore or call MCP):** non-staple `Chia Seeds`, stable id
+`buy_1789969547020_2zpdy`, unit `g`, quantity `10` -> `9` -> `10`. Revisions `29513` -> `29514` ->
+`29515`. 1 temporary-set attempt, 1 restore attempt, 0 recovery attempts. Unit unchanged, unrelated
+inventory and ready food reported unchanged. Exactly 2 production writes, 0 others. No unit
+conversion, no new item, no tombstone reported.
+
+**Unchanged:** no OAuth, secrets, Access, routes or Cloudflare config changes; no redeploy during
+closeout; TASK-065 untouched. Closeout is docs/governance only.
+
+---
+
 ## 2026-10-04 — TASK-072 CLOSED `done`: stock-state MCP tools accepted in production
 
 **What closed it:** Worker version `a7c7d71c-017a-4989-922c-671ab371b3e3` (deployed at 100%; rollback
