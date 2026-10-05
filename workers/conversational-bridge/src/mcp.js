@@ -70,6 +70,18 @@ const MARK_IN_STOCK_ANNOTATIONS = {
   openWorldHint: false
 };
 
+// set_inventory_quantity overwrites an existing quantity, so destructiveHint is true (false would
+// mean additive-only updates). idempotentHint is true by the MCP definition: repeated calls with the
+// SAME ARGUMENTS add no further effect. expectedRevision is one of the arguments, so an exact
+// replay (same revision) is a revision_conflict with zero mutation; a call with the new revision is
+// a different call, not a replay.
+const SET_QUANTITY_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
 function toolResult(data) {
   return {
     structuredContent: data,
@@ -123,6 +135,18 @@ function consumeReadyFoodInputSchema() {
 function inventoryStockInputSchema() {
   return z.strictObject({
     ingredientId: z.string().min(1),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+// quantity is typed > 0 so the public schema advertises the contract; the message steers a zero
+// ("none left") to mark_out_of_stock. expectedUnit is a precondition asserted against the stored
+// unit, never a replacement; there is no `unit` key, so strictObject rejects it.
+function setInventoryQuantityInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1),
+    quantity: z.number().positive('quantity must be a number > 0. For none left, use mark_out_of_stock.'),
+    expectedUnit: z.string().min(1),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -271,7 +295,69 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => markInStockTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'set_inventory_quantity',
+    {
+      title: 'Set inventory quantity',
+      description: 'Set the ABSOLUTE quantity of one existing non-staple pantry item ("I have 7 eggs", ' +
+        '"chicken is 650g"). Not for adding, buying, using or consuming: "I bought/used/added N" is ' +
+        'NOT supported. Required flow: 1) read get_inventory; 2) identify the stable row; 3) pass the ' +
+        'stored unit of the row as expectedUnit (a precondition only: it is never saved, never relabels the ' +
+        'row, and must match the stored unit exactly); 4) express quantity in that SAME stored unit; ' +
+        '5) call this tool. Stored unit g: "I have 650g chicken" -> quantity=650, expectedUnit="g". ' +
+        'Stored unit g: "I have 0.65kg chicken" -> do NOT send quantity=0.65 with expectedUnit="g"; ' +
+        'resolve or ask first. The tool never converts units; g vs kg, ml vs L, pieces vs cans are ' +
+        'rejected as unit_mismatch. For none left or out of milk, use mark_out_of_stock. Staples are refused (use ' +
+        'mark_in_stock / mark_out_of_stock). Take ingredientId ONLY from get_inventory; never guess or ' +
+        'fuzzy-match, and ask which row if several match. On ambiguous, ask the user to set the staple ' +
+        'flag in the app. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
+        'whether to retry.',
+      inputSchema: setInventoryQuantityInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: inventoryItemSchema()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: SET_QUANTITY_ANNOTATIONS
+    },
+    async (args) => setInventoryQuantityTool(env, deps, ctx, args)
+  );
+
   return server;
+}
+
+// Same adapter shape as the stock-state tools: auth -> read -> compare expectedRevision (no retry)
+// -> canonical wrapper -> ONE guarded pantry write -> sanitized result.
+async function setInventoryQuantityTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
+
+    const r = inventory.setCountedQuantity(doc.pantry, {
+      ingredientId: args.ingredientId,
+      quantity: args.quantity,
+      expectedUnit: args.expectedUnit
+    });
+    const written = await writeDoc(env, accessToken, {
+      fieldPaths: ['pantry'],
+      fields: { pantry: r.pantry },
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }, fetchImpl);
+
+    return toolResult({ ok: true, revision: written.revision, item: r.item });
+  } catch (error) {
+    return inventoryStockError(error, 'The inventory quantity could not be set.');
+  }
 }
 
 async function markOutOfStockTool(env, deps, ctx, args) {
@@ -514,7 +600,8 @@ const TOOL_SECURITY_SCHEMES = {
   record_ready_food: WRITE_SECURITY_SCHEMES,
   consume_ready_food: WRITE_SECURITY_SCHEMES,
   mark_out_of_stock: WRITE_SECURITY_SCHEMES,
-  mark_in_stock: WRITE_SECURITY_SCHEMES
+  mark_in_stock: WRITE_SECURITY_SCHEMES,
+  set_inventory_quantity: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {

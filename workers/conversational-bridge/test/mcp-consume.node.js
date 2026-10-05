@@ -411,16 +411,16 @@ test('uid, owner, path, collection, document, TARGET_UID, operation and other ex
 
 // ── SURFACE / REGRESSION ─────────────────────────────────────────────────────
 
-test('tools/list keeps the four ready-food tools unchanged alongside the two reviewed stock-state tools', async () => {
+test('tools/list keeps the four ready-food tools unchanged alongside the reviewed stock-state and set-quantity tools', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(2, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
   );
   const names = (await responseMessage(response)).result.tools.map((tool) => tool.name);
   assert.deepEqual(names, [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock'
+    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity'
   ]);
-  assert.doesNotMatch(names.join(' '), /finish|remove|delete|patch|execute|set_inventory|mutate/i);
+  assert.doesNotMatch(names.join(' '), /finish|remove|delete|patch|execute|set_inventory(?!_quantity)|mutate/i);
 });
 
 test('consume_ready_food advertises typed, required, strict input and the exact result shape', async () => {

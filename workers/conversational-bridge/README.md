@@ -254,6 +254,43 @@ surface to exactly six: `get_inventory`, `get_ready_food`, `record_ready_food`,
   canonical unchanged state; replay with the old revision conflicts. `mark_out_of_stock` is
   destructive because its non-staple path removes and tombstones the row; `mark_in_stock` is not.
 
+## TASK-073 authenticated MCP absolute inventory count (local only — NOT deployed)
+
+One more model-visible tool brings the surface to exactly seven: `get_inventory`,
+`get_ready_food`, `record_ready_food`, `consume_ready_food`, `mark_out_of_stock`,
+`mark_in_stock`, and `set_inventory_quantity`.
+
+| Tool | Existing canonical mapping | Result |
+|---|---|---|
+| `set_inventory_quantity` | `inventory.setCountedQuantity()` -> `inventory.setQuantity()` -> the same guarded pantry-only write used by `POST /v1/inventory/set-quantity` | `{ ok, revision, item }` |
+
+- Input is exactly `ingredientId` (non-empty string from `get_inventory`), `quantity` (finite number
+  strictly > 0), `expectedUnit` (non-empty string) and `expectedRevision` (non-negative integer).
+  There is NO replacement `unit` input; uid, path, collection, staple, delta, `unit` and any other
+  extra key are rejected before Firestore access.
+- `expectedUnit` is a PRECONDITION only: the model asserts the unit it read from `get_inventory`.
+  It must equal the stored unit exactly (no trimming, case folding or conversion): `g` vs `kg`,
+  `ml` vs `L`, `pieces` vs `cans` all fail with `unit_mismatch` and zero mutation. A row with a
+  blank, null or missing stored unit also fails `unit_mismatch`. It is never forwarded to
+  `setQuantity()`, never persisted and cannot relabel the row. "I have 0.65kg" against a stored
+  `g` row must be resolved or clarified before the call, never sent as 0.65 with `g`.
+- It is an ABSOLUTE count: "I have 7 eggs", "chicken is 650g", "only 2 cans left". It is not
+  "bought 7", "used 3" or "add 500g"; those delta operations do not exist.
+- Zero and negative quantities are rejected with a pointer to `mark_out_of_stock`. The tool never
+  translates zero into an out-of-stock call, and never creates a zero-quantity row.
+- The row's stored unit is preserved and nothing is converted.
+- Explicit staple rows are refused (staples are tracked by stock level: use `mark_in_stock` /
+  `mark_out_of_stock`). A row with no staple flag and a non-pantry category returns `ambiguous`
+  without writing, like `mark_out_of_stock`. Unknown or tombstoned ids return `not_found`.
+- A same-value set is NOT a no-op: canonical `setQuantity()` always stamps `updatedAt`, so it is a
+  normal guarded write with one revision increment. Replay with the old revision conflicts.
+  `destructiveHint: true` because the tool overwrites an existing quantity (false means additive
+  updates only). `idempotentHint: true` by the MCP definition (same arguments, no additional
+  effect): `expectedRevision` is one of the arguments, so an exact replay is a `revision_conflict`
+  with zero mutation; a call with the new revision is a different call.
+- One update-time-guarded pantry patch; stale `expectedRevision` returns `revision_conflict` with no
+  mutation and is never retried. Requires the existing `mealprep:write` scope; OAuth is unchanged.
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
