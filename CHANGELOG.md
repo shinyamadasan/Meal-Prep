@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-074 — fix-first (branch: task-074; base: 85fcdda)
+changed:
+  - app.js (`setRecipeFormMode()` restores only controls it disabled for details mode and toggles the photo upload read-only class, 10 net loc)
+  - tests/plan-persistence-and-picker.spec.js (Add/edit save restoration, retained business-disabled control, then-preview-again regressions, 59 loc)
+tests: focused Plan/picker spec (28 passed); editor restoration (2 passed); recipe editor/modal specs (9 passed); `npm test` (724 passed)
+blockers: none
+deviations: no scope changes; TASKS.md remains `review`
+deployment: none
+
 ## TASK-074 — done (branch: task-074)
 changed:
   - app.js (`#recipe-modal`, `openRecipeDetailsModal()`, `renderBatchPickerResults()`,

@@ -10661,6 +10661,7 @@ function downloadCSVTemplate() {
 
 var currentRecipeImportDraft = null;
 var recipeFormMode = 'manual';
+var recipeDetailsDisabledControls = new WeakSet();
 var importDuplicateOverride = false;
 var importSaveInProgress = false;
 
@@ -10673,14 +10674,21 @@ function setRecipeFormMode(mode) {
   if (form) {
     form.classList.toggle('recipe-form--readonly', details);
     form.querySelectorAll('input, select, textarea, button').forEach(control => {
-      if (control.id !== 'cancel-btn') control.disabled = details;
+      if (control.id === 'cancel-btn') return;
+      if (details && !control.disabled) {
+        recipeDetailsDisabledControls.add(control);
+        control.disabled = true;
+      } else if (!details && recipeDetailsDisabledControls.has(control)) {
+        control.disabled = false;
+        recipeDetailsDisabledControls.delete(control);
+      }
     });
   }
   if (submitBtn) submitBtn.hidden = details;
   const closeBtn = document.getElementById('cancel-btn');
   if (closeBtn) closeBtn.textContent = details ? 'Close' : 'Cancel';
   const photoGroup = document.getElementById('recipe-photo')?.closest('.form-group');
-  if (photoGroup) photoGroup.classList.add('recipe-photo-upload-group');
+  if (photoGroup) photoGroup.classList.toggle('recipe-photo-upload-group', details);
 }
 
 function openRecipeImportModal() {

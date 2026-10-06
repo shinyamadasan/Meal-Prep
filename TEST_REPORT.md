@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-074 fix-first · 2026-10-06
+suite: focused `tests/plan-persistence-and-picker.spec.js` (28); editor restoration cases (2); `tests/recipe-edit-preservation.spec.js`, `tests/recipe-actions.spec.js`, `tests/recipe-storage-persistence.spec.js` (9); `npm test` / `playwright test --project=local`.
+result: focused Plan/picker 28 passed; restoration 2 passed; adjacent editor/modal checks 9 passed; full local suite 724 passed, 0 failed. `node --check app.js`, `git diff --check`, exactly one `:root` block, delta secret scan clean.
+coverage: no instrumented coverage. Accessibility and responsive Playwright checks passed: keyboard title activation, dialog semantics, visible focus, focus return, narrow layout without horizontal overflow, and modal scrolling. Details remains read-only; Add/Edit saving works after closing details; controls already disabled before details remain disabled after return.
+untested: real-device rendering and production behavior; no deployment, production access, or recipe/Plan state mutation was performed by verification.
+
 ## TASK-074 · 2026-10-06
 suite: `npx playwright test tests/plan-persistence-and-picker.spec.js --project=local`; `npm test`
 result: focused Plan/picker spec 26 passed, 0 failed; full local Playwright suite 722 passed,

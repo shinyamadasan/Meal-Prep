@@ -422,6 +422,65 @@ test('Add-meals picker: several recipe details can be inspected sequentially wit
   await expect(page.locator('#batch-picker-modal')).toBeVisible();
 });
 
+test('closing Plan preview restores Add Recipe controls and allows saving', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { showTab('planner'); openBatchPickerModal(); });
+  await page.locator('#batch-picker-results .batch-result', { hasText: 'Test Long Life Rice' }).locator('.batch-name-btn').click();
+  await expect(page.locator('#recipe-submit-btn')).toBeHidden();
+  await page.locator('#cancel-btn').click();
+  await page.locator('#batch-picker-modal').getByRole('button', { name: 'Done' }).click();
+  await page.evaluate(() => showTab('recipes'));
+
+  await page.locator('#add-recipe-btn').click();
+  await expect(page.locator('#recipe-form')).not.toHaveClass(/recipe-form--readonly/);
+  await expect(page.locator('#recipe-name')).toBeEnabled();
+  await expect(page.locator('#recipe-photo')).toBeVisible();
+  expect(await page.locator('#recipe-photo').evaluate(input => getComputedStyle(input.closest('.form-group').querySelector('.form-label')).display)).not.toBe('none');
+  await expect(page.locator('#recipe-submit-btn')).toBeVisible();
+  await page.locator('#recipe-name').fill('Preview Restored Recipe');
+  await page.locator('#recipe-category').selectOption('Main Dish');
+  await page.locator('#prep-time').fill('5');
+  await page.locator('#cook-time').fill('10');
+  await page.locator('#servings').fill('2');
+  const ingredient = page.locator('#ingredients-list .ingredient-item').first();
+  await ingredient.locator('input').nth(0).fill('Rice');
+  await ingredient.locator('input').nth(1).fill('1');
+  await ingredient.locator('select').nth(0).selectOption('cups');
+  await ingredient.locator('select').nth(1).selectOption('Grain');
+  await page.locator('#instructions').fill('Cook the rice.');
+  await page.locator('#recipe-submit-btn').click();
+  expect(await page.evaluate(() => AppState.recipes.some(r => r.name === 'Preview Restored Recipe'))).toBe(true);
+});
+
+test('closing Plan preview restores Edit Recipe controls and keeps later previews read-only', async ({ page }) => {
+  await loadWithPlanRecipes(page);
+  await page.evaluate(() => { showTab('planner'); openBatchPickerModal(); });
+  const title = page.locator('#batch-picker-results .batch-result', { hasText: 'Test Long Life Rice' }).locator('.batch-name-btn');
+  await page.locator('#nutrition-calories').evaluate(input => { input.disabled = true; });
+  await title.click();
+  await expect(page.locator('#recipe-name')).toBeDisabled();
+  await page.locator('#recipe-modal .modal-close').click();
+
+  await page.evaluate(() => { showTab('recipes'); openEditRecipeModal('r_longlife'); });
+  await expect(page.locator('#recipe-form')).not.toHaveClass(/recipe-form--readonly/);
+  await expect(page.locator('#recipe-name')).toBeEnabled();
+  await expect(page.locator('#recipe-photo')).toBeVisible();
+  expect(await page.locator('#recipe-photo').evaluate(input => getComputedStyle(input.closest('.form-group').querySelector('.form-label')).display)).not.toBe('none');
+  await expect(page.locator('#nutrition-calories')).toBeDisabled();
+  await expect(page.locator('#recipe-submit-btn')).toBeVisible();
+  await page.locator('#recipe-name').fill('Edited After Preview');
+  await page.locator('#recipe-submit-btn').click();
+  expect(await page.evaluate(() => AppState.recipes.find(r => r.id === 'r_longlife').name)).toBe('Edited After Preview');
+
+  await title.click();
+  await expect(page.locator('#recipe-form')).toHaveClass(/recipe-form--readonly/);
+  await expect(page.locator('#recipe-name')).toBeDisabled();
+  await expect(page.locator('#recipe-submit-btn')).toBeHidden();
+  await expect(page.locator('#recipe-photo')).toBeHidden();
+  await page.locator('#cancel-btn').click();
+  await expect(page.locator('#batch-picker-modal')).toBeVisible();
+});
+
 test('Plan recipe title has keyboard focus and details remain scrollable on a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await loadWithPlanRecipes(page);
