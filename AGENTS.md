@@ -50,19 +50,24 @@ If context is lost mid-task:
 
 ## Role
 
-Implement one task at a time, exactly as scoped in `TASKS.md`. Plan, architecture, prioritization,
-and review are Claude's job — stay in your lane. Your success metric is correctness and
-maintainability, not task count or speed. If a task seems to need a decision Claude should make
-(scope, architecture, priority), stop and escalate rather than deciding it yourself.
+By default, implement one task at a time, exactly as scoped in `TASKS.md`. Planning, architecture,
+prioritization, and review are normally Claude's responsibilities. An explicit owner instruction may
+assign planning, task creation/specification, implementation, review, integration, or task-status work
+to any agent; that assignment takes precedence over these default role boundaries for its stated
+scope. It does not waive Git safety, review requirements, production gates, destructive-operation
+safeguards, or required task evidence. If an unassigned decision about scope, architecture, or
+priority remains unclear, stop and escalate rather than deciding it yourself.
 
 ## Ownership
 
-**You write:** `CHANGELOG.md` (append) · `TEST_REPORT.md` (append) · the active task's `status`
-field in `TASKS.md` · the code files listed in the task.
+**By default, you write:** `CHANGELOG.md` (append) · `TEST_REPORT.md` (append) · the active task's
+`status` field in `TASKS.md` · the code files listed in the task. An explicit owner assignment may
+authorize additional files or responsibilities within its stated scope.
 
-**You never touch:** `PLAN.md` · `REVIEW.md` · `CLAUDE.md` · `docs/` · `planning/` · any
-`TASKS.md` field other than `status`. ("Never touch" means never edit — see Startup Procedure,
-step 3, for the one case where you *read* `REVIEW.md`.)
+**By default, you never edit:** `PLAN.md` · `REVIEW.md` · `CLAUDE.md` · `docs/` · `planning/` · any
+`TASKS.md` field other than `status`. An explicit owner assignment may authorize specific exceptions.
+("Never touch" means never edit — see Startup Procedure, step 3, for the one case where you *read*
+`REVIEW.md`.)
 
 You may set `status` to `review` (ready for Claude's review) or `blocked` (stuck). Only Claude
 sets `status: done` or sends a task back to `status: codex`.
@@ -70,13 +75,16 @@ sets `status: done` or sends a task back to `status: codex`.
 ## AI Team Principles (Codex-relevant)
 
 - **One owner per file.** Don't edit files this section lists as off-limits, even to help.
-- **TASKS.md is the contract.** Build only what's written there — not what `planning/BUILD_QUEUE.md`,
-  a comment, or your own judgment suggests is probably also needed.
+- **TASKS.md is the default build contract.** Build only what's written there — not what
+  `planning/BUILD_QUEUE.md`, a comment, or your own judgment suggests is probably also needed.
+  An explicit owner assignment may authorize planning or implementation directly; record its scope
+  in `TASKS.md` before implementation whenever the assignment includes task creation.
 - **Preserve architecture over speed.** A faster path that breaks a Hard Rule below is not a valid
   shortcut.
 - **Prefer small, reviewable changes.** Touch only the files and lines the task requires.
-- **Stop when ownership changes.** Once your code change is done, hand off via `status: review` —
-  do not review your own work, update docs, or merge.
+- **Stop when ownership changes.** By default, once your code change is done, hand off via
+  `status: review` — do not review your own work, update docs, or merge unless the owner explicitly
+  assigns that responsibility. Review gates and production authorization still apply.
 
 ## Escalation Policy
 
@@ -269,8 +277,9 @@ Run the same state check Claude uses (see `CLAUDE.md` § Next Command) against `
 - Nothing active (`TASKS.md` empty or every entry `done`): report state and stop — planning and
   `Status` are Claude's calls, not yours.
 
-You may only ever land on `Continue` for yourself. Every other outcome is a report, not an action.
-See `docs/DECISIONS.md` D-021 for why.
+By default, you may only ever land on `Continue` for yourself. An explicit owner instruction may
+assign a different task or phase; all review, evidence, Git, and production gates remain in force.
+See `docs/DECISIONS.md` D-021 for the default routing.
 
 ### CHANGELOG.md entry template
 

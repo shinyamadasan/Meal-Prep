@@ -10,6 +10,11 @@
 
 ## What this is
 
+Claude and Codex responsibilities described here are defaults. An explicit owner instruction may
+assign planning, task creation/specification, implementation, review, integration, or task-status
+work to any agent. The assignment applies only to its stated scope; Git safety, review and production
+gates, destructive-operation safeguards, and required task evidence remain in force.
+
 A complete **AI-native development operating system** for solo app development. It replaces the team you don't have — product manager, engineering lead, QA, security reviewer — with a coordinated system of autonomous agents, gated pipelines, and scheduled automation.
 
 You are the CEO. You make the decisions that matter: what to build, whether to ship. The OS handles everything in between.

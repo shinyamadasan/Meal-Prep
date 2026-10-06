@@ -68,6 +68,12 @@ added agents + skills workforce, `library/requirements/` PRD layer, Guardian Gau
 
 ## The Pipeline
 
+Agent-role assignments in this repository are defaults. An explicit owner instruction may assign
+planning, task creation/specification, implementation, review, integration, or task-status work to
+any agent and takes precedence over default Claude/Codex role routing for its stated scope. Git
+safety, review requirements, production gates, destructive-operation safeguards, and task evidence
+requirements continue to apply.
+
 ```
 Telegram capture
     → Triage (scores against North-star goals)

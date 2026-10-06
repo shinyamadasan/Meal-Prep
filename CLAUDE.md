@@ -78,9 +78,9 @@ If conversation context is lost or a new session begins:
 
 ### Claude
 
-Claude is the Product Manager, Tech Lead, Architect, and Reviewer.
+Claude is the default Product Manager, Tech Lead, Architect, and Reviewer.
 
-Claude owns:
+By default, Claude owns:
 - Product judgment, prioritization, scope, and acceptance criteria
 - Architecture decisions and documentation consistency
 - Breaking approved work into small implementation tasks
@@ -108,9 +108,9 @@ Otherwise Claude focuses on planning, architecture, documentation, and review.
 
 ### Codex
 
-Codex is the Software Engineer, Implementer, and Tester.
+Codex is the default Software Engineer, Implementer, and Tester.
 
-Codex owns:
+By default, Codex owns:
 - Implementing one task at a time from `TASKS.md`
 - Focused code changes that satisfy acceptance criteria
 - Running tests and recording results
@@ -118,8 +118,8 @@ Codex owns:
 - Appending test evidence to `TEST_REPORT.md`
 - Updating only the active task's `status` field during execution
 
-Codex must not read `planning/BUILD_QUEUE.md` as an execution source. `TASKS.md` is the only handoff
-from Claude to Codex.
+By default, Codex must not read `planning/BUILD_QUEUE.md` as an execution source. `TASKS.md` is the
+handoff from Claude to Codex unless the owner explicitly assigns planning or another source.
 
 ## AI Team Principles
 
@@ -137,9 +137,13 @@ These principles govern all AI collaboration.
 4. **The repository is the communication channel.**
    Agents communicate through repository files, not chat history.
 
-5. **TASKS.md is the contract.**
-   Claude plans work in `TASKS.md`.
-   Codex executes only what appears there.
+5. **TASKS.md is the default contract.**
+   By default, Claude plans work in `TASKS.md` and Codex executes only what appears there. An
+   explicit owner instruction may assign planning, task creation/specification, implementation,
+   review, integration, or task-status work to any agent. That assignment overrides default role
+   routing for its stated scope; Git safety, review requirements, production gates, destructive-
+   operation safeguards, and required evidence still apply. When the owner assigns planning and
+   implementation together, record a ready task in `TASKS.md` before building it.
 
 6. **Preserve architecture over speed.**
    Never introduce shortcuts that violate documented architecture or hard rules.
@@ -242,7 +246,8 @@ Pull only the docs the active task needs.
 
 ### Tech Lead
 
-- Convert approved `planning/BUILD_QUEUE.md` items into small, independently testable tasks.
+- By default, convert approved `planning/BUILD_QUEUE.md` items into small, independently testable
+  tasks. An explicit owner assignment may route planning and task creation to another agent.
 - Write clear objective, files, acceptance criteria, and expected verification in `TASKS.md`.
 - Set new implementation tasks to `status: codex`.
 - Make `TASKS.md` complete enough that Codex does not need `planning/BUILD_QUEUE.md`.
@@ -312,7 +317,8 @@ If any item is missing, the task is not complete.
 
 Codex follows `AGENTS.md`. Summary:
 
-1. Open `TASKS.md` and find the first task with `status: codex`.
+1. Open `TASKS.md` and find the first task with `status: codex`, unless an explicit owner instruction
+   assigns a different task or status to Codex.
 2. Read the task acceptance checklist and listed files.
 3. Read `docs/ARCHITECTURE.md` and `docs/DECISIONS.md`.
 4. Implement on branch `task-<id>`.
@@ -321,7 +327,8 @@ Codex follows `AGENTS.md`. Summary:
 7. Set the task `status` to `review` in `TASKS.md`.
 8. If blocked, set `status: blocked` and record the blocker under the task.
 
-Codex never uses `planning/BUILD_QUEUE.md` to choose work.
+By default, Codex never uses `planning/BUILD_QUEUE.md` to choose work. An explicit owner instruction
+may assign planning from that source, with the resulting scope recorded in `TASKS.md` before build.
 
 ## Decision Priority
 
@@ -342,8 +349,9 @@ Do not violate a higher-priority rule to satisfy a lower-priority one.
    OS-level infrastructure changes: agents, workflow events, pipeline changes, or new hard rules.
 1. **Nothing builds without human approval.** Triage routes, Sprint Planning schedules, Builder builds.
    Do not cross lanes. See DECISIONS D-015.
-2. **Codex builds only from `TASKS.md`.** `planning/BUILD_QUEUE.md` is Claude's planning input, not
-   Codex's execution source.
+2. **Codex builds from `TASKS.md` by default.** `planning/BUILD_QUEUE.md` is planning input, not a
+   default execution source. An explicit owner instruction may assign planning to Codex; when it
+   does, record the ready task in `TASKS.md` before implementation.
 3. **Quote recipe ids in handlers:** `onclick="openEditRecipeModal('${recipe.id}')"` because Firestore
    ids are strings. Unquoted ids render as bare identifiers and break.
 4. **Patch old recipes after storage load:** call `patchMissingNutrition(AppState.recipes)` after loading
