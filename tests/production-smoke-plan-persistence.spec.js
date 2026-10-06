@@ -159,7 +159,9 @@ test('live: batch recipe title opens the existing recipe detail modal by stable 
   await expect(nameBtn).toHaveText('PSP Long Life Rice');
   await nameBtn.click();
   await expect(page.locator('#recipe-modal')).not.toHaveClass(/hidden/);
-  expect(await page.evaluate(() => String(AppState.currentEditingRecipe))).toBe('psp_longlife');
+  await expect(page.locator('#recipe-name')).toHaveValue('PSP Long Life Rice');
+  await expect(page.locator('#recipe-name')).toBeDisabled();
+  await expect(page.locator('#recipe-submit-btn')).toBeHidden();
 
   const stillThere = await page.evaluate((batchId) => AppState.plannedBatches.find((b) => b.id === batchId), id);
   expect(stillThere.recipeId).toBe('psp_longlife');
