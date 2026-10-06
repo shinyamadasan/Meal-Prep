@@ -4,6 +4,31 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-074 — PASS (targeted reviewer relay) → owner-authorized integration → approved
+branch: `task-074`; reviewed candidate `0d2a6f78d65a1aa20952f6ffbef1c04ecdb70ae1` (fix-first base `85fcddaa5ca090fe47f7cf50b1c3d1633bbd0b0a`; initial review base `ce9bbb6cd767712ff04fdea522b288d8ebbbcd85`)
+date: 2026-10-06
+
+### Provenance
+The owner relayed the targeted independent reviewer verdict as PASS. The reviewer report was not
+provided as a repository artifact; this record preserves that provenance and does not present the
+review as authored by the builder.
+
+### Integration and verification
+Owner authorized the complete integration, static release, read-only production verification, and
+closeout lifecycle. The clean local `main` worktree fast-forwarded directly to the reviewed
+candidate; integration SHA equals the reviewed candidate SHA, so the implementation tree is
+identical with no merge resolution. On the integration tip, the focused Plan/picker plus recipe
+editor suites passed 37/37; `node --check app.js`, `git diff --check`, and all 110 decision
+pointers passed. The builder had already recorded the full local browser suite at 724/724 on this
+same immutable candidate. `Check-DocsConsistency.ps1` continues to report the repository's known
+51 potential drift items; none are in TASK-074's changed decision/architecture anchors.
+
+### Gate
+Landing status is **`approved`** pending static GitHub Pages release and live read-only
+verification. No Firebase, Worker, MCP, inventory, shopping, or production-data mutation is part
+of this task.
+
+---
 ## Review TASK-073 — MCP set_inventory_quantity — FIX FIRST -> targeted re-review PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)
 branch: `task-073`; reviewed candidate `42fef1892e5d3e92d4424ede60fea6d4d9aae11c` (earlier candidate `1c4a9f3f31c9d2ef27c9909ffa17b83d3f7eba84` returned FIX FIRST; review base `4c32dee2d0db47f377acfe6ab1d6c62543447655`, planning `64fe27cdaf66bd04ae3d9f8b212edb474a4a274a`);
   integrated into `main` by merge `--no-ff` on `62b5c17bd95953c796b05142edceadc0f4e47eeb`
