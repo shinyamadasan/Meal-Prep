@@ -5817,6 +5817,70 @@ merge/deployment gate:
 
 ---
 
+### TASK-074 · Plan recipe preview/details
+status: codex
+owner: owner-directed planning + implementation (Codex)
+priority: P1
+source: owner "OWNER OVERRIDE + TASK-074 — PLAN RECIPE PREVIEW / DETAILS" (2026-10-06)
+files: app.js; style.css; tests/plan-persistence-and-picker.spec.js; CHANGELOG.md; TEST_REPORT.md;
+  TASKS.md status field only during implementation.
+
+live-inspection findings (verified against origin/main @ ce9bbb6):
+  - The Add-meals picker is `#batch-picker-modal`, rendered by `renderBatchPickerResults()`;
+    search, filters, Added state, and results already remain mounted while another modal opens.
+  - Plan batch rows are rendered by `plannedBatchRowHtml()` and resolve recipe identity with
+    `findRecipeById(b.recipeId)`.
+  - The shared top-level `#recipe-modal` is opened by `openEditRecipeModal(recipeId)` and is an
+    editable form (including Save, ingredient removal, and photo controls), not a read-only viewer.
+    Reuse this modal in a locked details mode; do not expose editor mutations from Plan inspection.
+  - Existing picker and Plan-row inspection handlers target a wrapping `.batch-info` div around a
+    title button. Replace these with a semantic title button handler to avoid nested/conflicting
+    click targets. Keep `+ Add`, favorite, servings, and remove actions separate.
+  - Closing the top-level recipe modal leaves the picker visible underneath; preserve its current
+    query/filter/results and do not re-open or re-render it as part of the details close path.
+
+objective:
+  Let a user inspect a recipe from the Plan Add-meals picker and This week's batches without
+  leaving Plan or changing the plan. Reuse the canonical recipe lookup and existing recipe modal
+  in an explicitly read-only details mode. Viewing a recipe is separate from adding it.
+
+acceptance:
+  - [ ] In the Add-meals picker, the recipe title is a semantic, keyboard-operable button that opens
+        the shared recipe modal in a clearly read-only details mode; it shows canonical recipe
+        information including ingredients and instructions. It never adds the recipe. The Add,
+        Added, and favorite controls retain independent behavior.
+  - [ ] In This week's batches, the recipe title opens that same read-only details mode by stable
+        recipe id. The servings stepper and remove control remain separate and work after viewing.
+  - [ ] Read-only details hide/disable every recipe mutation control, including save, editable
+        fields, ingredient removal, and photo upload/removal. Closing restores the normal editor
+        behavior at other existing entry points.
+  - [ ] Closing details returns to the same picker or Plan view, preserving search, filters, Added
+        state, plan membership, and servings. Sequential inspection of multiple recipes works.
+  - [ ] Inspection leaves recipe data/favorites, weekly-plan membership, servings, inventory,
+        shopping, ready food, and MCP state unchanged; inspecting then Add adds exactly one entry.
+  - [ ] Recipe title activation works by mouse and keyboard with visible focus; there are no nested
+        or conflicting click targets. Details modal scrolling works on desktop and narrow/mobile
+        viewports without horizontal overflow.
+  - [ ] Focused Playwright cases cover: unadded inspect-close-Add; already-added inspect; search and
+        filter return; sequential inspection; Added-state preservation; no duplicate; unchanged
+        servings; +/- and remove after viewing; keyboard activation; narrow layout; unchanged
+        recipe/inventory/shopping state.
+
+constraints: Reuse `#recipe-modal`; do not create a competing recipe viewer or edit/import/recommend
+  recipes. Do not redesign Plan. No conversational planning, MCP tools/state, recipe data model,
+  favorites, inventory, shopping, or ready-food mutations. No deployment or production access.
+  Keep existing editor entry points and Plan action semantics unchanged.
+
+verification:
+  - [ ] Run focused `tests/plan-persistence-and-picker.spec.js` coverage and the repo-required
+        `npm test`; record exact results in `TEST_REPORT.md`.
+  - [ ] Complete `SELF_REVIEW.md` and all AI-verifiable `QA.md` checks. Check desktop and narrow
+        viewport behavior in Playwright, `git diff --check`, and ensure no domain state changes on
+        view-only open/close.
+
+merge/deployment gate: Hand off at `status: review`; independent review required before merge.
+  No production deployment or production verification is authorized by this task.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 <!-- TASK TEMPLATE — copy and fill:
