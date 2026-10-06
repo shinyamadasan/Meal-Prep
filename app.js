@@ -4071,12 +4071,29 @@ function resetServingSize(recipeId) {
 }
 
 function openEditRecipeModal(recipeId) {
-  setRecipeFormMode('edit');
+  openRecipeModal(recipeId, 'edit');
+}
+
+function openRecipeDetailsModal(recipeId) {
+  recipeDetailsReturnFocus = document.activeElement;
+  openRecipeModal(recipeId, 'details');
+}
+window.openRecipeDetailsModal = openRecipeDetailsModal;
+
+var recipeDetailsReturnFocus = null;
+
+function openRecipeModal(recipeId, mode) {
   const recipe = AppState.recipes.find(r => String(r.id) === String(recipeId));
   if (!recipe) return;
+
+  setRecipeFormMode(mode);
   
-  AppState.currentEditingRecipe = recipeId;
-  document.getElementById('modal-title').textContent = 'Edit Recipe';
+  if (mode === 'edit') AppState.currentEditingRecipe = recipeId;
+  const modal = document.getElementById('recipe-modal');
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'modal-title');
+  document.getElementById('modal-title').textContent = mode === 'details' ? 'Recipe Details' : 'Edit Recipe';
   
   // Populate form with recipe data
   document.getElementById('recipe-name').value = recipe.name;
@@ -4098,10 +4115,12 @@ function openEditRecipeModal(recipeId) {
   
   // Handle existing photo
   if (recipe.photo) {
-    currentRecipePhoto = recipe.photo;
+    if (mode === 'edit') currentRecipePhoto = recipe.photo;
     showPhotoPreview(recipe.photo);
-  } else {
+  } else if (mode === 'edit') {
     removePhoto();
+  } else {
+    document.getElementById('photo-preview').style.display = 'none';
   }
   
   // Clear and populate ingredients
@@ -4117,13 +4136,18 @@ function openEditRecipeModal(recipeId) {
     });
   });
   
-  document.getElementById('recipe-modal').classList.remove('hidden');
+  setRecipeFormMode(mode);
+  modal.classList.remove('hidden');
+  if (mode === 'details') modal.querySelector('.modal-close').focus();
 }
 
 function closeRecipeModal() {
+  const returnFocus = recipeFormMode === 'details' ? recipeDetailsReturnFocus : null;
+  recipeDetailsReturnFocus = null;
   document.getElementById('recipe-modal').classList.add('hidden');
   setRecipeFormMode('manual');
   clearRecipeForm();
+  if (returnFocus && returnFocus.isConnected) returnFocus.focus();
 }
 
 function clearRecipeForm() {
@@ -4167,6 +4191,7 @@ function removeIngredientField(button) {
 
 function saveRecipe(e) {
   e.preventDefault();
+  if (recipeFormMode === 'details') return;
   if (recipeFormMode === 'import-review') {
     updateCurrentImportDraftFromRecipeForm();
     saveCurrentRecipeImportDraft();
@@ -10163,15 +10188,11 @@ function renderBatchPickerResults() {
     var addBtn = alreadyPlanned
       ? '<span class="batch-picker-added">Added ✓</span>'
       : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
-    // Three distinct controls, none of which mutate another: the info area (title, meta,
-    // and its blank space) inspects via the same recipe edit/detail modal as the Plan
-    // tab's batch list, the heart reuses the existing Recipes-tab favorite toggle exactly,
-    // and +Add/Added is unchanged (TASK-064). The title button carries no handler of its
-    // own — its click (mouse or keyboard) bubbles to .batch-info, so it opens once.
-    var nameBtn = '<button type="button" class="batch-name batch-name-btn" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
+    // Title details, favorite, and +Add/Added are separate actions (TASK-064/TASK-074).
+    var nameBtn = '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJ(String(r.id)) + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
     var favBtn = '<button type="button" class="recipe-fav-btn' + (r.favorite ? ' active' : '') + '" onclick="toggleFavorite(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()" title="' + (r.favorite ? 'Remove from favorites' : 'Add to favorites') + '" aria-label="' + (r.favorite ? 'Remove ' + escapeHtml(r.name) + ' from favorites' : 'Add ' + escapeHtml(r.name) + ' to favorites') + '">♥</button>';
     return '<div class="batch-result">' +
-      '<div class="batch-info batch-info--inspect" onclick="openEditRecipeModal(\'' + escJ(String(r.id)) + '\')">' + nameBtn +
+      '<div class="batch-info">' + nameBtn +
       (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
       favBtn +
       addBtn +
@@ -10199,18 +10220,14 @@ function plannedBatchRowHtml(b, mode) {
       '<button type="button" class="batch-remove-btn" aria-label="Remove ' + escapeHtml(name) + '" onclick="removePlannedBatch(\'' + idArg + '\')">×</button>';
   }
   // Recipe title is inspectable only on the Plan tab's own batch list, and only when
-  // the recipe still exists — reuses the existing edit/detail modal by stable recipeId,
-  // never a display-name lookup (TASK-064). Prep tab and picker rows are unchanged.
-  // The whole info area (title + meta) is the target; stepper/remove sit outside it.
+  // the recipe still exists — reuses the shared modal in read-only mode by stable id.
+  // The title button, servings stepper, and remove control stay separate (TASK-074).
   var inspectable = mode !== 'prep' && recipe;
   var nameHtml = inspectable
-    ? '<button type="button" class="batch-name batch-name-btn" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
+    ? '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJ(String(recipe.id)) + '\')" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
     : '<span class="batch-name">' + escapeHtml(name) + '</span>';
-  var infoOpen = inspectable
-    ? '<div class="batch-info batch-info--inspect" onclick="openEditRecipeModal(\'' + escJ(String(recipe.id)) + '\')">'
-    : '<div class="batch-info">';
   return '<div class="batch-row" data-batch-id="' + escapeHtml(b.id) + '">' +
-    infoOpen + nameHtml +
+    '<div class="batch-info">' + nameHtml +
     '<span class="batch-meta">' + escapeHtml(servingsText) + '</span></div>' +
     controls + '</div>';
 }
@@ -10649,8 +10666,21 @@ var importSaveInProgress = false;
 
 function setRecipeFormMode(mode) {
   recipeFormMode = mode || 'manual';
+  const details = recipeFormMode === 'details';
+  const form = document.getElementById('recipe-form');
   const submitBtn = document.getElementById('recipe-submit-btn');
   if (submitBtn) submitBtn.textContent = 'Save Recipe';
+  if (form) {
+    form.classList.toggle('recipe-form--readonly', details);
+    form.querySelectorAll('input, select, textarea, button').forEach(control => {
+      if (control.id !== 'cancel-btn') control.disabled = details;
+    });
+  }
+  if (submitBtn) submitBtn.hidden = details;
+  const closeBtn = document.getElementById('cancel-btn');
+  if (closeBtn) closeBtn.textContent = details ? 'Close' : 'Cancel';
+  const photoGroup = document.getElementById('recipe-photo')?.closest('.form-group');
+  if (photoGroup) photoGroup.classList.add('recipe-photo-upload-group');
 }
 
 function openRecipeImportModal() {

@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-074 · 2026-10-06
+suite: `npx playwright test tests/plan-persistence-and-picker.spec.js --project=local`; `npm test`
+result: focused Plan/picker spec 26 passed, 0 failed; full local Playwright suite 722 passed,
+  0 failed. Coverage: not instrumented (browser end-to-end suite).
+untested: real-device rendering and production behavior; no deployment or production access.
+
 ## TASK-073 fix-first round 1 · 2026-10-04
 suite: node --test test/mcp-set-quantity.node.js (22/22, was 17); npm run test:bridge (206 passed, 0 failed, 0 skipped; was 201); node --check on src/mcp.js, src/operations/inventory.js and the test file; git diff --check; delta secret scan; Verify-Decisions; Check-DocsConsistency vs baseline.
 result: pass. expectedUnit precondition: exact match writes; g/kg, kg/g, ml/L, pieces/cans, case and whitespace variants, stale assumption, and blank/null/non-string stored units all return unit_mismatch with a byte-identical store; correct unit + stale revision is revision_conflict; expectedUnit absent from persisted rows and the whole store; missing/empty/non-string expectedUnit and a unit key fail the schema before Firestore. destructiveHint true; idempotentHint true with the same-arguments replay asserted as a conflict with zero further mutation.

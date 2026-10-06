@@ -15,7 +15,10 @@
 - **Batch Picker modal (D-078)** — Working · `#batch-picker-modal`, `openBatchPickerModal()` /
   `renderBatchPickerResults()` · a full recipe picker: every recipe is listed by default (no query
   needed to browse), search narrows it, and **Low effort** is an optional filter chip that starts
-  OFF — it no longer hides the rest of the recipe box by default (`getBatchSearchResults()`).
+  OFF — it no longer hides the rest of the recipe box by default (`getBatchSearchResults()`). Recipe
+  title buttons open `#recipe-modal` through `openRecipeDetailsModal()` in read-only mode; closing
+  returns to the picker with its query and filters intact. Plan batch titles use the same details
+  view, separate from servings and remove controls.
 - **By day (Plan)** — Working · collapsed `<details id="plan-by-day-details">`, closed by default
   — the Monday–Sunday scheduler is optional and demoted below the batch list (D-078).
 - **Shop from batches** — Implemented · `generateGroceryList()` includes batches scaled to their servings.

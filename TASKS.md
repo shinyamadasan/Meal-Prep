@@ -5818,7 +5818,7 @@ merge/deployment gate:
 ---
 
 ### TASK-074 · Plan recipe preview/details
-status: codex
+status: review
 owner: owner-directed planning + implementation (Codex)
 priority: P1
 source: owner "OWNER OVERRIDE + TASK-074 — PLAN RECIPE PREVIEW / DETAILS" (2026-10-06)

@@ -5,6 +5,20 @@
 
 ---
 
+## TASK-074 — done (branch: task-074)
+changed:
+  - app.js (`#recipe-modal`, `openRecipeDetailsModal()`, `renderBatchPickerResults()`,
+    `plannedBatchRowHtml()`, and `setRecipeFormMode()` provide guarded read-only details from Plan,
+    50 loc)
+  - style.css (read-only controls remain legible; mutation controls and Save are hidden, 7 loc)
+  - docs/FEATURES.md (documents title-button inspection from picker and Plan batches, 4 loc)
+  - tests/plan-persistence-and-picker.spec.js (read-only, return state, action separation,
+    keyboard, responsive and state-preservation coverage, 165 loc)
+tests: focused Plan spec (26 cases, all pass); `npm test` (722 passed)
+blockers: none
+deviations: none
+→ status set to `review` in TASKS.md
+
 ## TASK-073 — review (branch: task-073), fix-first round 1
 fix (reviewer FIX FIRST, base 4c32dee, old candidate 1c4a9f3):
   - mcp.js + inventory.js setCountedQuantity(): mandatory expectedUnit precondition (non-empty string; exact equality with the stored unit; blank/null/non-string stored unit rejected; distinct unit_mismatch error; zero mutation). Never forwarded to setQuantity(), never persisted. No trimming, case folding or conversion helpers.

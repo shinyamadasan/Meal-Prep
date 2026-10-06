@@ -7604,7 +7604,6 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 }
 .batch-result:last-child, .batch-row:last-child { border-bottom: none; }
 .batch-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.batch-info--inspect { cursor: pointer; }
 /* TASK-064: the picker's own favorite toggle reuses .recipe-fav-btn's icon/color/active
    state exactly, but that class's align-self:flex-start (tuned for the Recipes-tab card
    header) sits high against this row's centered layout, and its glyph-only hit area is
@@ -7638,6 +7637,12 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   text-underline-offset: 2px;
 }
 .batch-name-btn:hover, .batch-name-btn:focus-visible { color: var(--color-primary); }
+#recipe-form.recipe-form--readonly :disabled { opacity: 1; color: var(--color-text); cursor: default; }
+#recipe-form.recipe-form--readonly .remove-ingredient,
+#recipe-form.recipe-form--readonly .remove-photo,
+#recipe-form.recipe-form--readonly #recipe-photo { display: none; }
+#recipe-form.recipe-form--readonly .recipe-photo-upload-group > .form-label { display: none; }
+#recipe-submit-btn[hidden] { display: none; }
 .batch-stepper { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; }
 .batch-step-btn, .batch-remove-btn {
   width: 36px;
