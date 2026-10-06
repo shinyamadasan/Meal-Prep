@@ -5818,11 +5818,13 @@ merge/deployment gate:
 ---
 
 ### TASK-074 · Plan recipe preview/details
-status: approved
+status: done
 owner: owner-directed planning + implementation (Codex)
 priority: P1
 source: owner "OWNER OVERRIDE + TASK-074 — PLAN RECIPE PREVIEW / DETAILS" (2026-10-06)
+owner override (2026-10-06): authorized safe integration, normal push to main, static GitHub Pages release, read-only production verification, and governance closeout. No backend, Worker, MCP, inventory, shopping, or production-data mutation.
 files: app.js; style.css; docs/FEATURES.md; tests/plan-persistence-and-picker.spec.js;
+  tests/production-smoke-plan-persistence.spec.js (stale edit-mode assertion corrected for details);
   CHANGELOG.md; TEST_REPORT.md;
   TASKS.md status field only during implementation.
 
@@ -5846,43 +5848,44 @@ objective:
   in an explicitly read-only details mode. Viewing a recipe is separate from adding it.
 
 acceptance:
-  - [ ] In the Add-meals picker, the recipe title is a semantic, keyboard-operable button that opens
+  - [x] In the Add-meals picker, the recipe title is a semantic, keyboard-operable button that opens
         the shared recipe modal in a clearly read-only details mode; it shows canonical recipe
         information including ingredients and instructions. It never adds the recipe. The Add,
         Added, and favorite controls retain independent behavior.
-  - [ ] In This week's batches, the recipe title opens that same read-only details mode by stable
+  - [x] In This week's batches, the recipe title opens that same read-only details mode by stable
         recipe id. The servings stepper and remove control remain separate and work after viewing.
-  - [ ] Read-only details hide/disable every recipe mutation control, including save, editable
+  - [x] Read-only details hide/disable every recipe mutation control, including save, editable
         fields, ingredient removal, and photo upload/removal. Closing restores the normal editor
         behavior at other existing entry points.
-  - [ ] Closing details returns to the same picker or Plan view, preserving search, filters, Added
+  - [x] Closing details returns to the same picker or Plan view, preserving search, filters, Added
         state, plan membership, and servings. Sequential inspection of multiple recipes works.
-  - [ ] Inspection leaves recipe data/favorites, weekly-plan membership, servings, inventory,
+  - [x] Inspection leaves recipe data/favorites, weekly-plan membership, servings, inventory,
         shopping, ready food, and MCP state unchanged; inspecting then Add adds exactly one entry.
-  - [ ] Recipe title activation works by mouse and keyboard with visible focus; there are no nested
+  - [x] Recipe title activation works by mouse and keyboard with visible focus; there are no nested
         or conflicting click targets. Details modal scrolling works on desktop and narrow/mobile
         viewports without horizontal overflow.
-  - [ ] `docs/FEATURES.md` describes recipe inspection from the picker and Plan batch list using
+  - [x] `docs/FEATURES.md` describes recipe inspection from the picker and Plan batch list using
         stable anchors; no recipe data-model documentation changes are needed.
-  - [ ] Focused Playwright cases cover: unadded inspect-close-Add; already-added inspect; search and
+  - [x] Focused Playwright cases cover: unadded inspect-close-Add; already-added inspect; search and
         filter return; sequential inspection; Added-state preservation; no duplicate; unchanged
         servings; +/- and remove after viewing; keyboard activation; narrow layout; unchanged
         recipe/inventory/shopping state.
 
 constraints: Reuse `#recipe-modal`; do not create a competing recipe viewer or edit/import/recommend
   recipes. Do not redesign Plan. No conversational planning, MCP tools/state, recipe data model,
-  favorites, inventory, shopping, or ready-food mutations. No deployment or production access.
+  favorites, inventory, shopping, or ready-food mutations. The owner override authorizes only the
+  static GitHub Pages release and read-only production verification.
   Keep existing editor entry points and Plan action semantics unchanged.
 
 verification:
-  - [ ] Run focused `tests/plan-persistence-and-picker.spec.js` coverage and the repo-required
+  - [x] Run focused `tests/plan-persistence-and-picker.spec.js` coverage and the repo-required
         `npm test`; record exact results in `TEST_REPORT.md`.
-  - [ ] Complete `SELF_REVIEW.md` and all AI-verifiable `QA.md` checks. Check desktop and narrow
+  - [x] Complete `SELF_REVIEW.md` and all AI-verifiable `QA.md` checks. Check desktop and narrow
         viewport behavior in Playwright, `git diff --check`, and ensure no domain state changes on
         view-only open/close.
 
-merge/deployment gate: Hand off at `status: review`; independent review required before merge.
-  No production deployment or production verification is authorized by this task.
+merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and released on main;
+  direct read-only GitHub Pages verification passed. No backend release or production-data writes.
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 

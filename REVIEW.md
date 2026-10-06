@@ -23,10 +23,26 @@ pointers passed. The builder had already recorded the full local browser suite a
 same immutable candidate. `Check-DocsConsistency.ps1` continues to report the repository's known
 51 potential drift items; none are in TASK-074's changed decision/architecture anchors.
 
-### Gate
-Landing status is **`approved`** pending static GitHub Pages release and live read-only
-verification. No Firebase, Worker, MCP, inventory, shopping, or production-data mutation is part
-of this task.
+### Closeout — 2026-10-06
+The normal push to `main` released the approved candidate at `9c361afac0f8c0b57fed5a1784d9b0935f41aace`.
+The actual GitHub Pages app returned HTTP 200 and its served `app.js` contained the candidate's
+`recipeDetailsDisabledControls` restoration code. The app does not expose a commit id in its UI;
+the served source signature and live behavior were verified directly. GitHub's Actions API was
+unavailable from this environment, so no workflow-run status is claimed.
+
+Direct production verification used a fresh isolated browser context with `AppState.cloudReady`
+false and no saves: picker preview remained read-only, did not add or change Plan/kitchen state,
+preserved search/focus, and left Add separate; a disposable in-memory weekly-batch fixture opened
+read-only details without changing membership or servings, with stepper/remove controls separate;
+after closing, manual and edit forms had enabled fields/save/photo UI and no read-only class.
+At 390px the modal scrolled with zero horizontal overflow. The live production smoke for batch
+details passed 1/1 after correcting its stale assertion from the edit-only
+`currentEditingRecipe` field to the displayed, disabled detail form. No production recipe, plan,
+inventory, shopping, or MCP data was written.
+
+Full local browser suite: 724/724 on the immutable reviewed candidate; integrated focused Plan and
+editor suites: 37/37; post-release production smoke: 1/1. Task status is **`done`**. No Firebase,
+Worker, OAuth, route, secret, or backend deployment changes.
 
 ---
 ## Review TASK-073 — MCP set_inventory_quantity — FIX FIRST -> targeted re-review PASS (STRICT) -> owner-authorized integration -> approved -> done (production pilot passed)

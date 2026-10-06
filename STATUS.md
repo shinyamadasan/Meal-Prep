@@ -5,6 +5,40 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-10-06 — TASK-074 CLOSED `done`: Plan recipe preview/details released
+
+**Review and integration:** the owner relayed the targeted independent reviewer verdict as PASS
+(reviewer report not provided in-repo). The immutable reviewed candidate
+`0d2a6f78d65a1aa20952f6ffbef1c04ecdb70ae1` was an exact fast-forward of `main`; integration SHA
+equals the candidate. The approval/status commit `9c361afac0f8c0b57fed5a1784d9b0935f41aace`
+was pushed normally to `origin/main` and triggered the static GitHub Pages release.
+
+**Static release evidence:** after push, a fresh browser request received HTTP 200 from the live
+GitHub Pages app and the served `app.js` contained the candidate-specific mode-restoration code.
+The app does not expose its source commit in the UI. Direct live behavior passed; GitHub Actions
+run status was not retrievable from this environment and is not claimed.
+
+**Direct live read-only verification:** a fresh isolated browser context remained cloud-not-ready
+(`AppState.cloudReady === false`). Add-meals preview showed locked details, did not add a batch or
+change Plan/kitchen state, preserved search and focus, and kept Add separately available. A
+disposable in-memory This week's batches fixture opened the same locked details without changing
+membership or servings; servings and remove controls remained independent. Closing preview
+restored manual and edit form fields, Save, and photo upload UI. A 390px check passed modal
+scrolling with zero horizontal overflow. No save was submitted; production data writes: 0.
+
+**Automated evidence:** full local Playwright suite 724/724 on the reviewed candidate; integrated
+focused Plan/picker and editor suites 37/37; live production batch-details smoke 1/1. The existing
+production smoke had an obsolete assertion that details set the edit-only `currentEditingRecipe`;
+it now checks displayed recipe details are disabled and Save is hidden. `node --check app.js`,
+`git diff --check`, and all 110 decision pointers passed. Docs consistency reports the existing
+51 potential drift items; no TASK-074 decision or architecture anchors were changed.
+
+**Unchanged:** inventory, shopping, MCP, Firebase, Cloudflare Worker, OAuth, routes, secrets, and
+backend services. No production recipe or plan changes. Closeout is governance plus a production
+smoke assertion correction; no runtime change after the reviewed release.
+
+---
+
 ## 2026-10-05 — TASK-073 CLOSED `done`: absolute inventory count MCP tool accepted in production
 
 **What closed it:** Worker version `154b5f14-6f53-4265-b49b-6adf2b5362f2` (deployed at 100%; rollback
