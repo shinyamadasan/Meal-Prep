@@ -5822,7 +5822,8 @@ status: codex
 owner: owner-directed planning + implementation (Codex)
 priority: P1
 source: owner "OWNER OVERRIDE + TASK-074 — PLAN RECIPE PREVIEW / DETAILS" (2026-10-06)
-files: app.js; style.css; tests/plan-persistence-and-picker.spec.js; CHANGELOG.md; TEST_REPORT.md;
+files: app.js; style.css; docs/FEATURES.md; tests/plan-persistence-and-picker.spec.js;
+  CHANGELOG.md; TEST_REPORT.md;
   TASKS.md status field only during implementation.
 
 live-inspection findings (verified against origin/main @ ce9bbb6):
@@ -5861,6 +5862,8 @@ acceptance:
   - [ ] Recipe title activation works by mouse and keyboard with visible focus; there are no nested
         or conflicting click targets. Details modal scrolling works on desktop and narrow/mobile
         viewports without horizontal overflow.
+  - [ ] `docs/FEATURES.md` describes recipe inspection from the picker and Plan batch list using
+        stable anchors; no recipe data-model documentation changes are needed.
   - [ ] Focused Playwright cases cover: unadded inspect-close-Add; already-added inspect; search and
         filter return; sequential inspection; Added-state preservation; no duplicate; unchanged
         servings; +/- and remove after viewing; keyboard activation; narrow layout; unchanged
