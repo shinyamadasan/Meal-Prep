@@ -19,14 +19,16 @@ or the lifecycle model; read CLAUDE.md for those if you need the wider picture.
 1. Read `HANDOFF.md` if present for the latest thread-reset checkpoint. Treat it as context only;
    `TASKS.md` remains the execution contract.
 2. Open `TASKS.md`.
-3. Find the first task with `status: codex`.
+3. Find the first task with `status: codex`, unless an explicit owner instruction assigns a different
+   task or status.
 4. If this task previously returned from review, read `REVIEW.md` before continuing — see Rework
    Path.
 5. Read the task's `acceptance:` checklist, `files:`, and `constraints:`.
 6. Read `docs/ARCHITECTURE.md` and `docs/DECISIONS.md` for the areas the task touches.
 7. Proceed to Definition of Ready before writing code.
 
-Do not read `planning/BUILD_QUEUE.md` — it is Claude's planning input, not an execution source.
+By default, do not read `planning/BUILD_QUEUE.md` as an execution source. An explicit owner
+instruction may assign planning from that source.
 
 ## Default Entry Point
 
@@ -69,12 +71,14 @@ authorize additional files or responsibilities within its stated scope.
 ("Never touch" means never edit — see Startup Procedure, step 3, for the one case where you *read*
 `REVIEW.md`.)
 
-You may set `status` to `review` (ready for Claude's review) or `blocked` (stuck). Only Claude
-sets `status: done` or sends a task back to `status: codex`.
+By default, you may set `status` to `review` (ready for Claude's review) or `blocked` (stuck); only
+Claude sets `status: done` or sends a task back to `status: codex`. An explicit owner assignment may
+assign task-status work to another agent, but it does not bypass required review before `done`.
 
 ## AI Team Principles (Codex-relevant)
 
-- **One owner per file.** Don't edit files this section lists as off-limits, even to help.
+- **One owner per file by default.** Don't edit files this section lists as off-limits, even to help,
+  unless the owner explicitly assigns that file or responsibility.
 - **TASKS.md is the default build contract.** Build only what's written there — not what
   `planning/BUILD_QUEUE.md`, a comment, or your own judgment suggests is probably also needed.
   An explicit owner assignment may authorize planning or implementation directly; record its scope
@@ -275,7 +279,7 @@ Run the same state check Claude uses (see `CLAUDE.md` § Next Command) against `
 - Current task's status is `blocked`, `review`, or `approved`: it's Claude's turn. Report the
   task and stop. Do not attempt to resolve, review, or re-implement it yourself.
 - Nothing active (`TASKS.md` empty or every entry `done`): report state and stop — planning and
-  `Status` are Claude's calls, not yours.
+  `Status` normally route to Claude unless the owner explicitly assigns them elsewhere.
 
 By default, you may only ever land on `Continue` for yourself. An explicit owner instruction may
 assign a different task or phase; all review, evidence, Git, and production gates remain in force.
