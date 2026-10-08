@@ -5,6 +5,17 @@
 
 ---
 
+## TASK-077 — second strict-review rework (branch: task-077; base: 0207608f)
+changed:
+  - `workers/conversational-bridge/src/operations/inventory.js` (replace fixed hundredth scaling with dynamic exact decimal addition and numeric round-trip validation)
+  - `workers/conversational-bridge/test/operations-add-stock.node.js` (fine precision, scientific notation, forward/reverse metric, overflow, and loss-of-significance regressions)
+  - `workers/conversational-bridge/test/mcp-add-stock.node.js` (precision loss/overflow prove unchanged document, zero writes, and no retry)
+tests: focused add-stock operation/MCP tests 18/18; full Worker bridge suite 236/236; changed-JS syntax, `git diff --check`, Verify-Decisions 110/110, delta secret scan clean; docs-consistency output identical to base (55 existing candidates); Wrangler 4.148.0 `versions upload --dry-run` successful.
+blockers: none.
+deviations: none; no schema, conversion policy, tool surface, or previously reviewed add-stock semantics changed.
+deployment: none.
+→ status remains `review` in TASKS.md for targeted re-review.
+
 ## TASK-077 — strict-review rework (branch: task-077; base: 1c299066)
 changed:
   - `workers/conversational-bridge/src/operations/inventory.js` (reject add-stock deltas not exactly representable at canonical two-decimal quantity precision; remove rounding of the combined total)

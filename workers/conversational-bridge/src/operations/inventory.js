@@ -83,26 +83,63 @@ function validateUnit(unit) {
   }
 }
 
-function quantityToCentiUnits(quantity, multiplier = 1n, divisor = 1n) {
+function decimalFromNumber(quantity) {
   const [mantissa, exponentText] = quantity.toString().toLowerCase().split('e');
   const exponent = exponentText == null ? 0 : Number(exponentText);
   const [whole, fraction = ''] = mantissa.split('.');
-  const digits = (whole + fraction).replace(/^0+/, '') || '0';
-  let numerator = BigInt(digits) * 100n * multiplier;
-  let denominator = divisor;
-  const decimalPlaces = fraction.length - exponent;
-  if (decimalPlaces > 0) denominator *= 10n ** BigInt(decimalPlaces);
-  else numerator *= 10n ** BigInt(-decimalPlaces);
-  if (numerator % denominator !== 0n) {
-    throw new ValidationError('The requested increment cannot be represented at the stored quantity precision.', { field: 'quantity' });
+  const negative = whole.startsWith('-');
+  const digits = (whole.replace('-', '') + fraction).replace(/^0+/, '') || '0';
+  let coefficient = BigInt(digits) * (negative ? -1n : 1n);
+  let scale = fraction.length - exponent;
+  if (scale < 0) {
+    coefficient *= 10n ** BigInt(-scale);
+    scale = 0;
   }
-  return numerator / denominator;
+  while (scale > 0 && coefficient % 10n === 0n) {
+    coefficient /= 10n;
+    scale -= 1;
+  }
+  return { coefficient, scale };
 }
 
-function centiUnitsToQuantity(centiUnits) {
-  const whole = centiUnits / 100n;
-  const fraction = String(centiUnits % 100n).padStart(2, '0');
-  return Number(whole + '.' + fraction);
+function convertedDecimal(quantity, expectedUnit, storedUnit) {
+  const decimal = decimalFromNumber(quantity);
+  if ((expectedUnit === 'kg' && storedUnit === 'g') || (expectedUnit === 'L' && storedUnit === 'ml')) {
+    decimal.coefficient *= 1000n;
+  } else if ((expectedUnit === 'g' && storedUnit === 'kg') || (expectedUnit === 'ml' && storedUnit === 'L')) {
+    decimal.scale += 3;
+  }
+  while (decimal.scale > 0 && decimal.coefficient % 10n === 0n) {
+    decimal.coefficient /= 10n;
+    decimal.scale -= 1;
+  }
+  return decimal;
+}
+
+function addDecimals(left, right) {
+  const scale = Math.max(left.scale, right.scale);
+  const sum = {
+    coefficient: left.coefficient * 10n ** BigInt(scale - left.scale) + right.coefficient * 10n ** BigInt(scale - right.scale),
+    scale
+  };
+  while (sum.scale > 0 && sum.coefficient % 10n === 0n) {
+    sum.coefficient /= 10n;
+    sum.scale -= 1;
+  }
+  return sum;
+}
+
+function decimalToString(decimal) {
+  const negative = decimal.coefficient < 0n;
+  const digits = String(negative ? -decimal.coefficient : decimal.coefficient);
+  const value = decimal.scale === 0
+    ? digits
+    : digits.padStart(decimal.scale + 1, '0').slice(0, -decimal.scale) + '.' + digits.padStart(decimal.scale + 1, '0').slice(-decimal.scale);
+  return negative ? '-' + value : value;
+}
+
+function sameDecimal(left, right) {
+  return left.coefficient === right.coefficient && left.scale === right.scale;
 }
 
 // Absolute set on an existing record only — idempotent by construction (D-082 / TASK-065:
@@ -370,19 +407,15 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
   }
   if (classification === 'non-staple') validateMergeFreshness(record);
   const amount = convertQuantity(quantity, expectedUnit, record.unit);
-  const total = record.quantity + amount;
-  if (!Number.isFinite(total) || total > MAX_STOCK_QUANTITY || total <= record.quantity) {
+  if (!Number.isFinite(amount) || amount <= 0) {
     throw new ValidationError('The resulting stock quantity is outside the safely representable range.', { field: 'quantity' });
   }
-
-  let multiplier = 1n;
-  let divisor = 1n;
-  if ((expectedUnit === 'kg' && record.unit === 'g') || (expectedUnit === 'L' && record.unit === 'ml')) multiplier = 1000n;
-  if ((expectedUnit === 'g' && record.unit === 'kg') || (expectedUnit === 'ml' && record.unit === 'L')) divisor = 1000n;
-  const totalCentiUnits = quantityToCentiUnits(record.quantity) + quantityToCentiUnits(quantity, multiplier, divisor);
-  const exactTotal = centiUnitsToQuantity(totalCentiUnits);
-  if (!Number.isFinite(exactTotal) || exactTotal > MAX_STOCK_QUANTITY || exactTotal <= record.quantity ||
-      quantityToCentiUnits(exactTotal) !== totalCentiUnits) {
+  const intendedTotal = addDecimals(decimalFromNumber(record.quantity), convertedDecimal(quantity, expectedUnit, record.unit));
+  const exactTotal = Number(decimalToString(intendedTotal));
+  if (!Number.isFinite(exactTotal) || exactTotal > MAX_STOCK_QUANTITY) {
+    throw new ValidationError('The resulting stock quantity is outside the safely representable range.', { field: 'quantity' });
+  }
+  if (exactTotal <= record.quantity || !sameDecimal(decimalFromNumber(exactTotal), intendedTotal)) {
     throw new ValidationError('The requested increment cannot be represented without losing quantity.', { field: 'quantity' });
   }
 

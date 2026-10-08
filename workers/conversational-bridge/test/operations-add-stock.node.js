@@ -30,26 +30,35 @@ test('same-unit and supported metric additions preserve identity and existing lo
   assert.equal(converted.item.quantity, 1000);
 });
 
-test('additions preserve exact hundredth-unit deltas and reject overcount or undercount rounding', () => {
-  for (const quantity of [0.006, 0.014]) {
-    const pantry = [freshRow()];
-    const before = structuredClone(pantry);
-    assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity, expectedUnit: 'g' }), ValidationError);
-    assert.deepEqual(pantry, before);
-  }
-
+test('same-unit additions preserve finer decimals and ordinary deltas exactly', () => {
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.006, expectedUnit: 'g' }).item.quantity, 500.006);
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.014, expectedUnit: 'g' }).item.quantity, 500.014);
   assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.01, expectedUnit: 'g' }).item.quantity, 500.01);
   assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 300, expectedUnit: 'g' }).item.quantity, 800);
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 1e-7, expectedUnit: 'g' }).item.quantity, 500.0000001);
+  assert.equal(call([freshRow({ quantity: 1.2 })], { ingredientId: 'chicken', quantity: 0.8, expectedUnit: 'g' }).item.quantity, 2);
+
+  assert.equal(call([freshRow({ quantity: 0.001, unit: 'kg' })], { ingredientId: 'chicken', quantity: 0.002, expectedUnit: 'kg' }).item.quantity, 0.003);
 });
 
-test('small metric conversions are accepted only when the stored-unit delta is representable', () => {
-  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.00001, expectedUnit: 'kg' }).item.quantity, 500.01);
-  assert.equal(call([freshRow({ unit: 'ml' })], { ingredientId: 'chicken', quantity: 0.00001, expectedUnit: 'L' }).item.quantity, 500.01);
+test('forward and reverse metric conversions preserve exact fine decimals', () => {
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.000006, expectedUnit: 'kg' }).item.quantity, 500.006);
+  assert.equal(call([freshRow({ unit: 'ml' })], { ingredientId: 'chicken', quantity: 0.000014, expectedUnit: 'L' }).item.quantity, 500.014);
+  assert.equal(call([freshRow({ quantity: 0.001, unit: 'kg' })], { ingredientId: 'chicken', quantity: 1, expectedUnit: 'g' }).item.quantity, 0.002);
+  assert.equal(call([freshRow({ quantity: 0.001, unit: 'L' })], { ingredientId: 'chicken', quantity: 1, expectedUnit: 'ml' }).item.quantity, 0.002);
+  assert.equal(call([freshRow({ quantity: 0.001, unit: 'kg' })], { ingredientId: 'chicken', quantity: 0.001, expectedUnit: 'g' }).item.quantity, 0.001001);
+});
 
-  for (const [row, quantity, expectedUnit] of [[freshRow(), 0.000014, 'kg'], [freshRow({ unit: 'ml' }), 0.000014, 'L']]) {
+test('true loss of significance and numeric overflow reject without mutation', () => {
+  const cases = [
+    [freshRow({ quantity: Number.MAX_SAFE_INTEGER - 1 }), 0.1],
+    [freshRow({ quantity: Number.MAX_VALUE }), Number.MAX_VALUE],
+    [freshRow({ quantity: Number.MAX_SAFE_INTEGER }), 1]
+  ];
+  for (const [row, quantity] of cases) {
     const pantry = [row];
     const before = structuredClone(pantry);
-    assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity, expectedUnit }), ValidationError);
+    assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity, expectedUnit: 'g' }), ValidationError);
     assert.deepEqual(pantry, before);
   }
 });
@@ -92,7 +101,7 @@ test('invalid quantity, unit mismatch, unknown conversion, overflow, and unrepre
     [{ quantity: 1 }, { quantity: 1, expectedUnit: 'ml' }],
     [{ quantity: 1 }, { quantity: 1, expectedUnit: 'cup' }],
     [{ quantity: 1 }, { quantity: 1, expectedUnit: '' }],
-    [{ quantity: 1 }, { quantity: 0.001, expectedUnit: 'g' }]
+    [{ quantity: 1 }, { quantity: Infinity, expectedUnit: 'g' }]
   ];
   for (const [rowChange, input] of invalid) {
     const pantry = [freshRow(rowChange)];

@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-077 · 2026-10-08 · second strict-review rework
+suite: focused `operations-add-stock.node.js` + `mcp-add-stock.node.js` (18/18); `npm run test:bridge` (236/236); `node --check` on all changed JavaScript; `git diff --check`; delta secret-pattern scan; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1` compared with TASK-077 base; Wrangler 4.148.0 `versions upload --dry-run`.
+result: dynamic decimal addition accepts 500 + 0.006 = 500.006, 500 + 0.014 = 500.014, 0.001 kg + 0.002 kg = 0.003 kg, and fine forward/reverse g/kg and ml/L conversions. Scientific notation input round-trips correctly. A safe-range loss-of-significance result, unsafe result, and non-finite sum reject; MCP tests prove the full document/revision remains unchanged with one read, zero writes, and no retry. Same-revision add/add, add/consume, add/set, and add/mark-out races pass; the nine-tool surface is unchanged. Syntax/diff checks passed; all 110 decision pointers hold; secret scan had no matches; docs-consistency output is identical to base with 55 existing candidate items; Wrangler dry-run built and exited before upload. A temporary junction to the existing Builder dependency cache was removed after tests and dry-run.
+untested: root Playwright suite not rerun (no app/UI files changed); deployment and production access intentionally not performed.
+
 ## TASK-076 production acceptance closeout · 2026-10-08
 suite: integration gates recorded below; final closeout validation: `git diff --check`, `tools/Verify-Decisions.ps1`, read-only Cloudflare deployments history.
 result: Owner supplied authoritative production acceptance PASS: Coconut cream id `1782470280618.3713`, 600 ml -> 599 ml -> exact restoration to 600 ml; revisions 29516 -> 29517 -> 29518; exactly 2 writes, 0 retries, 0 recovery writes, no tombstone; unrelated inventory and ready food unchanged. Shopping unchanged. OAuth configuration unchanged.
