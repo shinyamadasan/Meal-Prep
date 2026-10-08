@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-076 · 2026-10-08
+suite: focused `node --test test/operations-consume-stock.node.js test/mcp-consume-stock.node.js`; `npm run test:bridge`; root `npm test`; changed-JS `node --check`; `npm audit --omit=dev`; decision/docs checks; diff check; delta secret scan; Wrangler 4.148.0 `versions upload --dry-run` to a temporary output directory.
+result: focused suites 23 passed, 0 failed; bridge suite 234 passed; root Playwright suite 725 passed. Changed-JS syntax passed; audit reported 0 vulnerabilities; decision verification 110/110; diff check and delta secret scan clean. Docs consistency found 55 items vs 51 on base, the four additions are expected Worker-only identifiers. Wrangler dry-run bundled the Worker and exited before upload.
+coverage: exact eight-tool surface; strict `consume_stock` schema; supported unit arithmetic; partial and exact-zero consumption; staple policy; zero-write invalid, stale, conflict, and over-consumption cases; same-revision races; tombstone and write boundaries; existing operation regressions. `SELF_REVIEW.md` and applicable `QA.md` checks passed.
+untested: live connector schema/tool response and production acceptance intentionally not run; no production access, write, or deployment was performed. App/UI-only QA checks do not apply because no app/UI files changed.
+
 ## TASK-075 deployment · 2026-10-08
 suite: Wrangler 4.148.0 read-only `whoami`, `versions list`, and `deployments list`; `versions upload --dry-run`; post-deploy `deployments list`.
 result: a stale process-only token was refreshed from the distinct existing user-scope token; authentication and Worker version queries succeeded. Uploaded and deployed reviewed version `85767a48-23d6-4347-9647-d7dcdecbac3e` to 100%; post-deploy listing confirmed 100%. Previous live / immediate rollback `154b5f14-6f53-4265-b49b-6adf2b5362f2`; preceding deployment `a7c7d71c-017a-4989-922c-671ab371b3e3`.

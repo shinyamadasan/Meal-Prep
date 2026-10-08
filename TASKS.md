@@ -5889,6 +5889,56 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
+### TASK-076 · MCP conversational stock consumption — `consume_stock`
+status: review
+owner: owner-directed planning + implementation (Codex)
+risk: STRICT (red-zone, D-032): new authenticated pantry quantity mutation and possible non-staple tombstone.
+source: direct owner authorization, “PROGRAM CONTINUATION — CLOSE TASK-075 AND BUILD TASK-076” (2026-10-08).
+depends-on: TASK-075 (done); TASK-072 and TASK-073 (done).
+files: workers/conversational-bridge/src/mcp.js; workers/conversational-bridge/src/errors.js; workers/conversational-bridge/src/operations/inventory.js; workers/conversational-bridge/src/operations/quantity.js (new pure unit helper); workers/conversational-bridge/test/operations-consume-stock.node.js; workers/conversational-bridge/test/mcp-consume-stock.node.js; workers/conversational-bridge/test/mcp.node.js; workers/conversational-bridge/test/mcp-consume.node.js; workers/conversational-bridge/test/mcp-stock-state.node.js; workers/conversational-bridge/test/mcp-set-quantity.node.js; workers/conversational-bridge/README.md; docs/DECISIONS.md (D-082 addendum); CHANGELOG.md; TEST_REPORT.md; TASKS.md status field.
+branch: task-076, fresh isolated worktree from the synchronized TASK-075 closeout main.
+
+live findings (inspected on main at TASK-075 closeout SHA 3d18677):
+  - `inventory.setQuantity()` is an absolute write and can relabel units; do not use it directly for conversational deltas.
+  - `setCountedQuantity()` only permits explicitly non-staple rows with finite positive quantity and an exact stored-unit precondition. Staples are stock-level tracked; ambiguous classification is refused.
+  - Canonical `inventory.markOutOfStock()` preserves a staple row and sets `stockLevel: 'empty'`; for non-staples it removes the row and writes `deletions.pantry[id]` tombstone. Ambiguous classification fails safely.
+  - `inventory.markInStock()` is staple-only. Firestore writes use a whole-document revision check plus `currentDocument.updateTime`; pantry tombstones require field paths `pantry` and `deletions.pantry`.
+  - App `deductIngredientsForRecipe()` excludes staples, then calls `toGrams()` and falls back to factor `1` for unknown pantry units. This client-only helper is unsafe for conversational consumption and must not be reused.
+  - Canonical ingredient/recipe units observed include `g`, `kg`, `ml`, `pieces`, `pcs`, `can`, `pack`, `bunches`, `cloves`, `stalks`, `tbsp`, and `tsp`; `per 100g` also appears as a custom metadata unit and is not a consumable stock unit. No unit conversion is needed for the app's existing absolute-count contract.
+
+objective:
+  Add one strict, existing-item-only MCP delta command for “I used 300g chicken” and “I used 3 eggs.” Use stable `ingredientId`; never create an item or ask the model to calculate an absolute resulting quantity.
+
+tool contract:
+  - Add exactly one tool, `consume_stock`, keeping all existing tools. Input is strict `{ ingredientId, quantity, expectedUnit, expectedRevision }`: nonblank ingredientId and expectedUnit strings; finite quantity > 0; integer expectedRevision >= 0. Reject unknown keys (including uid/path/collection) before Firestore reads.
+  - Use existing fixed-owner authorization and `mealprep:write`; require expectedRevision, compare after the one read, write once with Firestore update-time precondition, and never retry. Successful mutation increments revision exactly once. No OAuth, route, secret, dependency, or Firestore schema changes.
+  - The pure helper explicitly classifies supported units and has no fallback conversion. Permit exact same-unit arithmetic for explicitly supported canonical stock units. Permit only exact metric scaling `g`↔`kg` and `ml`↔`L`; preserve case-sensitive canonical spelling, including keeping `pcs` distinct from `pieces`. Reject blank/unknown units (including metadata-only `per 100g`), mass-volume conversion, cups-to-grams, pieces-to-grams, cans/packages to other units, and unsupported aliases. Do not normalize unrelated units.
+  - `expectedUnit` is a precondition describing the unit used by the caller; it is never persisted. Convert only the requested delta into the stored unit under the helper's exact rules, then subtract it directly from the current quantity.
+  - Require an existing, explicitly non-staple row with finite current quantity and valid stored unit for partial numeric consumption. Missing/malformed quantity or ambiguous staple classification fails without write. Never call `setQuantity()` with a model-computed absolute result.
+  - Over-consume fails as `insufficient_stock`, with zero write and no clamping. Partial consume preserves id and metadata and updates only quantity/update time.
+  - Exact zero non-staple delegates to canonical `markOutOfStock()` removal/tombstone behavior and atomically writes `pantry` plus `deletions.pantry`; no zero-quantity row remains.
+  - Staple quantities remain stock-level tracked: reject partial counted consumption. If a read proves a finite stored quantity and the requested delta exactly consumes that quantity, use canonical `markOutOfStock()` so the staple identity remains and `stockLevel` becomes `empty`; never set a numeric staple remainder. Unknown/ambiguous staple classification fails safely.
+  - Writes may change only pantry state, `deletions.pantry` when exact-zero non-staple removal requires it, and normal revision/update-time metadata. Shopping, ready food, mealConsumptions, recipes, and unrelated inventory rows remain unchanged.
+  - MCP annotations must reflect non-idempotent delta semantics. Description requires stable IDs from `get_inventory`, asks which item for duplicate name matches, requires a fresh read and exact delta for “all,” and warns against replaying with a fresh revision.
+
+acceptance:
+  - [x] MCP exposes exactly eight tools; `consume_stock` has the strict schema above and correct write-scope security metadata.
+  - [x] Pure helper tests cover supported same-unit arithmetic and g/kg, ml/L scaling, plus unknown/blank units, unsupported aliases/conversions, dimension mismatch, and no fallback factor.
+  - [x] Partial non-staple consumption preserves identity/metadata; exact zero removes non-staple with tombstone; exact zero staple uses stockLevel empty; ambiguous classification and partial staple consumption reject with zero mutation.
+  - [x] Over-consume returns `insufficient_stock` without clamping or mutation. Unit mismatch, unsupported conversion, missing unit/quantity, stale revision, invalid input, and unknown identity all make zero writes.
+  - [x] Same-revision races, exact-zero races, and over-consume races are adversarially covered: at most one competing write wins, others conflict/fail; no automatic retry.
+  - [x] Duplicate-name rows act only on the supplied stable id; numeric/float ids round-trip. Unrelated pantry rows, shopping, cookedMeals, mealConsumptions, and recipe data remain byte-identical.
+  - [x] Existing set_inventory_quantity, mark_out_of_stock, mark_in_stock, read tools, and REST routes retain behavior.
+  - [x] Clarification cases are documented/tested: 300g chicken; 0.3kg chicken; 3 eggs; half an egg (same-unit arithmetic only, no unit invention); 1 cup chicken; 500ml milk; 0.5L milk; 900g from 500g; all chicken (must first read exact amount/unit/revision); last 3 eggs; 2 cans tomatoes.
+  - [x] `mcp.js` remains a thin adapter with no unit conversion, staple classification, tombstone, or pantry-array logic.
+
+constraints: Existing-item consumption only. Do not implement add_stock, create-item, inventory quantity set, new app deduction behavior, shopping/meal-planning/ready-food/recipe changes, OAuth changes, Worker routes, deployments, production Firestore access/writes, or data schema changes. Use no app client conversion/deduction helper. Preserve existing semantics outside the explicitly authorized consume_stock operation.
+
+verification:
+  - [x] Focused new consume-stock suites; full `npm run test:bridge`; root `npm test`; changed-JS syntax checks; `git diff --check`; delta secret scan; `npm audit --omit=dev`; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1` compared with baseline; Wrangler dry-run only; complete SELF_REVIEW.md and QA.md.
+
+merge/deployment gate: Stop at `status: review`. Independent STRICT review is required under D-032. Do not integrate, deploy, run a production pilot, or perform a production write. Landing after review remains `approved` for owner merge, never `done`.
+
 ### TASK-075 · Shared ready-food leftovers/takeout freshness contract
 status: done
 owner: owner-directed planning + implementation (Codex)

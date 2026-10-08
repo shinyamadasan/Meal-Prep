@@ -418,7 +418,7 @@ test('tools/list keeps the four ready-food tools unchanged alongside the reviewe
   const names = (await responseMessage(response)).result.tools.map((tool) => tool.name);
   assert.deepEqual(names, [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity'
+    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock'
   ]);
   assert.doesNotMatch(names.join(' '), /finish|remove|delete|patch|execute|set_inventory(?!_quantity)|mutate/i);
 });

@@ -275,7 +275,7 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
   `setQuantity()`, never persisted and cannot relabel the row. "I have 0.65kg" against a stored
   `g` row must be resolved or clarified before the call, never sent as 0.65 with `g`.
 - It is an ABSOLUTE count: "I have 7 eggs", "chicken is 650g", "only 2 cans left". It is not
-  "bought 7", "used 3" or "add 500g"; those delta operations do not exist.
+  "bought 7" or "add 500g". For a supported "used 3" delta, use `consume_stock` instead.
 - Zero and negative quantities are rejected with a pointer to `mark_out_of_stock`. The tool never
   translates zero into an out-of-stock call, and never creates a zero-quantity row.
 - The row's stored unit is preserved and nothing is converted.
@@ -290,6 +290,32 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
   with zero mutation; a call with the new revision is a different call.
 - One update-time-guarded pantry patch; stale `expectedRevision` returns `revision_conflict` with no
   mutation and is never retried. Requires the existing `mealprep:write` scope; OAuth is unchanged.
+
+## TASK-076 authenticated MCP stock consumption (local candidate only — NOT deployed)
+
+`consume_stock` adds a semantic quantity delta for one existing pantry row; the current local MCP
+surface has exactly eight tools. This candidate is not deployed and has no production pilot.
+
+- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The id must
+  come from `get_inventory`; duplicate-name matches require asking which row. The amount is the
+  delta used, never an absolute resulting quantity. Extra uid/path/collection fields fail before
+  Firestore access.
+- The pure `operations/quantity.js` helper accepts exact same-unit arithmetic and exact metric
+  scaling only between `g`/`kg` and `ml`/`L`. It does not infer cups, density, aliases, or
+  count-to-mass conversions. Unknown or blank stored units fail safely.
+- Partial quantity consumption is limited to explicitly non-staple rows. Over-consume returns
+  `insufficient_stock` and writes nothing. Exact-zero non-staple consumption uses the canonical
+  removal plus pantry tombstone path. Partial staple consumption is unsupported; exact depletion
+  uses `markOutOfStock()` to retain the staple id and set `stockLevel: 'empty'`. Ambiguous
+  classification fails without a write.
+- The tool uses `mealprep:write`, one observed revision, and one update-time-guarded patch. It never
+  retries and is non-idempotent: replaying with a fresh revision consumes again. Its write boundary
+  is pantry, `deletions.pantry` only for exact-zero non-staple removal, and the normal version field.
+  Shopping, ready food, `mealConsumptions`, and recipe data are untouched.
+- “All” is only an exact delta after reading the current quantity, unit, and revision. “Half an
+  egg” is supported only when the row is explicitly in `pieces` or `pcs` and the user’s amount is
+  exactly represented in that same unit; those spellings remain distinct and the Worker invents
+  no conversion.
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
@@ -486,10 +512,9 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
 UI). No Plan/Shop/Prep tools. No recipe generation. There is no natural-language parsing inside
-the Worker. No `set_inventory_quantity`, add-stock, consume-stock, finish, create-item, shopping,
-or generic inventory-mutation tool is exposed through MCP. No generic "execute"/"patch"/"update
-document" tool exists or is planned; no caller-selected Firestore field or path is accepted under
-any name.
+the Worker. TASK-076 adds only `consume_stock`; `add_stock`, finish, create-item, shopping, and
+generic inventory-mutation tools remain absent. No generic "execute"/"patch"/"update document"
+tool exists or is planned; no caller-selected Firestore field or path is accepted under any name.
 
 ## Operations: rotation, revocation, emergency stop
 

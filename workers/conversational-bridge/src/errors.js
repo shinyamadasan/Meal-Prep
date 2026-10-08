@@ -1,4 +1,4 @@
-// Shared, sanitized error types for the four response codes the operation contract defines
+// Shared, sanitized error types for the response codes the operation contracts define
 // that aren't already covered by auth.js (UnauthorizedError) or firestore.js
 // (RevisionConflictError, InfrastructureError). Every error here carries only what's safe to
 // hand back to the caller — no stack traces, no secrets, ever (index.js enforces that boundary).
@@ -25,6 +25,15 @@ export class InsufficientServingsError extends Error {
     super('Not enough servings remaining.');
     this.name = 'InsufficientServingsError';
     this.code = 'insufficient_servings';
+    this.detail = { remaining };
+  }
+}
+
+export class InsufficientStockError extends Error {
+  constructor(remaining) {
+    super('Not enough stock remaining.');
+    this.name = 'InsufficientStockError';
+    this.code = 'insufficient_stock';
     this.detail = { remaining };
   }
 }

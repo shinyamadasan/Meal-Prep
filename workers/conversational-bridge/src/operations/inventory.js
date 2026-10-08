@@ -17,7 +17,8 @@
 // real app would only have marked empty, which is real, unrecoverable(ish) data loss; guessing
 // "staple" risks nothing (the record just survives with stockLevel stamped). See
 // AmbiguousError / the reserved `ambiguous` contract code in errors.js.
-import { NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
+import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
+import { convertQuantity } from './quantity.js';
 
 const MAX_UNIT_LENGTH = 40;
 
@@ -182,4 +183,71 @@ export function markInStock(pantry, { ingredientId }) {
   const updated = Object.assign({}, record, { stockLevel: 'full', updatedAt: new Date().toISOString() });
   next[index] = updated;
   return { pantry: next, item: toInventoryItem(updated), unchanged: false };
+}
+
+// Apply a conversational delta to an existing, counted non-staple row. Exact-zero paths use
+// markOutOfStock() so they retain the canonical removal/tombstone or staple-empty behavior.
+export function consumeStock(pantry, deletionsPantry, { ingredientId, quantity, expectedUnit }) {
+  if (typeof ingredientId !== 'string' || !ingredientId.trim()) {
+    throw new ValidationError('ingredientId must be a non-blank string.', { field: 'ingredientId' });
+  }
+  if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
+    throw new ValidationError('quantity must be a finite number > 0.', { field: 'quantity' });
+  }
+  if (typeof expectedUnit !== 'string' || !expectedUnit.trim()) {
+    throw new ValidationError('expectedUnit must be a non-blank string.', { field: 'expectedUnit' });
+  }
+
+  const index = findPantryIndex(pantry, ingredientId);
+  if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
+
+  const record = pantry[index];
+  const classification = classifyStaple(record);
+  if (classification === 'ambiguous') {
+    throw new AmbiguousError(
+      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
+      'set an explicit staple value in the app before retrying.',
+      { field: 'ingredientId', category: record.category != null ? record.category : null }
+    );
+  }
+
+  if (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity) || record.quantity < 0) {
+    throw new ValidationError('The stored quantity is missing or invalid; re-read inventory and clarify before consuming.', { field: 'quantity' });
+  }
+  const storedUnit = record.unit;
+  if (typeof storedUnit !== 'string' || !storedUnit.trim()) {
+    throw new ValidationError('The stored unit is missing; re-read inventory and clarify before consuming.', { field: 'expectedUnit' });
+  }
+  const amount = convertQuantity(quantity, expectedUnit, storedUnit);
+  if (amount > record.quantity || (classification === 'staple' && record.stockLevel === 'empty')) {
+    throw new InsufficientStockError(classification === 'staple' && record.stockLevel === 'empty' ? 0 : record.quantity);
+  }
+
+  if (classification === 'staple') {
+    if (amount !== record.quantity) {
+      throw new ValidationError(
+        'Staple quantities are stock-level tracked; only an exact depletion can mark the staple empty. Partial staple consumption is unsupported.',
+        { field: 'quantity' }
+      );
+    }
+    return Object.assign(markOutOfStock(pantry, deletionsPantry, { ingredientId }), { unchanged: false });
+  }
+
+  if (amount === record.quantity) {
+    return markOutOfStock(pantry, deletionsPantry, { ingredientId });
+  }
+
+  const next = pantry.slice();
+  const updated = Object.assign({}, record, {
+    quantity: record.quantity - amount,
+    updatedAt: new Date().toISOString()
+  });
+  next[index] = updated;
+  return {
+    pantry: next,
+    deletionsPantry,
+    item: toInventoryItem(updated),
+    unchanged: false,
+    removed: false
+  };
 }

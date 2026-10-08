@@ -3384,6 +3384,25 @@ When omitted, source and freshness remain unknown as before. The operation still
 cookedMeals; it records neither a restaurant meal nor a consumption fact. No OAuth scope or
 revision/write semantics change.
 
+### Conversational stock-consumption addendum (2026-10-08, TASK-076)
+
+`consume_stock` is the explicit existing-item pantry delta tool. It accepts a stable id, a positive
+delta, the unit used for that delta, and the observed document revision. It does not ask the model
+to compute an absolute remainder or call `setQuantity()`. The pure unit helper permits exact
+same-unit arithmetic and only unambiguous metric scaling (`g`/`kg`, `ml`/`L`); it rejects unknown
+units, aliases, mass/volume and count/mass conversions, and all fallback factors. It is separate
+from TASK-073's absolute `set_inventory_quantity` contract.
+
+Partial numeric consumption remains limited to explicitly non-staple rows because the existing
+canonical model tracks staples by stock level and excludes them from counted quantity updates.
+Exact staple depletion follows the existing `markOutOfStock()` policy and marks the staple empty;
+non-staple exact depletion follows canonical removal/tombstone behavior. Partial or ambiguous
+staple consumption fails safely. The single existing `mealprep:write` scope covers this pantry
+command without an OAuth change; the write remains limited to pantry, the required pantry deletion
+tombstone, and revision metadata. No add-stock, item creation, shopping, ready-food, or history
+behavior is introduced. This addendum supersedes only the TASK-073 note that delta consumption
+remained future work; its absolute-count rules remain unchanged.
+
 Supersedes: nothing. Extends the platform choice `workers/recipe-import` already established;
 does not revisit or reverse D-058's caution about scheduled/always-on backends, because this
 bridge is not one.

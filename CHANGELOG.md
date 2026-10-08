@@ -5,6 +5,18 @@
 
 ---
 
+## TASK-076 — review (branch: task-076; base: 3d18677)
+changed:
+  - `workers/conversational-bridge/src/operations/quantity.js` (new strict unit helper: exact same-unit arithmetic and g/kg, ml/L scaling only)
+  - `workers/conversational-bridge/src/operations/inventory.js`, `src/errors.js`, and `src/mcp.js` (existing-item consumption, `insufficient_stock`, strict eighth MCP tool)
+  - Worker tests (unit rules, partial/exact-zero behavior, staple policy, schema/auth, zero-write failures, races, write boundaries, and existing tool-surface checks)
+  - Worker README and `docs/DECISIONS.md` D-082 addendum (document the limits and safety policy)
+tests: focused consume-stock suites 23/23; `npm run test:bridge` 234/234; root `npm test` 725/725; changed-JS syntax checks; `npm audit --omit=dev` (0 vulnerabilities); `tools/Verify-Decisions.ps1` (110/110); `git diff --check`; delta secret scan clean; Wrangler 4.148.0 dry-run successful.
+blockers: none.
+deviations: partial staple consumption is refused because staples are stock-level tracked; exact depletion delegates to canonical `markOutOfStock()` and retains the staple as empty. Docs consistency reports 55 findings vs the 51-item baseline, with four expected Worker-only identifiers (`consume_stock`, `markOutOfStock()`, `set_inventory_quantity`, `setQuantity()`).
+deployment: none; no production Firestore access or writes.
+→ status set to `review` in TASKS.md.
+
 ## TASK-075 — done (main closeout)
 reviewed / integrated candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (independent STRICT review PASS; integrated SHA identical)
 deployment: Worker version `85767a48-23d6-4347-9647-d7dcdecbac3e` serving 100%; rollback version `154b5f14-6f53-4265-b49b-6adf2b5362f2`.

@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
 import { getUserDocument, patchUserDocument, RevisionConflictError } from './firestore.js';
-import { AmbiguousError, InsufficientServingsError, NotFoundError, ValidationError } from './errors.js';
+import { AmbiguousError, InsufficientServingsError, InsufficientStockError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
 import {
@@ -50,6 +50,14 @@ const WRITE_ANNOTATIONS = {
 // revision is safe only because the first success advanced it (revision_conflict) — conflict-safety
 // is not idempotence, and transport/model replay of this tool is unsafe.
 const CONSUME_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
+// A stock delta is not idempotent: replaying it against a fresh revision consumes again.
+const CONSUME_STOCK_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: false,
@@ -149,6 +157,15 @@ function setInventoryQuantityInputSchema() {
     ingredientId: z.string().min(1),
     quantity: z.number().positive('quantity must be a number > 0. For none left, use mark_out_of_stock.'),
     expectedUnit: z.string().min(1),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+function consumeStockInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
+    quantity: z.number().positive(),
+    expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -329,6 +346,33 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => setInventoryQuantityTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'consume_stock',
+    {
+      title: 'Consume pantry stock',
+      description: 'Consume a quantity from one existing pantry row using ingredientId ONLY from ' +
+        'get_inventory; never guess or fuzzy-match, and ask which row if several match. Submit the ' +
+        'amount the user used and its stated unit as expectedUnit; only exact same-unit arithmetic ' +
+        'and g/kg or ml/L metric scaling are supported. Do not infer cups, density, pieces-to-mass, ' +
+        'or can/package conversions. Partial consumption is for explicitly non-staple rows; a staple ' +
+        'can only be marked empty when its exact current amount is consumed. If the user says “all”, ' +
+        'first read the current quantity, unit, and revision, then submit that exact amount against ' +
+        'that revision. On insufficient_stock, unit mismatch, or ambiguous, stop and clarify. This is ' +
+        'a delta and is NOT safe to replay with a fresh revision; on revision_conflict, re-read before ' +
+        'deciding whether to retry.',
+      inputSchema: consumeStockInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: inventoryItemSchema().nullable(),
+        removed: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: CONSUME_STOCK_ANNOTATIONS
+    },
+    async (args) => consumeStockTool(env, deps, ctx, args)
+  );
+
   return server;
 }
 
@@ -362,6 +406,40 @@ async function setInventoryQuantityTool(env, deps, ctx, args) {
     return toolResult({ ok: true, revision: written.revision, item: r.item });
   } catch (error) {
     return inventoryStockError(error, 'The inventory quantity could not be set.');
+  }
+}
+
+// Apply exactly one delta against the observed revision, then make one guarded write. Exact-zero
+// deletion and staple-empty semantics come from the canonical inventory operation.
+async function consumeStockTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
+
+    const r = inventory.consumeStock(doc.pantry, doc.deletions.pantry || {}, {
+      ingredientId: args.ingredientId,
+      quantity: args.quantity,
+      expectedUnit: args.expectedUnit
+    });
+    const write = r.removed
+      ? { fieldPaths: ['pantry', 'deletions.pantry'], fields: { pantry: r.pantry, deletions: { pantry: r.deletionsPantry } } }
+      : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } };
+    const written = await writeDoc(env, accessToken, Object.assign(write, {
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }), fetchImpl);
+
+    return toolResult({ ok: true, revision: written.revision, item: r.item, removed: r.removed });
+  } catch (error) {
+    return inventoryStockError(error, 'The inventory stock could not be consumed.');
   }
 }
 
@@ -446,6 +524,9 @@ function inventoryStockError(error, fallback) {
   }
   if (error instanceof NotFoundError) {
     return { content: [{ type: 'text', text: 'not_found: ' + error.message }], isError: true };
+  }
+  if (error instanceof InsufficientStockError) {
+    return { content: [{ type: 'text', text: 'insufficient_stock: ' + error.message }], isError: true };
   }
   if (error instanceof ValidationError) {
     return { content: [{ type: 'text', text: error.message }], isError: true };
@@ -607,7 +688,8 @@ const TOOL_SECURITY_SCHEMES = {
   consume_ready_food: WRITE_SECURITY_SCHEMES,
   mark_out_of_stock: WRITE_SECURITY_SCHEMES,
   mark_in_stock: WRITE_SECURITY_SCHEMES,
-  set_inventory_quantity: WRITE_SECURITY_SCHEMES
+  set_inventory_quantity: WRITE_SECURITY_SCHEMES,
+  consume_stock: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {
