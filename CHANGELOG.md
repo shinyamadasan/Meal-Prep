@@ -1113,4 +1113,16 @@ blockers: none for TASK-002
 deviations: branch remained `task-001` because the workspace already had unrelated uncommitted work; no branch switch attempted
 → status set to `review` in TASKS.md
 
+## TASK-075 — ready for review (branch: task-075)
+changed:
+  - shared/readyFoodContract.js (8 loc): shared source enum and default freshness
+  - app.js, index.html (20 loc): app modal reads source and defaults from the shared contract
+  - workers/conversational-bridge/src/operations/readyFood.js, src/mcp.js (19 loc): optional source validation/persistence and nullable read output
+  - docs/ARCHITECTURE.md, docs/DATA_MODEL.md, docs/DECISIONS.md, workers/conversational-bridge/README.md (27 loc): document the shared contract and conversational limits
+  - workers/conversational-bridge/test/*, tests/ready-food-contract.spec.js (114 loc): source, freshness, schema, revision/race, and app coverage
+tests: `npm run test:bridge` (210 passed); `npm test` (725 passed); changed-JS `node --check`; Wrangler dry-run; `npm audit --omit=dev` (0 vulnerabilities); Verify-Decisions (110 pointers); delta secret scan; `git diff --check`. Docs-consistency reports 51 items, identical to the origin/main baseline.
+blockers: none
+deviations: no deployment or production access, as required for this task handoff
+→ status set to `review` in TASKS.md
+
 <!-- Entries go here, newest first. -->

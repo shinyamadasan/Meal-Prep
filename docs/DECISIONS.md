@@ -3374,6 +3374,16 @@ preserved and asserted because setQuantity() can relabel a unit without conversi
 bridge's unit helpers make unsafe chat assumptions (cup = 240 g, pieces = 100 g); no conversion
 engine is added. Delta semantics (bought / used / add N) remain future, separate tools.
 
+### Ready-food source/freshness addendum (2026-10-07, TASK-075)
+
+shared/readyFoodContract.js is the single source for the optional ready-food source enum
+(leftovers, takeout) and the app's existing default shelf lives (3 fridge days, 90 freezer
+days). The classic-script app and the Worker consume that same file. record_ready_food may carry
+the optional source; when supplied, the Worker stores it and the canonical freshness defaults.
+When omitted, source and freshness remain unknown as before. The operation still writes only
+cookedMeals; it records neither a restaurant meal nor a consumption fact. No OAuth scope or
+revision/write semantics change.
+
 Supersedes: nothing. Extends the platform choice `workers/recipe-import` already established;
 does not revisit or reverse D-058's caution about scheduled/always-on backends, because this
 bridge is not one.

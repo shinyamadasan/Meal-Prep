@@ -280,6 +280,11 @@ updateTime`) and the invariants `correctKitchenStock()` / `_doMarkCooked()` / `u
 Local build/test only as of this entry — see `workers/conversational-bridge/README.md`'s
 "Production enablement checklist" for what must happen before it is reachable by anything real.
 
+The browser app and conversational Worker consume the same ready-food source/freshness contract at
+shared/readyFoodContract.js: index.html loads it as a classic script and the Worker imports it for
+record_ready_food. This keeps the app's existing leftovers/takeout values and freshness defaults
+canonical without adding a build step.
+
 ## Safety / cross-cutting
 - All user strings pass `escapeHtml()` before `innerHTML`.
 - Global error handler: `window.addEventListener('error', …)` shows a dismissable banner.

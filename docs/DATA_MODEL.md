@@ -138,7 +138,7 @@ the same time: the last save wins for the whole plan (the same behavior as `week
 {
   id,                  // 'cm_<timestamp>_<rand>'
   recipeId,            // string id of the source recipe, or null for manually added food
-  source?,             // 'leftovers' | 'takeout' — manual adds only
+  source?,             // optional leftovers/takeout source for manual or conversational records
   name,
   cookedDate,          // 'YYYY-MM-DD' (LOCAL calendar date — daysLeftFrom() parses it as local midnight)
   storage,             // 'fridge' | 'freezer' — drives which shelf life applies

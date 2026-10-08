@@ -564,6 +564,7 @@
     <script>
       window.RECIPE_IMPORT_ENDPOINT = 'https://meal-prep-recipe-import.shinyamadasan.workers.dev/recipe-import';
     </script>
+    <script src="shared/readyFoodContract.js"></script>
     <script src="app.js"></script>
 
     <!-- Add/Edit Ingredient Modal -->
@@ -1129,10 +1130,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Type</label>
-                        <select id="manual-cooked-source" class="form-control">
-                            <option value="leftovers">Leftovers</option>
-                            <option value="takeout">Takeout</option>
-                        </select>
+                        <select id="manual-cooked-source" class="form-control"></select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Stored on</label>

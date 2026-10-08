@@ -307,13 +307,22 @@ write/delete/patch/execute tool exists anywhere in the diff):
 `recordCookedFood()` mints a fresh random `cookedMealId` on every call — conflict-safety under
 `expectedRevision` is not the same property as idempotence.
 
+Optional `source` is restricted to the shared `leftovers` / `takeout` contract in
+`shared/readyFoodContract.js`. Supplying it stores that source and the contract's fridge/freezer
+freshness defaults; omitting it keeps the legacy unknown-source/unknown-freshness behavior. The
+browser's manual leftovers/takeout form reads the same contract. `servings` means whole meal
+portions: ask for a count when “half” or another amount is unclear. A per-record storage choice
+means split fridge/freezer food needs separate records. Record only the food brought home; this
+tool does not log restaurant meals or consumption. Throwing food away is not consumption and must
+not call `consume_ready_food`.
+
 The tool is a thin adapter, not a second implementation: it reuses `recordCookedFood()`'s existing
 validation and record shape and the same read -> compare `expectedRevision` -> write path
 `index.js`'s REST route already uses, including the exact `409`-equivalent `revision_conflict`
 semantics (surfaced as a tool error, never silently retried) and the exact REST validation error
 text for a malformed `name`/`servings`/`storage`/`cookedDate`. Its input schema is a strict
-allow-list of exactly `name`, `servings`, `storage`, `cookedDate`, `recipeId` (optional), and
-`expectedRevision` — no UID, Firestore path, collection name, or existing record id of any kind is
+allow-list of exactly `name`, `servings`, `storage`, `cookedDate`, `recipeId` (optional), `source`
+(optional enum), and `expectedRevision` — no UID, Firestore path, collection name, or existing record id of any kind is
 accepted, so the tool cannot be used to reach `consume`, `finish`, or any inventory mutation.
 `consume` and `finish` were considered and rejected for this pilot (see `TASKS.md` TASK-069):
 both operate on an *existing* record and are strictly more destructive than a pure append.

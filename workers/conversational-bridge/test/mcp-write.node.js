@@ -167,6 +167,7 @@ test('correct-revision call succeeds, creates exactly one record, and returns th
     item: {
       cookedMealId: message.result.structuredContent.item.cookedMealId,
       recipeId: null,
+      source: null,
       name: 'Chili',
       servingsRemaining: 2,
       trackedPortions: true,
@@ -177,6 +178,46 @@ test('correct-revision call succeeds, creates exactly one record, and returns th
   });
   assert.equal(fake.store.fields.version, 1);
   assert.equal(fake.store.fields.cookedMeals.length, 1);
+});
+
+test('leftovers and takeout persist the shared source and freshness while source omission stays legacy-unknown', async () => {
+  for (const source of ['leftovers', 'takeout']) {
+    const pantry = [{ id: 'p1', name: 'Eggs' }];
+    const groceryList = [{ name: 'Rice', checked: false }];
+    const mealConsumptions = [];
+    const { fake, call } = bridge({ version: 0, cookedMeals: [], pantry, groceryList, mealConsumptions });
+    const message = await responseMessage(await call(Object.assign({}, VALID_ARGS, { source })));
+    assert.equal(message.result.isError, undefined);
+    const [record] = fake.store.fields.cookedMeals;
+    assert.equal(record.source, source);
+    assert.equal(record.fridgeLife, 3);
+    assert.equal(record.freezerLife, 90);
+    assert.equal(message.result.structuredContent.item.source, source);
+    assert.deepEqual(fake.store.fields.pantry, pantry);
+    assert.deepEqual(fake.store.fields.groceryList, groceryList);
+    assert.deepEqual(fake.store.fields.mealConsumptions, mealConsumptions);
+  }
+
+  const { fake, call } = bridge({ version: 0, cookedMeals: [] });
+  const legacy = await responseMessage(await call(VALID_ARGS));
+  const [record] = fake.store.fields.cookedMeals;
+  assert.equal(Object.hasOwn(record, 'source'), false);
+  assert.equal(record.fridgeLife, null);
+  assert.equal(record.freezerLife, null);
+  assert.equal(legacy.result.structuredContent.item.source, null);
+});
+
+test('arbitrary, null, and non-string sources are rejected before Firestore access', async () => {
+  for (const source of ['restaurant', null, 5]) {
+    const read = readDeps({ revision: 0, pantry: [], cookedMeals: [] });
+    const response = await routeRequest(
+      mcpRequest(toolCall(1, 'record_ready_food', Object.assign({}, VALID_ARGS, { source }))),
+      testEnv(), read.deps, contextWithScope([MCP_WRITE_SCOPE])
+    );
+    const message = await responseMessage(response);
+    assert.equal(message.result.isError, true);
+    assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 });
+  }
 });
 
 test('stale expectedRevision is rejected with zero mutation', async () => {
@@ -213,11 +254,11 @@ test('malformed expectedRevision (non-integer, negative, string, boolean) is rej
 
 test('two calls racing the same expectedRevision: exactly one succeeds, the other fails revision_conflict with no silent overwrite', async () => {
   const { fake, call } = bridge({ version: 0, cookedMeals: [] });
-  const first = await responseMessage(await call(VALID_ARGS));
-  assert.equal(first.result.isError, undefined);
-  const second = await responseMessage(await call(VALID_ARGS));
-  assert.equal(second.result.isError, true);
-  assert.match(second.result.content[0].text, /revision_conflict/);
+  const responses = await Promise.all([call(VALID_ARGS), call(VALID_ARGS)]);
+  const messages = await Promise.all(responses.map(responseMessage));
+  assert.equal(messages.filter((message) => !message.result.isError).length, 1);
+  const conflict = messages.find((message) => message.result.isError);
+  assert.match(conflict.result.content[0].text, /revision_conflict/);
   assert.equal(fake.store.fields.cookedMeals.length, 1, 'the race must not have produced a second record');
 });
 

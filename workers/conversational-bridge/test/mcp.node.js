@@ -121,8 +121,9 @@ test('tools/list exposes exactly seven tools total — two read, five write — 
   assert.equal(recordReadyFood.inputSchema.additionalProperties, false);
   assert.deepEqual(
     new Set(Object.keys(recordReadyFood.inputSchema.properties)),
-    new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'expectedRevision'])
+    new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'source', 'expectedRevision'])
   );
+  assert.deepEqual(recordReadyFood.inputSchema.properties.source.enum, ['leftovers', 'takeout']);
 
   assert.deepEqual(consumeReadyFood.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.deepEqual(consumeReadyFood._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
@@ -182,6 +183,7 @@ test('get_ready_food preserves the canonical revision and stable cooked-meal ids
     items: [{
       cookedMealId: 'meal-stable-1',
       recipeId: 'recipe-1',
+      source: null,
       name: 'Adobo',
       servingsRemaining: 3,
       trackedPortions: true,

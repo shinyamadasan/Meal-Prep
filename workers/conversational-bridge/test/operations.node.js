@@ -148,6 +148,19 @@ test('recordCookedFood always creates a tracked batch shaped like _doMarkCooked(
   assert.equal(result.record.cookedDate, COOKED_DATE);
 });
 
+test('recordCookedFood applies shared source freshness only when a canonical source is provided', () => {
+  for (const source of ['leftovers', 'takeout']) {
+    const result = recordCookedFood({ name: 'Pizza', recipeId: null, servings: 3, storage: 'fridge', cookedDate: COOKED_DATE, source });
+    assert.equal(result.record.source, source);
+    assert.equal(result.record.fridgeLife, globalThis.MealPrepReadyFoodContract.defaultFridgeLife);
+    assert.equal(result.record.freezerLife, globalThis.MealPrepReadyFoodContract.defaultFreezerLife);
+    assert.equal(result.record.recipeId, null);
+  }
+
+  assert.throws(() => recordCookedFood({ name: 'Food', servings: 1, storage: 'fridge', cookedDate: COOKED_DATE, source: 'unknown' }), ValidationError);
+  assert.throws(() => recordCookedFood({ name: 'Food', servings: 1, storage: 'fridge', cookedDate: COOKED_DATE, source: null }), ValidationError);
+});
+
 test('recordCookedFood rejects invalid name, servings, and storage', () => {
   assert.throws(() => recordCookedFood({ name: '', servings: 1, storage: 'fridge', cookedDate: COOKED_DATE }), ValidationError);
   assert.throws(() => recordCookedFood({ name: 'Chili', servings: 0, storage: 'fridge', cookedDate: COOKED_DATE }), ValidationError);

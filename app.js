@@ -12928,15 +12928,26 @@ function openManualCookedModal() {
   var nameEl = document.getElementById('manual-cooked-name');
   if (nameEl) nameEl.value = '';
   var sourceEl = document.getElementById('manual-cooked-source');
-  if (sourceEl) sourceEl.value = 'leftovers';
+  var readyFoodContract = globalThis.MealPrepReadyFoodContract;
+  if (sourceEl && readyFoodContract) {
+    if (!sourceEl.options.length) {
+      readyFoodContract.sources.forEach(function(source) {
+        var option = document.createElement('option');
+        option.value = source;
+        option.textContent = source.charAt(0).toUpperCase() + source.slice(1);
+        sourceEl.appendChild(option);
+      });
+    }
+    sourceEl.value = readyFoodContract.sources[0];
+  }
   var dateEl = document.getElementById('manual-cooked-date');
   if (dateEl) dateEl.value = todayISO();
   var storageEl = document.getElementById('manual-cooked-storage');
   if (storageEl) storageEl.value = 'fridge';
   var fridgeEl = document.getElementById('manual-cooked-fridge-life');
-  if (fridgeEl) fridgeEl.value = '3';
+  if (fridgeEl && readyFoodContract) fridgeEl.value = String(readyFoodContract.defaultFridgeLife);
   var freezerEl = document.getElementById('manual-cooked-freezer-life');
-  if (freezerEl) freezerEl.value = '90';
+  if (freezerEl && readyFoodContract) freezerEl.value = String(readyFoodContract.defaultFreezerLife);
   var portionsEl = document.getElementById('manual-cooked-portions');
   if (portionsEl) portionsEl.value = ''; // blank = untracked, the pre-wave behaviour
   var proteinEl = document.getElementById('manual-cooked-protein');
@@ -12971,7 +12982,10 @@ function saveManualCookedMeal() {
   var fridgeEl = document.getElementById('manual-cooked-fridge-life');
   var freezerEl = document.getElementById('manual-cooked-freezer-life');
 
-  var source = sourceEl && sourceEl.value === 'takeout' ? 'takeout' : 'leftovers';
+  var readyFoodContract = globalThis.MealPrepReadyFoodContract;
+  var source = sourceEl && readyFoodContract && readyFoodContract.sources.includes(sourceEl.value)
+    ? sourceEl.value
+    : (readyFoodContract ? readyFoodContract.sources[0] : null);
   var storage = storageEl && storageEl.value === 'freezer' ? 'freezer' : 'fridge';
   var portionsEl = document.getElementById('manual-cooked-portions');
   var portions = portionCountOrNull(portionsEl ? portionsEl.value : null, 1);

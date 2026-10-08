@@ -115,6 +115,7 @@ function recordReadyFoodInputSchema() {
     storage: z.unknown().optional(),
     cookedDate: z.unknown().optional(),
     recipeId: z.unknown().optional(),
+    source: z.enum(readyFood.READY_FOOD_SOURCES).optional(),
     expectedRevision: z.unknown().optional()
   });
 }
@@ -160,6 +161,7 @@ function readyFoodItemSchema() {
     trackedPortions: z.boolean(),
     storage: z.enum(['fridge', 'freezer']),
     cookedDate: z.string().nullable(),
+    source: z.enum(readyFood.READY_FOOD_SOURCES).nullable(),
     updatedAt: z.string().nullable()
   });
 }
@@ -217,7 +219,9 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     {
       title: 'Record ready food',
       description: 'Create exactly one new ready-to-eat (cooked) food record. Append-only: ' +
-        'never edits, removes, or finishes any existing record.',
+        'never edits, removes, or finishes any existing record. Optional source is leftovers or ' +
+        'takeout; either source uses the shared ready-food freshness defaults. Omit source to keep ' +
+        'freshness unknown.',
       inputSchema: recordReadyFoodInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
@@ -532,7 +536,8 @@ async function recordReadyFoodTool(env, deps, ctx, args) {
       servings: args.servings,
       storage: args.storage,
       cookedDate: args.cookedDate,
-      recipeId: args.recipeId
+      recipeId: args.recipeId,
+      source: args.source
     });
     const nextMeals = (doc.cookedMeals || []).concat([r.record]);
     const written = await writeDoc(env, accessToken, {

@@ -17,6 +17,10 @@
 // from a stale synced copy) rather than the specific code path that happens to produce it
 // client-side.
 import { NotFoundError, ValidationError, InsufficientServingsError } from '../errors.js';
+import '../../../../shared/readyFoodContract.js';
+
+const READY_FOOD_CONTRACT = globalThis.MealPrepReadyFoodContract;
+export const READY_FOOD_SOURCES = READY_FOOD_CONTRACT.sources;
 
 const PORTION_COUNT_MAX = 99;
 const VALID_STORAGE = ['fridge', 'freezer'];
@@ -30,6 +34,7 @@ function toReadyFoodItem(meal) {
   return {
     cookedMealId: String(meal.id),
     recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
+    source: meal.source != null ? meal.source : null,
     name: meal.name != null ? meal.name : null,
     servingsRemaining: tracksPortions(meal) ? meal.portionsRemaining : null,
     trackedPortions: tracksPortions(meal),
@@ -95,11 +100,14 @@ function validateCookedDate(value) {
 // `servings` and `expectedRevision` are both required, no exceptions, which is what makes a
 // lost-response retry of this create safe (D-082 idempotency model): a retry under the same
 // stale expectedRevision is rejected upstream, never re-applied as a second batch.
-export function recordCookedFood({ name, recipeId, servings, storage, cookedDate }) {
+export function recordCookedFood({ name, recipeId, servings, storage, cookedDate, source }) {
   validateName(name);
   const portions = validateServings(servings, 'servings');
   validateStorage(storage);
   const date = validateCookedDate(cookedDate);
+  if (source !== undefined && !READY_FOOD_SOURCES.includes(source)) {
+    throw new ValidationError('source must be one of: ' + READY_FOOD_SOURCES.join(', ') + '.', { field: 'source' });
+  }
 
   const record = {
     id: 'cm_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -107,11 +115,12 @@ export function recordCookedFood({ name, recipeId, servings, storage, cookedDate
     name,
     cookedDate: date,
     storage,
-    fridgeLife: null,
-    freezerLife: null,
+    fridgeLife: source === undefined ? null : READY_FOOD_CONTRACT.defaultFridgeLife,
+    freezerLife: source === undefined ? null : READY_FOOD_CONTRACT.defaultFreezerLife,
     initialPortions: portions,
     portionsRemaining: portions
   };
+  if (source !== undefined) record.source = source;
   return { item: toReadyFoodItem(record), record };
 }
 

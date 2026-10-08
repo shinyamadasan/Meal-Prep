@@ -5889,6 +5889,71 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
+### TASK-075 · Shared ready-food leftovers/takeout freshness contract
+status: review
+owner: owner-directed planning + implementation (Codex)
+risk: STRICT (D-032): additive MCP ready-food write contract plus shared app/Worker domain semantics.
+source: owner "TASK-075 — CONTINUE WITH SHARED READY-FOOD FRESHNESS CONTRACT" (2026-10-07)
+depends-on: TASK-074 (done); TASK-073 (done)
+files: shared/readyFoodContract.js (new shared source); index.html; app.js; docs/ARCHITECTURE.md; docs/DATA_MODEL.md; docs/DECISIONS.md (D-082 addendum); workers/conversational-bridge/src/operations/readyFood.js; workers/conversational-bridge/src/mcp.js; workers/conversational-bridge/test/operations.node.js; workers/conversational-bridge/test/mcp-write.node.js; workers/conversational-bridge/test/mcp.node.js; workers/conversational-bridge/test/ready-food-contract.node.js (new); tests/ready-food-contract.spec.js (new); workers/conversational-bridge/README.md; CHANGELOG.md; TEST_REPORT.md; TASKS.md status field.
+objective:
+  Extract one minimal canonical ready-food contract consumed by both the classic-script browser app
+  and the conversational Worker. Extend existing record_ready_food with optional canonical source
+  semantics for leftovers/takeout while preserving all auth, revision, one-write, and legacy-call
+  behavior. No new MCP tool or standalone external-meal history.
+live findings (verified on origin/main 05a168ce):
+  - app.js openManualCookedModal() defaults source to leftovers, fridgeLife to 3, freezerLife to 90;
+    saveManualCookedMeal() accepts only leftovers/takeout and stores both freshness values.
+  - docs/DATA_MODEL.md defines cookedMeal.source as optional 'leftovers' | 'takeout'.
+  - Worker recordCookedFood() currently omits source and stores fridgeLife/freezerLife as null.
+  - record_ready_food writes only cookedMeals, requires expectedRevision, and already permits
+    recipeId:null. D-082's mealConsumptions ledger records actual consumption only; recording food
+    brought home must not append a mealConsumption or invent recipe/cooked ids.
+  - App entry is classic-script index.html -> app.js; Worker is ESM. Use the smallest shared plain
+    JS contract that both can consume without a build-system rewrite. If Wrangler cannot bundle it
+    safely, stop with the exact runtime constraint.
+contract:
+  - One shared source defines allowed sources exactly ['leftovers','takeout'], fridgeLife 3,
+    freezerLife 90. Replace active app literals with reads from this shared source.
+  - record_ready_food accepts optional source, strictly limited to the shared enum. When present,
+    persist source and derive both freshness values from the shared contract. Never accept
+    caller-provided freshness values. When omitted, preserve existing record shape/behavior (source
+    absent, freshness unknown) and recipeId null semantics.
+  - Expose source in ready-food returned items as nullable so legacy unknown-source records remain
+    distinguishable from takeout/leftovers. No changes to consume_ready_food semantics.
+  - Keep cookedMeals as the only written Firestore field; preserve mealprep:write, fixed owner,
+    expectedRevision guard, updateTime precondition, exactly one guarded write, and no retries.
+  - No pantry/shopping/history/mealConsumptions side effects. Discard is not consumption.
+acceptance:
+  - [x] Browser app and Worker import/read the same shared contract; active app/Worker paths contain
+        no duplicate source/default literals. App modal behavior remains source=leftovers, 3 fridge,
+        90 freezer; takeout remains selectable and receives the same defaults.
+  - [x] record_ready_food optional source enum is strict; leftovers and takeout each persist source
+        and canonical 3/90 freshness; arbitrary/invalid source is rejected with zero write.
+  - [x] Omitted source preserves the current record semantics; recipeId:null remains valid; returned
+        ready-food items expose known source and nullable legacy source without fabricating ids.
+  - [x] Correct revision produces exactly one cookedMeals write; stale revision produces zero writes;
+        same-revision race yields exactly one success and one conflict; no automatic retry.
+  - [x] Existing consume_ready_food behavior/contract and mealConsumptions ledger are unchanged;
+        recording ready food appends no consumption fact. Pantry and shopping remain byte-identical.
+  - [x] Chaos cases are documented/tested for the limits of this deterministic command: integer
+        portions required; split fridge/freezer state uses separate records; outside-meal history is
+        not fabricated; discard never calls consume_ready_food.
+constraints:
+  - No new MCP tool, generic mutation, item creation, OAuth/secrets/routes/TARGET_UID change, or
+    caller-supplied freshness override. No deployment or production Firestore access/write in this
+    task. Do not edit screenshots/ or unrelated TASK-065/TASK-066.
+verification:
+  - [x] Focused shared-contract, app behavior, MCP write, schema, invalid-source, legacy, revision,
+        race, ledger, and untouched-pantry/shopping tests; record exact commands/counts.
+  - [x] npm run test:bridge; root npm test (Playwright); node --check for changed JS; Wrangler
+        deploy --dry-run only; dependency audit; Verify-Decisions.ps1; Check-DocsConsistency.ps1;
+        git diff --check; delta secret scan; SELF_REVIEW.md and QA.md.
+merge/deployment gate:
+  Hand off at status: review. A NEW independent STRICT reviewer must return PASS. Do not deploy,
+  perform production acceptance, integrate, or mark done in this task; wait for the independent
+  review and the next owner-directed program phase.
+
 <!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>
