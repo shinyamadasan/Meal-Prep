@@ -5943,7 +5943,7 @@ merge/deployment gate: Stop at `status: review`. Independent STRICT review is re
 owner-authorized continuation (2026-10-08): independent STRICT PASS for candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0`; fast-forwarded to main at the same SHA and verified on integration. Deployed Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Read-only Cloudflare deployment history confirms the version immediately live before TASK-076 was `85767a48-23d6-4347-9647-d7dcdecbac3e`, which is the correct rollback target; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the deployment before that. Production acceptance PASS is based on owner-authoritative evidence supplied 2026-10-08: item `1782470280618.3713` Coconut cream, `600 ml -> consume 1 ml -> restore 600 ml`, revisions `29516 -> 29517 -> 29518`, exactly two writes (one `consume_stock`, one `set_inventory_quantity` restoration), zero retries/recovery writes, no tombstone, unrelated inventory and ready food unchanged. No OAuth configuration was changed. TASK-076 is done.
 
 ### TASK-077 · MCP conversational stock replenishment — `add_stock`
-status: codex
+status: review
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (D-032): authenticated pantry quantity delta mutation.
 source: direct owner authorization, “PROGRAM CONTINUATION — CLOSE TASK-076, THEN START TASK-077” (2026-10-08).
@@ -5954,7 +5954,7 @@ branch: task-077, fresh isolated worktree from synchronized TASK-076 closeout ma
 live findings (verified against canonical app and Worker code before implementation):
   - App purchase merge keeps the existing item id and metadata; it does not create/reconstruct rows.
   - Non-staple purchase merge leaves `purchaseDate` unchanged so the oldest stock governs freshness; it refuses printed-expiry and already-expired items. New input carries no date/expiry/storage override, so the bridge preserves those fields.
-  - App purchase merge updates `updatedAt`; numeric staple purchase merge sets `stockLevel: 'full'`. Its grocery reconciliation is app-only and is not part of this Worker operation.
+  - App purchase merge updates `updatedAt`; staple purchase merge sets `stockLevel: 'full'` and clears `suggestDismissed`. Its grocery reconciliation is app-only and is not part of this Worker operation.
   - `consume_stock` introduced the shared pure `convertQuantity` helper. Reuse it; do not add a second unit table.
   - Existing Worker stock-state semantics preserve staple rows, remove/tombstone non-staples on mark-out, and only mark staples in stock. A missing/tombstoned item cannot be safely reconstructed by this operation.
   - App `pantryDaysLeft()` compares against the browser's local calendar date; the stateless Worker has UTC and pantry rows store no timezone. Preserve the merge safety rule with a conservative date window: refuse rows whose expiry could differ by timezone, rather than guessing.
@@ -5969,26 +5969,26 @@ tool contract:
   - Server reads current quantity and adds the converted delta. Reject non-finite result or a result that cannot represent an increase; never clamp, wrap, or silently discard the increment. Keep decimal arithmetic behavior consistent with the existing app purchase merge where safely representable.
   - Preserve existing row id, purchaseDate, expiry/dateMode, storage, category, and other metadata. Update `updatedAt`. Do not create/reconstruct absent rows or change Firestore schema.
   - Preserve canonical freshness boundaries: printed-expiry-mode rows cannot merge; refuse non-staple rows whose canonical purchase freshness is already expired; do not refresh/reset dates as an add-stock side effect. Since app freshness uses local calendar dates and no timezone is stored, fail with zero mutation when the Worker cannot unambiguously establish freshness around a UTC/local date boundary. If required metadata is malformed or cannot be merged safely, fail with zero mutation.
-  - For a staple with safe numeric quantity and unit, apply the same reviewed delta rules and set `stockLevel: 'full'`, consistent with app purchase merging. For a stock-level-only staple without numeric quantity/unit, refuse and direct the caller to existing `mark_in_stock`; do not invent quantity semantics.
+  - For a staple with safe numeric quantity and unit, apply the same reviewed delta rules, set `stockLevel: 'full'`, and clear `suggestDismissed`, consistent with app purchase merging. For a stock-level-only staple without numeric quantity/unit, refuse and direct the caller to existing `mark_in_stock`; do not invent quantity semantics.
   - For an existing live staple row marked `empty`, numeric replenishment may add to its stored quantity and restore `stockLevel: 'full'`. Absent/tombstoned rows and non-staple rows removed by canonical mark-out are not resurrected. Reject unsafe live out-of-stock states rather than guessing.
   - Writes may change only the target pantry row, normal update/revision metadata, and only fields already touched by canonical pantry writes. Shopping, cookedMeals, mealConsumptions, recipes, and unrelated inventory remain unchanged; no app-side grocery reconciliation is added.
   - MCP description requires stable ids from `get_inventory`, clarifies duplicate names, asks for exact amount/unit, and warns this non-idempotent delta must not be replayed with a fresh revision. Annotation reflects non-idempotent write semantics.
 
 acceptance:
-  - [ ] MCP exposes exactly nine tools; `add_stock` uses the strict schema above and correct write-scope security metadata.
-  - [ ] Same-unit and supported metric deltas add to the live quantity and preserve item id and metadata; update time and revision change exactly once.
-  - [ ] Stale revision, same-revision add/add race, add/consume race, add/set-quantity race, and add/mark-out race are covered; at most one competing write wins, losers conflict/fail, and automatic retries are zero.
-  - [ ] Overflow, unit mismatch, unsupported conversion, blank/unknown units, staple ambiguity/stock-level-only staple, invalid freshness metadata, expired or timezone-ambiguous rows, absent rows, and tombstones all fail with zero writes.
-  - [ ] Numeric staples follow canonical add/restock semantics and become `full`; no numeric staple quantity is invented.
-  - [ ] Purchase/expiry/storage metadata follows canonical merge rules; no row identity/date/storage reconstruction occurs.
-  - [ ] Unrelated pantry, shopping, ready food, mealConsumptions, and recipe data remain unchanged. Existing consume_stock, set_inventory_quantity, mark_in_stock, and mark_out_of_stock tests/regressions pass.
-  - [ ] `mcp.js` remains a thin adapter; unit conversion, freshness/staple classification, and pantry-array logic remain in the operation/domain layer.
+  - [x] MCP exposes exactly nine tools; `add_stock` uses the strict schema above and correct write-scope security metadata.
+  - [x] Same-unit and supported metric deltas add to the live quantity and preserve item id and metadata; update time and revision change exactly once.
+  - [x] Stale revision, same-revision add/add race, add/consume race, add/set-quantity race, and add/mark-out race are covered; at most one competing write wins, losers conflict/fail, and automatic retries are zero.
+  - [x] Overflow, unit mismatch, unsupported conversion, blank/unknown units, staple ambiguity/stock-level-only staple, invalid freshness metadata, expired or timezone-ambiguous rows, absent rows, and tombstones all fail with zero writes.
+  - [x] Numeric staples follow canonical add/restock semantics and become `full`; no numeric staple quantity is invented.
+  - [x] Purchase/expiry/storage metadata follows canonical merge rules; no row identity/date/storage reconstruction occurs.
+  - [x] Unrelated pantry, shopping, ready food, mealConsumptions, and recipe data remain unchanged. Existing consume_stock, set_inventory_quantity, mark_in_stock, and mark_out_of_stock tests/regressions pass.
+  - [x] `mcp.js` remains a thin adapter; unit conversion, freshness/staple classification, and pantry-array logic remain in the operation/domain layer.
 
 constraints: Existing-item replenishment only. Do not implement item creation, tombstone resurrection, package guessing, app manual leftovers, shopping automation, generic mutation, ready-food/inventory/shopping/meal-planning changes outside the authorized Worker operation, OAuth/auth changes, Worker routes, tool-count changes beyond the one new tool, or Firestore schema changes. Do not deploy or perform production Firestore reads/writes. Do not change TASK-075 shared freshness or TASK-076 consume semantics.
 
 verification:
-  - [ ] Focused add-stock operation and MCP tests; MCP schema/write tests; stale revision and race tests; existing stock-operation regressions.
-  - [ ] Full `npm run test:bridge`; root `npm test` if inexpensive; changed-JS `node --check`; `git diff --check`; delta secret scan; dependency audit; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1` against baseline; Wrangler dry-run only; complete SELF_REVIEW.md and AI-verifiable QA.md checks.
+  - [x] Focused add-stock operation (5/5) and MCP tests (9/9); MCP schema/write tests; stale revision and all four races; existing stock-operation regressions.
+  - [x] Full `npm run test:bridge` (250/250); root `npm test` (725/725); changed-JS `node --check`; `git diff --check`; delta secret scan; `npm audit --omit=dev` (0 vulnerabilities); `tools/Verify-Decisions.ps1` (110/110); `tools/Check-DocsConsistency.ps1` against baseline (55 unchanged); Wrangler dry-run only; SELF_REVIEW.md and AI-verifiable QA.md checks.
 
 merge/deployment gate: Stop at `status: review` for independent STRICT review. Do not integrate, push, deploy, or run a production pilot/write.
 

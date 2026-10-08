@@ -951,3 +951,8 @@ result: focused Worker suites 50 passed, 0 failed; full bridge suite 211 passed,
 untested: Wrangler dry-run could not run because Wrangler is unavailable locally and `npx` has no cached package; no dependency was installed. No deployment or production access. Consume fractional semantics remain covered by existing bridge tests and unchanged.
 
 <!-- Entries go here, newest first. -->
+
+## TASK-077 · 2026-10-08
+suite: focused `operations-add-stock.node.js` + `mcp-add-stock.node.js`; existing MCP consume-stock, set-quantity, stock-state, and MCP surface suites; `npm run test:bridge`; root `npm test`; `node --check` on changed Worker source/tests; Wrangler `versions upload --dry-run`; `npm audit --omit=dev`; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`; delta secret scan; `git diff --check`.
+result: add-stock operation 5/5 and MCP 9/9 passed; existing MCP regressions 63/63 passed; full bridge suite 250/250 passed; Playwright 725/725 passed; syntax and diff checks passed; Wrangler 4.148.0 dry-run compiled/checks and exited before upload; audit found 0 vulnerabilities; all 110 decision pointers passed; secret-pattern scan 0 findings. Docs-consistency produced 55 existing candidates, byte-for-byte the same set on unchanged main. Initial sandbox bridge invocation was blocked by Node `spawn EPERM`; elevated rerun completed successfully.
+untested: production deployment and production-data access intentionally not performed. Date-sensitive rows within the UTC/local calendar boundary are rejected for app-side recheck because the Worker has no caller timezone.

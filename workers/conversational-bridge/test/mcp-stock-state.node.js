@@ -104,16 +104,16 @@ function snapshotUnrelated(store) {
   });
 }
 
-test('tools/list exposes exactly eight tools with strict stock schemas and annotations', async () => {
+test('tools/list exposes exactly nine tools with strict stock schemas and annotations', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(1, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
   );
   const tools = (await responseMessage(response)).result.tools;
   assert.deepEqual(tools.map((tool) => tool.name), [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock'
+    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock', 'add_stock'
   ]);
-  assert.doesNotMatch(tools.map((tool) => tool.name).join(' '), /add_stock|create_inventory|mutate_inventory|shopping/i);
+  assert.doesNotMatch(tools.map((tool) => tool.name).join(' '), /create_inventory|mutate_inventory|shopping/i);
 
   const out = tools.find((tool) => tool.name === 'mark_out_of_stock');
   const inStock = tools.find((tool) => tool.name === 'mark_in_stock');

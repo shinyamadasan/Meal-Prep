@@ -1197,3 +1197,16 @@ deviations: no deployment; fractional input is rejected before Firestore access 
 → status remains `review` in TASKS.md
 
 <!-- Entries go here, newest first. -->
+
+## TASK-077 — ready for review (branch: task-077)
+changed:
+  - workers/conversational-bridge/src/operations/inventory.js (server-owned `addStock` delta, reused `convertQuantity`, safe arithmetic, existing-row and canonical metadata guards)
+  - workers/conversational-bridge/src/mcp.js (strict `add_stock` schema, `mealprep:write`, nine-tool surface, one update-time-guarded pantry write)
+  - workers/conversational-bridge/test/operations-add-stock.node.js, test/mcp-add-stock.node.js (delta, conversion, freshness, staples, zero mutation, scope, stale revision and cross-operation races)
+  - workers/conversational-bridge/test/mcp.node.js, test/mcp-consume-stock.node.js, test/mcp-set-quantity.node.js, test/mcp-stock-state.node.js, test/mcp-consume.node.js (nine-tool and existing-operation regressions)
+  - workers/conversational-bridge/README.md (add_stock contract, metadata/freshness boundaries and no-deploy state)
+  - TASKS.md (TASK-077 acceptance/evidence; status set to review)
+tests: `npm run test:bridge` (250 passed); focused add-stock operation/MCP tests (14 passed); existing MCP stock/surface regressions (63 passed); `npm test` (725 passed); changed-JS syntax checks; `git diff --check`; Wrangler 4.148.0 `versions upload --dry-run`; `npm audit --omit=dev` (0 vulnerabilities); Verify-Decisions (110/110); delta secret scan (0 findings). Docs-consistency reports 55 potential drift items, identical on unchanged main and this candidate.
+blockers: none
+deviations: app freshness uses browser-local calendar time while the stateless Worker has no caller timezone; add_stock fails closed for the UTC/local boundary window instead of guessing. No deployment, production read, or production write.
+→ status set to `review` in TASKS.md

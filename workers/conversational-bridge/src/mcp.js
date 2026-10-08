@@ -64,6 +64,14 @@ const CONSUME_STOCK_ANNOTATIONS = {
   openWorldHint: false
 };
 
+// A stock delta is not idempotent: replaying it against a fresh revision adds stock again.
+const ADD_STOCK_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
 const MARK_OUT_OF_STOCK_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
@@ -162,6 +170,15 @@ function setInventoryQuantityInputSchema() {
 }
 
 function consumeStockInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
+    quantity: z.number().finite().positive(),
+    expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+function addStockInputSchema() {
   return z.strictObject({
     ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
     quantity: z.number().finite().positive(),
@@ -373,6 +390,31 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => consumeStockTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'add_stock',
+    {
+      title: 'Add pantry stock',
+      description: 'Add an exact purchased quantity to one existing pantry row using ingredientId ' +
+        'ONLY from get_inventory; never guess or fuzzy-match, and ask which row if several match. ' +
+        'State the exact amount and unit the user bought. The Worker adds this delta to the live ' +
+        'stored quantity; do not calculate or submit an absolute total. Only exact same-unit arithmetic ' +
+        'and g/kg or ml/L metric scaling are supported. Do not infer cups, density, pieces-to-mass, ' +
+        'or can/package conversions. Printed-expiry lots, expired or date-ambiguous rows, stock-level-only ' +
+        'staples, and removed/tombstoned items must be handled in the app; use mark_in_stock for a ' +
+        'stock-level-only staple. This delta is NOT safe to replay with a fresh revision; on ' +
+        'revision_conflict, re-read before deciding whether to retry.',
+      inputSchema: addStockInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        item: inventoryItemSchema()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: ADD_STOCK_ANNOTATIONS
+    },
+    async (args) => addStockTool(env, deps, ctx, args)
+  );
+
   return server;
 }
 
@@ -440,6 +482,38 @@ async function consumeStockTool(env, deps, ctx, args) {
     return toolResult({ ok: true, revision: written.revision, item: r.item, removed: r.removed });
   } catch (error) {
     return inventoryStockError(error, 'The inventory stock could not be consumed.');
+  }
+}
+
+// Apply exactly one purchase delta to the observed existing row, then make one guarded pantry write.
+async function addStockTool(env, deps, ctx, args) {
+  try {
+    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const fetchImpl = deps.fetchImpl || fetch;
+    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
+    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
+    const readDoc = deps.getUserDocument || getUserDocument;
+    const writeDoc = deps.patchUserDocument || patchUserDocument;
+
+    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const doc = await readDoc(env, accessToken, fetchImpl);
+    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
+
+    const r = inventory.addStock(doc.pantry, doc.deletions.pantry || {}, {
+      ingredientId: args.ingredientId,
+      quantity: args.quantity,
+      expectedUnit: args.expectedUnit
+    });
+    const written = await writeDoc(env, accessToken, {
+      fieldPaths: ['pantry'],
+      fields: { pantry: r.pantry },
+      expectedUpdateTime: doc.updateTime,
+      nextVersion: doc.revision + 1
+    }, fetchImpl);
+
+    return toolResult({ ok: true, revision: written.revision, item: r.item });
+  } catch (error) {
+    return inventoryStockError(error, 'The inventory stock could not be increased.');
   }
 }
 
@@ -689,7 +763,8 @@ const TOOL_SECURITY_SCHEMES = {
   mark_out_of_stock: WRITE_SECURITY_SCHEMES,
   mark_in_stock: WRITE_SECURITY_SCHEMES,
   set_inventory_quantity: WRITE_SECURITY_SCHEMES,
-  consume_stock: WRITE_SECURITY_SCHEMES
+  consume_stock: WRITE_SECURITY_SCHEMES,
+  add_stock: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {

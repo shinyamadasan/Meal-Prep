@@ -291,10 +291,11 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
 - One update-time-guarded pantry patch; stale `expectedRevision` returns `revision_conflict` with no
   mutation and is never retried. Requires the existing `mealprep:write` scope; OAuth is unchanged.
 
-## TASK-076 authenticated MCP stock consumption (local candidate only — NOT deployed)
+## TASK-076 authenticated MCP stock consumption (integrated and deployed)
 
 `consume_stock` adds a semantic quantity delta for one existing pantry row; the current local MCP
-surface has exactly eight tools. This candidate is not deployed and has no production pilot.
+surface at TASK-076 had exactly eight tools. That reviewed candidate was integrated and deployed;
+TASK-077 adds one more tool in a separate, local review candidate.
 
 - Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The id must
   come from `get_inventory`; duplicate-name matches require asking which row. The amount is the
@@ -316,6 +317,34 @@ surface has exactly eight tools. This candidate is not deployed and has no produ
   egg” is supported only when the row is explicitly in `pieces` or `pcs` and the user’s amount is
   exactly represented in that same unit; those spellings remain distinct and the Worker invents
   no conversion.
+
+## TASK-077 authenticated MCP stock replenishment (local candidate only — NOT deployed)
+
+`add_stock` adds an exact purchase delta to one active existing pantry row. The current local MCP
+surface has exactly nine tools; this candidate is not deployed and has no production pilot.
+
+- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The stable id
+  must come from `get_inventory`; duplicate-name matches require asking which row. Quantity is the
+  amount bought, never an absolute total. The Worker adds it to the live stored quantity. Extra
+  uid/path/collection, date, storage, or other metadata keys fail before Firestore access.
+- `operations/quantity.js` is reused: exact same-unit arithmetic and only `g`/`kg` or `ml`/`L`
+  metric scaling. No density, cups, pieces-to-mass, package/can conversion, alias, or fallback.
+  `expectedUnit` asserts the unit used for the delta and is never persisted.
+- The existing row id and purchase, expiry, storage, category, and other metadata are preserved;
+  only quantity/update time change for a non-staple. Numeric staples add the delta and become
+  `stockLevel: 'full'`. Stock-level-only staples are refused with a direction to `mark_in_stock`.
+- Printed-expiry rows cannot merge, matching app purchase-merge behavior. The app compares inferred
+  freshness against a browser-local calendar date, but the Worker has no caller timezone and the
+  document stores none. It therefore refuses stale rows and the UTC/local boundary window where
+  expiration is uncertain; it never resets purchase dates to make old stock look fresh. Rows with
+  malformed freshness metadata fail closed.
+- Absent and tombstoned ids are refused; `add_stock` never creates or resurrects a row. A removed
+  non-staple must be re-added through the app.
+- One `mealprep:write` authorization, one observed revision, one update-time-guarded pantry patch,
+  and no retry. Overflow, precision loss, stale revisions, unsupported units, and unsafe metadata
+  fail without mutation. The delta is non-idempotent and must not be replayed with a fresh revision.
+- Shopping, ready food, meal-consumption history, recipes, and unrelated inventory remain untouched.
+  The app may perform its existing grocery reconciliation on a later open; this Worker does not.
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
@@ -512,9 +541,10 @@ note below. It means "refused because the bridge cannot safely tell," not "malfo
 
 No `create_inventory_item` (no authoritative id-minting authority exists outside the app's own
 UI). No Plan/Shop/Prep tools. No recipe generation. There is no natural-language parsing inside
-the Worker. TASK-076 adds only `consume_stock`; `add_stock`, finish, create-item, shopping, and
-generic inventory-mutation tools remain absent. No generic "execute"/"patch"/"update document"
-tool exists or is planned; no caller-selected Firestore field or path is accepted under any name.
+the Worker. TASK-076 added `consume_stock`; TASK-077 adds `add_stock`. Finish, create-item,
+shopping, and generic inventory-mutation tools remain absent. No generic
+"execute"/"patch"/"update document" tool exists or is planned; no caller-selected Firestore field
+or path is accepted under any name.
 
 ## Operations: rotation, revocation, emergency stop
 

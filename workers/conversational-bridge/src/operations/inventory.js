@@ -21,6 +21,19 @@ import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError 
 import { convertQuantity } from './quantity.js';
 
 const MAX_UNIT_LENGTH = 40;
+const MAX_STOCK_QUANTITY = Number.MAX_SAFE_INTEGER;
+const MILLISECONDS_PER_DAY = 86400000;
+const UTC_LOCAL_DATE_SKEW_DAYS = 1;
+const DEFAULT_CATEGORY_SHELF_LIFE_DAYS = 7;
+
+const CATEGORY_SHELF_LIFE_DAYS = Object.freeze({
+  protein: 3,
+  vegetable: 7,
+  fruit: 5,
+  dairy: 7,
+  grain: 180,
+  pantry: 365
+});
 
 function classifyStaple(p) {
   if (!p) return 'non-staple';
@@ -250,4 +263,109 @@ export function consumeStock(pantry, deletionsPantry, { ingredientId, quantity, 
     unchanged: false,
     removed: false
   };
+}
+
+function dateStringToUtcDay(value, field) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ValidationError('The stored ' + field + ' is malformed; clarify freshness in the app before adding stock.', { field });
+  }
+  const timestamp = Date.parse(value + 'T00:00:00.000Z');
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
+    throw new ValidationError('The stored ' + field + ' is malformed; clarify freshness in the app before adding stock.', { field });
+  }
+  return Math.floor(timestamp / MILLISECONDS_PER_DAY);
+}
+
+function validateMergeFreshness(record) {
+  if (record.dateMode === 'expiry') {
+    throw new ValidationError('This item has a printed expiry date and cannot be merged safely; use the app to record the new purchase separately.', { field: 'dateMode' });
+  }
+  if (record.purchaseDate == null) return;
+
+  const purchaseDay = dateStringToUtcDay(record.purchaseDate, 'purchaseDate');
+  let shelfLifeDays = record.shelfLifeDays;
+  if (shelfLifeDays == null) {
+    if (record.category != null && typeof record.category !== 'string') {
+      throw new ValidationError('The stored category is malformed; clarify freshness in the app before adding stock.', { field: 'category' });
+    }
+    const category = (record.category || '').trim().toLowerCase();
+    shelfLifeDays = Object.hasOwn(CATEGORY_SHELF_LIFE_DAYS, category)
+      ? CATEGORY_SHELF_LIFE_DAYS[category]
+      : DEFAULT_CATEGORY_SHELF_LIFE_DAYS;
+  }
+  if (typeof shelfLifeDays !== 'number' || !Number.isFinite(shelfLifeDays) || !Number.isInteger(shelfLifeDays) || shelfLifeDays < 0) {
+    throw new ValidationError('The stored shelf life is malformed; clarify freshness in the app before adding stock.', { field: 'shelfLifeDays' });
+  }
+
+  const expiryDay = purchaseDay + shelfLifeDays;
+  const utcToday = Math.floor(Date.now() / MILLISECONDS_PER_DAY);
+  // The app uses the browser-local calendar day; this Worker has no stored caller timezone.
+  // A local date can be one day behind or ahead of UTC, so decide only outside that window.
+  if (expiryDay < utcToday - UTC_LOCAL_DATE_SKEW_DAYS) {
+    throw new ValidationError('This item is already expired and cannot be merged; use the app to record the new purchase separately.', { field: 'purchaseDate' });
+  }
+  if (expiryDay <= utcToday) {
+    throw new ValidationError('Freshness is near a UTC/local date boundary; re-check the item in the app before adding stock.', { field: 'purchaseDate' });
+  }
+}
+
+// Apply a conversational purchase delta to an existing row only. Preserve the old lot's
+// freshness/storage metadata; reject printed-expiry rows, unsafe dates, and resurrection.
+export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expectedUnit }) {
+  if (typeof ingredientId !== 'string' || !ingredientId.trim()) {
+    throw new ValidationError('ingredientId must be a non-blank string.', { field: 'ingredientId' });
+  }
+  if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
+    throw new ValidationError('quantity must be a finite number > 0.', { field: 'quantity' });
+  }
+  if (typeof expectedUnit !== 'string' || !expectedUnit.trim()) {
+    throw new ValidationError('expectedUnit must be a non-blank string.', { field: 'expectedUnit' });
+  }
+
+  const id = String(ingredientId);
+  const index = findPantryIndex(pantry, ingredientId);
+  if (index === -1 || (deletionsPantry && Object.hasOwn(deletionsPantry, id))) {
+    throw new NotFoundError('No active pantry record with ingredientId "' + ingredientId + '"; add or restore it in the app first.');
+  }
+
+  const record = pantry[index];
+  const classification = classifyStaple(record);
+  if (classification === 'ambiguous') {
+    throw new AmbiguousError(
+      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
+      'set an explicit staple value in the app before adding stock.',
+      { field: 'ingredientId', category: record.category != null ? record.category : null }
+    );
+  }
+  if (classification === 'staple' && (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity))) {
+    throw new ValidationError('This staple has no counted quantity; use mark_in_stock instead.', { field: 'quantity' });
+  }
+  if (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity) || record.quantity < 0) {
+    throw new ValidationError('The stored quantity is missing or invalid; clarify the amount in the app before adding stock.', { field: 'quantity' });
+  }
+  if (typeof record.unit !== 'string' || !record.unit.trim()) {
+    throw new ValidationError('The stored unit is missing; re-read inventory and clarify before adding stock.', { field: 'expectedUnit' });
+  }
+  if (classification === 'non-staple') validateMergeFreshness(record);
+  const amount = convertQuantity(quantity, expectedUnit, record.unit);
+  const total = record.quantity + amount;
+  if (!Number.isFinite(total) || total > MAX_STOCK_QUANTITY || total <= record.quantity) {
+    throw new ValidationError('The resulting stock quantity is outside the safely representable range.', { field: 'quantity' });
+  }
+  const roundedTotal = Number(total.toFixed(2));
+  if (!Number.isFinite(roundedTotal) || roundedTotal > MAX_STOCK_QUANTITY || roundedTotal <= record.quantity) {
+    throw new ValidationError('The requested increment cannot be represented without losing quantity.', { field: 'quantity' });
+  }
+
+  const next = pantry.slice();
+  const updated = Object.assign({}, record, {
+    quantity: roundedTotal,
+    updatedAt: new Date().toISOString()
+  });
+  if (classification === 'staple') {
+    updated.stockLevel = 'full';
+    delete updated.suggestDismissed;
+  }
+  next[index] = updated;
+  return { pantry: next, item: toInventoryItem(updated), unchanged: false };
 }
