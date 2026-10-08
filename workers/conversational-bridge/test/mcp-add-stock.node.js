@@ -133,6 +133,30 @@ test('a failed persistence attempt is not retried', async () => {
   assert.equal(doc.pantry[0].quantity, 500);
 });
 
+test('unrepresentable add_stock deltas fail without changing the document or retrying', async () => {
+  for (const quantity of [0.006, 0.014]) {
+    const doc = {
+      revision: 4,
+      updateTime: 't',
+      pantry: [structuredClone(FRESH_ROW)],
+      cookedMeals: [{ id: 'meal-1', name: 'Chili' }],
+      mealConsumptions: [{ id: 'history-1' }],
+      shopping: [{ id: 'shopping-1' }],
+      recipes: [{ id: 'recipe-1' }],
+      deletions: { pantry: {}, cookedMeals: {} }
+    };
+    const before = structuredClone(doc);
+    const { calls, deps } = countingDeps(doc);
+    const message = await responseMessage(await routeRequest(
+      request(toolCall(1, 'add_stock', { ...VALID, quantity })), testEnv(), deps, AUTH_CONTEXT()
+    ));
+    assert.equal(message.result.isError, true);
+    assert.match(message.result.content[0].text, /represent|precision/i);
+    assert.deepEqual(doc, before);
+    assert.deepEqual(calls, { token: 1, read: 1, write: 0, fetch: 0 });
+  }
+});
+
 test('add_stock adds server-side, preserves lot metadata, increments revision once, and leaves other state unchanged', async () => {
   const b = bridge();
   const unrelated = { id: 'milk', name: 'Milk', quantity: 2, unit: 'L', staple: false, note: 'unchanged' };

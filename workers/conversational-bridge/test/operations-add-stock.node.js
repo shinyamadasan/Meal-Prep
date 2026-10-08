@@ -30,6 +30,30 @@ test('same-unit and supported metric additions preserve identity and existing lo
   assert.equal(converted.item.quantity, 1000);
 });
 
+test('additions preserve exact hundredth-unit deltas and reject overcount or undercount rounding', () => {
+  for (const quantity of [0.006, 0.014]) {
+    const pantry = [freshRow()];
+    const before = structuredClone(pantry);
+    assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity, expectedUnit: 'g' }), ValidationError);
+    assert.deepEqual(pantry, before);
+  }
+
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.01, expectedUnit: 'g' }).item.quantity, 500.01);
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 300, expectedUnit: 'g' }).item.quantity, 800);
+});
+
+test('small metric conversions are accepted only when the stored-unit delta is representable', () => {
+  assert.equal(call([freshRow()], { ingredientId: 'chicken', quantity: 0.00001, expectedUnit: 'kg' }).item.quantity, 500.01);
+  assert.equal(call([freshRow({ unit: 'ml' })], { ingredientId: 'chicken', quantity: 0.00001, expectedUnit: 'L' }).item.quantity, 500.01);
+
+  for (const [row, quantity, expectedUnit] of [[freshRow(), 0.000014, 'kg'], [freshRow({ unit: 'ml' }), 0.000014, 'L']]) {
+    const pantry = [row];
+    const before = structuredClone(pantry);
+    assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity, expectedUnit }), ValidationError);
+    assert.deepEqual(pantry, before);
+  }
+});
+
 test('delta can restore a numeric staple to full without changing its stable id', () => {
   const row = { id: 'rice', name: 'Rice', quantity: 2, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'pantry', suggestDismissed: true };
   const result = call([row], { ingredientId: 'rice', quantity: 500, expectedUnit: 'g' });

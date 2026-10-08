@@ -5,6 +5,17 @@
 
 ---
 
+## TASK-077 — strict-review rework (branch: task-077; base: 1c299066)
+changed:
+  - `workers/conversational-bridge/src/operations/inventory.js` (reject add-stock deltas not exactly representable at canonical two-decimal quantity precision; remove rounding of the combined total)
+  - `workers/conversational-bridge/test/operations-add-stock.node.js` (overcount/undercount, exact and normal deltas, and small kg/L conversion regressions)
+  - `workers/conversational-bridge/test/mcp-add-stock.node.js` (precision errors prove unchanged document/revision, zero writes, and no retry)
+tests: focused add-stock operation/MCP tests 17/17; full Worker bridge suite 236/236; changed-JS syntax, `git diff --check`, Verify-Decisions 110/110, delta secret scan clean; docs-consistency output identical to base (55 existing candidates); Wrangler 4.148.0 `versions upload --dry-run` successful.
+blockers: none.
+deviations: none; no MCP schema, shared quantity helper, or previously reviewed add-stock semantics changed.
+deployment: none.
+→ status remains `review` in TASKS.md for targeted re-review.
+
 ## TASK-076 — done (main closeout)
 reviewed candidate / integration SHA: `11acb93080bfce6e8278f34ddba67605fc18c0c0` (owner-relayed independent STRICT PASS; fast-forwarded without conflict resolution).
 deployment: Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Read-only deployment history confirms previous live / correct rollback version `85767a48-23d6-4347-9647-d7dcdecbac3e`; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the version before TASK-075.

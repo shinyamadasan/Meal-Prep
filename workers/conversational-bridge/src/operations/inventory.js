@@ -83,6 +83,28 @@ function validateUnit(unit) {
   }
 }
 
+function quantityToCentiUnits(quantity, multiplier = 1n, divisor = 1n) {
+  const [mantissa, exponentText] = quantity.toString().toLowerCase().split('e');
+  const exponent = exponentText == null ? 0 : Number(exponentText);
+  const [whole, fraction = ''] = mantissa.split('.');
+  const digits = (whole + fraction).replace(/^0+/, '') || '0';
+  let numerator = BigInt(digits) * 100n * multiplier;
+  let denominator = divisor;
+  const decimalPlaces = fraction.length - exponent;
+  if (decimalPlaces > 0) denominator *= 10n ** BigInt(decimalPlaces);
+  else numerator *= 10n ** BigInt(-decimalPlaces);
+  if (numerator % denominator !== 0n) {
+    throw new ValidationError('The requested increment cannot be represented at the stored quantity precision.', { field: 'quantity' });
+  }
+  return numerator / denominator;
+}
+
+function centiUnitsToQuantity(centiUnits) {
+  const whole = centiUnits / 100n;
+  const fraction = String(centiUnits % 100n).padStart(2, '0');
+  return Number(whole + '.' + fraction);
+}
+
 // Absolute set on an existing record only — idempotent by construction (D-082 / TASK-065:
 // repeating the same value under a fresh expectedRevision reproduces the same state; repeating
 // under the SAME stale expectedRevision is rejected upstream as a revision conflict, not
@@ -352,14 +374,21 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
   if (!Number.isFinite(total) || total > MAX_STOCK_QUANTITY || total <= record.quantity) {
     throw new ValidationError('The resulting stock quantity is outside the safely representable range.', { field: 'quantity' });
   }
-  const roundedTotal = Number(total.toFixed(2));
-  if (!Number.isFinite(roundedTotal) || roundedTotal > MAX_STOCK_QUANTITY || roundedTotal <= record.quantity) {
+
+  let multiplier = 1n;
+  let divisor = 1n;
+  if ((expectedUnit === 'kg' && record.unit === 'g') || (expectedUnit === 'L' && record.unit === 'ml')) multiplier = 1000n;
+  if ((expectedUnit === 'g' && record.unit === 'kg') || (expectedUnit === 'ml' && record.unit === 'L')) divisor = 1000n;
+  const totalCentiUnits = quantityToCentiUnits(record.quantity) + quantityToCentiUnits(quantity, multiplier, divisor);
+  const exactTotal = centiUnitsToQuantity(totalCentiUnits);
+  if (!Number.isFinite(exactTotal) || exactTotal > MAX_STOCK_QUANTITY || exactTotal <= record.quantity ||
+      quantityToCentiUnits(exactTotal) !== totalCentiUnits) {
     throw new ValidationError('The requested increment cannot be represented without losing quantity.', { field: 'quantity' });
   }
 
   const next = pantry.slice();
   const updated = Object.assign({}, record, {
-    quantity: roundedTotal,
+    quantity: exactTotal,
     updatedAt: new Date().toISOString()
   });
   if (classification === 'staple') {
