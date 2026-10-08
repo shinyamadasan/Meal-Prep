@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-076 strict-review rework · 2026-10-08
+suite: direct focused Node tests for `operations-consume-stock.node.js` and `mcp-consume-stock.node.js`; full Worker `npm test`; `node --check` for changed JavaScript; `git diff --check`; Wrangler 4.148.0 `versions upload --dry-run`.
+result: focused suites 25 passed, 0 failed; full Worker suite 236 passed, 0 failed; syntax and diff checks passed. Wrangler dry-run bundled the Worker and exited before upload.
+coverage: Zod `.finite().positive()` rejects an overflowed JSON numeric literal (`1e999`) before any token fetch, Firestore read, or write; the fixed revision remains unchanged and there is no retry. Direct domain invocation rejects `Infinity` and leaves pantry unchanged. Existing valid conversion, over-consumption, exact-zero staple/non-staple, stale revision, races, set-quantity, mark-in/out, and tool-surface tests pass in the full suite.
+untested: live connector production schema/tool response; no production access, write, deployment, or integration was performed.
+
 ## TASK-076 · 2026-10-08
 suite: focused `node --test test/operations-consume-stock.node.js test/mcp-consume-stock.node.js`; `npm run test:bridge`; root `npm test`; changed-JS `node --check`; `npm audit --omit=dev`; decision/docs checks; diff check; delta secret scan; Wrangler 4.148.0 `versions upload --dry-run` to a temporary output directory.
 result: focused suites 23 passed, 0 failed; bridge suite 234 passed; root Playwright suite 725 passed. Changed-JS syntax passed; audit reported 0 vulnerabilities; decision verification 110/110; diff check and delta secret scan clean. Docs consistency found 55 items vs 51 on base, the four additions are expected Worker-only identifiers. Wrangler dry-run bundled the Worker and exited before upload.

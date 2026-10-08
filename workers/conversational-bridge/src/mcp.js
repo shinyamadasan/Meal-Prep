@@ -164,7 +164,7 @@ function setInventoryQuantityInputSchema() {
 function consumeStockInputSchema() {
   return z.strictObject({
     ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
-    quantity: z.number().positive(),
+    quantity: z.number().finite().positive(),
     expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
     expectedRevision: z.number().int().nonnegative()
   });

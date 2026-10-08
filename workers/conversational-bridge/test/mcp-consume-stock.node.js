@@ -22,6 +22,14 @@ function request(body) {
   });
 }
 
+function requestRaw(body) {
+  return new Request(MCP_URL, {
+    method: 'POST',
+    headers: { Host: 'localhost', Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
+    body
+  });
+}
+
 async function responseMessage(response) {
   const raw = await response.text();
   if ((response.headers.get('Content-Type') || '').includes('text/event-stream')) {
@@ -133,6 +141,19 @@ test('strict schema rejects malformed fields and extra identity/path keys before
     assert.equal(message.result.isError, true, JSON.stringify(args));
     assert.deepEqual(calls, { token: 0, read: 0, write: 0, fetch: 0 }, JSON.stringify(args));
   }
+});
+
+test('overflowed JSON quantity is rejected before any Firestore access or retry', async () => {
+  const doc = { revision: 4, updateTime: 't', pantry: [], cookedMeals: [], deletions: {} };
+  const { calls, deps } = countingDeps(doc);
+  const body = '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"consume_stock","arguments":{"ingredientId":"chicken","quantity":1e999,"expectedUnit":"g","expectedRevision":4}}}';
+  assert.equal(JSON.parse('1e999'), Infinity, 'the JSON number must reach JavaScript as a non-finite number');
+
+  const response = await routeRequest(requestRaw(body), testEnv(), deps, AUTH_CONTEXT());
+  const message = await responseMessage(response);
+  assert.equal(message.result.isError, true);
+  assert.deepEqual(calls, { token: 0, read: 0, write: 0, fetch: 0 });
+  assert.equal(doc.revision, 4);
 });
 
 test('partial same-unit consume writes the semantic delta once and leaves unrelated state unchanged', async () => {

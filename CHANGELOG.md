@@ -5,6 +5,17 @@
 
 ---
 
+## TASK-076 — strict-review rework (branch: task-076; base: 5b012480)
+changed:
+  - `workers/conversational-bridge/src/mcp.js` (`consume_stock.quantity` now uses Zod `.finite().positive()`)
+  - `workers/conversational-bridge/test/mcp-consume-stock.node.js` (raw overflowed JSON `1e999` proves rejection before token/read/write and without retry)
+  - `workers/conversational-bridge/test/operations-consume-stock.node.js` (direct `Infinity` rejects without pantry mutation)
+tests: focused operation/MCP suites 25/25; full Worker suite 236/236; changed-JS syntax checks; `git diff --check`; Wrangler 4.148.0 dry-run successful.
+blockers: none.
+deviations: none; unit behavior, conversion, staple/tombstone, and tool semantics remain unchanged.
+deployment: none.
+→ status remains `review` in TASKS.md for targeted re-review.
+
 ## TASK-076 — review (branch: task-076; base: 3d18677)
 changed:
   - `workers/conversational-bridge/src/operations/quantity.js` (new strict unit helper: exact same-unit arithmetic and g/kg, ml/L scaling only)

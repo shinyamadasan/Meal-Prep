@@ -99,6 +99,13 @@ test('over-consume, partial staple, ambiguous staple, malformed stored quantity/
   }
 });
 
+test('direct consumeStock rejects Infinity before mutating pantry', () => {
+  const pantry = [{ id: 'chicken', name: 'Chicken', quantity: 500, unit: 'g', staple: false }];
+  const before = structuredClone(pantry);
+  assert.throws(() => call(pantry, { ingredientId: 'chicken', quantity: Infinity, expectedUnit: 'g' }), ValidationError);
+  assert.deepEqual(pantry, before);
+});
+
 test('unknown stable id fails as not found without mutation', () => {
   const pantry = [{ id: 'x', quantity: 1, unit: 'pieces', staple: false }];
   const before = structuredClone(pantry);

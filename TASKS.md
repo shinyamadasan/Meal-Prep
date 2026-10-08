@@ -5923,6 +5923,7 @@ tool contract:
 
 acceptance:
   - [x] MCP exposes exactly eight tools; `consume_stock` has the strict schema above and correct write-scope security metadata.
+  - [x] The MCP quantity schema explicitly requires finite positive numbers; overflowed JSON `1e999` is rejected before any Firestore access, while direct operation calls still reject `Infinity` before mutation.
   - [x] Pure helper tests cover supported same-unit arithmetic and g/kg, ml/L scaling, plus unknown/blank units, unsupported aliases/conversions, dimension mismatch, and no fallback factor.
   - [x] Partial non-staple consumption preserves identity/metadata; exact zero removes non-staple with tombstone; exact zero staple uses stockLevel empty; ambiguous classification and partial staple consumption reject with zero mutation.
   - [x] Over-consume returns `insufficient_stock` without clamping or mutation. Unit mismatch, unsupported conversion, missing unit/quantity, stale revision, invalid input, and unknown identity all make zero writes.
