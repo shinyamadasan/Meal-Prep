@@ -5,6 +5,14 @@
 
 ---
 
+## TASK-075 — integrated / approved; Worker deployment pending (main: 0d1059e)
+reviewed candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (owner-relayed independent STRICT PASS)
+integration: fast-forward on `main`; integration SHA equals reviewed candidate exactly.
+contract: `shared/readyFoodContract.js` is consumed by browser app and Worker; source enum `leftovers | takeout`; fridge/freezer defaults `3/90`; ready-food servings require positive integers and fractional values reject before mutation.
+tests: Worker operation/MCP/shared-contract suites 50/50; full bridge 211/211; shared-contract Playwright 1/1; syntax/diff checks clean; Wrangler 4.148.0 `versions upload --dry-run` passed.
+blocker: Worker deployment/version capture and production acceptance pending. Wrangler remote inspection failed with invalid configured Cloudflare token (9109/10000; deployments list also rate limited 10429). No upload, deploy, or production MCP request was made.
+state: TASK-075 `approved`, not `done`; TASK-076 not started because its start condition is TASK-075 `done`.
+
 ## TASK-074 — fix-first (branch: task-074; base: 85fcdda)
 changed:
   - app.js (`setRecipeFormMode()` restores only controls it disabled for details mode and toggles the photo upload read-only class, 10 net loc)

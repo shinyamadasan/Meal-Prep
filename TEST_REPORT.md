@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-075 integration · 2026-10-08
+suite: `node --test workers/conversational-bridge/test/operations.node.js workers/conversational-bridge/test/mcp-write.node.js workers/conversational-bridge/test/mcp.node.js workers/conversational-bridge/test/ready-food-contract.node.js`; `npm run test:bridge`; `npx playwright test tests/ready-food-contract.spec.js --project=local`; changed-JS `node --check`; `git diff --check`; Wrangler 4.148.0 `versions upload --dry-run`.
+result: focused Worker tests 50 passed, 0 failed; bridge 211 passed, 0 failed; browser contract 1 passed, 0 failed; syntax and diff checks clean; dry-run bundled 1569.00 KiB / gzip 285.10 KiB.
+untested: production version/rollback capture, Worker upload/deploy, connector schema refresh, and production invalid-fractional zero-mutation acceptance. Read-only Wrangler inspection failed with invalid configured Cloudflare token (9109/10000); deployments list also returned 10429. No production write or deployment occurred. Docs/test evidence reflects the owner-relayed STRICT PASS; task remains `approved` pending production gate.
+
 ## TASK-074 fix-first · 2026-10-06
 suite: focused `tests/plan-persistence-and-picker.spec.js` (28); editor restoration cases (2); `tests/recipe-edit-preservation.spec.js`, `tests/recipe-actions.spec.js`, `tests/recipe-storage-persistence.spec.js` (9); `npm test` / `playwright test --project=local`.
 result: focused Plan/picker 28 passed; restoration 2 passed; adjacent editor/modal checks 9 passed; full local suite 724 passed, 0 failed. `node --check app.js`, `git diff --check`, exactly one `:root` block, delta secret scan clean.

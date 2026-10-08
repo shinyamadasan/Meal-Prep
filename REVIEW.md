@@ -4,6 +4,30 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-075 — PASS (STRICT; owner-relayed) → integrated (production gate pending)
+branch: `task-075`; reviewed candidate `0d1059e02483a3f059bdcb93d587ca521c897c28`; integrated `main` SHA is identical
+date: 2026-10-08
+
+### Provenance
+The owner relayed the independent STRICT reviewer verdict as PASS. The reviewer report was not
+provided as a repository artifact; this record preserves the relay and does not present the review
+as authored by the builder.
+
+### Integration verification
+The clean authoritative `main` worktree fast-forwarded from `05a168ce83962edb770db48496dc4dd1795adf5a`
+to the reviewed candidate with no conflict resolution. On that same immutable candidate, focused
+Worker operation/MCP/shared-contract tests passed 50/50, the full bridge suite passed 211/211, the
+ready-food contract browser test passed 1/1, changed-JS syntax checks and `git diff --check` passed,
+and Wrangler 4.148.0 `versions upload --dry-run` bundled successfully (1569.00 KiB, 285.10 KiB gzip).
+
+### Production gate — pending
+No Worker version was uploaded or deployed, and no production acceptance call was made. Wrangler
+read-only version and deployment inspection failed because the configured Cloudflare token is
+invalid (API errors 9109/10000; the deployment-list request also returned 10429 rate limit). No
+alternate authentication path was attempted. TASK-075 remains `approved`; the required production
+gate must pass before `done` or TASK-076 can start.
+
+---
 ## Review TASK-074 — PASS (targeted reviewer relay) → owner-authorized integration → approved
 branch: `task-074`; reviewed candidate `0d2a6f78d65a1aa20952f6ffbef1c04ecdb70ae1` (fix-first base `85fcddaa5ca090fe47f7cf50b1c3d1633bbd0b0a`; initial review base `ce9bbb6cd767712ff04fdea522b288d8ebbbcd85`)
 date: 2026-10-06

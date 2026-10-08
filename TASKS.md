@@ -5890,7 +5890,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-075 · Shared ready-food leftovers/takeout freshness contract
-status: review
+status: approved
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (D-032): additive MCP ready-food write contract plus shared app/Worker domain semantics.
 source: owner "TASK-075 — CONTINUE WITH SHARED READY-FOOD FRESHNESS CONTRACT" (2026-10-07)
@@ -5950,9 +5950,11 @@ verification:
         deploy --dry-run only; dependency audit; Verify-Decisions.ps1; Check-DocsConsistency.ps1;
         git diff --check; delta secret scan; SELF_REVIEW.md and QA.md.
 merge/deployment gate:
-  Hand off at status: review. A NEW independent STRICT reviewer must return PASS. Do not deploy,
-  perform production acceptance, integrate, or mark done in this task; wait for the independent
-  review and the next owner-directed program phase.
+  Owner-relayed independent STRICT review returned PASS for candidate
+  0d1059e02483a3f059bdcb93d587ca521c897c28. Integrated by fast-forward with the same SHA.
+  Wrangler remote version/deployment inspection and deployment are pending: configured Cloudflare
+  token is invalid (API authentication errors 9109/10000); production acceptance was not run. Do not
+  mark done or start TASK-076 until deployment and nonmutating production acceptance pass.
 
 <!-- TASK TEMPLATE — copy and fill:
 
