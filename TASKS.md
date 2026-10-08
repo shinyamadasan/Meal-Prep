@@ -5940,6 +5940,8 @@ verification:
 
 merge/deployment gate: Stop at `status: review`. Independent STRICT review is required under D-032. Do not integrate, deploy, run a production pilot, or perform a production write. Landing after review remains `approved` for owner merge, never `done`.
 
+owner-authorized continuation (2026-10-08): independent STRICT PASS for candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0`; fast-forwarded to main at the same SHA, verified on integration, and deployed as Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Previous version: `85767a48-23d6-4347-9647-d7dcdecbac3e`; immediate rollback: `154b5f14-6f53-4265-b49b-6adf2b5362f2`. Production connector verification and the authorized reversible pilot remain pending: this session has no connected Meal Prep MCP tools or browser/app surface. No production inventory read/write was made. Keep status `approved`; do not mark done or start TASK-077 until the connector-backed pilot and exact restoration pass.
+
 ### TASK-075 · Shared ready-food leftovers/takeout freshness contract
 status: done
 owner: owner-directed planning + implementation (Codex)

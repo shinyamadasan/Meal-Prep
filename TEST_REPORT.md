@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-076 integration/deployment · 2026-10-08
+suite: focused consume_stock operation/MCP, tool-surface, set-quantity, stock-state, and consume-ready-food tests; full Worker `npm test`; changed-JS syntax; `git diff --check`; `tools/Verify-Decisions.ps1`; Wrangler 4.148.0 dry-run; read-only `whoami`, versions, and deployment inspection.
+result: focused suites passed; full Worker suite 236 passed, 0 failed; syntax, diff, and all 110 decision pointers passed; dry-run passed. Owner-relayed STRICT PASS candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0` fast-forwarded to main at identical SHA. Uploaded Worker `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` and promoted to 100%; post-deploy listing confirmed 100%.
+production version capture: before promotion, `85767a48-23d6-4347-9647-d7dcdecbac3e` was live and `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the immediate rollback version.
+untested / pending: this session exposes no Meal Prep MCP tools and CUA reports no browser/app surfaces. Live eight-tool/schema verification and the connector-backed reversible pilot/restoration could not run. No production inventory read/write occurred; no retries or recovery writes. TASK-076 remains `approved`, not `done`; TASK-077 has not started.
+
 ## TASK-076 strict-review rework · 2026-10-08
 suite: direct focused Node tests for `operations-consume-stock.node.js` and `mcp-consume-stock.node.js`; full Worker `npm test`; `node --check` for changed JavaScript; `git diff --check`; Wrangler 4.148.0 `versions upload --dry-run`.
 result: focused suites 25 passed, 0 failed; full Worker suite 236 passed, 0 failed; syntax and diff checks passed. Wrangler dry-run bundled the Worker and exited before upload.

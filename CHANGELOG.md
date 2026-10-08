@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-076 — integrated and deployed; production acceptance pending
+reviewed candidate / integration SHA: `11acb93080bfce6e8278f34ddba67605fc18c0c0` (STRICT PASS relayed by owner; clean fast-forward, identical SHA).
+status: `approved`; separate administrative status commit `ae4f0511aa785e0db5c8c8dd426e9804e4c421ff`.
+deployment: Wrangler 4.148.0 uploaded version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` and promoted it to 100%. Captured previous live version `85767a48-23d6-4347-9647-d7dcdecbac3e`; immediate rollback version `154b5f14-6f53-4265-b49b-6adf2b5362f2`.
+verification: integration focused tests passed; full Worker suite 236/236; syntax, diff, decision checks and Wrangler dry-run passed. Post-deploy deployment listing confirmed 100%.
+production acceptance pending: no Meal Prep MCP tools or browser/app session is available here, so live tool/schema verification and the reversible two-write pilot were not run. Production inventory reads/writes: 0. Do not mark done or begin TASK-077 until the connector gate passes.
+
 ## TASK-076 — strict-review rework (branch: task-076; base: 5b012480)
 changed:
   - `workers/conversational-bridge/src/mcp.js` (`consume_stock.quantity` now uses Zod `.finite().positive()`)
