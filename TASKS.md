@@ -5890,7 +5890,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`
-status: review
+status: approved
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (red-zone, D-032): new authenticated pantry quantity mutation and possible non-staple tombstone.
 source: direct owner authorization, “PROGRAM CONTINUATION — CLOSE TASK-075 AND BUILD TASK-076” (2026-10-08).
