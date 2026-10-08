@@ -124,6 +124,9 @@ test('tools/list exposes exactly seven tools total — two read, five write — 
     new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'source', 'expectedRevision'])
   );
   assert.deepEqual(recordReadyFood.inputSchema.properties.source.enum, ['leftovers', 'takeout']);
+  assert.equal(recordReadyFood.inputSchema.properties.servings.type, 'integer');
+  assert.equal(recordReadyFood.inputSchema.properties.servings.minimum, 1);
+  assert.equal(recordReadyFood.inputSchema.properties.servings.maximum, 99);
 
   assert.deepEqual(consumeReadyFood.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.deepEqual(consumeReadyFood._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);

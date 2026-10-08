@@ -63,6 +63,13 @@ function validateServings(value, field) {
   return n;
 }
 
+function validateReadyFoodServings(value) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > PORTION_COUNT_MAX) {
+    throw new ValidationError('servings must be a whole number between 1 and ' + PORTION_COUNT_MAX + '.', { field: 'servings' });
+  }
+  return value;
+}
+
 function validateStorage(storage) {
   if (!VALID_STORAGE.includes(storage)) {
     throw new ValidationError('storage must be one of: ' + VALID_STORAGE.join(', ') + '.', { field: 'storage' });
@@ -102,7 +109,7 @@ function validateCookedDate(value) {
 // stale expectedRevision is rejected upstream, never re-applied as a second batch.
 export function recordCookedFood({ name, recipeId, servings, storage, cookedDate, source }) {
   validateName(name);
-  const portions = validateServings(servings, 'servings');
+  const portions = validateReadyFoodServings(servings);
   validateStorage(storage);
   const date = validateCookedDate(cookedDate);
   if (source !== undefined && !READY_FOOD_SOURCES.includes(source)) {

@@ -167,12 +167,19 @@ test('recordCookedFood rejects invalid name, servings, and storage', () => {
   assert.throws(() => recordCookedFood({ name: 'Chili', servings: 1, storage: 'counter', cookedDate: COOKED_DATE }), ValidationError);
 });
 
-// portionCountOrNull()'s documented app.js behavior is to FLOOR a fractional count, not reject
-// it ("half a meal portion is not a concept this app has") — the bridge mirrors that exactly
-// rather than inventing stricter validation the app itself doesn't enforce.
-test('recordCookedFood floors a fractional servings count rather than rejecting it, matching portionCountOrNull()', () => {
-  const result = recordCookedFood({ name: 'Chili', servings: 1.9, storage: 'fridge', cookedDate: COOKED_DATE });
-  assert.equal(result.record.initialPortions, 1);
+test('recordCookedFood rejects fractional, non-number, and out-of-range servings without coercion', () => {
+  for (const servings of [1.5, 0.5, 0, -1, 100, NaN, Infinity, '2', null]) {
+    assert.throws(
+      () => recordCookedFood({ name: 'Chili', servings, storage: 'fridge', cookedDate: COOKED_DATE }),
+      ValidationError,
+      String(servings)
+    );
+  }
+  for (const servings of [1, 2, 3]) {
+    const result = recordCookedFood({ name: 'Chili', servings, storage: 'fridge', cookedDate: COOKED_DATE });
+    assert.equal(result.record.initialPortions, servings);
+    assert.equal(result.record.portionsRemaining, servings);
+  }
 });
 
 // Corrected per independent review: cookedDate is now a REQUIRED, caller-supplied local calendar

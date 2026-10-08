@@ -240,6 +240,27 @@ test('missing expectedRevision is rejected before any Firestore read', async () 
   assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 });
 });
 
+test('fractional servings are rejected before Firestore access and cannot mutate any ledger state', async () => {
+  for (const servings of [1.5, 0.5]) {
+    const doc = { revision: 7, pantry: [], cookedMeals: [], mealConsumptions: [] };
+    const originalMeals = structuredClone(doc.cookedMeals);
+    const originalConsumptions = structuredClone(doc.mealConsumptions);
+    const read = readDeps(doc);
+    const args = Object.assign({}, VALID_ARGS, { servings, expectedRevision: 7 });
+    const response = await routeRequest(
+      mcpRequest(toolCall(1, 'record_ready_food', args)),
+      testEnv(), read.deps, contextWithScope([MCP_WRITE_SCOPE])
+    );
+    const message = await responseMessage(response);
+    assert.equal(message.result.isError, true, String(servings));
+    assert.match(message.result.content[0].text, /input validation error/i, String(servings));
+    assert.deepEqual(read.calls, { token: 0, read: 0, write: 0, fetch: 0 }, String(servings));
+    assert.equal(doc.revision, 7, String(servings));
+    assert.deepEqual(doc.cookedMeals, originalMeals, String(servings));
+    assert.deepEqual(doc.mealConsumptions, originalConsumptions, String(servings));
+  }
+});
+
 test('malformed expectedRevision (non-integer, negative, string, boolean) is rejected before any Firestore read', async () => {
   for (const expectedRevision of [1.5, -1, '0', true, null]) {
     const read = readDeps({ revision: 0, pantry: [], cookedMeals: [] });

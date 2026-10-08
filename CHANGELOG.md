@@ -1125,4 +1125,14 @@ blockers: none
 deviations: no deployment or production access, as required for this task handoff
 → status set to `review` in TASKS.md
 
+## TASK-075 — fix-first (branch: task-075; base: 259fcdc)
+changed:
+  - workers/conversational-bridge/src/operations/readyFood.js (record path now requires positive integer servings; consume path flooring unchanged)
+  - workers/conversational-bridge/src/mcp.js (record_ready_food schema advertises integer servings, 1–99)
+  - workers/conversational-bridge/test/operations.node.js, test/mcp-write.node.js, test/mcp.node.js (fractional rejection, zero mutation, schema and integer regressions)
+tests: focused Worker tests (50 passed); full bridge suite (211 passed); Wrangler dry-run unavailable (Wrangler not installed/cached in this Builder environment); changed-JS `node --check`; `git diff --check`.
+blockers: none
+deviations: no deployment; fractional input is rejected before Firestore access by the MCP schema and by server-side domain validation; consume_ready_food semantics remain unchanged
+→ status remains `review` in TASKS.md
+
 <!-- Entries go here, newest first. -->

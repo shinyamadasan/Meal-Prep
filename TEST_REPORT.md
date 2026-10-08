@@ -906,4 +906,9 @@ suite: `npm run test:bridge`; `npm test`; changed-JS `node --check`; `npx wrangl
 result: bridge 210 passed, 0 failed; full Playwright suite 725 passed, 0 failed (includes ready-food contract coverage); Node syntax checks passed; Wrangler dry-run passed; audit found 0 vulnerabilities; all 110 decision pointers passed; no delta secrets; diff check clean.
 untested: production deployment and acceptance intentionally not run in TASK-075. Docs-consistency still reports 51 potential drift items; running against origin/main produces the same 51, so there is no task delta.
 
+## TASK-075 fix-first · 2026-10-08
+suite: `node --test test/operations.node.js test/mcp-write.node.js test/mcp.node.js test/ready-food-contract.node.js`; Worker `npm test`; `node --check` on changed Worker source/tests; `git diff --check`.
+result: focused Worker suites 50 passed, 0 failed; full bridge suite 211 passed, 0 failed; syntax checks and diff check clean. Fractional 1.5 and 0.5 rejected by the MCP integer schema before Firestore access; direct operation tests reject both and additional malformed/out-of-range inputs without coercion. Existing stale revision and same-revision race tests passed; valid whole servings, omitted source, leftovers and takeout tests passed.
+untested: Wrangler dry-run could not run because Wrangler is unavailable locally and `npx` has no cached package; no dependency was installed. No deployment or production access. Consume fractional semantics remain covered by existing bridge tests and unchanged.
+
 <!-- Entries go here, newest first. -->

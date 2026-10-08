@@ -103,15 +103,16 @@ function inventoryItemSchema() {
   });
 }
 
-// Business-field values are deliberately left as z.unknown() rather than typed: a malformed
-// name/servings/storage/cookedDate must fail with recordCookedFood()'s own validation error
-// shape (matching the REST route), not a generic schema error. The object shape itself (exactly
-// these keys, no more) is still enforced by strictObject — no UID, path, collection, or document
-// field can ever reach the domain function.
+// Business-field values are deliberately left as z.unknown() rather than typed so malformed
+// values fail with recordCookedFood()'s own validation error shape (matching the REST route).
+// Servings is the exception: this public schema advertises whole portions, while the operation
+// repeats integer validation for non-MCP callers. The object shape itself (exactly these keys,
+// no more) is still enforced by strictObject — no UID, path, collection, or document field can
+// ever reach the domain function.
 function recordReadyFoodInputSchema() {
   return z.strictObject({
     name: z.unknown().optional(),
-    servings: z.unknown().optional(),
+    servings: z.number().int().min(1).max(99).optional(),
     storage: z.unknown().optional(),
     cookedDate: z.unknown().optional(),
     recipeId: z.unknown().optional(),
