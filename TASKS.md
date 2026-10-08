@@ -5943,7 +5943,7 @@ merge/deployment gate: Stop at `status: review`. Independent STRICT review is re
 owner-authorized continuation (2026-10-08): independent STRICT PASS for candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0`; fast-forwarded to main at the same SHA and verified on integration. Deployed Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Read-only Cloudflare deployment history confirms the version immediately live before TASK-076 was `85767a48-23d6-4347-9647-d7dcdecbac3e`, which is the correct rollback target; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the deployment before that. Production acceptance PASS is based on owner-authoritative evidence supplied 2026-10-08: item `1782470280618.3713` Coconut cream, `600 ml -> consume 1 ml -> restore 600 ml`, revisions `29516 -> 29517 -> 29518`, exactly two writes (one `consume_stock`, one `set_inventory_quantity` restoration), zero retries/recovery writes, no tombstone, unrelated inventory and ready food unchanged. No OAuth configuration was changed. TASK-076 is done.
 
 ### TASK-077 · MCP conversational stock replenishment — `add_stock`
-status: review
+status: approved
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (D-032): authenticated pantry quantity delta mutation.
 source: direct owner authorization, “PROGRAM CONTINUATION — CLOSE TASK-076, THEN START TASK-077” (2026-10-08).
