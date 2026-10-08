@@ -20,12 +20,20 @@ Worker operation/MCP/shared-contract tests passed 50/50, the full bridge suite p
 ready-food contract browser test passed 1/1, changed-JS syntax checks and `git diff --check` passed,
 and Wrangler 4.148.0 `versions upload --dry-run` bundled successfully (1569.00 KiB, 285.10 KiB gzip).
 
-### Production gate — pending
-No Worker version was uploaded or deployed, and no production acceptance call was made. Wrangler
-read-only version and deployment inspection failed because the configured Cloudflare token is
-invalid (API errors 9109/10000; the deployment-list request also returned 10429 rate limit). No
-alternate authentication path was attempted. TASK-075 remains `approved`; the required production
-gate must pass before `done` or TASK-076 can start.
+### Production gate — deployment complete; acceptance pending
+The stale process-scope `CLOUDFLARE_API_TOKEN` differed from the existing user-scope token and was
+shadowing it. A fresh child process used the existing user-scope credential; read-only `whoami`,
+versions, and deployments queries succeeded for the configured account and Worker. Prior live and
+immediate rollback version `154b5f14-6f53-4265-b49b-6adf2b5362f2`; preceding deployment
+`a7c7d71c-017a-4989-922c-671ab371b3e3`.
+Reviewed code was uploaded and version `85767a48-23d6-4347-9647-d7dcdecbac3e` was promoted to 100%.
+Post-deploy deployment listing confirmed that version at 100%.
+
+Production MCP tool-list/schema verification and the invalid fractional-request acceptance were not
+run: this Codex session has no connected Meal Prep MCP tools or browser, and plugin discovery found
+no reconnectable Meal Prep connector. No production MCP request or Firestore data write occurred.
+TASK-075 remains `approved`, not `done`, until the production MCP schema and nonmutating rejection
+acceptance are verified. TASK-076 has not started.
 
 ---
 ## Review TASK-074 — PASS (targeted reviewer relay) → owner-authorized integration → approved

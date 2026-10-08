@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-075 — Worker deployed; production MCP acceptance pending (main: 3fca894)
+reviewed / integrated candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (owner-relayed independent STRICT PASS; integrated SHA identical)
+auth: stale process-scope token was shadowing a distinct existing user-scope token; refreshed only the child process from that existing user-scope source. Wrangler read-only identity/version/deployment queries succeeded.
+deployment: uploaded reviewed Worker version `85767a48-23d6-4347-9647-d7dcdecbac3e` and promoted to 100%; post-deploy listing confirmed it. Previous live / immediate rollback version `154b5f14-6f53-4265-b49b-6adf2b5362f2`; preceding deployment `a7c7d71c-017a-4989-922c-671ab371b3e3`.
+contract: shared `shared/readyFoodContract.js`; app and Worker consume it; sources `leftovers | takeout`; freshness defaults 3/90; record servings integer 1..99.
+tests: focused Worker 50/50; bridge 211/211; browser contract 1/1; syntax/diff checks and Wrangler `versions upload --dry-run` passed.
+blocker: production schema/invalid-fractional zero-mutation acceptance awaits a connected authenticated Meal Prep MCP client. No production MCP request or Firestore write occurred. Inventory/shopping/OAuth unchanged.
+state: TASK-075 remains `approved`, not `done`; TASK-076 not started.
+
 ## TASK-075 — integrated / approved; Worker deployment pending (main: 0d1059e)
 reviewed candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (owner-relayed independent STRICT PASS)
 integration: fast-forward on `main`; integration SHA equals reviewed candidate exactly.

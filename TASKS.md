@@ -5952,9 +5952,12 @@ verification:
 merge/deployment gate:
   Owner-relayed independent STRICT review returned PASS for candidate
   0d1059e02483a3f059bdcb93d587ca521c897c28. Integrated by fast-forward with the same SHA.
-  Wrangler remote version/deployment inspection and deployment are pending: configured Cloudflare
-  token is invalid (API authentication errors 9109/10000); production acceptance was not run. Do not
-  mark done or start TASK-076 until deployment and nonmutating production acceptance pass.
+  Production Worker version 85767a48-23d6-4347-9647-d7dcdecbac3e is serving 100%; previous live
+  version 154b5f14-6f53-4265-b49b-6adf2b5362f2 (also the immediate rollback version) and earlier
+  deployment a7c7d71c-017a-4989-922c-671ab371b3e3 were captured. Auth recovered by refreshing only the child
+  process token from the existing user-scope credential. Production schema and invalid-input
+  zero-mutation acceptance remain pending because no Meal Prep MCP client/tool session is connected
+  in this Codex environment. Do not mark done or start TASK-076 until acceptance passes.
 
 <!-- TASK TEMPLATE — copy and fill:
 

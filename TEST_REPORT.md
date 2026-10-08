@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-075 deployment · 2026-10-08
+suite: Wrangler 4.148.0 read-only `whoami`, `versions list`, and `deployments list`; `versions upload --dry-run`; post-deploy `deployments list`.
+result: a stale process-only token was refreshed from the distinct existing user-scope token; authentication and Worker version queries succeeded. Uploaded and deployed reviewed version `85767a48-23d6-4347-9647-d7dcdecbac3e` to 100%; post-deploy listing confirmed 100%. Previous live / immediate rollback `154b5f14-6f53-4265-b49b-6adf2b5362f2`; preceding deployment `a7c7d71c-017a-4989-922c-671ab371b3e3`.
+untested: production MCP tool count/schema and nonmutating 1.5-servings acceptance. No Meal Prep MCP client/tool session or browser is connected in this environment; no production MCP call or Firestore write occurred. TASK-075 remains approved pending this gate; TASK-076 not started.
+
 ## TASK-075 integration · 2026-10-08
 suite: `node --test workers/conversational-bridge/test/operations.node.js workers/conversational-bridge/test/mcp-write.node.js workers/conversational-bridge/test/mcp.node.js workers/conversational-bridge/test/ready-food-contract.node.js`; `npm run test:bridge`; `npx playwright test tests/ready-food-contract.spec.js --project=local`; changed-JS `node --check`; `git diff --check`; Wrangler 4.148.0 `versions upload --dry-run`.
 result: focused Worker tests 50 passed, 0 failed; bridge 211 passed, 0 failed; browser contract 1 passed, 0 failed; syntax and diff checks clean; dry-run bundled 1569.00 KiB / gzip 285.10 KiB.
