@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-076 — done (main closeout)
+reviewed candidate / integration SHA: `11acb93080bfce6e8278f34ddba67605fc18c0c0` (owner-relayed independent STRICT PASS; fast-forwarded without conflict resolution).
+deployment: Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Read-only deployment history confirms previous live / correct rollback version `85767a48-23d6-4347-9647-d7dcdecbac3e`; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the version before TASK-075.
+production acceptance: owner-authoritative PASS evidence: stable item `1782470280618.3713` (Coconut cream), `600 ml → 599 ml → 600 ml`; `consume_stock` delta 1 ml then exact `set_inventory_quantity` restoration; revisions `29516 → 29517 → 29518`; exactly two writes, zero retries and recovery writes, no tombstone. Unrelated inventory, ready food, and shopping were unchanged. No OAuth configuration was changed.
+verification: integration focused MCP/operation/tool-surface tests passed; full Worker suite 236/236; syntax, `git diff --check`, all 110 decision checks, Wrangler dry-run and post-deploy 100% listing passed.
+→ status set to `done` in TASKS.md. Main closeout commit and normal push follow.
+
 ## TASK-076 — integrated and deployed; production acceptance pending
 reviewed candidate / integration SHA: `11acb93080bfce6e8278f34ddba67605fc18c0c0` (STRICT PASS relayed by owner; clean fast-forward, identical SHA).
 status: `approved`; separate administrative status commit `ae4f0511aa785e0db5c8c8dd426e9804e4c421ff`.

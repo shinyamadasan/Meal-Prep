@@ -5,6 +5,12 @@
 
 ---
 
+## TASK-076 production acceptance closeout · 2026-10-08
+suite: integration gates recorded below; final closeout validation: `git diff --check`, `tools/Verify-Decisions.ps1`, read-only Cloudflare deployments history.
+result: Owner supplied authoritative production acceptance PASS: Coconut cream id `1782470280618.3713`, 600 ml -> 599 ml -> exact restoration to 600 ml; revisions 29516 -> 29517 -> 29518; exactly 2 writes, 0 retries, 0 recovery writes, no tombstone; unrelated inventory and ready food unchanged. Shopping unchanged. OAuth configuration unchanged.
+rollback bookkeeping: Cloudflare deployment history shows `85767a48-23d6-4347-9647-d7dcdecbac3e` was live immediately before TASK-076 and is the correct rollback target; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the deployment before that. No redeployment was made to resolve the discrepancy.
+provenance: production acceptance details are owner-authoritative evidence from the continuation; this session did not independently issue connector calls. Wrangler version/deployment history was independently read-only verified.
+
 ## TASK-076 integration/deployment · 2026-10-08
 suite: focused consume_stock operation/MCP, tool-surface, set-quantity, stock-state, and consume-ready-food tests; full Worker `npm test`; changed-JS syntax; `git diff --check`; `tools/Verify-Decisions.ps1`; Wrangler 4.148.0 dry-run; read-only `whoami`, versions, and deployment inspection.
 result: focused suites passed; full Worker suite 236 passed, 0 failed; syntax, diff, and all 110 decision pointers passed; dry-run passed. Owner-relayed STRICT PASS candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0` fast-forwarded to main at identical SHA. Uploaded Worker `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` and promoted to 100%; post-deploy listing confirmed 100%.
