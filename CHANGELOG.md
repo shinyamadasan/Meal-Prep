@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-075 — done (main closeout)
+reviewed / integrated candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (independent STRICT review PASS; integrated SHA identical)
+deployment: Worker version `85767a48-23d6-4347-9647-d7dcdecbac3e` serving 100%; rollback version `154b5f14-6f53-4265-b49b-6adf2b5362f2`.
+contract: `shared/readyFoodContract.js` is consumed by app and Worker; source enum `leftovers | takeout`; freshness defaults fridge 3 days / freezer 90 days; omitted source remains legacy-compatible; ready-food servings are integers 1..99.
+evidence: backend behavior is supported by reviewed code and automated tests. Live connector exposed exactly seven tools, including optional `record_ready_food.source` enum and integer servings schema. Live connector rejected 1.5 servings and invalid source with zero mutation. Invalid-source production read evidence: revision stayed 29516; ready-food count stayed 2; no record or retry; production writes 0. Inventory, shopping, and OAuth were unchanged. The connector schema rejection is not represented as an independent backend-domain-validation test; no raw MCP `tools/list` response was retrieved.
+→ TASK-075 status set to `done` in `TASKS.md`.
+
 ## TASK-075 — Worker deployed; production MCP acceptance pending (main: 3fca894)
 reviewed / integrated candidate: `0d1059e02483a3f059bdcb93d587ca521c897c28` (owner-relayed independent STRICT PASS; integrated SHA identical)
 auth: stale process-scope token was shadowing a distinct existing user-scope token; refreshed only the child process from that existing user-scope source. Wrangler read-only identity/version/deployment queries succeeded.

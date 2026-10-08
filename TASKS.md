@@ -5890,7 +5890,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-075 · Shared ready-food leftovers/takeout freshness contract
-status: approved
+status: done
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (D-032): additive MCP ready-food write contract plus shared app/Worker domain semantics.
 source: owner "TASK-075 — CONTINUE WITH SHARED READY-FOOD FRESHNESS CONTRACT" (2026-10-07)
@@ -5955,9 +5955,15 @@ merge/deployment gate:
   Production Worker version 85767a48-23d6-4347-9647-d7dcdecbac3e is serving 100%; previous live
   version 154b5f14-6f53-4265-b49b-6adf2b5362f2 (also the immediate rollback version) and earlier
   deployment a7c7d71c-017a-4989-922c-671ab371b3e3 were captured. Auth recovered by refreshing only the child
-  process token from the existing user-scope credential. Production schema and invalid-input
-  zero-mutation acceptance remain pending because no Meal Prep MCP client/tool session is connected
-  in this Codex environment. Do not mark done or start TASK-076 until acceptance passes.
+  process token from the existing user-scope credential. Live connector acceptance passed: exactly
+  seven tools are exposed; record_ready_food exposes optional source enum leftovers|takeout and
+  servings integer 1..99. Invalid fractional servings (1.5) and invalid source were each rejected
+  with zero mutation; the invalid-source check ended at revision 29516 and ready-food count 2, with
+  no test record, retry, or production write. Production read evidence also confirmed inventory,
+  shopping, and OAuth unchanged. The live connector's schema-validation rejection is not claimed as
+  an independent exercise of backend domain validation; that remains supported by reviewed code and
+  automated tests. No raw MCP tools/list response was retrieved. TASK-075 is closed; TASK-076 may
+  begin after the closeout commit is pushed and main/origin are synchronized.
 
 <!-- TASK TEMPLATE — copy and fill:
 

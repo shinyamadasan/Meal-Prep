@@ -911,6 +911,11 @@ suite: npm test
 result: not completed — sandbox run failed with `spawn EPERM`; approved runs timed out after 124s and 304s
 untested: visual browser baseline and full Playwright suite remain unverified. Diagnostic `npx playwright test tests/mobile-layout.spec.js --workers=1 --reporter=list --timeout=60000` failed before the CSS overflow assertion because `#kitchen-setup-modal` intercepted the `.tab-btn[data-tab="recipes"]` click.
 
+## TASK-075 production acceptance closeout · 2026-10-08
+suite: live connector schema inspection and invalid-source schema-boundary check; production revision/ready-food read before and after.
+result: connector exposed exactly 7 tools; `record_ready_food.source` was optional enum `leftovers | takeout`; servings was integer 1..99. Invalid 1.5 servings and invalid source were rejected with zero mutation. Invalid-source check: revision 29516 before/after, ready-food count 2 before/after, no test record, retries 0, production writes 0. Inventory, shopping, and OAuth unchanged. Reviewed backend code and existing automated tests provide separate domain-validation evidence.
+untested: no raw MCP `tools/list` response was retrieved; connector-level schema rejection does not independently exercise backend domain validation.
+
 ## TASK-075 · 2026-10-07
 suite: `npm run test:bridge`; `npm test`; changed-JS `node --check`; `npx wrangler deploy --dry-run --config workers/conversational-bridge/wrangler.jsonc`; `npm audit --omit=dev`; `tools/Verify-Decisions.ps1`; `tools/Check-DocsConsistency.ps1`; `git diff --check`; delta secret scan.
 result: bridge 210 passed, 0 failed; full Playwright suite 725 passed, 0 failed (includes ready-food contract coverage); Node syntax checks passed; Wrangler dry-run passed; audit found 0 vulnerabilities; all 110 decision pointers passed; no delta secrets; diff check clean.
