@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-077 — integrated and deployed; production pilot pending
+reviewed candidate / integration SHA: `9561f6658babe4631f5d8abd7a1ceddc8a31817d` (STRICT PASS; fast-forwarded from `c66693b8d2765ef9317eaf47a8dab606098c544b` without changing the reviewed commit). Review-to-approved status commit: `e71c567b4f8cdbeee72c6ccc386fcb4ca80167f2`.
+deployment: uploaded with Wrangler 4.148.0 `versions upload` and deployed with `versions deploy` to 100%. Worker version `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f`. Previous live version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca`; immediate rollback version `85767a48-23d6-4347-9647-d7dcdecbac3e`.
+verification: integration focused stock/schema/concurrency tests 81/81; full Worker bridge suite 254/254; changed-JS syntax, `git diff --check`, all 110 decision pointers, Wrangler dry-run, and post-deployment 100% listing passed. Existing vars were preserved; OAuth, Access, routes, secrets, TARGET_UID, and service-account configuration were not changed.
+production gate pending: no Meal Prep MCP tools or browser/app surfaces are exposed in this session. The required nine-tool live connector surface could not be verified, so no production inventory/ready-food reads, pilot writes, or restoration writes were made. Retries 0; recovery writes 0. TASK-077 remains `approved`, not `done`, pending connector verification and the authorized two-write pilot/restoration.
+→ stop before declaring program completion or recommending live `add_stock` use.
+
 ## TASK-077 — second strict-review rework (branch: task-077; base: 0207608f)
 changed:
   - `workers/conversational-bridge/src/operations/inventory.js` (replace fixed hundredth scaling with dynamic exact decimal addition and numeric round-trip validation)
