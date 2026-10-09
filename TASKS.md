@@ -5943,7 +5943,7 @@ merge/deployment gate: Stop at `status: review`. Independent STRICT review is re
 owner-authorized continuation (2026-10-08): independent STRICT PASS for candidate `11acb93080bfce6e8278f34ddba67605fc18c0c0`; fast-forwarded to main at the same SHA and verified on integration. Deployed Worker version `ea6b6d79-4097-4530-93f4-e50e18e8f7ca` at 100%. Read-only Cloudflare deployment history confirms the version immediately live before TASK-076 was `85767a48-23d6-4347-9647-d7dcdecbac3e`, which is the correct rollback target; `154b5f14-6f53-4265-b49b-6adf2b5362f2` was the deployment before that. Production acceptance PASS is based on owner-authoritative evidence supplied 2026-10-08: item `1782470280618.3713` Coconut cream, `600 ml -> consume 1 ml -> restore 600 ml`, revisions `29516 -> 29517 -> 29518`, exactly two writes (one `consume_stock`, one `set_inventory_quantity` restoration), zero retries/recovery writes, no tombstone, unrelated inventory and ready food unchanged. No OAuth configuration was changed. TASK-076 is done.
 
 ### TASK-077 · MCP conversational stock replenishment — `add_stock`
-status: approved
+status: done
 owner: owner-directed planning + implementation (Codex)
 risk: STRICT (D-032): authenticated pantry quantity delta mutation.
 source: direct owner authorization, “PROGRAM CONTINUATION — CLOSE TASK-076, THEN START TASK-077” (2026-10-08).
@@ -5991,6 +5991,8 @@ verification:
   - [x] Full `npm run test:bridge` (250/250); root `npm test` (725/725); changed-JS `node --check`; `git diff --check`; delta secret scan; `npm audit --omit=dev` (0 vulnerabilities); `tools/Verify-Decisions.ps1` (110/110); `tools/Check-DocsConsistency.ps1` against baseline (55 unchanged); Wrangler dry-run only; SELF_REVIEW.md and AI-verifiable QA.md checks.
 
 merge/deployment gate: Stop at `status: review` for independent STRICT review. Do not integrate, push, deploy, or run a production pilot/write.
+
+owner-authorized closeout (2026-10-08): independent STRICT PASS for candidate `9561f6658babe4631f5d8abd7a1ceddc8a31817d`; fast-forwarded to main unchanged. Deployed Worker version `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` at 100% (previous `ea6b6d79-4097-4530-93f4-e50e18e8f7ca`; rollback target `85767a48-23d6-4347-9647-d7dcdecbac3e`). Deployment evidence commit `b0b944250bdff34fd0cd30fce157378b27fff177`. Production acceptance PASS on owner-authoritative live evidence: live tool count 9; `add_stock` schema verified; Chia Seeds `buy_1789969547020_2zpdy` `10 g -> add 1 g -> 11 g -> restore 10 g`; revisions `29518 -> 29519 -> 29520`; exactly two writes, zero retries, zero recovery writes; inventory count 97 and ready food 2 before/after; unrelated inventory unchanged; item id/unit/storage/stock status preserved; `updatedAt` changed as expected. Shopping preservation was NOT verified live because no shopping read tool exists; this is a documented verification gap, not a zero/false result. The shopping boundary is supported by code/review evidence only: `addStockTool` (`src/mcp.js`) writes `fieldPaths: ['pantry']`, `patchUserDocument` (`src/firestore.js`) sends only that mask plus `version` under an update-time precondition, and `test/mcp-add-stock.node.js` asserts shopping is unchanged. No further production writes or deployment were performed during closeout. TASK-077 is done.
 
 ### TASK-075 · Shared ready-food leftovers/takeout freshness contract
 status: done

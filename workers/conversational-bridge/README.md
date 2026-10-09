@@ -295,7 +295,7 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
 
 `consume_stock` adds a semantic quantity delta for one existing pantry row; the current local MCP
 surface at TASK-076 had exactly eight tools. That reviewed candidate was integrated and deployed;
-TASK-077 adds one more tool in a separate, local review candidate.
+TASK-077 later added one more tool.
 
 - Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The id must
   come from `get_inventory`; duplicate-name matches require asking which row. The amount is the
@@ -318,10 +318,13 @@ TASK-077 adds one more tool in a separate, local review candidate.
   exactly represented in that same unit; those spellings remain distinct and the Worker invents
   no conversion.
 
-## TASK-077 authenticated MCP stock replenishment (local candidate only — NOT deployed)
+## TASK-077 authenticated MCP stock replenishment (integrated and deployed)
 
-`add_stock` adds an exact purchase delta to one active existing pantry row. The current local MCP
-surface has exactly nine tools; this candidate is not deployed and has no production pilot.
+`add_stock` adds an exact purchase delta to one active existing pantry row. The MCP surface has
+exactly nine tools. Reviewed candidate `9561f665` is deployed as Worker version
+`4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` (100%); the production pilot passed (see TEST_REPORT.md).
+Shopping preservation is supported by code/review evidence only (the write mask is `pantry` plus
+`version`); it was not verified live because no shopping read tool exists.
 
 - Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The stable id
   must come from `get_inventory`; duplicate-name matches require asking which row. Quantity is the

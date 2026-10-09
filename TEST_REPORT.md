@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-077 closeout · 2026-10-08
+live production evidence (owner-supplied): Worker `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` at 100%; tool count 9; `add_stock` schema verified; Chia Seeds `buy_1789969547020_2zpdy` 10 g -> 11 g -> 10 g; revisions 29518 -> 29519 -> 29520; writes 2, retries 0, recovery writes 0; inventory 97 and ready food 2 before/after; unrelated inventory unchanged; id/unit/storage/stock status preserved; `updatedAt` changed.
+code/review-only evidence: shopping preservation NOT verified live (no shopping read tool). Boundary verified in code: `src/mcp.js` `addStockTool` patches `fieldPaths: ['pantry']`; `src/firestore.js` `patchUserDocument` sends only that `updateMask` plus `version`; `test/mcp-add-stock.node.js` asserts shopping/cookedMeals/mealConsumptions/recipes/deletions unchanged.
+local ref check (read from .git, pre-commit): main, origin/main, and closeout branch all at `b0b944250bdff34fd0cd30fce157378b27fff177`.
+not run in this session: no shell available, so test suites, fetch, and push were not executed here. The closeout changes docs only and touches no code.
+result: TASK-077 set to `done`.
+
 ## TASK-077 integration/deployment · 2026-10-08
 suite: integration-tip focused add-stock operation/MCP and adjacent stock/MCP-surface suites (81/81); `npm run test:bridge` (254/254); changed-JS `node --check`; `git diff --check`; `tools/Verify-Decisions.ps1`; Wrangler 4.148.0 dry-run; Wrangler `whoami`, versions/deployments listing, upload and deployment verification.
 result: reviewed candidate `9561f6658babe4631f5d8abd7a1ceddc8a31817d` fast-forwarded to main unchanged; TASK-077 set to `approved`. All tests/gates passed. Live Worker before deployment was `ea6b6d79-4097-4530-93f4-e50e18e8f7ca`; immediate rollback target `85767a48-23d6-4347-9647-d7dcdecbac3e`. Uploaded version `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` and deployed it to 100%; post-deployment listing confirmed 100%. A stale process token returned invalid access; the existing user-scope token was used from a fresh child process. No credential was rotated and no OAuth, Access, routes, secrets, TARGET_UID, or service-account setting was changed.
