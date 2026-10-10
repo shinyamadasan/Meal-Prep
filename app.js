@@ -4346,7 +4346,13 @@ window.handleRecipeCardClick = handleRecipeCardClick;
 // Expand/collapse a recipe card's ingredients + instructions.
 function buildDetailIngList(recipe, servings) {
   const scale = servings / recipe.baseServings;
-  return (recipe.baseIngredients || recipe.ingredients || []).map(ingredient => {
+  const ingredients = recipe.baseIngredients || recipe.ingredients || [];
+  // A recipe saved without ingredients would otherwise render a blank list
+  // under "Ingredients:"; say so plainly instead.
+  if (ingredients.length === 0) {
+    return '<li class="ingredient-quantity ingredient-list-empty">No ingredients listed yet. Edit this recipe to add them.</li>';
+  }
+  return ingredients.map(ingredient => {
     // != null (not ||) so a genuine 0 quantity isn't mistaken for "absent" and
     // doesn't fall through to ingredient.quantity. null stays null through the
     // scale multiply — formatQuantity() renders it blank rather than crashing.

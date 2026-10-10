@@ -1996,6 +1996,11 @@ select.form-control {
   gap: var(--space-4);
 }
 
+.ingredient-list-empty {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
 .quantity-original {
   color: var(--color-text-secondary);
   text-decoration: line-through;
