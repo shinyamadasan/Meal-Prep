@@ -4,6 +4,14 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-038 — code review PASS; owner integration decision pending (2026-11-01)
+application candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527` (`bridge-CHAT-mealprep-task038-fill-empty-20261031-builder-1`); base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`.
+provenance: AI Dev OS produced candidate via one Claude Builder invocation and reported separate read-only Claude Reviewer PASS on the exact SHA; owner-relayed local validation was performed afterward in an isolated checkout. Reviewer was the same provider as Builder but a separate invocation. Codex cross-provider review NOT TESTED. The reviewer approval is NOT approval to merge/deploy.
+change scope: only `app.js` (load saved week fill-empty logic and dialog/result copy) and new `tests/week-template-fill.spec.js` (nine tests); no shape/schema, sync, worker or deployment changes.
+local evidence (owner-relayed): syntax PASS; 43/43 focused local tests, 736/736 full local suite, 45/45 repeated feature tests. No failures reported. Original AI Dev OS Builder tests gate was SKIP. The untested production smoke/button specs remain open.
+qualification: malformed persisted current plans fail on boot in both base and candidate; injected malformed in-memory states can remain invalid. Separate follow-up only, not a claim TASK-038 fixes invalid current data.
+**Review disposition:** code review PASS; candidate ready for owner release decision. **Integration approval: PENDING. Deployment: NOT AUTHORIZED.** Keep `TASKS.md` at `status: approved` (not `done`) until owner approval and required post-deployment checks. No merge or deployment performed in this preparation.
+
 ## Review TASK-075 — PASS (STRICT; owner-relayed) → integrated (production gate pending)
 branch: `task-075`; reviewed candidate `0d1059e02483a3f059bdcb93d587ca521c897c28`; integrated `main` SHA is identical
 date: 2026-10-08

@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-038 — isolated candidate local validation (owner-relayed, 2026-11-01)
+candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527`; base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`. Validated in a separate detached checkout. This report records the owner's supplied local execution evidence; AI Dev OS Builder did NOT run tests (tests gate SKIP).
+environment: Node 24.19.0, npm 11.17.0, Playwright 1.61.0.
+results: `npm ci` exit 0 (0 vulnerabilities); `node --check app.js` exit 0; `npx playwright test tests/week-template-fill.spec.js tests/plan-persistence-and-picker.spec.js tests/suite-classification.spec.js --project=local` 43/43 PASS, 0 failed/flaky/skipped (new spec 9/9, persistence 28/28, classification 6/6); full local project 736/736 PASS; new spec with `--repeat-each=5` 45/45 PASS.
+acceptance: already planned meals preserved, saved meals fill only empty slots, nonempty snacks preserved, deleted recipe IDs skipped, incomplete saved templates tolerated, Cancel/no-op do not save, fill survives reload, grocery list updates, and dialog copy says fill rather than replace. Only `app.js` and new `tests/week-template-fill.spec.js` changed in application candidate.
+malformed-state qualification: 14 shape probes were reported. Valid persisted JSON cannot contain explicit undefined; pre-existing malformed *current* plans may fail on boot in both base and candidate. Some injected malformed in-memory states are not normalized by the new code. Follow up separately; not claimed fixed by TASK-038.
+production check: NOT RUN. `tests/smoke.spec.js` and `tests/button-smoke.spec.js` are production-project specs targeting the live GitHub Pages site, so they cannot validate the unmerged candidate. Run them after authorized deployment; do not claim production acceptance now.
+release gate: owner approval to integrate and deploy NOT YET GIVEN. No merge, push or deployment performed.
+
 ## TASK-077 closeout · 2026-10-08
 live production evidence (owner-supplied): Worker `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` at 100%; tool count 9; `add_stock` schema verified; Chia Seeds `buy_1789969547020_2zpdy` 10 g -> 11 g -> 10 g; revisions 29518 -> 29519 -> 29520; writes 2, retries 0, recovery writes 0; inventory 97 and ready food 2 before/after; unrelated inventory unchanged; id/unit/storage/stock status preserved; `updatedAt` changed.
 code/review-only evidence: shopping preservation NOT verified live (no shopping read tool). Boundary verified in code: `src/mcp.js` `addStockTool` patches `fieldPaths: ['pantry']`; `src/firestore.js` `patchUserDocument` sends only that `updateMask` plus `version`; `test/mcp-add-stock.node.js` asserts shopping/cookedMeals/mealConsumptions/recipes/deletions unchanged.

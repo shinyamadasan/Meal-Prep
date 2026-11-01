@@ -2028,7 +2028,7 @@ priority: P0
 depends-on: TASK-036 (loadWeekTemplate's confirm() copy needs to match the new fill-empty-only
   behavior, not still warn about a full replace — sequence after TASK-036 lands, or coordinate if
   built in parallel)
-files: app.js
+files: app.js, tests/week-template-fill.spec.js
 
 context:
   `docs/FEATURES.md` documents `loadWeekTemplate()` as "fills empty slots only," but the actual code
@@ -2038,11 +2038,11 @@ context:
   warning at all.
 
 acceptance:
-  - [ ] `loadWeekTemplate()` fills only slots that are currently empty in `AppState.weeklyPlan` —
+  - [x] `loadWeekTemplate()` fills only slots that are currently empty in `AppState.weeklyPlan` —
         any slot that already has a recipe assigned is left untouched.
-  - [ ] `saveData()` and `generateGroceryList()` are still called after loading (confirm neither
+  - [x] `saveData()` and `generateGroceryList()` are still called after loading (confirm neither
         call was lost in the change).
-  - [ ] The confirmation copy (once routed through `showConfirmDialog()` per TASK-036, or still via
+  - [x] The confirmation copy (once routed through `showConfirmDialog()` per TASK-036, or still via
         `confirm()` if built before it) is updated to describe "fill empty slots" rather than
         "replace your current week's plan," since the destructive framing no longer matches what
         the function actually does.
@@ -2053,12 +2053,25 @@ constraints:
     copy.
 
 test steps:
-  - [ ] `node --check app.js`
-  - [ ] Deterministic case: a week with some slots already filled and a saved template loaded —
+  - [x] `node --check app.js`
+  - [x] Deterministic case: a week with some slots already filled and a saved template loaded —
         confirm the already-filled slots are untouched and only empty ones receive the template's
         recipes.
   - [ ] `npx playwright test tests/smoke.spec.js tests/button-smoke.spec.js --reporter=list
         --workers=1 --timeout=60000`
+
+release readiness (2026-11-01, owner approval to integrate NOT YET GIVEN):
+  - Reviewed candidate `43aa739a17dd9b49682b0b7ff5c21720fc663527` on base
+    `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`; AI Dev OS separate read-only
+    Claude Reviewer PASS. This is not Codex cross-provider review or owner release approval.
+  - Owner-relayed isolated validation: `npm ci` and JS syntax PASS; 43/43 focused local
+    tests (including 9/9 new cases), 736/736 full local tests, and 45/45 repeated
+    feature tests PASS. The AI Dev OS Builder itself did not execute tests.
+  - Production `smoke.spec.js` and `button-smoke.spec.js` are NOT RUN; they target the
+    live GitHub Pages site and remain open for post-deployment acceptance.
+  - No integration, deployment or main-branch changes. Status stays `approved`, not `done`,
+    pending owner authorization and production gates. The malformed-current-plan
+    boot issue is a separate pre-existing follow-up, not a TASK-038 fix.
 
 ---
 

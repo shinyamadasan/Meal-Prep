@@ -5,6 +5,15 @@
 
 ---
 
+## TASK-038 — release preparation; owner integration approval pending (2026-11-01)
+reviewed application candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527` (base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`; REVIEW_ONLY, **not integrated**).
+changes in candidate: `app.js` updates `loadWeekTemplate()` to fill only empty meals/snacks, preserve already-planned slots, skip deleted recipe IDs, handle incomplete saved templates, update weekly statistics/grocery list, and report filled count or no-op; new `tests/week-template-fill.spec.js` adds nine local regression cases. Only these two application files changed.
+review: AI Dev OS Builder COMPLETED; separate read-only Claude Reviewer PASS on the exact candidate SHA. This is code-review evidence, **not** an owner merge/deployment approval or a cross-provider Codex review.
+validation: owner-relayed separate checkout of exact candidate (Node 24.19.0, npm 11.17.0, Playwright 1.61.0): `npm ci` PASS (0 vulnerabilities), `node --check app.js` PASS, focused 43/43, full local 736/736, new feature repeated five times 45/45. No tests ran inside the AI Dev OS Builder.
+remaining gate: production `smoke.spec.js` and `button-smoke.spec.js` target the live site and were NOT RUN; owner release authorization, main fast-forward, GitHub Pages verification, and production acceptance remain pending. TASK-038 status stays `approved` until approved integration/production closeout.
+known separate issue: malformed *persisted current* weekly plans can fail during app boot on both base and candidate; no normalizer was added in TASK-038. Abnormal in-memory slot values are outside valid persisted-data assumptions.
+deployment: none. No push, merge, or production write in this preparation.
+
 ## TASK-077 — production acceptance passed; closed (done)
 production acceptance: owner-authoritative live evidence on Worker `4e0200cc-7e4d-4559-b9fe-00a2e2ef299f` (100%): live tool count 9; `add_stock` schema verified; Chia Seeds `buy_1789969547020_2zpdy` 10 g -> add 1 g -> 11 g -> restore 10 g; revisions 29518 -> 29519 -> 29520; exactly 2 writes, 0 retries, 0 recovery writes; inventory 97 and ready food 2 before/after; unrelated inventory unchanged; id/unit/storage/stock status preserved; `updatedAt` changed as expected.
 shopping: NOT verified live (no shopping read tool exists). This is a documented verification gap, not a zero/false result. The write boundary is supported by code/review evidence only: the `add_stock` patch mask is `pantry` + `version` under an update-time precondition, and the MCP add-stock test asserts shopping unchanged.
