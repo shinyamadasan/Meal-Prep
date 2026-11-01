@@ -10630,15 +10630,49 @@ function loadWeekTemplate() {
   if (!saved) return;
   showConfirmDialog(
     'Load saved week?',
-    '<p>This will replace your current week\'s plan with the saved one. Continue?</p>',
+    '<p>This will fill the empty slots in your week from your saved week. Meals you\'ve already planned stay unchanged.</p>',
     'Load Week',
     'Cancel',
     function() {
-      AppState.weeklyPlan = JSON.parse(saved);
+      const savedWeek = JSON.parse(saved) || {};
+      const recipeExists = id => AppState.recipes.some(r => String(r.id) === String(id));
+      const filledWeek = {};
+      let filled = 0;
+
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(day => {
+        const savedDay = savedWeek[day] || {};
+        const plan = Object.assign({ breakfast: null, lunch: null, dinner: null, snacks: [] }, AppState.weeklyPlan[day]);
+
+        ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+          if (!plan[meal] && savedDay[meal] && recipeExists(savedDay[meal])) {
+            plan[meal] = savedDay[meal];
+            filled++;
+          }
+        });
+
+        // Snacks count as one slot: a non-empty list is left alone, never merged.
+        if ((plan.snacks || []).length === 0) {
+          const savedSnacks = (Array.isArray(savedDay.snacks) ? savedDay.snacks : []).filter(recipeExists);
+          if (savedSnacks.length > 0) {
+            plan.snacks = savedSnacks;
+            filled++;
+          }
+        }
+
+        filledWeek[day] = plan;
+      });
+
+      if (filled === 0) {
+        showSuccessMessage('Nothing to fill: your saved week has no meals for your empty slots.');
+        return;
+      }
+
+      Object.assign(AppState.weeklyPlan, filledWeek);
       saveData();
       renderWeeklyPlanner();
+      updateWeeklyStats();
       generateGroceryList();
-      showSuccessMessage('Saved week loaded successfully!');
+      showSuccessMessage(`Filled ${filled} empty slot${filled !== 1 ? 's' : ''} from your saved week.`);
     }
   );
 }
