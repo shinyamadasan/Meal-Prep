@@ -1,0 +1,1042 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/reliability-recovery-v1.spec.js",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/recovery-after"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/recovery-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/recovery-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "reliability-recovery-v1.spec.js",
+      "file": "reliability-recovery-v1.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "imported grocery text stays inert at 1280px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 800,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:10.453Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-84d945ac5400f94464ea",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "imported grocery text stays inert at 390px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 728,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:11.377Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1331afee9663e88ab01b",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "numeric and string imported grocery ids remain usable and cannot inject handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 548,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:12.118Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9e1601aa2a29d71ed798",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 100,
+          "column": 1
+        },
+        {
+          "title": "rejected day snacks object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 423,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:12.680Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-e47dbed22b49ac3419f6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "rejected collection object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:13.116Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b71d647dfdd7be7fcdb6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "rejected null ingredient import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 403,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:13.542Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-48400ebab91d6fe5c464",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text pantry name import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 412,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:13.956Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-50e86f309519fc192614",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text grocery source import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 435,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:14.381Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9087dc12348f189da4c9",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "rejected non-object price map import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 453,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:14.831Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-2edc6577d3742984131e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 123,
+          "column": 3
+        },
+        {
+          "title": "a late preparation error rejects the detached candidate without leaking changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 456,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:15.300Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-77c8425e9a92b50133b0",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 1
+        },
+        {
+          "title": "a failed primary local save rejects the import without cloud writes or changed runtime",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5480,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:147:3",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 69,
+                      "line": 78
+                    },
+                    "snippet": "  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 69,
+                        "line": 78
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:147:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:15.768Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\recovery-after\\reliability-recovery-v1-a--3005c-d-writes-or-changed-runtime-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 69,
+                    "line": 78
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd409d340ad73213ae6d",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 144,
+          "column": 1
+        },
+        {
+          "title": "legacy 1.1 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 515,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:21.766Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-71fc3eb5e00cd2d805e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.2 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 454,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:22.405Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-4afa0115dd278503d9e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.3 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 486,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:22.871Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-05daee40e113f43308af",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.4 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 478,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:23.378Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b7403ddd2d271e1521f7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.5 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 473,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:23.872Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b9a9b118f1ed1c7b5750",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.6 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 450,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:24.357Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-0e283795039d7aba6008",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 3
+        },
+        {
+          "title": "backup includes every saved domain field, including cook history and prep session",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 387,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:24.831Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd1c768a847bfc319f39",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 174,
+          "column": 1
+        },
+        {
+          "title": "clear, reload and restore recover history/session, retain facts and survive cloud reconciliation",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5944,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:210:3",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 69,
+                      "line": 78
+                    },
+                    "snippet": "  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 69,
+                        "line": 78
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:210:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:25.237Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\recovery-after\\reliability-recovery-v1-cl-34f75-urvive-cloud-reconciliation-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 69,
+                    "line": 78
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-c5eb92fbffd7673bf550",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 189,
+          "column": 1
+        },
+        {
+          "title": "restore clears only restored ids, and stale conflict markers lose while later deletions win",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5545,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:218:3",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 69,
+                      "line": 78
+                    },
+                    "snippet": "  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 69,
+                        "line": 78
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  76 |     await loadFromFirestore(); // establish the real read-before-write guard; never bypass it\n  77 |   }, data);\n> 78 |   await expect.poll(() => page.evaluate(() => AppState.cloudReady)).toBe(true);\n     |                                                                     ^\n  79 | }\n  80 |\n  81 | for (const width of [1280, 390]) {\n    at mockCloud (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:78:69)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:218:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:31.709Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\recovery-after\\reliability-recovery-v1-re-0888c-e-while-later-deletions-win-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 69,
+                    "line": 78
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1d4df04771115e0a62e7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 215,
+          "column": 1
+        },
+        {
+          "title": "older backups without history/session keep supported defaults and recover records",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 449,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:37.897Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-888da43b3f008cab42d5",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 239,
+          "column": 1
+        },
+        {
+          "title": "malformed backup is refused without changing current data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:38.466Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-fe1be66422225d8319a8",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 251,
+          "column": 1
+        },
+        {
+          "title": "failed backup prevents clear from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:38.872Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-779d1d66cff793d10018",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 261,
+          "column": 3
+        },
+        {
+          "title": "failed backup prevents import from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 443,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T18:51:39.298Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-d6e1698cb8e8a7104829",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 261,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T18:51:09.794Z",
+    "duration": 30342.059999999998,
+    "expected": 21,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

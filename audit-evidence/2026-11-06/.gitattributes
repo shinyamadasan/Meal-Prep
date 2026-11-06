@@ -1,0 +1,2 @@
+# Preserve original bytes, including captured line endings and whitespace in old logs.
+* -text -whitespace

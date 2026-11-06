@@ -3486,3 +3486,24 @@ Verify: workers/conversational-bridge/src/errors.js contains "export class Ambig
 Verify: workers/conversational-bridge/src/errors.js contains "export class MalformedBodyError"
 Verify: workers/conversational-bridge/README.md contains "Production enablement checklist"
 Verify: package.json contains "test:bridge"
+
+## D-083 — Reliability Recovery V1 Phase 1: stage imports and explicitly revive backup records
+Date: 2026-11-06 · Status: Candidate; independent review PASS, owner integration pending
+Context: The November 6 audit reproduced executable imported grocery categories, imports which
+mutated state before rejecting a malformed plan, backups missing cooking history/prep state, and
+restored records deleted again by retained tombstones. Owner explicitly assigned these repairs.
+Decision: Validate provided JSON structures, prepare a detached snapshot, require the safety backup,
+then commit through saveData(). A local-save failure restores pre-import runtime data. Render imported
+grocery text with escapeHtml() and ids with JSON serialization plus HTML escaping. Include cookHistory
+and prepModeSession in internal backups, without changing export 1.6. Restore explicitly revives only
+records present in each restored collection, keeps their identity/history, and clears only matching
+tombstones. Preserve all other deletion evidence and canonical append-only consumption unions.
+The transaction conflict filter uses the existing D-020 updatedAt comparison, so an older remote
+marker cannot undo explicit restore intent; a later deletion still applies. MASS_DELETE_GUARD,
+ordinary cooked-meal deletion behavior and the Life Ledger schema remain unchanged.
+Trade-off: Malformed provided structures are rejected rather than partly applied. Legacy missing
+fields remain optional. This does not repair general concurrent decrements, the single backup slot,
+exported-history coverage, stock math, account isolation or any Phase 2 work. No production writes,
+merge or deployment are authorized by this decision.
+Verify: app.js contains "function prepareSnapshotChange(data, restoring)"
+Verify: tests/reliability-recovery-v1.spec.js contains "stale conflict markers lose while later deletions win"

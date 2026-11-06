@@ -1,0 +1,3397 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/reliability-recovery-v1.spec.js",
+      "tests/tombstone-namespace.spec.js",
+      "tests/meal-consumption-durability.spec.js",
+      "tests/ledger-source-contract.spec.js",
+      "tests/cross-repo-life-ledger-fixture.spec.js",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/recovery-focused"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/recovery-focused",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/recovery-focused",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "cross-repo-life-ledger-fixture.spec.js",
+      "file": "cross-repo-life-ledger-fixture.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "capture real cookedMeal + mealConsumption output shapes for the ChronaSense adapter cross-repo suite",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 800,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:51.579Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5ebccef2a301a2026133-0d29b346985864a7a8f3",
+          "file": "cross-repo-life-ledger-fixture.spec.js",
+          "line": 117,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "ledger-source-contract.spec.js",
+      "file": "ledger-source-contract.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "MEAL_LEDGER_SOURCE_CONTRACT_V1 — §3 closed six-field consumption schema",
+          "file": "ledger-source-contract.spec.js",
+          "line": 44,
+          "column": 6,
+          "specs": [
+            {
+              "title": "chaos: a renamed portionsConsumed field is rejected by the real canonicalizeMealConsumption(), not coerced",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 735,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:51.581Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-00efcb1e02f68402aa76",
+              "file": "ledger-source-contract.spec.js",
+              "line": 45,
+              "column": 3
+            },
+            {
+              "title": "chaos: a fractional portionsConsumed is rejected by the real source function",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 577,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:52.487Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-efaec06c800617db976d",
+              "file": "ledger-source-contract.spec.js",
+              "line": 54,
+              "column": 3
+            },
+            {
+              "title": "chaos: an extra unrecognized key on an otherwise-valid record is rejected, proving the schema is genuinely closed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 588,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:53.082Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-fe14883ec02da6c10724",
+              "file": "ledger-source-contract.spec.js",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "the real generateMealConsumptionId() produces the mc_ + UUID shape",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 585,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:53.685Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-cd56ce82c5f14f33d5e6",
+              "file": "ledger-source-contract.spec.js",
+              "line": 72,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "MEAL_LEDGER_SOURCE_CONTRACT_V1 — §4 append-only merge / conflict evidence",
+          "file": "ledger-source-contract.spec.js",
+          "line": 80,
+          "column": 6,
+          "specs": [
+            {
+              "title": "append-only union: disjoint ids from both sides all survive",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 609,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:54.286Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-209948e045d875da42bf",
+              "file": "ledger-source-contract.spec.js",
+              "line": 81,
+              "column": 3
+            },
+            {
+              "title": "chaos (\"realtime snapshot replacement\"): merging a smaller incoming array never drops existing unique ids — no wholesale replacement",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 594,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:54.912Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-1a918a7ad4c03ee1d840",
+              "file": "ledger-source-contract.spec.js",
+              "line": 91,
+              "column": 3
+            },
+            {
+              "title": "chaos (\"backup rollback\"): a stale backup record with different facts under the same id produces a conflict, never a silent rollback",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 616,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:55.524Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-234b805a09833b8bbd34",
+              "file": "ledger-source-contract.spec.js",
+              "line": 103,
+              "column": 3
+            },
+            {
+              "title": "an exact duplicate (same id, identical facts) from both sides dedupes to one, no conflict recorded",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 550,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:56.161Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-f0accd1d99b4900c92b7",
+              "file": "ledger-source-contract.spec.js",
+              "line": 119,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "MEAL_LEDGER_SOURCE_CONTRACT_V1 — §5 deletion evidence (mass-delete guard, cloud-sync gating)",
+          "file": "ledger-source-contract.spec.js",
+          "line": 130,
+          "column": 6,
+          "specs": [
+            {
+              "title": "chaos: more than MASS_DELETE_GUARD simultaneous vanishes are NOT tombstoned (treated as a transient load race)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 536,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:56.735Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-90ebed7df581d41c13dc",
+              "file": "ledger-source-contract.spec.js",
+              "line": 131,
+              "column": 3
+            },
+            {
+              "title": "a real one-at-a-time delete (within the guard) IS tombstoned by recordLocalDeletions",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 553,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:57.290Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-3981cc5b465fa7837434",
+              "file": "ledger-source-contract.spec.js",
+              "line": 148,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "MEAL_LEDGER_SOURCE_CONTRACT_V1 — benign changes must not break normalization",
+          "file": "ledger-source-contract.spec.js",
+          "line": 162,
+          "column": 6,
+          "specs": [
+            {
+              "title": "benign: an unrelated extra property on a cookedMeal record survives normalizeCookedMeals() untouched",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 552,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:57.858Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-dbd1961ff2a6270a983c",
+              "file": "ledger-source-contract.spec.js",
+              "line": 163,
+              "column": 3
+            },
+            {
+              "title": "benign: cookedDate is never touched/reinterpreted by normalizeCookedMeal — it only manages portion counts",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "local",
+                  "projectName": "local",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 521,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-06T19:01:58.425Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "24e2183a2737bc5f0d88-b126ced5bba96bd7ec0b",
+              "file": "ledger-source-contract.spec.js",
+              "line": 174,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "meal-consumption-durability.spec.js",
+      "file": "meal-consumption-durability.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "merge: identical facts under the same id dedupe to one record",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 553,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:52.561Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-c831a97e586cbb9a6af8",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 97,
+          "column": 1
+        },
+        {
+          "title": "merge: different facts under the same id are an explicit conflict — the original is kept, never overwritten",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 584,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:53.132Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-176ce5aceb90bde81cd3",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 104,
+          "column": 1
+        },
+        {
+          "title": "conflict evidence has one stable full-evidence id regardless of variant order or reconnect replay",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 588,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:53.734Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-76a4905452d8baecaa2f",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 116,
+          "column": 1
+        },
+        {
+          "title": "merge: disjoint ids on both sides all survive — append-only, order-independent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 588,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:54.341Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-54c39b5ec6b141914362",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 131,
+          "column": 1
+        },
+        {
+          "title": "merge: a record missing from the incoming side is NOT treated as a deletion",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 577,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:54.947Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-1d8af314101877ad3799",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 139,
+          "column": 1
+        },
+        {
+          "title": "closed source schema rejects unknown meal-consumption fields instead of silently comparing them",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 571,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:55.553Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-fdbccc65baff968c1285",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 146,
+          "column": 1
+        },
+        {
+          "title": "mergeMealConsumptions canonicalization: portionsConsumed 1 and 99 are valid, everything else is rejected",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 573,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:56.144Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-5e8cf7ab7f8a1fbf8fab",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 159,
+          "column": 1
+        },
+        {
+          "title": "an import / backup-restore snapshot carrying portionsConsumed 100 is rejected, existing facts preserved",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 547,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:56.735Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-19d8695ac115aa1b337d",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 188,
+          "column": 1
+        },
+        {
+          "title": "a same-id candidate with an out-of-range portion count is rejected outright, not stored as conflict evidence",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 557,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:57.296Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-2b65d771799ff1326d97",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 203,
+          "column": 1
+        },
+        {
+          "title": "normal useCookedPortion() still records exactly one portion per tap",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 542,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:57.865Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-f7fc7e1917a5ec4612e1",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 223,
+          "column": 1
+        },
+        {
+          "title": "a stale/older snapshot with fewer facts cannot erase a local consumption already recorded",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 523,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:58.423Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-bc93996aef6ffee7a2fd",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 241,
+          "column": 1
+        },
+        {
+          "title": "a same-id-different-facts snapshot never silently overwrites the locally-known fact",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 536,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:58.959Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-6c1568aea30b63141bd4",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 253,
+          "column": 1
+        },
+        {
+          "title": "duplicate snapshot / reconnect replay never creates a second record for the same id",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 527,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:59.509Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-c7481700b9229408dac1",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 263,
+          "column": 1
+        },
+        {
+          "title": "two genuine consumptions produce two distinct ids and both survive reconciliation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 584,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:00.049Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-5dc612068d6a6da19b75",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 275,
+          "column": 1
+        },
+        {
+          "title": "mealConsumptions is included in loadUserData's sign-in reconciliation, not silently omitted",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 537,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:00.648Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-b37c1d7e1da42630e44c",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 300,
+          "column": 1
+        },
+        {
+          "title": "a concurrent cloud fact X and local fact Y both survive the root-document transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 208,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.198Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-b7a20660aeb0daf6cbf3",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 317,
+          "column": 1
+        },
+        {
+          "title": "same-id conflict retains the accepted cloud fact and durable exact evidence across reload and reconnect",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 213,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-eeb9587d570d4d560ad4",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 330,
+          "column": 1
+        },
+        {
+          "title": "a Firestore transaction retry rereads and unions the latest remote facts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 209,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.646Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-121e4a162b476d4bf78b",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 352,
+          "column": 1
+        },
+        {
+          "title": "missing transaction API fails closed without a setDoc root write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 204,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.867Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-12bed385ea2530d2f148",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 365,
+          "column": 1
+        },
+        {
+          "title": "exact duplicate facts remain one fact through a cloud save and repeated reconnect snapshots",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 270,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:02.085Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-f8068ad3e5bf92e17aa6",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 375,
+          "column": 1
+        },
+        {
+          "title": "generateMealConsumptionId never reuses an id already present in AppState.mealConsumptions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 528,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:02.370Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-8a083f54f73db4fdf8cb",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 391,
+          "column": 1
+        },
+        {
+          "title": "a forced browser probe that always returns the same UUID is detected and refused rather than silently reused",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 563,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:02.912Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-95a1a6dc0d082ff18c56",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 414,
+          "column": 1
+        },
+        {
+          "title": "normal id generation produces distinct mc_<uuid>-shaped ids, not the old timestamp+small-random scheme",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 631,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:03.489Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b7bc1f5dfaca2dec0905-a90a1a0b8e8922a4a072",
+          "file": "meal-consumption-durability.spec.js",
+          "line": 440,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "reliability-recovery-v1.spec.js",
+      "file": "reliability-recovery-v1.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "imported grocery text stays inert at 1280px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 831,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:58.972Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-84d945ac5400f94464ea",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "imported grocery text stays inert at 390px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 808,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:01:59.816Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1331afee9663e88ab01b",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "numeric and string imported grocery ids remain usable and cannot inject handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 584,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:00.639Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9e1601aa2a29d71ed798",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 100,
+          "column": 1
+        },
+        {
+          "title": "rejected day snacks object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 442,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.236Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-e47dbed22b49ac3419f6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected collection object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 436,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:01.690Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b71d647dfdd7be7fcdb6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected null ingredient import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 435,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:02.139Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-48400ebab91d6fe5c464",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text pantry name import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 462,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:02.588Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-50e86f309519fc192614",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text grocery source import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 453,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:03.065Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9087dc12348f189da4c9",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected non-object price map import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 506,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:03.532Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-2edc6577d3742984131e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review recipe highlights object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 447,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.053Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-493e1fa7ad3bdfe00d88",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review grocery quantity string import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 452,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.511Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-6482136e9edc9938ced4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review missing storage-guide text import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 458,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.977Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-28893a851403e9306f4c",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review nested price list import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 467,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:05.452Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-ed5815c1e168c5e830a4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review reserved id import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 437,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:05.933Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-65910af5a9e400f1e3b8",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review inherited id import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 476,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:06.387Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1f5a483887499c98b07b",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review malformed tombstone import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 483,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:06.878Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-ff17f9c7ba381f1610bb",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "rejected review malformed conflict import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 469,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:07.377Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-d5f8f9b724a62b96a1d3",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 131,
+          "column": 3
+        },
+        {
+          "title": "review grocery category/unit remain inert in print and price views, including reserved category names",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 571,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:07.862Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-55590f3d9d2a591fa581",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 143,
+          "column": 1
+        },
+        {
+          "title": "review price-input handlers cannot execute imported item or store names",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "failed",
+                  "duration": 682,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mnull\u001b[39m\nReceived: \u001b[31m\"\\\\\\\"window.__recoveryMarkup=true\\\",\\\"Test\"\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mnull\u001b[39m\nReceived: \u001b[31m\"\\\\\\\"window.__recoveryMarkup=true\\\",\\\"Test\"\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:169:82",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 82,
+                      "line": 169
+                    },
+                    "snippet": "  167 |   await page.locator('.gpl-price-input').first().focus();\n  168 |   expect(await page.evaluate(() => !!window.__recoveryMarkup)).toBe(false);\n> 169 |   expect(await page.locator('.gpl-price-input').first().getAttribute('onfocus')).toBe(null);\n      |                                                                                  ^\n  170 | });\n  171 |\n  172 | test('review malformed nested prep session backup is rejected atomically', async ({ page }) => {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 82,
+                        "line": 169
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mnull\u001b[39m\nReceived: \u001b[31m\"\\\\\\\"window.__recoveryMarkup=true\\\",\\\"Test\"\u001b[39m\n\n  167 |   await page.locator('.gpl-price-input').first().focus();\n  168 |   expect(await page.evaluate(() => !!window.__recoveryMarkup)).toBe(false);\n> 169 |   expect(await page.locator('.gpl-price-input').first().getAttribute('onfocus')).toBe(null);\n      |                                                                                  ^\n  170 | });\n  171 |\n  172 | test('review malformed nested prep session backup is rejected atomically', async ({ page }) => {\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js:169:82"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:08.447Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\recovery-focused\\reliability-recovery-v1-re-2de49-mported-item-or-store-names-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 82,
+                    "line": 169
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-2c3fcc7b32ea03bbd63e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 161,
+          "column": 1
+        },
+        {
+          "title": "review malformed nested prep session backup is rejected atomically",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 497,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:09.713Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-5287e536312d8bb40fc4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 172,
+          "column": 1
+        },
+        {
+          "title": "a late preparation error rejects the detached candidate without leaking changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 502,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:10.336Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-77c8425e9a92b50133b0",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 185,
+          "column": 1
+        },
+        {
+          "title": "a failed primary local save rejects the import without cloud writes or changed runtime",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 486,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:10.853Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd409d340ad73213ae6d",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 194,
+          "column": 1
+        },
+        {
+          "title": "legacy 1.1 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 487,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:11.352Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-71fc3eb5e00cd2d805e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.2 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 487,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:11.854Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-4afa0115dd278503d9e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.3 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 519,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:12.357Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-05daee40e113f43308af",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.4 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 480,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:12.889Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b7403ddd2d271e1521f7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.5 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 487,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:13.383Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b9a9b118f1ed1c7b5750",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.6 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 493,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:13.882Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-0e283795039d7aba6008",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 211,
+          "column": 3
+        },
+        {
+          "title": "backup includes every saved domain field, including cook history and prep session",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 359,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:14.387Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd1c768a847bfc319f39",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 224,
+          "column": 1
+        },
+        {
+          "title": "clear, reload and restore recover history/session, retain facts and survive cloud reconciliation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 950,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:14.759Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-c5eb92fbffd7673bf550",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 239,
+          "column": 1
+        },
+        {
+          "title": "restore clears only restored ids, and stale conflict markers lose while later deletions win",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 467,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:15.720Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1d4df04771115e0a62e7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 265,
+          "column": 1
+        },
+        {
+          "title": "older backups without history/session keep supported defaults and recover records",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 374,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:16.200Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-888da43b3f008cab42d5",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 289,
+          "column": 1
+        },
+        {
+          "title": "malformed backup is refused without changing current data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 377,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:16.587Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-fe1be66422225d8319a8",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 301,
+          "column": 1
+        },
+        {
+          "title": "failed backup prevents clear from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 416,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:16.976Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-779d1d66cff793d10018",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 311,
+          "column": 3
+        },
+        {
+          "title": "failed backup prevents import from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 434,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:17.407Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-d6e1698cb8e8a7104829",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 311,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "tombstone-namespace.spec.js",
+      "file": "tombstone-namespace.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "BASE REPRO: old flat tombstones delete every collection sharing id 5",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 400,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.147Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-5d9ee3cd75b4e77fb703",
+          "file": "tombstone-namespace.spec.js",
+          "line": 129,
+          "column": 1
+        },
+        {
+          "title": "a recipes tombstone for id 5 deletes only recipe 5",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 389,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.566Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-4f2baf95029fc487f09b",
+          "file": "tombstone-namespace.spec.js",
+          "line": 159,
+          "column": 1
+        },
+        {
+          "title": "pantry and hack tombstones stay in their own collection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 419,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:04.973Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-00e6151fc98c16121ca6",
+          "file": "tombstone-namespace.spec.js",
+          "line": 180,
+          "column": 1
+        },
+        {
+          "title": "flavor, cooked meal and user ingredient prefixes remain isolated",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 419,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:05.407Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-411cd0851d7d7eca009f",
+          "file": "tombstone-namespace.spec.js",
+          "line": 197,
+          "column": 1
+        },
+        {
+          "title": "generic vanish-diff records collection identity and keeps MASS_DELETE_GUARD",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:05.843Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-83febb15ceceaf019327",
+          "file": "tombstone-namespace.spec.js",
+          "line": 220,
+          "column": 1
+        },
+        {
+          "title": "multi-collection transient empty trips the aggregate MASS_DELETE_GUARD before small buckets write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 400,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:06.247Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-845fe4ca4965d5bcb722",
+          "file": "tombstone-namespace.spec.js",
+          "line": 241,
+          "column": 1
+        },
+        {
+          "title": "legitimate disappearances below the aggregate guard still write collection-specific tombstones",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 397,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:06.664Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-4cd25e80afac360039b8",
+          "file": "tombstone-namespace.spec.js",
+          "line": 264,
+          "column": 1
+        },
+        {
+          "title": "explicit tombstone writers record their own collections",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 440,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:07.079Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-07e2fa624d677454617e",
+          "file": "tombstone-namespace.spec.js",
+          "line": 287,
+          "column": 1
+        },
+        {
+          "title": "expired cleanup writers are collection-aware even with shared ids",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 411,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:07.539Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-f7737f3c7db0031f7451",
+          "file": "tombstone-namespace.spec.js",
+          "line": 322,
+          "column": 1
+        },
+        {
+          "title": "LWW and purge horizon are unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 389,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:07.968Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-67a4dd4d8c1ab8fe19a8",
+          "file": "tombstone-namespace.spec.js",
+          "line": 342,
+          "column": 1
+        },
+        {
+          "title": "legacy flat payloads migrate only exclusive prefixes and drop ambiguous ids",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 409,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:08.375Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-f531763f206abfccd624",
+          "file": "tombstone-namespace.spec.js",
+          "line": 370,
+          "column": 1
+        },
+        {
+          "title": "ambiguous legacy numeric tombstones no longer globally delete live records",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 388,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:08.798Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-01d3ca51a98ff5c77b77",
+          "file": "tombstone-namespace.spec.js",
+          "line": 394,
+          "column": 1
+        },
+        {
+          "title": "localStorage round-trips namespaced tombstones",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 593,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:09.203Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-a745a12d87ac528f5aa6",
+          "file": "tombstone-namespace.spec.js",
+          "line": 407,
+          "column": 1
+        },
+        {
+          "title": "Firestore payload and load round-trip namespaced tombstones",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 404,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:09.813Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-8450b9ee433ce645d223",
+          "file": "tombstone-namespace.spec.js",
+          "line": 426,
+          "column": 1
+        },
+        {
+          "title": "sign-in union applies local recipe deletion without deleting same-id hack",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 372,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:10.232Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-6114966d7ea0fa9eead4",
+          "file": "tombstone-namespace.spec.js",
+          "line": 441,
+          "column": 1
+        },
+        {
+          "title": "concurrent cloud merge filters only the tombstoned collection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 366,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:10.618Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-9e255adee70a0b256714",
+          "file": "tombstone-namespace.spec.js",
+          "line": 452,
+          "column": 1
+        },
+        {
+          "title": "realtime remote deletion applies only to its collection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 393,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:10.998Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-5b2111d0b4241ad81f10",
+          "file": "tombstone-namespace.spec.js",
+          "line": 469,
+          "column": 1
+        },
+        {
+          "title": "import clears only the imported collection tombstone",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 494,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:11.406Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-b2f9490a61427e8a894c",
+          "file": "tombstone-namespace.spec.js",
+          "line": 482,
+          "column": 1
+        },
+        {
+          "title": "backup restore keeps current deletion semantics unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:11.916Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-c1c766faa6c09543b04c",
+          "file": "tombstone-namespace.spec.js",
+          "line": 502,
+          "column": 1
+        },
+        {
+          "title": "MUTATION: collapsing namespaces recreates collateral deletion",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 379,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:12.321Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-7348d93291dc364a2a9f",
+          "file": "tombstone-namespace.spec.js",
+          "line": 517,
+          "column": 1
+        },
+        {
+          "title": "MUTATION: bypassing the aggregate MASS_DELETE_GUARD writes phantom small-collection tombstones",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 385,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:12.714Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-e8a116785aa84dbad2b2",
+          "file": "tombstone-namespace.spec.js",
+          "line": 552,
+          "column": 1
+        },
+        {
+          "title": "clear all data tombstones every collection in its own namespace",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 666,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:02:13.112Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "68b4243e424a866a5247-abb3fe18d3e690c0791f",
+          "file": "tombstone-namespace.spec.js",
+          "line": 576,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T19:01:50.417Z",
+    "duration": 27787.453,
+    "expected": 92,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

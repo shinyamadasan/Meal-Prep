@@ -1773,7 +1773,9 @@ function snapshotData() {
     cookedMeals: AppState.cookedMeals,
     mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
     mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
+    cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
+    prepModeSession: AppState.prepModeSession,
     deletions: normalizeDeletions(AppState.deletions),
     inventoryVerifiedAt: AppState.inventoryVerifiedAt,
     plannedBatches: normalizePlannedBatches(AppState.plannedBatches)
@@ -1784,7 +1786,149 @@ function createBackup(label) {
   try {
     var backup = { label: label || 'backup', at: new Date().toISOString(), data: snapshotData() };
     localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
-  } catch (e) { console.error('Backup failed:', e); }
+    return true;
+  } catch (e) {
+    console.error('Backup failed:', e);
+    showErrorMessage('Could not save a safety backup. Nothing was changed.');
+    return false;
+  }
+}
+
+// Both imports and backups are untrusted JSON. Missing legacy fields remain optional;
+// malformed provided structures must fail before any state or deletion marker changes.
+function validateSnapshotData(data) {
+  var object = value => value && typeof value === 'object' && !Array.isArray(value);
+  var reserved = key => key === 'prototype' || Object.prototype.hasOwnProperty.call(Object.prototype, key);
+  var lists = TOMBSTONE_KEYS.concat(['groceryList', 'mealConsumptions', 'mealConsumptionConflicts', 'cookHistory', 'plannedBatches']);
+  if (!object(data) || !lists.concat(['weeklyPlan']).some(key => data[key] != null)) throw new Error('Invalid data format');
+  lists.forEach(function(key) {
+    if (data[key] == null) return;
+    if (!Array.isArray(data[key])) throw new Error('Invalid list: ' + key);
+    data[key].forEach(function(item) {
+      if (!object(item)) throw new Error('Invalid record: ' + key);
+      if (item.id != null && !['string', 'number'].includes(typeof item.id)) throw new Error('Invalid record id');
+      if (item.id != null && reserved(String(item.id))) throw new Error('Unsupported record id');
+      ['name', 'title', 'category', 'unit', 'instructions', 'storageMethod', 'storageTips'].forEach(function(field) {
+        if (item[field] != null && typeof item[field] !== 'string') throw new Error('Invalid text: ' + field);
+      });
+      if (['pantry', 'groceryList', 'userIngredients', 'customIngredients'].includes(key) && typeof item.name !== 'string') throw new Error('Missing item name');
+      if (key === 'customIngredients' && ['storageMethod', 'storageTips'].some(field => typeof item[field] !== 'string')) throw new Error('Missing storage guide text');
+      if (['groceryList', 'pantry'].includes(key) && item.quantity != null && (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity))) throw new Error('Invalid stock quantity');
+      if (item.highlights != null && (!Array.isArray(item.highlights) || item.highlights.some(h => typeof h !== 'string'))) throw new Error('Invalid highlights');
+      if (key === 'mealConsumptionConflicts' && !canonicalizeMealConsumptionConflict(item)) throw new Error('Invalid consumption conflict');
+      if (item.sources != null && (!Array.isArray(item.sources) || item.sources.some(s => typeof s !== 'string'))) throw new Error('Invalid grocery sources');
+      if (item.baseIngredients != null) {
+        if (!Array.isArray(item.baseIngredients)) throw new Error('Invalid ingredients');
+        item.baseIngredients.forEach(function(ing) {
+          if (!object(ing) || typeof ing.name !== 'string' || (ing.unit != null && typeof ing.unit !== 'string') ||
+              (ing.category != null && typeof ing.category !== 'string')) throw new Error('Invalid ingredient');
+        });
+      }
+    });
+  });
+  ['weeklyPlan', 'ingredientPrices', 'nutritionGoals', 'deletions', 'prepModeSession'].forEach(function(key) {
+    if (data[key] != null && !object(data[key])) throw new Error('Invalid object: ' + key);
+  });
+  ['myStores', 'customStores', 'recentRecipes'].forEach(function(key) {
+    if (data[key] != null && (!Array.isArray(data[key]) || data[key].some(value =>
+      key === 'recentRecipes' ? !['string', 'number'].includes(typeof value) : typeof value !== 'string'))) throw new Error('Invalid list: ' + key);
+  });
+  Object.keys(data.ingredientPrices || {}).forEach(function(name) {
+    var entry = data.ingredientPrices[name];
+    if (reserved(name) || !object(entry) || (entry.unit != null && typeof entry.unit !== 'string') ||
+        (entry.prices != null && !object(entry.prices))) throw new Error('Invalid ingredient price');
+    Object.keys(entry.prices || {}).forEach(function(store) {
+      if (reserved(store) || (entry.prices[store] != null && !['string', 'number'].includes(typeof entry.prices[store]))) throw new Error('Invalid store price');
+    });
+  });
+  Object.keys(data.deletions || {}).forEach(function(key) {
+    if (reserved(key)) throw new Error('Invalid deletion id');
+    var bucket = data.deletions[key];
+    var timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
+    if (TOMBSTONE_KEYS.includes(key)) {
+      if (!object(bucket) || Object.keys(bucket).some(id => reserved(id) || !timestamp(bucket[id]))) throw new Error('Invalid deletion bucket');
+    } else if (!timestamp(bucket)) throw new Error('Invalid legacy deletion');
+  });
+  var session = data.prepModeSession;
+  if (session) {
+    if (typeof session.active !== 'boolean' || !object(session.recipeUsage) || !object(session.checked) ||
+        Object.keys(session.recipeUsage).some(id => reserved(id) || !Number.isInteger(session.recipeUsage[id]) || session.recipeUsage[id] < 1) ||
+        Object.keys(session.checked).some(id => typeof session.checked[id] !== 'boolean')) throw new Error('Invalid prep session');
+  }
+  Object.keys(data.weeklyPlan || {}).forEach(function(day) {
+    var plan = data.weeklyPlan[day];
+    if (!PLAN_WEEK_DAYS.includes(day) || !object(plan)) throw new Error('Invalid plan day');
+    ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
+      if (plan[meal] != null && !['string', 'number'].includes(typeof plan[meal])) throw new Error('Invalid plan slot');
+    });
+    if (plan.snacks != null && (!Array.isArray(plan.snacks) || plan.snacks.some(id => !['string', 'number'].includes(typeof id)))) throw new Error('Invalid snacks');
+  });
+}
+
+// Build on detached records so normalization, fill-only planning and timestamp updates
+// cannot leak into the live state if any preparation step rejects the file.
+function prepareSnapshotChange(data, restoring) {
+  validateSnapshotData(data);
+  var next = JSON.parse(JSON.stringify(snapshotData()));
+  TOMBSTONE_KEYS.concat(['groceryList']).forEach(function(key) {
+    next[key] = restoring ? (data[key] || []) : unionById(next[key], data[key] || []);
+  });
+  patchMissingNutrition(next.recipes);
+  next.flavors = normalizeFlavors(next.flavors);
+  next.preparedFlavors = normalizePreparedFlavors(next.preparedFlavors);
+  next.cookedMeals = normalizeCookedMeals(next.cookedMeals);
+  var facts = mergeMealConsumptions(next.mealConsumptions, data.mealConsumptions || []);
+  if (facts.rejected.length) throw new Error('Invalid meal consumption record');
+  next.mealConsumptions = facts.merged;
+  next.mealConsumptionConflicts = mergeMealConsumptionConflicts(
+    mergeMealConsumptionConflicts(next.mealConsumptionConflicts, data.mealConsumptionConflicts || []), facts.conflicts);
+  if (restoring) {
+    if (data.weeklyPlan) {
+      next.weeklyPlan = {};
+      PLAN_WEEK_DAYS.forEach(day => { next.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] }; });
+      mergeWeeklyPlan(data.weeklyPlan, next);
+    }
+    next.nutritionGoals = data.nutritionGoals || next.nutritionGoals;
+    next.cookHistory = data.cookHistory || [];
+    next.recentRecipes = data.recentRecipes || [];
+    next.prepModeSession = data.prepModeSession || null;
+    next.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
+    if (data.plannedBatches) next.plannedBatches = normalizePlannedBatches(data.plannedBatches);
+    mergeDeletions(data.deletions, next);
+  } else {
+    if (data.weeklyPlan) mergeWeeklyPlan(data.weeklyPlan, next);
+    if (data.plannedBatches) mergePlannedBatches(data.plannedBatches, next);
+    if (data.inventoryVerifiedAt && data.inventoryVerifiedAt > (next.inventoryVerifiedAt || '')) next.inventoryVerifiedAt = data.inventoryVerifiedAt;
+  }
+  next.ingredientPrices = restoring ? (data.ingredientPrices || {}) : Object.assign({}, data.ingredientPrices || {}, next.ingredientPrices);
+  ['myStores', 'customStores'].forEach(function(key) {
+    next[key] = restoring ? (data[key] || []) : unionStrings(next[key], data[key] || []);
+  });
+  // Explicit import/restore intent revives only the supplied records in their own
+  // collection. Unrelated deletion evidence must survive; immutable facts are not stamped.
+  var revivedAt = new Date().toISOString();
+  next.deletions = normalizeDeletions(next.deletions);
+  TOMBSTONE_KEYS.concat(['groceryList']).forEach(function(key) {
+    var ids = new Set((restoring ? next[key] : (data[key] || [])).map(item => String(item.id)));
+    next[key].forEach(function(item) {
+      if (!ids.has(String(item.id))) return;
+      item.updatedAt = revivedAt;
+      if (next.deletions[key]) delete next.deletions[key][String(item.id)];
+    });
+  });
+  return next;
+}
+
+function commitSnapshotChange(next) {
+  var before = snapshotData();
+  Object.assign(AppState, next);
+  var saving = saveData();
+  if (!AppState.lastLocalSaveSucceeded) {
+    Object.assign(AppState, before);
+    return null;
+  }
+  cacheInlinePhotos();
+  return saving;
 }
 
 function restoreBackup() {
@@ -1795,7 +1939,7 @@ function restoreBackup() {
     return;
   }
   var backup;
-  try { backup = JSON.parse(raw); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
+  try { backup = JSON.parse(raw); validateSnapshotData(backup.data); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
   var when = backup.at ? new Date(backup.at).toLocaleString() : 'an earlier time';
   showConfirmDialog(
     'Restore backup?',
@@ -1803,41 +1947,18 @@ function restoreBackup() {
       '<p>This replaces your current data.</p>',
     'Restore Backup',
     'Cancel',
-    function() {
-      var d = backup.data || {};
-      AppState.recipes = d.recipes || [];
-      patchMissingNutrition(AppState.recipes);
-      AppState.weeklyPlan = d.weeklyPlan || AppState.weeklyPlan;
-      AppState.groceryList = d.groceryList || [];
-      AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
-      AppState.customIngredients = d.customIngredients || [];
-      AppState.customHacks = d.customHacks || [];
-      AppState.flavors = normalizeFlavors(d.flavors || []);
-      AppState.preparedFlavors = normalizePreparedFlavors(d.preparedFlavors || []);
-      AppState.pantry = d.pantry || [];
-      AppState.userIngredients = d.userIngredients || [];
-      AppState.ingredientPrices = d.ingredientPrices || {};
-      AppState.myStores = d.myStores || [];
-      AppState.customStores = d.customStores || [];
-      AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
-      // A historical event log must not be silently destroyed because the user loads an
-      // older backup — merge (union) in the backup's consumption history rather than
-      // replacing current history with it. Exact duplicates dedupe; events missing from this
-      // backup simply remain; a same-id/different-facts collision is an explicit conflict,
-      // never a silent overwrite in either direction. "Restore" here intentionally means
-      // "this backup's consumption facts are unioned in", not "roll back to only this backup".
-      reconcileMealConsumptions(d.mealConsumptions || []);
-      reconcileMealConsumptionConflicts(d.mealConsumptionConflicts || []);
-      AppState.recentRecipes = d.recentRecipes || [];
-      AppState.prepModeSession = d.prepModeSession || null;
-      AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
-      // Same rule as weeklyPlan above: an older backup without the key keeps the current plan.
-      if (d.plannedBatches) AppState.plannedBatches = normalizePlannedBatches(d.plannedBatches);
-      cacheInlinePhotos();
-      saveData();
+    async function() {
+      var next;
+      try { next = prepareSnapshotChange(backup.data, true); } catch (e) {
+        showErrorMessage('Backup is corrupted and cannot be restored.'); return;
+      }
+      var saving = commitSnapshotChange(next);
+      if (!saving) return;
+      await saving;
 
       renderRecipes();
       renderWeeklyPlanner();
+      renderGroceryList();
       renderStorageGuide();
       renderCookingHacks();
       renderFlavors();
@@ -1862,7 +1983,7 @@ async function clearLocalStorage() {
     'Clear All Data',
     'Cancel',
     async function() {
-      createBackup('Clear All Data');
+      if (!createBackup('Clear All Data')) return;
 
       // R1: PROPAGATE the wipe via tombstones + an explicit EMPTY document — never deleteDoc.
       // Deleting the doc just lets another live client (or our own 'empty'-path save) re-create it
@@ -6588,8 +6709,8 @@ function renderGroceryList() {
     return;
   }
   
-  // Group by category (fall back to "Other" when category is absent)
-  const categories = {};
+  // Imported category names are data, including object-property names such as __proto__.
+  const categories = Object.create(null);
   AppState.groceryList.forEach(item => {
     const cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
     if (!categories[cat]) categories[cat] = [];
@@ -6626,7 +6747,7 @@ function renderGroceryList() {
 
     return `
     <div class="grocery-category">
-      <h3 class="category-header">${category}${categoryTotal > 0 ? ` <span class="category-total">≈ ₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
+      <h3 class="category-header">${escapeHtml(category)}${categoryTotal > 0 ? ` <span class="category-total">≈ ₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
       ${categories[category].map(item => {
         // Show an exact line total when we can price it; otherwise fall back to
         // the market reference price (e.g. "₱200/kg") so there's always a price.
@@ -6634,7 +6755,7 @@ function renderGroceryList() {
         const priced = findIngredientPrice(item.name);
         let priceHtml = '';
         if (cost > 0) priceHtml = `<div class="ingredient-price">≈ ₱${formatQuantity(cost)}</div>`;
-        else if (priced && priced.priceLabel) priceHtml = `<div class="ingredient-price ingredient-price--ref">${priced.priceLabel}</div>`;
+        else if (priced && priced.priceLabel) priceHtml = `<div class="ingredient-price ingredient-price--ref">${escapeHtml(priced.priceLabel)}</div>`;
 
         // "Running low" staples are in the pantry by definition — don't let the
         // in-stock check hide them; the whole point is that you need to rebuy.
@@ -6642,18 +6763,19 @@ function renderGroceryList() {
         // claims "In stock" from the kitchen.
         const inPantry = (item.fromStaple || item.userSet) ? false : isInPantry(item.name);
         const isChecked = groceryItemChecked(item);
+        const itemId = escapeHtml(JSON.stringify(item.id));
         return `
-        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${item.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${item.id})}">
+        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${itemId})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${itemId})}">
           <input type="checkbox" class="grocery-checkbox" tabindex="-1" aria-hidden="true"
                  ${isChecked ? 'checked' : ''}>
           <div class="grocery-item-info">
             <div class="grocery-item-name">
-              ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
-              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + item.id + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
-              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${item.id})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
+              ${item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : ''}${escapeHtml(item.name)}
+              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + itemId + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
+              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${itemId})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
-              <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
+              <div class="grocery-item-source">From: ${escapeHtml(summarizeSources(item.sources))}</div>
             ` : ''}
             ${priceHtml}
           </div>
@@ -6763,12 +6885,12 @@ function openNotInKitchenDialog(groceryId) {
   if (!matches.length) return;
   var rows = matches.map(function(p) {
     var staple = isStaple(p);
-    var idArg = escapeHtml(escJ(String(p.id)));
+    var idArg = escapeHtml(JSON.stringify(String(p.id)));
     return '<div class="nik-row">' +
       '<div class="nik-info"><span class="nik-name">' + escapeHtml(p.name) + '</span>' +
       '<span class="nik-meta">' + escapeHtml(describeKitchenRecord(p)) + '</span></div>' +
       '<button type="button" class="btn btn--secondary btn--sm nik-fix-btn" ' +
-        'onclick="fixNotInKitchen(\'' + idArg + '\', ' + item.id + ')">' +
+        'onclick="fixNotInKitchen(' + idArg + ', ' + escapeHtml(JSON.stringify(item.id)) + ')">' +
         (staple ? 'Mark empty' : 'Used up — remove') + '</button>' +
       '</div>';
   }).join('');
@@ -6861,7 +6983,7 @@ function renderGroceryPricePanel() {
   html += '</div>';
 
   // Group by category
-  var cats = {};
+  var cats = Object.create(null);
   AppState.groceryList.forEach(function(item) {
     var cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
     if (!cats[cat]) cats[cat] = [];
@@ -6880,12 +7002,12 @@ function renderGroceryPricePanel() {
       html += '<div class="gpl-row" style="grid-template-columns:' + colTemplate + '">';
       html += '<div class="gpl-col-name">';
       html += '<div class="gpl-item-name">' + escapeHtml(item.name) + '</div>';
-      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + (item.unit || '') + '</div>';
+      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + '</div>';
       html += '</div>';
       myStores.forEach(function(s) {
         var p = storePrices[s] || '';
         html += '<div class="gpl-col-store"><input class="gpl-price-input" value="' + escapeHtml(p) +
-          '" placeholder="₱—" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)" /></div>';
+          '" placeholder="₱—" onblur="saveIngredientStorePrice(' + escapeHtml(JSON.stringify(item.name)) + ',' + escapeHtml(JSON.stringify(s)) + ',this.value)" /></div>';
       });
       html += '</div>';
     });
@@ -8151,16 +8273,16 @@ function unionStrings(a, b) {
 
 // Fill only EMPTY plan slots from an imported plan — never overwrite a meal you
 // already planned. Snacks are unioned.
-function mergeWeeklyPlan(imported) {
+function mergeWeeklyPlan(imported, state = AppState) {
   ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(function(day) {
     if (!imported[day]) return;
-    if (!AppState.weeklyPlan[day]) AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+    if (!state.weeklyPlan[day]) state.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
     ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
-      if (!AppState.weeklyPlan[day][meal] && imported[day][meal]) AppState.weeklyPlan[day][meal] = imported[day][meal];
+      if (!state.weeklyPlan[day][meal] && imported[day][meal]) state.weeklyPlan[day][meal] = imported[day][meal];
     });
-    var cur = AppState.weeklyPlan[day].snacks || [];
+    var cur = state.weeklyPlan[day].snacks || [];
     (imported[day].snacks || []).forEach(function(id) { if (cur.indexOf(id) < 0) cur.push(id); });
-    AppState.weeklyPlan[day].snacks = cur;
+    state.weeklyPlan[day].snacks = cur;
   });
 }
 
@@ -8199,12 +8321,12 @@ function normalizePlannedBatches(list) {
 
 // Fill-only, same rule as mergeWeeklyPlan(): add batches whose id is missing, never
 // overwrite or drop one already planned.
-function mergePlannedBatches(incoming) {
-  var cur = normalizePlannedBatches(AppState.plannedBatches);
+function mergePlannedBatches(incoming, state = AppState) {
+  var cur = normalizePlannedBatches(state.plannedBatches);
   var have = {};
   cur.forEach(function(b) { have[b.id] = true; });
   normalizePlannedBatches(incoming).forEach(function(b) { if (!have[b.id]) cur.push(b); });
-  AppState.plannedBatches = cur;
+  state.plannedBatches = cur;
 }
 
 function importData() {
@@ -8214,89 +8336,28 @@ function importData() {
   input.onchange = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     const reader = new FileReader();
     reader.onload = function(e) {
       try {
         const importedData = JSON.parse(e.target.result);
-        
-        // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals', 'mealConsumptions', 'mealConsumptionConflicts'];
-        if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
-          throw new Error('Invalid data format');
-        }
-
+        validateSnapshotData(importedData);
         var newRecipeCount = (importedData.recipes || []).filter(function(r) {
           return r && r.id != null && !AppState.recipes.some(function(x) { return String(x.id) === String(r.id); });
         }).length;
-
         var bodyMsg = newRecipeCount > 0
           ? 'Add <strong>' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + '</strong> and any other data from this file to your collection?<br><br>Nothing is removed — imported items are merged into what you already have.'
-          : 'Merge this file\'s data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.';
+          : "Merge this file's data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.";
         showConfirmDialog('Import data?', bodyMsg, 'Import', 'Cancel', async function() {
+          var savedLocally = false;
           try {
-            // Snapshot current data first so this can be undone via "Restore Backup".
-            createBackup('Import');
-
-            // Explicit import overrides prior deletion — a re-imported item should
-            // not be silently filtered on the next signed-in reload by a tombstone
-            // left over from a previous Clear All Data that included it.
-            TOMBSTONE_KEYS.forEach(function(key) {
-              (importedData[key] || []).forEach(function(it) {
-                if (it && it.id != null) clearTombstone(key, it.id);
-              });
-            });
-
-            // MERGE, don't replace — union list-type data by id (existing items
-            // win on a collision, so re-importing your own backup is a no-op).
-            AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
-            patchMissingNutrition(AppState.recipes);
-            AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
-            AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
-            AppState.flavors = normalizeFlavors(unionById(AppState.flavors, importedData.flavors || []));
-            AppState.preparedFlavors = normalizePreparedFlavors(unionById(AppState.preparedFlavors, importedData.preparedFlavors || []));
-            AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
-            AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
-            AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
-            // Append-only facts, never edited after creation — merged via the canonical
-            // id+content primitive (not unionById's array-order/precedence union): identical
-            // facts on a same id dedupe, a genuinely differing same-id record is an explicit
-            // conflict, never a silent overwrite.
-            reconcileMealConsumptions(importedData.mealConsumptions || []);
-            reconcileMealConsumptionConflicts(importedData.mealConsumptionConflicts || []);
-            AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
-
-            var importStampedAt = new Date().toISOString();
-            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
-              var importedIds = {};
-              (importedData[key] || []).forEach(function(it) {
-                if (it && it.id != null) importedIds[String(it.id)] = true;
-              });
-              (AppState[key] || []).forEach(function(it) {
-                if (it && it.id != null && importedIds[String(it.id)]) it.updatedAt = importStampedAt;
-              });
-            });
-
-            // Plan: fill empty slots only (never wipe a planned meal).
-            if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
-            if (importedData.plannedBatches) mergePlannedBatches(importedData.plannedBatches);
-
-            // Maps + store lists: combine; current values win on conflicts.
-            AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
-            AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
-            AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
-            // A manual confidence stamp, not a list — "merge" means keep whichever is NEWER,
-            // never regress an existing verification with an older imported file.
-            if (importedData.inventoryVerifiedAt && importedData.inventoryVerifiedAt > (AppState.inventoryVerifiedAt || '')) {
-              AppState.inventoryVerifiedAt = importedData.inventoryVerifiedAt;
-            }
-            cacheInlinePhotos();
-
-            var savePromise = saveData();
-
-            // Refresh every view immediately — AppState is already updated
+            var next = prepareSnapshotChange(importedData, false);
+            if (!createBackup('Import')) return;
+            var saving = commitSnapshotChange(next);
+            if (!saving) return;
+            savedLocally = true;
             renderRecipes();
             renderWeeklyPlanner();
+            renderGroceryList();
             renderStorageGuide();
             renderCookingHacks();
             renderFlavors();
@@ -8308,16 +8369,16 @@ function importData() {
             updateFreshnessBadges();
             renderFreshnessBanner();
             renderInventoryVerifiedStatus();
-
-            // Wait for Firestore to commit before declaring success — closes the race
-            // window where a refresh could land on the pre-import cloud version.
-            await savePromise;
-            showSuccessMessage(newRecipeCount > 0
-              ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
-              : 'Imported and merged into your data.');
+            var synced = await saving;
+            showSuccessMessage(AppState.currentUser && !synced
+              ? 'Imported on this device. Cloud sync is pending.' : newRecipeCount > 0
+                ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
+                : 'Imported and merged into your data.');
           } catch (importErr) {
             console.error('Error applying import:', importErr);
-            showErrorMessage('Import failed while applying data. Your existing data is unchanged.');
+            showErrorMessage(savedLocally
+              ? 'Data was imported locally, but the view could not refresh. Reload to view it.'
+              : 'Import failed while applying data. Your existing data is unchanged.');
           }
         });
       } catch (error) {
@@ -8696,9 +8757,9 @@ function recordLocalDeletions() {
 }
 
 // Union two tombstone maps; the later deletedAt wins.
-function mergeDeletions(remote) {
+function mergeDeletions(remote, state = AppState) {
   remote = normalizeDeletions(remote);
-  var local = ensureDeletions();
+  var local = state.deletions = normalizeDeletions(state.deletions);
   TOMBSTONE_KEYS.forEach(function(collection) {
     Object.keys(remote[collection] || {}).forEach(function (id) {
       if (!local[collection][id] || remote[collection][id] > local[collection][id]) {
@@ -9056,8 +9117,11 @@ async function saveToFirestore() {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
           payload.deletions = normalizeDeletions(AppState.deletions); // carry the merged tombstones
-          TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
-            payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !readTombstone(key, it.id); });
+          TOMBSTONE_KEYS.forEach(function (key) { // same LWW rule as applyTombstones(), including explicit restores
+            payload[key] = (payload[key] || []).filter(function (it) {
+              var deletedAt = it && it.id != null && readTombstone(key, it.id);
+              return !deletedAt || (it.updatedAt && it.updatedAt > deletedAt);
+            });
           });
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
@@ -9776,7 +9840,7 @@ function clearRecipeForm() {
 // ── Grocery List — Print & Copy ───────────────────────────────────────────────
 
 function getGroceryByCategory() {
-  const categories = {};
+  const categories = Object.create(null);
   AppState.groceryList.forEach(item => {
     if (!categories[item.category]) categories[item.category] = [];
     categories[item.category].push(item);
@@ -9794,10 +9858,10 @@ function printGroceryList() {
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const rows = Object.keys(categories).map(cat =>
-    '<h3>' + cat + '</h3>' +
+    '<h3>' + escapeHtml(cat) + '</h3>' +
     categories[cat].map(item =>
       '<div class="gp-item"><span class="gp-box"></span><span>' +
-      (item.quantity ? formatQuantity(item.quantity) + ' ' + (item.unit || '') + ' ' : '') +
+      (item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : '') +
       '<strong>' + escapeHtml(item.name) + '</strong></span></div>'
     ).join('')
   ).join('');

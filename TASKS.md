@@ -6084,7 +6084,7 @@ merge/deployment gate:
   begin after the closeout commit is pushed and main/origin are synchronized.
 
 ### TASK-078 · Reliability Recovery V1 — Phase 1 import and backup repairs
-status: codex
+status: review
 owner: codex
 source: Explicit owner assignment, 2026-11-06; audit F5/F6/F7
 depends-on: none
@@ -6100,23 +6100,23 @@ files:
   - TASKS.md (this task only), CHANGELOG.md, TEST_REPORT.md
   - REVIEW.md (independent reviewer only)
 acceptance:
-  - [ ] Preserve the complete November 6 audit and verify its artifact hashes.
-  - [ ] Reproduce all four defects before changing app code; record the failing checks.
-  - [ ] Grocery category and other untrusted values in the same row renderer remain inert text;
+  - [x] Preserve the complete November 6 audit and verify its artifact hashes.
+  - [x] Reproduce all four defects before changing app code; record the failing checks.
+  - [x] Grocery category and other untrusted values in the same row renderer remain inert text;
         existing numeric and string grocery ids still work without executable interpolation.
-  - [ ] Parse, validate and build imports on detached state before replacing any AppState field.
+  - [x] Parse, validate and build imports on detached state before replacing any AppState field.
         Rejected imports leave runtime data, primary storage and deletion records unchanged.
         A failed local save restores the pre-import runtime; no cloud write occurs on rejection.
-  - [ ] Internal backups contain cookHistory and prepModeSession as well as existing fields;
+  - [x] Internal backups contain cookHistory and prepModeSession as well as existing fields;
         restore these through reload. Older backups missing them retain their existing defaults.
-  - [ ] Restore revives only ids actually present in each restored collection, with a fresh
+  - [x] Restore revives only ids actually present in each restored collection, with a fresh
         updatedAt, and clears only their matching collection tombstones. Preserve unrelated
         deletion evidence and append-only meal facts/conflicts. Do not rewrite historical ids,
         cooking dates or consumption facts, or fabricate consumption from restored portions.
-  - [ ] Restored items survive reload, cloud read, stale remote tombstones during a version
+  - [x] Restored items survive reload, cloud read, stale remote tombstones during a version
         conflict, and real-time reconciliation; a genuinely later deletion still wins.
-  - [ ] Failed safety-backup writes abort Clear/Import; malformed backups do not overwrite data.
-  - [ ] Relevant regressions, ledger contract, complete npm test, worker/bridge tests, self-review,
+  - [x] Failed safety-backup writes abort Clear/Import; malformed backups do not overwrite data.
+  - [x] Relevant regressions, ledger contract, complete npm test, worker/bridge tests, self-review,
         QA and an independent read-only review pass; status becomes review, never done.
 constraints:
   - Isolated branch task-078-reliability-recovery-v1 from origin/main at 144c7f5; leave the
@@ -6135,6 +6135,15 @@ verification:
     git diff --check; changed-handler/escaping/persistence review; artifact SHA-256 verification.
   - Independent reviewer inspects final diff, compatibility and actual test evidence; no production
     testing or automation runners with merge/push behavior.
+
+evidence:
+  - audit-evidence/recovery-v1/REPORT.md and application.patch; independent PASS in REVIEW.md.
+  - Before: 40 targeted cases, 7 passed / 33 failed against original source. After: 40/40;
+    focused recovery/deletion/ledger 98/98; complete npm test 776/776; Worker 9/9; bridge 254/254.
+  - All 112 decision pointers pass. Docs-consistency has 55 existing warnings on both baseline
+    and candidate, with zero new warnings. Original audit artifacts: 27/27 hashes unchanged.
+  - No merge, push, deployment, migration, production access/write, or Phase 2 work. Broad unrelated
+    import XSS and offline-restore/stale-cloud scalar sync risks remain explicitly documented.
 
 <!-- TASK TEMPLATE — copy and fill:
 

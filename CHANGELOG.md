@@ -1254,3 +1254,16 @@ tests: `npm run test:bridge` (250 passed); focused add-stock operation/MCP tests
 blockers: none
 deviations: app freshness uses browser-local calendar time while the stateless Worker has no caller timezone; add_stock fails closed for the UTC/local boundary window instead of guessing. No deployment, production read, or production write.
 → status set to `review` in TASKS.md
+
+## TASK-078 — ready for review (branch: task-078-reliability-recovery-v1)
+changed:
+  - app.js (206 added / 142 removed): snapshotData/createBackup/restoreBackup completeness and failure gates; validateSnapshotData/prepareSnapshotChange/commitSnapshotChange stage and persist imports without partial rejection; existing merge helpers accept detached targets; saveToFirestore conflict filtering follows updatedAt LWW; grocery List/Prices/Print/correction-dialog escaping and safe grouping.
+  - tests/reliability-recovery-v1.spec.js (40 synthetic cases: import rejection, grocery text/ids, legacy exports, complete backups, failed saves, reload/cloud/realtime deletion semantics).
+  - docs/FEATURES.md, docs/DATA_MODEL.md, docs/DECISIONS.md (scoped behavior/compatibility notes and D-083).
+  - audit-evidence/2026-11-06 (27 original artifacts preserved with hashes and byte-preserving attributes); audit-evidence/recovery-v1 (before/after reports, exact application patch, final gate evidence and limitations).
+  - TASKS.md (owner-assigned plan and status review); REVIEW.md (independent reviewer PASS).
+tests: 40 new regressions pass (original baseline: 7 passed / 33 failed); focused recovery/tombstone/consumption/ledger suites 98 passed; complete npm test local project 776 passed; recipe-import Worker 9 passed; bridge 254 passed; syntax/diff checks; 112 decision pointers; audit hashes 27/27 unchanged.
+blockers: none within Phase 1. Generic docs scan still reports 55 historical warnings (baseline=55, candidate=55, new=0). Production rollout is not authorized.
+deviations: independent review extended the same grocery import security boundary to Print, Prices and Not anymore? handlers, plus malformed nested data. No unrelated feature work or Phase 2. Existing broader import XSS and stale-cloud overwriting offline-restored history/session remain disclosed limitations.
+self-review: Code Health PASS; bounded repair is ready for owner review. Actual-device and live-cloud checks were not performed.
+→ status set to `review` in TASKS.md; no merge, push, deployment, production writes or migrations.

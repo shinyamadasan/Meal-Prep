@@ -1,0 +1,21 @@
+
+> meal-prep-app@1.0.0 test:worker
+> node --test workers/recipe-import/test/*.node.js
+
+✔ request boundary rejects invalid methods and bodies (26.5511ms)
+✔ url validation rejects malformed, unsupported, credentialed, and local targets (1.3185ms)
+✔ fetch handles redirects, blocked redirect targets, loops, content type, status, size, and timeout (10.6494ms)
+✔ json-ld discovery handles multiple blocks, malformed blocks, arrays, @graph, and type arrays (0.4564ms)
+✔ multiple recipes select the most complete candidate deterministically (0.2281ms)
+✔ extracts source recipe fields without app-specific normalization (0.8911ms)
+✔ missing optional data remains null or empty, never invented (0.1227ms)
+✔ endpoint returns stable success, warnings, CORS, and no-recipe envelopes (0.9478ms)
+✔ instruction extractor supports strings, HowToStep, and HowToSection (0.202ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 151.1658
