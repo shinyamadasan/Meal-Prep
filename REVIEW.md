@@ -3860,3 +3860,107 @@ verdict: approved OR changes requested
 → task status set to `approved` / `codex` in TASKS.md
 
 -->
+
+
+## Independent Review TASK-078 — Phase 1 PASS
+Date: 2026-11-06
+branch: task-078-reliability-recovery-v1
+verdict: scoped code and recorded verification pass; owner integration remains pending
+
+Independent read-only source review compared app.js against origin/main, inspected TASK-078,
+LEDGER_CONTRACT.md, the preserved audit F5/F6/F7, and the recovery regression tests. The reviewer
+made no application, task-status, merge, push, deployment or production changes. This entry is the
+reviewer's only file edit. Reviewed app.js SHA-256:
+c722095e095d06710fece803b506b03d16f43ae1c7df801ff8d79bda4a840518.
+
+Must-fix findings from the first review are resolved:
+- validateSnapshotData rejects the identified malformed collection/nested structures, highlights,
+  pantry/grocery quantities, reserved record ids, price/deletion/session maps and conflict evidence.
+  prepareSnapshotChange builds detached state and supplies complete days for partial backup plans;
+  commitSnapshotChange restores prior runtime domain data when the primary local save fails.
+- renderGroceryList, renderGroceryPricePanel and printGroceryList escape the imported grocery text
+  reviewed here. Safe category maps handle prototype-property names. Grocery, correction-dialog and
+  price-input handler arguments use JSON serialization with HTML escaping, retaining usable normal
+  numeric/string ids. Unsupported inherited-property ids are rejected before mutation.
+- snapshotData includes cookHistory and prepModeSession. Restore stamps only revived mutable
+  records and clears their own collection tombstones while retaining unrelated markers and canonical
+  immutable consumption facts/conflict evidence. The saveToFirestore conflict filter now follows the
+  existing updatedAt LWW rule. No consumption schema, historical id/date, deletion namespace or
+  MASS_DELETE_GUARD change was found. Export format 1.6 is unchanged.
+
+Evidence inspected in audit-evidence/recovery-v1:
+- before-corrected.json: 7 passed / 17 failed; review-before.json: 0 passed / 11 failed;
+  final-before.json: 0 passed / 5 failed, establishing the original defects and later review cases.
+- focused-final.json: 98 passed, zero failed/skipped/flaky, including recovery, collection tombstones,
+  immutable-consumption durability, the ledger contract and cross-repo fixture.
+- full-regression.json: complete local suite, 776 passed, zero failed/skipped/flaky; errors is empty.
+  The audit-only Playwright wrapper blocks external browser traffic; this is synthetic local and
+  mocked-cloud evidence, not a production or actual two-device test.
+- worker-tests.txt: 9 passed / 0 failed. bridge-tests.txt: 254 passed / 0 failed after reuse of
+  installed dependencies in the isolated worktree.
+- Independently recomputed preserved SHA256SUMS.json: 27 listed artifacts, zero size/hash mismatches.
+  git diff --check passed. decision-verification.txt reports all 112 pointers hold. The generic
+  documentation consistency report retains existing historical/heuristic warnings; it is not a clean
+  full-documentation audit and does not establish broader product claims.
+
+Limits: this verdict covers the bounded Phase 1 import/backup repairs and recorded local gates.
+A later stale-cloud sign-in can still overwrite offline-restored scalar cookHistory/prepModeSession;
+other recipe/hack/storage renderers still have pre-existing unescaped import surfaces. This is not
+an all-application sanitization or general multi-device recovery guarantee. Stock math, Phase 2,
+production writes and deployment remain outside this review. No remaining must-fix was identified
+within the reviewed Phase 1 scope. No task status was changed by this reviewer.
+
+## Independent Release-Hardening Review TASK-078 — Scoped PASS
+Date: 2026-11-06
+branch: task-078-reliability-recovery-v1
+verdict: scoped code and completed local verification pass; owner integration pending
+
+Separate reviewer /root/release_hardening_review inspected the app.js delta from preserved
+checkpoint 6f03531, new regression source, three existing-test setup additions, scoped docs/D-084,
+REPORT.md and RELEASE_CHECKLIST.md. This append is the reviewer's only file change; the earlier
+review is preserved. No application/test edit, status change, commit, merge, push, deployment or
+production access was performed. Reviewed app.js SHA-256:
+c71e93cb54cc1f0a8f30ef11c358f4aef1ae2df3dee92b01165ce310aa5ec5f3.
+
+No remaining must-fix was identified within the assigned boundary:
+- Recipe output and reachable Plan/Prep/Nutrition, picker, batch and Home handlers escape the
+  reviewed imported text, attributes and arguments. escJAttr applies JavaScript escaping before
+  HTML escaping, including line terminators; CSS-selector use remains unchanged. Nested ingredient
+  form values and CSV preview remain inert. Stored strings are not sanitized. Existing photo
+  DOM/src handling does not introduce an additional executable HTML sink in these paths.
+- Storage Guide and Cooking Hacks escape their imported display fields. JSON plus HTML escaping
+  retains strict numeric/string CRUD id types. Null-prototype hack grouping and own-property icon
+  lookup keep inherited-property category names usable.
+- Restore requires an online, signed-in, cloud-ready account and transaction-capable client,
+  rechecked for the same uid before mutation. Refusal preserves runtime, primary storage and
+  backup. Unconfirmed cloud saves are explicitly local-only with retained-backup retry guidance.
+  Existing saveData, read-before-write, tombstone LWW and immutable ledger contracts remain intact;
+  no account-unsafe scalar precedence or new persisted field was added.
+
+Actual evidence inspected in audit-evidence/release-hardening:
+- before-final.json: 37 new local cases, 2 numeric-id compatibility passes and 35 intended failures
+  on the preserved checkpoint, zero skips/flaky. focused-final.json: 135 expected passes, zero
+  failures/skips/flaky or runner errors, including all 37 new and 40 original recovery cases.
+  Existing recovery assertions are unchanged; only three eligible-account setup lines differ.
+- full-regression.json and full-console.txt: complete npm offline-isolated local gate, 813/813
+  expected passes, zero failures/skips/flaky or runner errors, duration 268835.726 ms. Independently
+  enumerated all 813 results: local project only. Evidence uses synthetic data and mocked cloud.
+- Worker: 9 passed, zero failed. Conversational bridge: 254 passed, zero failed. Decision check:
+  all 115 pointers hold. Documentation outputs are baseline/candidate identical, retaining 55
+  existing warnings; this is not a clean global documentation audit.
+- Independently recomputed all three candidate source/test hashes and all 47 preserved artifact
+  sizes/hashes: zero mismatches. git diff --check passed during review.
+
+Release assessment: GO for owner review/integration of the bounded candidate. NO-GO for merge,
+deployment or production writes without required owner authorization and release checks. The
+prepared checklist distinguishes reviewed source from the actually deployed revision, avoids
+data-clearing rollback and notes that rollback reintroduces prior defects.
+
+Limits: guest/offline Restore deliberately requires sign-in/reconnection; backups lack account
+binding. Connectivity/account changes after the guard or failed transactions can still leave
+local-only restoration exposed to later cloud scalar precedence. Retained-backup retry is the
+mitigation, not an atomic or general multi-device guarantee. Assigned recipe/storage/hack paths
+and compatibility with the earlier grocery repair are reviewed, not every imported collection or
+full-app XSS clearance. Real devices, production sync/MCP and actual service-worker upgrades were
+not tested. Single-slot capacity, clock skew and broader concurrent-edit risks remain. Phase 2
+and production rollout were not performed. No task status was changed by this reviewer.

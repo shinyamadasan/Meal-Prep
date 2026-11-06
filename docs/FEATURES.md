@@ -85,7 +85,7 @@
 - **Getting Started card** — Working · 2-step onboarding, auto-dismiss.
 - **Paste recipe import** — Partial · `parseAndImportRecipe()`; heuristic, quality varies; shows confidence/warning.
 - **CSV import** — Working · file → preview → confirm; template download.
-- **JSON export/import** — Working · `exportData()` / `importData()`. Import **merges** by id (`unionById`) — existing items win on collision, re-importing a backup is a no-op. Confirmation via `showConfirmDialog()` (works on iOS PWA; `confirm()` is silently blocked in standalone mode). Snapshots `mealPrepBackup` first.
+- **JSON export/import** — Working · `exportData()` / `importData()`. Import **merges** by id (`unionById`) — existing items win on collision. `validateSnapshotData()` and `prepareSnapshotChange()` validate and stage detached records before mutation; rejected files do not change live data or deletion markers. Legacy partial exports remain supported. A failed safety backup aborts the operation; a failed primary local save rolls runtime data back. Grocery category, name, unit and source text is escaped on display, and grocery ids are JSON-encoded in handlers. Confirmation uses `showConfirmDialog()`. The JSON export format remains 1.6; see D-083. Release hardening (D-084) also escapes imported recipe, Storage Guide and Cooking Hacks text/attributes and their related Plan/Prep/Nutrition/Home handlers, including nested ingredient forms and CSV preview. Imported values remain unchanged in storage.
 
 ## Inventory (My Fridge)
 - **Cooked meals** — Working · `renderCookedMeals()` · location, days-remaining, expired highlight.
@@ -171,6 +171,7 @@
   separate wave. See DECISIONS D-074.
 
 ## Settings & Help
+- **Restore Backup (D-083)** — `snapshotData()` includes cooking history and the prep session. Restore revives only records actually in the backup, timestamps those mutable records, and clears only their collection's matching deletion markers. Unrelated tombstones and append-only consumption facts/conflict evidence survive. Older backups missing history/session use empty/null defaults. Release hardening (D-084) requires an online, signed-in account with cloud data loaded, rechecked for the same account at confirmation. Offline/guest restore is refused without mutation; the backup remains available after sign-in. A failed cloud confirmation reports local-only restoration and retains the backup for retry before sign-out/reload. Reload and cloud conflict/realtime behavior are covered by synthetic regression tests; no production verification is implied.
 - Settings modal — Working · `openSettingsModal()` · display name, account/sign-out, **Food expiry alerts** opt-in, export/import, restore backup, clear all (snapshots first).
 - Help modal — Working · `#help-modal` · 6-step guide · reachable via Settings; does NOT auto-open on first run when the Kitchen Setup Wizard will also fire (`pantryOnboardingDone` gate in `initApp()`).
 - **Kitchen Setup Wizard** — Working · `openKitchenSetupModal()` / `seedPantryIfEmpty()` · auto-opens on first run only (when pantry is empty and `pantryOnboardingDone` not set); only onboarding gate on brand-new first run.

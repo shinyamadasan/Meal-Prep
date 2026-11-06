@@ -6083,6 +6083,95 @@ merge/deployment gate:
   automated tests. No raw MCP tools/list response was retrieved. TASK-075 is closed; TASK-076 may
   begin after the closeout commit is pushed and main/origin are synchronized.
 
+### TASK-078 · Reliability Recovery V1 — Phase 1 import and backup repairs
+status: review
+owner: codex
+source: Explicit owner assignment, 2026-11-06; audit F5/F6/F7
+depends-on: none
+objective:
+  Repair imported grocery markup execution, partial rejected imports, incomplete internal
+  backups, and restore/tombstone conflicts. Preserve current merge and deletion contracts.
+files:
+  - app.js
+  - tests/reliability-recovery-v1.spec.js
+  - docs/FEATURES.md, docs/DATA_MODEL.md, docs/DECISIONS.md (Phase 1 notes only)
+  - audit-evidence/2026-11-06/** (unaltered audit artifacts plus SHA-256 manifest)
+  - audit-evidence/recovery-v1/** (plan, before/after verification and review evidence)
+  - TASKS.md (this task only), CHANGELOG.md, TEST_REPORT.md
+  - REVIEW.md (independent reviewer only)
+acceptance:
+  - [x] Preserve the complete November 6 audit and verify its artifact hashes.
+  - [x] Reproduce all four defects before changing app code; record the failing checks.
+  - [x] Grocery category and other untrusted values in the same row renderer remain inert text;
+        existing numeric and string grocery ids still work without executable interpolation.
+  - [x] Parse, validate and build imports on detached state before replacing any AppState field.
+        Rejected imports leave runtime data, primary storage and deletion records unchanged.
+        A failed local save restores the pre-import runtime; no cloud write occurs on rejection.
+  - [x] Internal backups contain cookHistory and prepModeSession as well as existing fields;
+        restore these through reload. Older backups missing them retain their existing defaults.
+  - [x] Restore revives only ids actually present in each restored collection, with a fresh
+        updatedAt, and clears only their matching collection tombstones. Preserve unrelated
+        deletion evidence and append-only meal facts/conflicts. Do not rewrite historical ids,
+        cooking dates or consumption facts, or fabricate consumption from restored portions.
+  - [x] Restored items survive reload, cloud read, stale remote tombstones during a version
+        conflict, and real-time reconciliation; a genuinely later deletion still wins.
+  - [x] Failed safety-backup writes abort Clear/Import; malformed backups do not overwrite data.
+  - [x] Relevant regressions, ledger contract, complete npm test, worker/bridge tests, self-review,
+        QA and an independent read-only review pass; status becomes review, never done.
+constraints:
+  - Isolated branch task-078-reliability-recovery-v1 from origin/main at 144c7f5; leave the
+    original checkout and its untracked screenshots untouched. Synthetic local/mock data only.
+  - No merge, push to main, deployment, live cloud/connector writes, migrations, secrets changes, Phase 2,
+    stock-math repair, shopping redesign, or new framework/dependency.
+  - Keep JSON export 1.6 and legacy partial-import support. Missing fields remain optional;
+    keep duplicate-id local precedence and fill-only plans; reject malformed provided structures.
+  - Internal backup completeness is in scope; do not redesign exported-history semantics.
+  - Resolve the transaction tombstone filter with the existing updatedAt LWW rule only as needed
+    for restored records; preserve deletion namespaces and MASS_DELETE_GUARD behavior.
+verification:
+  - Run new focused browser checks before implementation, then focused related suites and the
+    ledger compatibility gate; verify synthetic desktop/mobile markup and backup/reload flows.
+  - npm test (full local project); npm run test:worker; npm run test:bridge; node --check;
+    git diff --check; changed-handler/escaping/persistence review; artifact SHA-256 verification.
+  - Independent reviewer inspects final diff, compatibility and actual test evidence; no production
+    testing or automation runners with merge/push behavior.
+
+evidence:
+  - audit-evidence/recovery-v1/REPORT.md and application.patch; independent PASS in REVIEW.md.
+  - Before: 40 targeted cases, 7 passed / 33 failed against original source. After: 40/40;
+    focused recovery/deletion/ledger 98/98; complete npm test 776/776; Worker 9/9; bridge 254/254.
+  - All 112 decision pointers pass. Docs-consistency has 55 existing warnings on both baseline
+    and candidate, with zero new warnings. Original audit artifacts: 27/27 hashes unchanged.
+  - No merge, push, deployment, migration, production access/write, or Phase 2 work. Broad unrelated
+    import XSS and offline-restore/stale-cloud scalar sync risks remain explicitly documented.
+
+
+release-hardening assignment (owner, 2026-11-06):
+  Continue the completed Phase 1 candidate at 6f03531; preserve its implementation and evidence.
+  Additional files: tests/release-hardening.spec.js, audit-evidence/release-hardening/**,
+  scoped documentation/journals (including docs/ARCHITECTURE.md and STATUS.md) and a PR/deployment/rollback checklist. REVIEW.md remains
+  independent-reviewer-owned. No Phase 2, production writes, merge or deployment.
+release-hardening acceptance:
+  - [x] Reproduce and escape import-controlled recipe, Storage Guide and Cooking Hacks output,
+        including inline handlers and reachable Plan/Prep/Nutrition views. Preserve string/numeric ids.
+  - [x] Restrict Restore to an online, signed-in account after its cloud read, checking again at
+        confirmation. Preserve the backup and report unsuccessful cloud confirmation accurately.
+        This deliberately avoids account-unsafe scalar sync precedence or a general sync redesign.
+  - [x] New regressions fail on the preserved candidate and pass after repair; existing recovery,
+        Shop/Prep/Fridge, ledger and MCP tests remain green. Full offline-isolated npm test passes.
+  - [x] Final independent review, self-review and QA pass; record remaining limits and rollback.
+  - [x] Commit verified changes on the existing task branch and prepare the PR/release handoff.
+        Feature-branch publication for a draft PR is authorized by this assignment; never push main.
+release-hardening evidence:
+  - audit-evidence/release-hardening/REPORT.md, application.patch, RELEASE_CHECKLIST.md and PR_BODY.md.
+  - New 37 cases: 2 pass/35 fail on preserved 6f03531; after 37/37. Focused 135/135;
+    complete local npm 813/813 (zero skip/flaky); Worker 9/9; bridge 254/254.
+  - Independent release-hardening review PASS appended to REVIEW.md; no must-fix remaining.
+    All 47 prior evidence files unchanged; 115 decision pointers pass; 55 identical docs warnings.
+verification addendum:
+  - Preserve earlier evidence unchanged. Capture new red/green results, full suite, worker/bridge,
+    syntax/whitespace, decision pointers, documentation warning delta and original audit integrity.
+
 <!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>
@@ -6091,8 +6180,8 @@ source: BQ-<id>
 depends-on: none
 files: path/to/file.js, path/to/other.js
 acceptance:
-  - [ ] criterion 1
-  - [ ] criterion 2
+  - [x] criterion 1
+  - [x] criterion 2
 constraints: <any hard limits — deps to use/avoid, perf, backward compat>
 notes: see ADR or PRD reference if applicable
 

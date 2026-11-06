@@ -1,0 +1,586 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/release-hardening.spec.js",
+      "--grep",
+      "review ",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/hardening-review-before"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/hardening-review-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/hardening-review-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "release-hardening.spec.js",
+      "file": "release-hardening.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "CSV recipe preview renders imported text inertly",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5600,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#csv-preview-body').locator('img')\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m2\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#csv-preview-body').locator('img')\u001b[22m\n\u001b[2m    14 × locator resolved to 2 elements\u001b[22m\n\u001b[2m       - unexpected value \"2\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#csv-preview-body').locator('img')\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m2\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#csv-preview-body').locator('img')\u001b[22m\n\u001b[2m    14 × locator resolved to 2 elements\u001b[22m\n\u001b[2m       - unexpected value \"2\"\u001b[22m\n\n    at assertInert (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:95:55)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:202:9",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 55,
+                      "line": 95
+                    },
+                    "snippet": "  93 |\n  94 | async function assertInert(page, selector) {\n> 95 |   await expect(page.locator(selector).locator('img')).toHaveCount(0);\n     |                                                       ^\n  96 |   expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  97 | }\n  98 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 55,
+                        "line": 95
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#csv-preview-body').locator('img')\nExpected: \u001b[32m0\u001b[39m\nReceived: \u001b[31m2\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#csv-preview-body').locator('img')\u001b[22m\n\u001b[2m    14 × locator resolved to 2 elements\u001b[22m\n\u001b[2m       - unexpected value \"2\"\u001b[22m\n\n\n  93 |\n  94 | async function assertInert(page, selector) {\n> 95 |   await expect(page.locator(selector).locator('img')).toHaveCount(0);\n     |                                                       ^\n  96 |   expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  97 | }\n  98 |\n    at assertInert (C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:95:55)\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:202:9"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:46.950Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-CSV-reci-9e12c-nders-imported-text-inertly-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 55,
+                    "line": 95
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-01208c3d3c04ea126fdf",
+          "file": "release-hardening.spec.js",
+          "line": 199,
+          "column": 1
+        },
+        {
+          "title": "review entity recipe id survives card and prep handlers literally",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 722,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 93,
+                      "line": 282
+                    },
+                    "snippet": "  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 93,
+                        "line": 282
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:53.194Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-e-7620c-and-prep-handlers-literally-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 93,
+                    "line": 282
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-8d1f919e3d50638f7087",
+          "file": "release-hardening.spec.js",
+          "line": 278,
+          "column": 3
+        },
+        {
+          "title": "review multiline recipe id survives card and prep handlers literally",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 727,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 93,
+                      "line": 282
+                    },
+                    "snippet": "  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 93,
+                        "line": 282
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:54.599Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-m-bf362-and-prep-handlers-literally-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 93,
+                    "line": 282
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-5bfb80a54fba5b683a6b",
+          "file": "release-hardening.spec.js",
+          "line": 278,
+          "column": 3
+        },
+        {
+          "title": "review storage-alert imported handler arguments stay literal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 792,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 319
+                    },
+                    "snippet": "  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 319
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:55.969Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-s-d8b15-dler-arguments-stay-literal-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 319
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6084b2d768bfd4159281",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review what-to-eat imported handler arguments stay literal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 730,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 319
+                    },
+                    "snippet": "  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 319
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:57.526Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-w-670d3-dler-arguments-stay-literal-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 319
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6da01b715682c4811965",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review home-buy imported handler arguments stay literal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 860,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Missing\\\" onpointerover=\\\"window.__hardeningXss=true\\\\'thing\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Missing\\\" onpointerover=\\\"window.__hardeningXss=true\\\\'thing\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 319
+                    },
+                    "snippet": "  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 319
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"Missing\\\" onpointerover=\\\"window.__hardeningXss=true\\\\'thing\"\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:37:58.952Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-h-27ee5-dler-arguments-stay-literal-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 319
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-f2746de8c709b25b7479",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review expiry-plan imported handler arguments stay literal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 727,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x\u001b[7m');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"x\"\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x\u001b[7m');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"x\"\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 319
+                    },
+                    "snippet": "  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 319
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x\u001b[7m');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\u001b[27m\"\u001b[39m\nReceived: \u001b[31m\"x\"\u001b[39m\n\n  317 |       return window.__hardeningArg;\n  318 |     }, { id: BAD_ID, missing, surface });\n> 319 |     expect(result).toBe(surface === 'home-buy' ? missing : BAD_ID);\n      |                    ^\n  320 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  321 |   });\n  322 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:319:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:38:00.579Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-review-before\\release-hardening-review-e-c3be9-dler-arguments-stay-literal-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 319
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6428ca4772024ddb5744",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T19:37:46.109Z",
+    "duration": 15710.966999999999,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 7,
+    "flaky": 0
+  }
+}

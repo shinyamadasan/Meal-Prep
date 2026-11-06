@@ -72,6 +72,13 @@ Desktop is unchanged.
   30s auto-save, the `online` event, a render) from overwriting good cloud data with an un-loaded
   default `AppState` — the deploy/reload data-loss bug (D-010).
 
+`restoreBackup()` is the bounded exception to offline operation (D-084): `canRestoreBackup()`
+requires an online, signed-in account with `cloudReady`, rechecked for the same uid immediately
+before preparation/commit. The local snapshot has no account binding, so this avoids changing
+sign-in scalar precedence. Restoration still uses `saveData()` and reports success only after its
+cloud result; an unconfirmed save leaves the backup available for explicit retry. This does not
+provide general concurrent/offline multi-device reconciliation.
+
 ## Photos
 Recipe photos are compressed (max 1000px JPEG ~0.7) and stored in a Firestore **subcollection**
 `users/{uid}/photos/{recipeId}` (one doc each) to stay under Firestore's 1 MiB doc limit (D-006).

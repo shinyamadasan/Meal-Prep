@@ -459,6 +459,26 @@ otherwise it becomes `null` (unknown) rather than an invented number.
 | `defaultStorageData` | ~40 | Seeds `customIngredients` ONLY in the Firebase-unavailable fallback |
 
 ## Versioning
+### Internal recovery snapshots (D-083)
+
+`snapshotData()` / `mealPrepBackup.data` include all locally persisted domain fields, including
+`cookHistory` and `prepModeSession`; cloud revision and last-save bookkeeping are excluded.
+Older backups lacking those two fields restore them as `[]` and `null`. JSON export 1.6 is unchanged.
+Local backups have no account ownership metadata. D-084 therefore restricts `restoreBackup()` to
+an online signed-in account after its cloud read, with the same account checked at confirmation.
+No pending-restore field or scalar merge precedence is added. Refused restore leaves local state
+and backup untouched; failed cloud confirmation retains the backup and warns that later cloud
+loads can replace locally restored history/session data. Imported text is escaped at rendering,
+without sanitizing or changing persisted content, ids, export format, or ledger facts.
+Import remains a duplicate-id/local-wins merge with fill-only planning. Backup restore replaces
+mutable collections, but consumption facts and conflict evidence always use their canonical unions.
+
+`prepareSnapshotChange()` validates provided structures and builds detached state. Explicitly
+restored records keep their ids and historical fields, receive a fresh mutable `updatedAt`, and
+clear only their own collection's tombstone. Current and backup deletion maps are otherwise
+combined. Stale remote markers lose to the restored `updatedAt`; later real deletions still win
+under the same LWW comparison used by cloud reads and transaction-conflict filtering.
+
 `version` on the Firestore doc is incremented every save and used to detect concurrent edits.
 It is **not** a schema-migration system — backward-compat is handled by `patchMissingNutrition()`
 and defensive `|| []` / `|| {}` defaults on load.

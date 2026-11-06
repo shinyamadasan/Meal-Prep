@@ -1,0 +1,3003 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/release-hardening.spec.js",
+      "tests/reliability-recovery-v1.spec.js",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/hardening-after"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/hardening-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/test-results/hardening-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-reliability-recovery-v1/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "release-hardening.spec.js",
+      "file": "release-hardening.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "recipes imported markup is inert at 1280px and after reload",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 934,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:17.375Z\",\u001b[39m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:17.375Z\",\u001b[39m\n\u001b[2m  }\u001b[22m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:118:125",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 125,
+                      "line": 118
+                    },
+                    "snippet": "  116 |       await waitForRestored(page, collection => AppState[collection].some(x => x.id === 'hardening'), collection);\n  117 |       await assertInert(page, selector);\n> 118 |       expect(await page.evaluate(({ collection }) => AppState[collection].find(x => x.id === 'hardening'), { collection })).toEqual(expect.objectContaining(item));\n      |                                                                                                                             ^\n  119 |     });\n  120 |   }\n  121 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 125,
+                        "line": 118
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:17.375Z\",\u001b[39m\n\u001b[2m  }\u001b[22m\n\n  116 |       await waitForRestored(page, collection => AppState[collection].some(x => x.id === 'hardening'), collection);\n  117 |       await assertInert(page, selector);\n> 118 |       expect(await page.evaluate(({ collection }) => AppState[collection].find(x => x.id === 'hardening'), { collection })).toEqual(expect.objectContaining(item));\n      |                                                                                                                             ^\n  119 |     });\n  120 |   }\n  121 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:118:125"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:16.703Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-recipes--8b102--at-1280px-and-after-reload-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 125,
+                    "line": 118
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-4b4db6e160a36f5209a7",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "customIngredients imported markup is inert at 1280px and after reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 827,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:18.320Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-831c64edf4d335db14e3",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "customHacks imported markup is inert at 1280px and after reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 735,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:19.269Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-f3768e781b541b59d82c",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "recipes imported markup is inert at 390px and after reload",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 821,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:20.474Z\",\u001b[39m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:20.474Z\",\u001b[39m\n\u001b[2m  }\u001b[22m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:118:125",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 125,
+                      "line": 118
+                    },
+                    "snippet": "  116 |       await waitForRestored(page, collection => AppState[collection].some(x => x.id === 'hardening'), collection);\n  117 |       await assertInert(page, selector);\n> 118 |       expect(await page.evaluate(({ collection }) => AppState[collection].find(x => x.id === 'hardening'), { collection })).toEqual(expect.objectContaining(item));\n      |                                                                                                                             ^\n  119 |     });\n  120 |   }\n  121 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 125,
+                        "line": 118
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  -  2\u001b[39m\n\u001b[31m+ Received  + 19\u001b[39m\n\n\u001b[32m- ObjectContaining {\u001b[39m\n\u001b[31m+ Object {\u001b[39m\n\u001b[31m+   \"activeTime\": null,\u001b[39m\n\u001b[2m    \"baseCookTime\": 10,\u001b[22m\n\u001b[2m    \"baseIngredients\": Array [],\u001b[22m\n\u001b[2m    \"basePrepTime\": 5,\u001b[22m\n\u001b[2m    \"baseServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"category\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"currentServings\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[31m+   \"effort\": null,\u001b[39m\n\u001b[31m+   \"equipment\": Array [],\u001b[39m\n\u001b[2m    \"freezerLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"fridgeLife\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[2m    \"id\": \"hardening\",\u001b[22m\n\u001b[2m    \"instructions\": \"Synthetic recipe.\",\u001b[22m\n\u001b[31m+   \"mealBalance\": Object {\u001b[39m\n\u001b[31m+     \"carb\": false,\u001b[39m\n\u001b[31m+     \"protein\": false,\u001b[39m\n\u001b[31m+     \"vegetables\": false,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[2m    \"name\": \"<img src=\\\"/hardening-missing\\\" onerror=\\\"window.__hardeningXss=true\\\">\",\u001b[22m\n\u001b[32m-   \"updatedAt\": \"2026-01-01T00:00:00.000Z\",\u001b[39m\n\u001b[31m+   \"nutritionPerServing\": Object {\u001b[39m\n\u001b[31m+     \"calories\": 0,\u001b[39m\n\u001b[31m+     \"carbs\": 0,\u001b[39m\n\u001b[31m+     \"fat\": 0,\u001b[39m\n\u001b[31m+     \"fiber\": 0,\u001b[39m\n\u001b[31m+     \"protein\": 0,\u001b[39m\n\u001b[31m+     \"sodium\": 0,\u001b[39m\n\u001b[31m+   },\u001b[39m\n\u001b[31m+   \"tags\": Array [],\u001b[39m\n\u001b[31m+   \"updatedAt\": \"2026-11-06T19:39:20.474Z\",\u001b[39m\n\u001b[2m  }\u001b[22m\n\n  116 |       await waitForRestored(page, collection => AppState[collection].some(x => x.id === 'hardening'), collection);\n  117 |       await assertInert(page, selector);\n> 118 |       expect(await page.evaluate(({ collection }) => AppState[collection].find(x => x.id === 'hardening'), { collection })).toEqual(expect.objectContaining(item));\n      |                                                                                                                             ^\n  119 |     });\n  120 |   }\n  121 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:118:125"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:20.022Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-recipes--cbf72-t-at-390px-and-after-reload-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 125,
+                    "line": 118
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-55125948d13e51331c92",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "customIngredients imported markup is inert at 390px and after reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 830,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:21.424Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-b483aebb3b52b4c5cdbb",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "customHacks imported markup is inert at 390px and after reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 736,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:22.485Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6f741b0026ff025d4c58",
+          "file": "release-hardening.spec.js",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "customIngredients number id edits the correct record without execution",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 510,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:23.234Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-e020d7b81f17756610df",
+          "file": "release-hardening.spec.js",
+          "line": 128,
+          "column": 5
+        },
+        {
+          "title": "customIngredients string id edits the correct record without execution",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 527,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:23.758Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-b538fda5bae5b114b5a2",
+          "file": "release-hardening.spec.js",
+          "line": 128,
+          "column": 5
+        },
+        {
+          "title": "customHacks number id edits the correct record without execution",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 521,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:24.300Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-f06b364e3edc5a2e1267",
+          "file": "release-hardening.spec.js",
+          "line": 128,
+          "column": 5
+        },
+        {
+          "title": "customHacks string id edits the correct record without execution",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 522,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:24.836Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-4362ff935978149620ec",
+          "file": "release-hardening.spec.js",
+          "line": 128,
+          "column": 5
+        },
+        {
+          "title": "hack category constructor stays usable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 471,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:25.369Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-7e1a9d7639eed413be29",
+          "file": "release-hardening.spec.js",
+          "line": 143,
+          "column": 3
+        },
+        {
+          "title": "hack category __proto__ stays usable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 495,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:25.853Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-3025cc606402ad3680e8",
+          "file": "release-hardening.spec.js",
+          "line": 143,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in card handlers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 646,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 168
+                    },
+                    "snippet": "  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 168
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:26.362Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-imported-9db62-ys-literal-in-card-handlers-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 168
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-bbf3bb463cab48bb9bb5",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in planner handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 643,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:27.675Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-882f53c2edc80d18b16b",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in selection handlers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 713,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 168
+                    },
+                    "snippet": "  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 168
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n\n  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:28.513Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-imported-5e13b-teral-in-selection-handlers-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 168
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-61df711acc9a1e342b5d",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in nutrition handlers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 680,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 168
+                    },
+                    "snippet": "  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 168
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n\n  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:29.771Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-imported-34dc7-teral-in-nutrition-handlers-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 168
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-37261b64464153f5556c",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in quick-plan handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 528,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:31.111Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-599b9e7e083070f958ad",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in prep handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 491,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:31.757Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-bf498a6833ed0bb23bc9",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in batch handlers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 628,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 20,
+                      "line": 168
+                    },
+                    "snippet": "  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 20,
+                        "line": 168
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m\"x');window.__hardeningXss=true;//\\\" onpointerover=\\\"window.__hardeningXss=true\"\u001b[39m\nReceived: \u001b[31m\"recovery\"\u001b[39m\n\n  166 |       return window.__hardeningArg;\n  167 |     }, { id: BAD_ID, surface });\n> 168 |     expect(result).toBe(['card', 'prep'].includes(surface) ? true : BAD_ID);\n      |                    ^\n  169 |     expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);\n  170 |   });\n  171 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:168:20"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:32.261Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-imported-9fbcd-s-literal-in-batch-handlers-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 20,
+                    "line": 168
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-c22ae2ae2970cc80bb85",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "imported recipe id stays literal in home handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 622,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:33.446Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-f4b67092f50f0b694580",
+          "file": "release-hardening.spec.js",
+          "line": 152,
+          "column": 3
+        },
+        {
+          "title": "planned recipe text stays inert in Plan, picker, alerts and Nutrition",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 507,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:34.221Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-86266428333767df8b05",
+          "file": "release-hardening.spec.js",
+          "line": 173,
+          "column": 1
+        },
+        {
+          "title": "editing imported nested ingredient values cannot break input attributes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 528,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:34.743Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-8f78d789605bb157a259",
+          "file": "release-hardening.spec.js",
+          "line": 181,
+          "column": 1
+        },
+        {
+          "title": "cook suggestion with backslash and quote searches literally",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 476,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:35.285Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-a14a0a0192730c588d1d",
+          "file": "release-hardening.spec.js",
+          "line": 190,
+          "column": 1
+        },
+        {
+          "title": "CSV recipe preview renders imported text inertly",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 426,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:35.785Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-01208c3d3c04ea126fdf",
+          "file": "release-hardening.spec.js",
+          "line": 199,
+          "column": 1
+        },
+        {
+          "title": "restore refuses signed-out before mutation and retains backup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 461,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:36.228Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-56edacff6c0c986ca71e",
+          "file": "release-hardening.spec.js",
+          "line": 207,
+          "column": 3
+        },
+        {
+          "title": "restore refuses offline before mutation and retains backup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 455,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:36.705Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-9d91fc391cb9c0008cb5",
+          "file": "release-hardening.spec.js",
+          "line": 207,
+          "column": 3
+        },
+        {
+          "title": "restore refuses unread-cloud before mutation and retains backup",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 430,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:37.172Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6e6571b86507a60c00f2",
+          "file": "release-hardening.spec.js",
+          "line": 207,
+          "column": 3
+        },
+        {
+          "title": "restore rechecks eligibility after confirmation opens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 457,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:37.615Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-01783b95d11f8eba51b8",
+          "file": "release-hardening.spec.js",
+          "line": 221,
+          "column": 1
+        },
+        {
+          "title": "failed restore cloud confirmation retains backup and warns about sign-in loss",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 457,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:38.084Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-94cda9944b398995e12d",
+          "file": "release-hardening.spec.js",
+          "line": 231,
+          "column": 1
+        },
+        {
+          "title": "restore refuses an account change while confirmation is open",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 454,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:38.553Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-1fc426ded4d4f766c100",
+          "file": "release-hardening.spec.js",
+          "line": 243,
+          "column": 1
+        },
+        {
+          "title": "offline backup survives stale-cloud sign-in and eligible restore survives cloud reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 673,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:39.019Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-096722f11ca1267eaa79",
+          "file": "release-hardening.spec.js",
+          "line": 253,
+          "column": 1
+        },
+        {
+          "title": "review entity recipe id survives card and prep handlers literally",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 579,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 93,
+                      "line": 282
+                    },
+                    "snippet": "  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 93,
+                        "line": 282
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:39.705Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-review-e-7620c-and-prep-handlers-literally-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 93,
+                    "line": 282
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-8d1f919e3d50638f7087",
+          "file": "release-hardening.spec.js",
+          "line": 278,
+          "column": 3
+        },
+        {
+          "title": "review multiline recipe id survives card and prep handlers literally",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 8,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 641,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                      "column": 93,
+                      "line": 282
+                    },
+                    "snippet": "  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                        "column": 93,
+                        "line": 282
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mundefined\u001b[39m\n\n  280 |     await importHardening(page, { recipes: [{ ...RECIPE, id, name: 'Review payload', baseIngredients: [{ name: 'Carrot', quantity: 1, unit: 'g' }] }], weeklyPlan: { Monday: { dinner: id } } });\n  281 |     await page.evaluate(() => document.querySelector('.recipe-card:last-child .recipe-fav-btn').click());\n> 282 |     expect(await page.evaluate(id => AppState.recipes.find(r => r.id === id).favorite, id)).toBe(true);\n      |                                                                                             ^\n  283 |     expect(await page.locator('.recipe-card').last().getAttribute('data-recipe-id')).toBe(id);\n  284 |     await page.evaluate(() => { openPrepMode(); document.querySelector('#prep-mode-body .prep-check-row').click(); });\n  285 |     expect(await page.evaluate(id => AppState.prepModeSession.checked[id + '-ing-0'], id)).toBe(true);\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js:282:93"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:40.813Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\test-results\\hardening-after\\release-hardening-review-m-bf362-and-prep-handlers-literally-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-reliability-recovery-v1\\tests\\release-hardening.spec.js",
+                    "column": 93,
+                    "line": 282
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-5bfb80a54fba5b683a6b",
+          "file": "release-hardening.spec.js",
+          "line": 278,
+          "column": 3
+        },
+        {
+          "title": "review storage-alert imported handler arguments stay literal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 519,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:42.091Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6084b2d768bfd4159281",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review what-to-eat imported handler arguments stay literal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 475,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:42.737Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6da01b715682c4811965",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review home-buy imported handler arguments stay literal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 475,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:43.226Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-f2746de8c709b25b7479",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        },
+        {
+          "title": "review expiry-plan imported handler arguments stay literal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 453,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:43.720Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "568ca8d1b8f06c07030e-6428ca4772024ddb5744",
+          "file": "release-hardening.spec.js",
+          "line": 291,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "reliability-recovery-v1.spec.js",
+      "file": "reliability-recovery-v1.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "imported grocery text stays inert at 1280px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 895,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:16.700Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-84d945ac5400f94464ea",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 85,
+          "column": 3
+        },
+        {
+          "title": "imported grocery text stays inert at 390px, including category and row fields",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 769,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:17.718Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1331afee9663e88ab01b",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 85,
+          "column": 3
+        },
+        {
+          "title": "numeric and string imported grocery ids remain usable and cannot inject handlers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 613,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:18.501Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9e1601aa2a29d71ed798",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 103,
+          "column": 1
+        },
+        {
+          "title": "rejected day snacks object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 436,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:19.129Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-e47dbed22b49ac3419f6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected collection object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 404,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:19.578Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b71d647dfdd7be7fcdb6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected null ingredient import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 436,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:19.994Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-48400ebab91d6fe5c464",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text pantry name import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 429,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:20.442Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-50e86f309519fc192614",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected non-text grocery source import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 408,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:20.884Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-9087dc12348f189da4c9",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected non-object price map import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 490,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:21.304Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-2edc6577d3742984131e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review recipe highlights object import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:21.809Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-493e1fa7ad3bdfe00d88",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review grocery quantity string import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 404,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:22.236Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-6482136e9edc9938ced4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review missing storage-guide text import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 409,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:22.654Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-28893a851403e9306f4c",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review nested price list import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:23.075Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-ed5815c1e168c5e830a4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review reserved id import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 418,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:23.502Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-65910af5a9e400f1e3b8",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review inherited id import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 422,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:23.934Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1f5a483887499c98b07b",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review malformed tombstone import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 421,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:24.370Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-ff17f9c7ba381f1610bb",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review malformed conflict import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 408,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:24.805Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-d5f8f9b724a62b96a1d3",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "rejected review supplied pantry quantity import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 422,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:25.225Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-80dac6c115f01c720efe",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "review grocery category/unit remain inert in print and price views, including reserved category names",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 512,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:25.660Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-55590f3d9d2a591fa581",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 147,
+          "column": 1
+        },
+        {
+          "title": "review price-input handlers cannot execute imported item or store names",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 512,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:26.184Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-2c3fcc7b32ea03bbd63e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 165,
+          "column": 1
+        },
+        {
+          "title": "review malformed nested prep session backup is rejected atomically",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 406,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:26.709Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-5287e536312d8bb40fc4",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 176,
+          "column": 1
+        },
+        {
+          "title": "review correction dialog treats grocery id string-shopping-id as data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 611,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:27.129Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-fa6bd8e9c5142927ba4e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 190,
+          "column": 3
+        },
+        {
+          "title": "review correction dialog treats grocery id 0);window.__recoveryId=true;// as data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 634,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:27.755Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-51744e98dca50b43cb55",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 190,
+          "column": 3
+        },
+        {
+          "title": "signed-in clear and restore publish complete backup fields before cloud reload and stale-marker replay",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 992,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:28.404Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-4a864562d62bb8c75fbd",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 202,
+          "column": 1
+        },
+        {
+          "title": "partial weekly plan in an older backup restores all seven usable days",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 442,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:29.412Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-533d6c968fba85a057ab",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 234,
+          "column": 1
+        },
+        {
+          "title": "a late preparation error rejects the detached candidate without leaking changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 483,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:29.867Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-77c8425e9a92b50133b0",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 248,
+          "column": 1
+        },
+        {
+          "title": "a failed primary local save rejects the import without cloud writes or changed runtime",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 482,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:30.363Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd409d340ad73213ae6d",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 257,
+          "column": 1
+        },
+        {
+          "title": "legacy 1.1 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 510,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:30.857Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-71fc3eb5e00cd2d805e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.2 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 465,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:31.382Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-4afa0115dd278503d9e6",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.3 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 465,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:31.862Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-05daee40e113f43308af",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.4 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 470,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:32.339Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b7403ddd2d271e1521f7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.5 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 473,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:32.822Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-b9a9b118f1ed1c7b5750",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "legacy 1.6 partial export still merges, preserves unknown recipe fields and local duplicates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 503,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:33.306Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-0e283795039d7aba6008",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 274,
+          "column": 3
+        },
+        {
+          "title": "backup includes every saved domain field, including cook history and prep session",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 371,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:33.830Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-cd1c768a847bfc319f39",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 287,
+          "column": 1
+        },
+        {
+          "title": "clear, reload and restore recover history/session, retain facts and survive cloud reconciliation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 983,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:34.215Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-c5eb92fbffd7673bf550",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 302,
+          "column": 1
+        },
+        {
+          "title": "restore clears only restored ids, and stale conflict markers lose while later deletions win",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 485,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:35.213Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-1d4df04771115e0a62e7",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 329,
+          "column": 1
+        },
+        {
+          "title": "older backups without history/session keep supported defaults and recover records",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 446,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:35.711Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-888da43b3f008cab42d5",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 353,
+          "column": 1
+        },
+        {
+          "title": "malformed backup is refused without changing current data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 402,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:36.170Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-fe1be66422225d8319a8",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 366,
+          "column": 1
+        },
+        {
+          "title": "failed backup prevents clear from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 430,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:36.583Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-779d1d66cff793d10018",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 376,
+          "column": 3
+        },
+        {
+          "title": "failed backup prevents import from changing user data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 440,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:39:37.025Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-d6e1698cb8e8a7104829",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 376,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T19:39:15.922Z",
+    "duration": 28595.83,
+    "expected": 69,
+    "skipped": 0,
+    "unexpected": 8,
+    "flaky": 0
+  }
+}

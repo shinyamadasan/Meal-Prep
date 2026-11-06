@@ -1,0 +1,15 @@
+{
+  "node --check app.js": 0,
+  "node --check tests/release-hardening.spec.js": 0,
+  "node --check tests/reliability-recovery-v1.spec.js": 0,
+  "git diff --check": 0,
+  "candidate hashes unchanged": true,
+  "original evidence matched": 47,
+  "no CSS/HTML/service worker/worker/infrastructure code change": true,
+  "full local tests": 813,
+  "focused tests": 135,
+  "new regressions": 37,
+  "worker tests": 9,
+  "bridge tests": 254
+}
+Final staged git diff --cached --check: PASS; captured JSON/text/patch archive whitespace excluded; source/tests/Markdown checked normally.

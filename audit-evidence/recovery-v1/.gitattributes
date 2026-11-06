@@ -1,0 +1,2 @@
+# Patch context whitespace is part of the exact diff artifact, not newly authored source.
+application.patch -text -whitespace

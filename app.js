@@ -1773,7 +1773,9 @@ function snapshotData() {
     cookedMeals: AppState.cookedMeals,
     mealConsumptions: serializableMealConsumptions(AppState.mealConsumptions),
     mealConsumptionConflicts: serializableMealConsumptionConflicts(AppState.mealConsumptionConflicts),
+    cookHistory: AppState.cookHistory,
     recentRecipes: AppState.recentRecipes,
+    prepModeSession: AppState.prepModeSession,
     deletions: normalizeDeletions(AppState.deletions),
     inventoryVerifiedAt: AppState.inventoryVerifiedAt,
     plannedBatches: normalizePlannedBatches(AppState.plannedBatches)
@@ -1784,7 +1786,156 @@ function createBackup(label) {
   try {
     var backup = { label: label || 'backup', at: new Date().toISOString(), data: snapshotData() };
     localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
-  } catch (e) { console.error('Backup failed:', e); }
+    return true;
+  } catch (e) {
+    console.error('Backup failed:', e);
+    showErrorMessage('Could not save a safety backup. Nothing was changed.');
+    return false;
+  }
+}
+
+// Both imports and backups are untrusted JSON. Missing legacy fields remain optional;
+// malformed provided structures must fail before any state or deletion marker changes.
+function validateSnapshotData(data) {
+  var object = value => value && typeof value === 'object' && !Array.isArray(value);
+  var reserved = key => key === 'prototype' || Object.prototype.hasOwnProperty.call(Object.prototype, key);
+  var lists = TOMBSTONE_KEYS.concat(['groceryList', 'mealConsumptions', 'mealConsumptionConflicts', 'cookHistory', 'plannedBatches']);
+  if (!object(data) || !lists.concat(['weeklyPlan']).some(key => data[key] != null)) throw new Error('Invalid data format');
+  lists.forEach(function(key) {
+    if (data[key] == null) return;
+    if (!Array.isArray(data[key])) throw new Error('Invalid list: ' + key);
+    data[key].forEach(function(item) {
+      if (!object(item)) throw new Error('Invalid record: ' + key);
+      if (item.id != null && !['string', 'number'].includes(typeof item.id)) throw new Error('Invalid record id');
+      if (item.id != null && reserved(String(item.id))) throw new Error('Unsupported record id');
+      ['name', 'title', 'category', 'unit', 'instructions', 'storageMethod', 'storageTips'].forEach(function(field) {
+        if (item[field] != null && typeof item[field] !== 'string') throw new Error('Invalid text: ' + field);
+      });
+      if (['pantry', 'groceryList', 'userIngredients', 'customIngredients'].includes(key) && typeof item.name !== 'string') throw new Error('Missing item name');
+      if (key === 'customIngredients' && ['storageMethod', 'storageTips'].some(field => typeof item[field] !== 'string')) throw new Error('Missing storage guide text');
+      if (['groceryList', 'pantry'].includes(key) && item.quantity != null && (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity))) throw new Error('Invalid stock quantity');
+      if (item.highlights != null && (!Array.isArray(item.highlights) || item.highlights.some(h => typeof h !== 'string'))) throw new Error('Invalid highlights');
+      if (key === 'mealConsumptionConflicts' && !canonicalizeMealConsumptionConflict(item)) throw new Error('Invalid consumption conflict');
+      if (item.sources != null && (!Array.isArray(item.sources) || item.sources.some(s => typeof s !== 'string'))) throw new Error('Invalid grocery sources');
+      if (item.baseIngredients != null) {
+        if (!Array.isArray(item.baseIngredients)) throw new Error('Invalid ingredients');
+        item.baseIngredients.forEach(function(ing) {
+          if (!object(ing) || typeof ing.name !== 'string' || (ing.unit != null && typeof ing.unit !== 'string') ||
+              (ing.category != null && typeof ing.category !== 'string')) throw new Error('Invalid ingredient');
+        });
+      }
+    });
+  });
+  ['weeklyPlan', 'ingredientPrices', 'nutritionGoals', 'deletions', 'prepModeSession'].forEach(function(key) {
+    if (data[key] != null && !object(data[key])) throw new Error('Invalid object: ' + key);
+  });
+  ['myStores', 'customStores', 'recentRecipes'].forEach(function(key) {
+    if (data[key] != null && (!Array.isArray(data[key]) || data[key].some(value =>
+      key === 'recentRecipes' ? !['string', 'number'].includes(typeof value) : typeof value !== 'string'))) throw new Error('Invalid list: ' + key);
+  });
+  Object.keys(data.ingredientPrices || {}).forEach(function(name) {
+    var entry = data.ingredientPrices[name];
+    if (reserved(name) || !object(entry) || (entry.unit != null && typeof entry.unit !== 'string') ||
+        (entry.prices != null && !object(entry.prices))) throw new Error('Invalid ingredient price');
+    Object.keys(entry.prices || {}).forEach(function(store) {
+      if (reserved(store) || (entry.prices[store] != null && !['string', 'number'].includes(typeof entry.prices[store]))) throw new Error('Invalid store price');
+    });
+  });
+  Object.keys(data.deletions || {}).forEach(function(key) {
+    if (reserved(key)) throw new Error('Invalid deletion id');
+    var bucket = data.deletions[key];
+    var timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
+    if (TOMBSTONE_KEYS.includes(key)) {
+      if (!object(bucket) || Object.keys(bucket).some(id => reserved(id) || !timestamp(bucket[id]))) throw new Error('Invalid deletion bucket');
+    } else if (!timestamp(bucket)) throw new Error('Invalid legacy deletion');
+  });
+  var session = data.prepModeSession;
+  if (session) {
+    if (typeof session.active !== 'boolean' || !object(session.recipeUsage) || !object(session.checked) ||
+        Object.keys(session.recipeUsage).some(id => reserved(id) || !Number.isInteger(session.recipeUsage[id]) || session.recipeUsage[id] < 1) ||
+        Object.keys(session.checked).some(id => typeof session.checked[id] !== 'boolean')) throw new Error('Invalid prep session');
+  }
+  Object.keys(data.weeklyPlan || {}).forEach(function(day) {
+    var plan = data.weeklyPlan[day];
+    if (!PLAN_WEEK_DAYS.includes(day) || !object(plan)) throw new Error('Invalid plan day');
+    ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
+      if (plan[meal] != null && !['string', 'number'].includes(typeof plan[meal])) throw new Error('Invalid plan slot');
+    });
+    if (plan.snacks != null && (!Array.isArray(plan.snacks) || plan.snacks.some(id => !['string', 'number'].includes(typeof id)))) throw new Error('Invalid snacks');
+  });
+}
+
+// Build on detached records so normalization, fill-only planning and timestamp updates
+// cannot leak into the live state if any preparation step rejects the file.
+function prepareSnapshotChange(data, restoring) {
+  validateSnapshotData(data);
+  var next = JSON.parse(JSON.stringify(snapshotData()));
+  TOMBSTONE_KEYS.concat(['groceryList']).forEach(function(key) {
+    next[key] = restoring ? (data[key] || []) : unionById(next[key], data[key] || []);
+  });
+  patchMissingNutrition(next.recipes);
+  next.flavors = normalizeFlavors(next.flavors);
+  next.preparedFlavors = normalizePreparedFlavors(next.preparedFlavors);
+  next.cookedMeals = normalizeCookedMeals(next.cookedMeals);
+  var facts = mergeMealConsumptions(next.mealConsumptions, data.mealConsumptions || []);
+  if (facts.rejected.length) throw new Error('Invalid meal consumption record');
+  next.mealConsumptions = facts.merged;
+  next.mealConsumptionConflicts = mergeMealConsumptionConflicts(
+    mergeMealConsumptionConflicts(next.mealConsumptionConflicts, data.mealConsumptionConflicts || []), facts.conflicts);
+  if (restoring) {
+    if (data.weeklyPlan) {
+      next.weeklyPlan = {};
+      PLAN_WEEK_DAYS.forEach(day => { next.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] }; });
+      mergeWeeklyPlan(data.weeklyPlan, next);
+    }
+    next.nutritionGoals = data.nutritionGoals || next.nutritionGoals;
+    next.cookHistory = data.cookHistory || [];
+    next.recentRecipes = data.recentRecipes || [];
+    next.prepModeSession = data.prepModeSession || null;
+    next.inventoryVerifiedAt = data.inventoryVerifiedAt || null;
+    if (data.plannedBatches) next.plannedBatches = normalizePlannedBatches(data.plannedBatches);
+    mergeDeletions(data.deletions, next);
+  } else {
+    if (data.weeklyPlan) mergeWeeklyPlan(data.weeklyPlan, next);
+    if (data.plannedBatches) mergePlannedBatches(data.plannedBatches, next);
+    if (data.inventoryVerifiedAt && data.inventoryVerifiedAt > (next.inventoryVerifiedAt || '')) next.inventoryVerifiedAt = data.inventoryVerifiedAt;
+  }
+  next.ingredientPrices = restoring ? (data.ingredientPrices || {}) : Object.assign({}, data.ingredientPrices || {}, next.ingredientPrices);
+  ['myStores', 'customStores'].forEach(function(key) {
+    next[key] = restoring ? (data[key] || []) : unionStrings(next[key], data[key] || []);
+  });
+  // Explicit import/restore intent revives only the supplied records in their own
+  // collection. Unrelated deletion evidence must survive; immutable facts are not stamped.
+  var revivedAt = new Date().toISOString();
+  next.deletions = normalizeDeletions(next.deletions);
+  TOMBSTONE_KEYS.concat(['groceryList']).forEach(function(key) {
+    var ids = new Set((restoring ? next[key] : (data[key] || [])).map(item => String(item.id)));
+    next[key].forEach(function(item) {
+      if (!ids.has(String(item.id))) return;
+      item.updatedAt = revivedAt;
+      if (next.deletions[key]) delete next.deletions[key][String(item.id)];
+    });
+  });
+  return next;
+}
+
+function commitSnapshotChange(next) {
+  var before = snapshotData();
+  Object.assign(AppState, next);
+  var saving = saveData();
+  if (!AppState.lastLocalSaveSucceeded) {
+    Object.assign(AppState, before);
+    return null;
+  }
+  cacheInlinePhotos();
+  return saving;
+}
+
+function canRestoreBackup(userId) {
+  if (AppState.currentUser && (!userId || AppState.currentUser.uid === userId) &&
+      AppState.isOnline && AppState.cloudReady && window.firebase && window.firebase.runTransaction) return true;
+  showErrorMessage('Restore requires an online, signed-in account with cloud data loaded. Your backup is unchanged. Sign in, reconnect and try again.');
+  return false;
 }
 
 function restoreBackup() {
@@ -1795,7 +1946,9 @@ function restoreBackup() {
     return;
   }
   var backup;
-  try { backup = JSON.parse(raw); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
+  try { backup = JSON.parse(raw); validateSnapshotData(backup.data); } catch (e) { showErrorMessage('Backup is corrupted and cannot be restored.'); return; }
+  if (!canRestoreBackup()) return;
+  var restoreUserId = AppState.currentUser.uid;
   var when = backup.at ? new Date(backup.at).toLocaleString() : 'an earlier time';
   showConfirmDialog(
     'Restore backup?',
@@ -1803,41 +1956,19 @@ function restoreBackup() {
       '<p>This replaces your current data.</p>',
     'Restore Backup',
     'Cancel',
-    function() {
-      var d = backup.data || {};
-      AppState.recipes = d.recipes || [];
-      patchMissingNutrition(AppState.recipes);
-      AppState.weeklyPlan = d.weeklyPlan || AppState.weeklyPlan;
-      AppState.groceryList = d.groceryList || [];
-      AppState.nutritionGoals = d.nutritionGoals || AppState.nutritionGoals;
-      AppState.customIngredients = d.customIngredients || [];
-      AppState.customHacks = d.customHacks || [];
-      AppState.flavors = normalizeFlavors(d.flavors || []);
-      AppState.preparedFlavors = normalizePreparedFlavors(d.preparedFlavors || []);
-      AppState.pantry = d.pantry || [];
-      AppState.userIngredients = d.userIngredients || [];
-      AppState.ingredientPrices = d.ingredientPrices || {};
-      AppState.myStores = d.myStores || [];
-      AppState.customStores = d.customStores || [];
-      AppState.cookedMeals = normalizeCookedMeals(d.cookedMeals || []);
-      // A historical event log must not be silently destroyed because the user loads an
-      // older backup — merge (union) in the backup's consumption history rather than
-      // replacing current history with it. Exact duplicates dedupe; events missing from this
-      // backup simply remain; a same-id/different-facts collision is an explicit conflict,
-      // never a silent overwrite in either direction. "Restore" here intentionally means
-      // "this backup's consumption facts are unioned in", not "roll back to only this backup".
-      reconcileMealConsumptions(d.mealConsumptions || []);
-      reconcileMealConsumptionConflicts(d.mealConsumptionConflicts || []);
-      AppState.recentRecipes = d.recentRecipes || [];
-      AppState.prepModeSession = d.prepModeSession || null;
-      AppState.inventoryVerifiedAt = d.inventoryVerifiedAt || null;
-      // Same rule as weeklyPlan above: an older backup without the key keeps the current plan.
-      if (d.plannedBatches) AppState.plannedBatches = normalizePlannedBatches(d.plannedBatches);
-      cacheInlinePhotos();
-      saveData();
+    async function() {
+      if (!canRestoreBackup(restoreUserId)) return;
+      var next;
+      try { next = prepareSnapshotChange(backup.data, true); } catch (e) {
+        showErrorMessage('Backup is corrupted and cannot be restored.'); return;
+      }
+      var saving = commitSnapshotChange(next);
+      if (!saving) return;
+      var cloudSaved = await saving;
 
       renderRecipes();
       renderWeeklyPlanner();
+      renderGroceryList();
       renderStorageGuide();
       renderCookingHacks();
       renderFlavors();
@@ -1849,7 +1980,8 @@ function restoreBackup() {
       updateFreshnessBadges();
       renderFreshnessBanner();
       renderInventoryVerifiedStatus();
-      showSuccessMessage('Data restored from backup (' + when + ').');
+      if (cloudSaved) showSuccessMessage('Data restored from backup (' + when + ').');
+      else showErrorMessage('Restore is saved only on this device; cloud confirmation failed. Your backup is retained. Reconnect and restore again before signing out or reloading: cloud data may replace restored history and prep progress.');
     }
   );
 }
@@ -1858,11 +1990,11 @@ async function clearLocalStorage() {
   showConfirmDialog(
     'Clear all data?',
     '<p>Clear ALL your saved data (recipes, pantry, plan, lists)?</p>' +
-      '<p>This wipes it on every signed-in device. A backup is saved first — undo with the "Restore Backup" button.</p>',
+      '<p>This wipes it on every signed-in device. A backup is saved first — restore with the "Restore Backup" button while online and signed in.</p>',
     'Clear All Data',
     'Cancel',
     async function() {
-      createBackup('Clear All Data');
+      if (!createBackup('Clear All Data')) return;
 
       // R1: PROPAGATE the wipe via tombstones + an explicit EMPTY document — never deleteDoc.
       // Deleting the doc just lets another live client (or our own 'empty'-path save) re-create it
@@ -4030,7 +4162,7 @@ function parseNullableDayValue(value) {
 
 function formatStorageLife(days) {
   if (days === null || days === undefined) return 'Unknown';
-  return days + ' day' + (days === 1 ? '' : 's');
+  return escapeHtml(String(days)) + ' day' + (days === 1 ? '' : 's');
 }
 
 function persistRecipe(recipe) {
@@ -4168,10 +4300,10 @@ function addIngredientField(ingredient = null) {
 
   ingredientDiv.innerHTML = `
     <div class="ing-name-wrap">
-      <input type="text" class="form-control" placeholder="Type to search ingredient…" value="${ingredient?.name || ''}" required>
+      <input type="text" class="form-control" placeholder="Type to search ingredient…" value="${escapeHtml(ingredient?.name || '')}" required>
       <div class="ing-suggestions hidden"></div>
     </div>
-    <input type="number" class="form-control" placeholder="Qty" step="0.01" min="0" value="${ingredient?.quantity || ''}" required>
+    <input type="number" class="form-control" placeholder="Qty" step="0.01" min="0" value="${escapeHtml(ingredient?.quantity || '')}" required>
     <select class="form-control" required>
       <option value="">Unit</option>${unitOpts}
     </select>
@@ -4512,7 +4644,7 @@ function renderCookSuggestions() {
     if (!items.length) return '';
     var cards = items.map(function(s) {
       return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
-        escapeHtml(s.recipe.name).replace(/'/g, "\\'") + '\';renderRecipes()">' +
+        escJAttr(s.recipe.name) + '\';renderRecipes()">' +
         '<span class="cs-name">' + escapeHtml(s.recipe.name) + '</span>' +
         '<span class="cs-badge ' + tier.badgeCls + '">' + tier.badgeText + '</span>' +
         '</button>';
@@ -5306,11 +5438,11 @@ function renderWhatShouldWeEatCard() {
     }).join('');
     var open = p.kind === 'ready'
       ? 'goToFreshnessTab()'
-      : 'openRecipeFromHome(\'' + escJ(p.id) + '\')';
+      : 'openRecipeFromHome(\'' + escJAttr(p.id) + '\')';
     var act = p.action;
-    var onAction = act.type === 'use-portion' ? 'useCookedPortion(\'' + escJ(p.id) + '\')'
-      : act.type === 'finish' ? 'finishCookedMeal(\'' + escJ(p.id) + '\')'
-      : 'openRecipeFromHome(\'' + escJ(p.id) + '\')';
+    var onAction = act.type === 'use-portion' ? 'useCookedPortion(\'' + escJAttr(p.id) + '\')'
+      : act.type === 'finish' ? 'finishCookedMeal(\'' + escJAttr(p.id) + '\')'
+      : 'openRecipeFromHome(\'' + escJAttr(p.id) + '\')';
 
     return '<div class="wse-row">' +
       '<button class="wse-item" onclick="' + open + '">' +
@@ -5339,7 +5471,7 @@ function renderReadyFoodCard() {
   if (!ready.length) return '';
 
   var rows = ready.map(function(m) {
-    var id = escJ(m.id);
+    var id = escJAttr(m.id);
     var hint = readyFoodBalanceHint(m);
     var action = cookedMealTracksPortions(m)
       ? '<button class="dash-inline-btn dash-ready-use" onclick="useCookedPortion(\'' + id + '\')">Use 1</button>'
@@ -5368,12 +5500,12 @@ function renderCookSuggestionCard() {
   var rows = suggestions.map(function(s) {
     var sid = String(s.recipe.id);
     return '<div class="dash-sugg-row">' +
-      '<button class="dash-sugg-item" onclick="openRecipeFromHome(\'' + escJ(sid) + '\')">' +
+      '<button class="dash-sugg-item" onclick="openRecipeFromHome(\'' + escJAttr(sid) + '\')">' +
         '<span class="dash-sugg-label">' + s.icon + ' ' + escapeHtml(s.label) + '</span>' +
         '<span class="dash-sugg-name">' + escapeHtml(s.recipe.name) + '</span>' +
         '<span class="dash-sugg-why">' + escapeHtml(s.why) + '</span>' +
       '</button>' +
-      '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + escJ(sid) + '\')">Plan it</button>' +
+      '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + escJAttr(sid) + '\')">Plan it</button>' +
       '</div>';
   }).join('');
 
@@ -5452,7 +5584,7 @@ function renderRecipes() {
     };
     
     return `
-    <div class="recipe-card" data-recipe-id="${recipe.id}" onclick="handleRecipeCardClick(event, '${recipe.id}')" title="Click to edit">
+    <div class="recipe-card" data-recipe-id="${escapeHtml(String(recipe.id))}" onclick="handleRecipeCardClick(event, '${escJAttr(recipe.id)}')" title="Click to edit">
       ${recipe.photo ? `
         <div class="recipe-photo">
           <img src="${escapeHtml(recipe.photo)}" alt="${escapeHtml(recipe.name)}" class="recipe-image">
@@ -5466,25 +5598,25 @@ function renderRecipes() {
         <h3 class="recipe-title">${escapeHtml(recipe.name)}</h3>
         <span class="recipe-category">${escapeHtml(recipe.category)}</span>
         ${isSampleRecipe(recipe) ? '<span class="recipe-sample-badge" title="A built-in example to get you started — edit or delete it anytime">Sample</span>' : ''}
-        <button class="recipe-fav-btn${recipe.favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${recipe.id}')" title="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
+        <button class="recipe-fav-btn${recipe.favorite ? ' active' : ''}" onclick="event.stopPropagation();toggleFavorite('${escJAttr(recipe.id)}')" title="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}" aria-label="${recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
       </div>
       
       <!-- Serving Size Controls -->
       <div class="serving-controls">
-        <button class="serving-btn" onclick="updateServingSize('${recipe.id}', ${recipe.currentServings - 1})"
+        <button class="serving-btn" onclick="updateServingSize('${escJAttr(recipe.id)}', ${recipe.currentServings - 1})"
                 ${recipe.currentServings <= 1 ? 'disabled' : ''}>−</button>
         <div class="serving-info">
-          <div class="current-servings">${recipe.currentServings} servings</div>
-          <div class="base-servings">Base: ${recipe.baseServings}</div>
+          <div class="current-servings">${escapeHtml(String(recipe.currentServings))} servings</div>
+          <div class="base-servings">Base: ${escapeHtml(String(recipe.baseServings))}</div>
         </div>
-        <button class="serving-btn" onclick="updateServingSize('${recipe.id}', ${recipe.currentServings + 1})">+</button>
+        <button class="serving-btn" onclick="updateServingSize('${escJAttr(recipe.id)}', ${Number(recipe.currentServings) + 1})">+</button>
         <div class="quick-servings">
           ${[1, 2, 4, 6, 8].map(size => `
             <button class="quick-serving-btn ${recipe.currentServings === size ? 'active' : ''}"
-                    onclick="updateServingSize('${recipe.id}', ${size})">${size}</button>
+                    onclick="updateServingSize('${escJAttr(recipe.id)}', ${size})">${size}</button>
           `).join('')}
         </div>
-        ${isScaled ? `<button class="reset-servings" onclick="resetServingSize('${recipe.id}')">Reset</button>` : ''}
+        ${isScaled ? `<button class="reset-servings" onclick="resetServingSize('${escJAttr(recipe.id)}')">Reset</button>` : ''}
       </div>
       
       <div class="prep-time-info">
@@ -5556,9 +5688,9 @@ function renderRecipes() {
       <!-- Ingredients visible by default; instructions stay collapsed so the grid stays scannable -->
       <div class="recipe-details">
         <div class="detail-scaler">
-          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${recipe.id}',-1)">−</button>
-          <span class="detail-serving-count">${recipe.currentServings}</span>
-          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${recipe.id}',1)">+</button>
+          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${escJAttr(recipe.id)}',-1)">−</button>
+          <span class="detail-serving-count">${escapeHtml(String(recipe.currentServings))}</span>
+          <button class="detail-scaler-btn" onclick="event.stopPropagation();adjustDetailServings(event,'${escJAttr(recipe.id)}',1)">+</button>
           <span class="detail-scaler-label"> servings</span>
         </div>
         <div class="recipe-ingredients">
@@ -5574,8 +5706,8 @@ function renderRecipes() {
       </div>
 
       <div class="recipe-actions">
-        <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Edit</button>
-        <button class="btn btn--outline btn--sm" onclick="deleteRecipe('${recipe.id}')">Delete</button>
+        <button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${escJAttr(recipe.id)}')">Edit</button>
+        <button class="btn btn--outline btn--sm" onclick="deleteRecipe('${escJAttr(recipe.id)}')">Delete</button>
       </div>
     </div>
   `;
@@ -5676,10 +5808,10 @@ function renderWeeklyPlanner() {
                 <div class="meal-slot-label">${meal.charAt(0).toUpperCase() + meal.slice(1)}</div>
                 <div class="meal-slot-content">
                   <div class="recipe-details">
-                    <div class="recipe-name">${recipe.name}${expired ? ' <span class="expiry-badge" title="May expire before this day">' + icon('triangle-alert') + '</span>' : ''}</div>
-                    <div class="recipe-meta">${recipe.currentServings} servings • ${totalTime}m</div>
+                    <div class="recipe-name">${escapeHtml(recipe.name)}${expired ? ' <span class="expiry-badge" title="May expire before this day">' + icon('triangle-alert') + '</span>' : ''}</div>
+                    <div class="recipe-meta">${escapeHtml(String(recipe.currentServings))} servings • ${totalTime}m</div>
                   </div>
-                  <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${recipe.id}', this)" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
+                  <button class="slot-cooked-btn" onclick="event.stopPropagation(); markRecipeCooked('${escJAttr(recipe.id)}', this)" title="I cooked this — add to My Fridge and deduct ingredients">✓ Cooked</button>
                 </div>
               </div>`;
           }
@@ -5778,7 +5910,7 @@ function renderStorageAlerts() {
     <div class="storage-alert-banner">
       ${icon('triangle-alert')} <strong>${issues.length} recipe${issues.length > 1 ? 's' : ''} may not stay fresh until their planned day</strong>
       <ul class="storage-alert-list">${issues.map(i =>
-        `<li><button type="button" class="storage-alert-recipe-link" onclick="openEditRecipeModal('${escJ(i.recipeId)}')">${i.name}</button> — planned ${i.day}, but only lasts ${i.fridgeLife}d</li>`
+        `<li><button type="button" class="storage-alert-recipe-link" onclick="openEditRecipeModal('${escJAttr(i.recipeId)}')">${escapeHtml(i.name)}</button> — planned ${i.day}, but only lasts ${escapeHtml(String(i.fridgeLife))}d</li>`
       ).join('')}</ul>
     </div>`;
 }
@@ -5898,12 +6030,12 @@ function recipeSelectionCard(recipe) {
   const totalTime = Math.round(recipeTotalMinutes(recipe) * recipe.currentServings / recipe.baseServings);
   const costPerServing = calculateRecipeCost(recipe) / recipe.currentServings;
   return `
-    <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${recipe.id}')">
+    <div class="recipe-selection-card" onclick="selectRecipeForPlanning('${escJAttr(recipe.id)}')">
       <div class="recipe-icon">${getCategoryIcon(recipe.category)}</div>
-      <div class="recipe-title">${recipe.name}</div>
-      <div class="recipe-meta">${recipe.category}</div>
+      <div class="recipe-title">${escapeHtml(recipe.name)}</div>
+      <div class="recipe-meta">${escapeHtml(recipe.category)}</div>
       <div class="recipe-stats">
-        <span>${recipe.currentServings} servings</span>
+        <span>${escapeHtml(String(recipe.currentServings))} servings</span>
         <span>${totalTime}m</span>
         ${costPerServing > 0 ? `<span>₱${formatQuantity(costPerServing)}</span>` : ''}
       </div>
@@ -6137,7 +6269,7 @@ function renderDashboard() {
       var expiredRows = attention.expired.slice(0, 4).map(function(e) {
         var days = Math.abs(e.daysLeft);
         var when = days === 1 ? 'Expired yesterday' : 'Expired ' + days + 'd ago';
-        var args = '\'' + e.kind + '\', \'' + escJ(String(e.id)) + '\'';
+        var args = '\'' + e.kind + '\', \'' + escJAttr(String(e.id)) + '\'';
         return '<div class="dash-attn-row dash-attn-row--expired">' +
           '<span class="dash-attn-name">' + escapeHtml(e.name) + '</span>' +
           '<span class="dash-expiry-tag dash-expiry-tag--expired">' + when + '</span>' +
@@ -6196,7 +6328,7 @@ function renderDashboard() {
         var alreadyPlanned = todayIds.indexOf(sid) >= 0;
         var btn = alreadyPlanned
           ? '<span class="dash-planned-badge">Planned ✓</span>'
-          : '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + sid + '\')">Plan it</button>';
+          : '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + escJAttr(sid) + '\')">Plan it</button>';
         return '<div class="dash-attn-row">' +
           '<span class="dash-attn-name">' + escapeHtml(s.recipe.name) + '</span>' +
           '<span class="dash-expiry-tag" style="color:var(--color-text-secondary)">uses ' + escapeHtml(s.ingredient) + '</span>' +
@@ -6254,10 +6386,10 @@ function renderDashboard() {
           : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
         var buyBtn = '';
         if (tier.key === 1 && s.missingIngredients && s.missingIngredients.length === 1) {
-          buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJ(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
+          buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJAttr(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
         }
         return '<div class="dash-cook-row">' +
-          '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJ(sid) + '\')">' +
+          '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJAttr(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
           '</button>' + buyBtn + '</div>';
       }).join('');
@@ -6588,8 +6720,8 @@ function renderGroceryList() {
     return;
   }
   
-  // Group by category (fall back to "Other" when category is absent)
-  const categories = {};
+  // Imported category names are data, including object-property names such as __proto__.
+  const categories = Object.create(null);
   AppState.groceryList.forEach(item => {
     const cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
     if (!categories[cat]) categories[cat] = [];
@@ -6626,7 +6758,7 @@ function renderGroceryList() {
 
     return `
     <div class="grocery-category">
-      <h3 class="category-header">${category}${categoryTotal > 0 ? ` <span class="category-total">≈ ₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
+      <h3 class="category-header">${escapeHtml(category)}${categoryTotal > 0 ? ` <span class="category-total">≈ ₱${formatQuantity(categoryTotal)}</span>` : ''}</h3>
       ${categories[category].map(item => {
         // Show an exact line total when we can price it; otherwise fall back to
         // the market reference price (e.g. "₱200/kg") so there's always a price.
@@ -6634,7 +6766,7 @@ function renderGroceryList() {
         const priced = findIngredientPrice(item.name);
         let priceHtml = '';
         if (cost > 0) priceHtml = `<div class="ingredient-price">≈ ₱${formatQuantity(cost)}</div>`;
-        else if (priced && priced.priceLabel) priceHtml = `<div class="ingredient-price ingredient-price--ref">${priced.priceLabel}</div>`;
+        else if (priced && priced.priceLabel) priceHtml = `<div class="ingredient-price ingredient-price--ref">${escapeHtml(priced.priceLabel)}</div>`;
 
         // "Running low" staples are in the pantry by definition — don't let the
         // in-stock check hide them; the whole point is that you need to rebuy.
@@ -6642,18 +6774,19 @@ function renderGroceryList() {
         // claims "In stock" from the kitchen.
         const inPantry = (item.fromStaple || item.userSet) ? false : isInPantry(item.name);
         const isChecked = groceryItemChecked(item);
+        const itemId = escapeHtml(JSON.stringify(item.id));
         return `
-        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${item.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${item.id})}">
+        <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${itemId})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${itemId})}">
           <input type="checkbox" class="grocery-checkbox" tabindex="-1" aria-hidden="true"
                  ${isChecked ? 'checked' : ''}>
           <div class="grocery-item-info">
             <div class="grocery-item-name">
-              ${item.quantity ? formatQuantity(item.quantity) + ' ' + item.unit + ' ' : ''}${item.name}
-              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + item.id + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
-              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${item.id})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
+              ${item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : ''}${escapeHtml(item.name)}
+              ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + itemId + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
+              ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${itemId})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
             </div>
             ${item.sources && item.sources.length > 0 ? `
-              <div class="grocery-item-source">From: ${summarizeSources(item.sources)}</div>
+              <div class="grocery-item-source">From: ${escapeHtml(summarizeSources(item.sources))}</div>
             ` : ''}
             ${priceHtml}
           </div>
@@ -6763,12 +6896,12 @@ function openNotInKitchenDialog(groceryId) {
   if (!matches.length) return;
   var rows = matches.map(function(p) {
     var staple = isStaple(p);
-    var idArg = escapeHtml(escJ(String(p.id)));
+    var idArg = escapeHtml(JSON.stringify(String(p.id)));
     return '<div class="nik-row">' +
       '<div class="nik-info"><span class="nik-name">' + escapeHtml(p.name) + '</span>' +
       '<span class="nik-meta">' + escapeHtml(describeKitchenRecord(p)) + '</span></div>' +
       '<button type="button" class="btn btn--secondary btn--sm nik-fix-btn" ' +
-        'onclick="fixNotInKitchen(\'' + idArg + '\', ' + item.id + ')">' +
+        'onclick="fixNotInKitchen(' + idArg + ', ' + escapeHtml(JSON.stringify(item.id)) + ')">' +
         (staple ? 'Mark empty' : 'Used up — remove') + '</button>' +
       '</div>';
   }).join('');
@@ -6861,7 +6994,7 @@ function renderGroceryPricePanel() {
   html += '</div>';
 
   // Group by category
-  var cats = {};
+  var cats = Object.create(null);
   AppState.groceryList.forEach(function(item) {
     var cat = (item.category && item.category.trim()) ? item.category.trim() : 'Other';
     if (!cats[cat]) cats[cat] = [];
@@ -6880,12 +7013,12 @@ function renderGroceryPricePanel() {
       html += '<div class="gpl-row" style="grid-template-columns:' + colTemplate + '">';
       html += '<div class="gpl-col-name">';
       html += '<div class="gpl-item-name">' + escapeHtml(item.name) + '</div>';
-      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + (item.unit || '') + '</div>';
+      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + '</div>';
       html += '</div>';
       myStores.forEach(function(s) {
         var p = storePrices[s] || '';
         html += '<div class="gpl-col-store"><input class="gpl-price-input" value="' + escapeHtml(p) +
-          '" placeholder="₱—" onblur="saveIngredientStorePrice(\'' + escJ(item.name) + '\',\'' + escJ(s) + '\',this.value)" /></div>';
+          '" placeholder="₱—" onblur="saveIngredientStorePrice(' + escapeHtml(JSON.stringify(item.name)) + ',' + escapeHtml(JSON.stringify(s)) + ',this.value)" /></div>';
       });
       html += '</div>';
     });
@@ -6967,16 +7100,16 @@ function renderStorageGuide() {
     const indicatorClass = getStorageIndicatorClass(ingredient.fridgeLife);
     
     return `
-      <div class="storage-ingredient-card" onclick="handleCardEdit(event, openEditIngredientModal, ${ingredient.id})" title="Click to edit">
+      <div class="storage-ingredient-card" onclick="handleCardEdit(event, openEditIngredientModal, ${escapeHtml(JSON.stringify(ingredient.id))})" title="Click to edit">
         <div class="ingredient-header">
-          <h4 class="ingredient-name">${ingredient.name}</h4>
+          <h4 class="ingredient-name">${escapeHtml(String(ingredient.name ?? ''))}</h4>
           <span class="storage-indicator ${indicatorClass}"></span>
         </div>
         
         <!-- Pricing Information -->
         ${ingredient.pricePerUnit ? `
         <div class="ingredient-pricing">
-          <strong>Price:</strong> ₱${ingredient.pricePerUnit} ${ingredient.unit}
+          <strong>Price:</strong> ₱${escapeHtml(String(ingredient.pricePerUnit ?? ''))} ${escapeHtml(String(ingredient.unit ?? ''))}
         </div>
         ` : ''}
         
@@ -6986,27 +7119,27 @@ function renderStorageGuide() {
           <strong>Nutrition (per 100g):</strong>
           <div class="ingredient-nutrition-grid">
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.calories}</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.calories ?? ''))}</span>
               <span class="ingredient-nutrition-label">cal</span>
             </div>
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.protein}g</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.protein ?? ''))}g</span>
               <span class="ingredient-nutrition-label">protein</span>
             </div>
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.carbs}g</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.carbs ?? ''))}g</span>
               <span class="ingredient-nutrition-label">carbs</span>
             </div>
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.fat}g</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.fat ?? ''))}g</span>
               <span class="ingredient-nutrition-label">fat</span>
             </div>
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.fiber}g</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.fiber ?? ''))}g</span>
               <span class="ingredient-nutrition-label">fiber</span>
             </div>
             <div class="ingredient-nutrition-item">
-              <span class="ingredient-nutrition-value">${ingredient.sodium}mg</span>
+              <span class="ingredient-nutrition-value">${escapeHtml(String(ingredient.sodium ?? ''))}mg</span>
               <span class="ingredient-nutrition-label">sodium</span>
             </div>
           </div>
@@ -7015,24 +7148,24 @@ function renderStorageGuide() {
         
         <div class="storage-duration">
           <div class="duration-item">
-            ${icon('refrigerator')} Fridge: ${ingredient.fridgeLife} day${ingredient.fridgeLife !== 1 ? 's' : ''}
+            ${icon('refrigerator')} Fridge: ${escapeHtml(String(ingredient.fridgeLife ?? ''))} day${ingredient.fridgeLife !== 1 ? 's' : ''}
           </div>
           <div class="duration-item">
-            ${icon('snowflake')} Freezer: ${ingredient.freezerLife} day${ingredient.freezerLife !== 1 ? 's' : ''}
+            ${icon('snowflake')} Freezer: ${escapeHtml(String(ingredient.freezerLife ?? ''))} day${ingredient.freezerLife !== 1 ? 's' : ''}
           </div>
         </div>
         
         <div class="storage-method">
-          <strong>Storage:</strong> ${ingredient.storageMethod}
+          <strong>Storage:</strong> ${escapeHtml(String(ingredient.storageMethod ?? ''))}
         </div>
         
         <div class="storage-tips">
-          <strong>Tips:</strong> ${ingredient.storageTips}
+          <strong>Tips:</strong> ${escapeHtml(String(ingredient.storageTips ?? ''))}
         </div>
         
         <div class="storage-actions">
-          <button class="btn btn--outline btn--sm edit-ingredient-btn" onclick="openEditIngredientModal(${ingredient.id})">Edit</button>
-          <button class="btn btn--sm delete-ingredient-btn" onclick="deleteIngredient(${ingredient.id})">Delete</button>
+          <button class="btn btn--outline btn--sm edit-ingredient-btn" onclick="openEditIngredientModal(${escapeHtml(JSON.stringify(ingredient.id))})">Edit</button>
+          <button class="btn btn--sm delete-ingredient-btn" onclick="deleteIngredient(${escapeHtml(JSON.stringify(ingredient.id))})">Delete</button>
         </div>
       </div>
     `;
@@ -7060,7 +7193,7 @@ function renderCookingHacks() {
   }
   
   // Group by category
-  const categories = {};
+  const categories = Object.create(null);
   filteredHacks.forEach(hack => {
     if (!categories[hack.category]) {
       categories[hack.category] = [];
@@ -7073,21 +7206,21 @@ function renderCookingHacks() {
     
     return `
       <div class="hack-category">
-        <h3 class="hack-category-title">${getHackIcon(category)} ${category}</h3>
+        <h3 class="hack-category-title">${getHackIcon(category)} ${escapeHtml(category)}</h3>
         <div class="hack-tips">
           ${hacks.map(hack => `
-            <div class="hack-item" onclick="handleCardEdit(event, openEditHackModal, ${hack.id})" title="Click to edit">
+            <div class="hack-item" onclick="handleCardEdit(event, openEditHackModal, ${escapeHtml(JSON.stringify(hack.id))})" title="Click to edit">
               <div class="hack-item-header">
-                <h4 class="hack-item-title">${hack.title}</h4>
+                <h4 class="hack-item-title">${escapeHtml(hack.title)}</h4>
                 <div class="hack-actions">
-                  <button class="hack-edit-btn" onclick="openEditHackModal(${hack.id})">Edit</button>
-                  <button class="hack-delete-btn" onclick="deleteHack(${hack.id})">Delete</button>
+                  <button class="hack-edit-btn" onclick="openEditHackModal(${escapeHtml(JSON.stringify(hack.id))})">Edit</button>
+                  <button class="hack-delete-btn" onclick="deleteHack(${escapeHtml(JSON.stringify(hack.id))})">Delete</button>
                 </div>
               </div>
-              <div class="hack-item-content">${hack.description}</div>
+              <div class="hack-item-content">${escapeHtml(hack.description)}</div>
               <div class="hack-benefits">
-                ${hack.timeSaved ? `<div class="hack-benefit">${icon('timer')} Saves: ${hack.timeSaved}</div>` : ''}
-                ${hack.costSavings ? `<div class="hack-benefit">${icon('piggy-bank')} Saves: ${hack.costSavings}</div>` : ''}
+                ${hack.timeSaved ? `<div class="hack-benefit">${icon('timer')} Saves: ${escapeHtml(hack.timeSaved)}</div>` : ''}
+                ${hack.costSavings ? `<div class="hack-benefit">${icon('piggy-bank')} Saves: ${escapeHtml(hack.costSavings)}</div>` : ''}
               </div>
             </div>
           `).join('')}
@@ -7110,7 +7243,7 @@ function getHackIcon(category) {
     'Time-Saving': '⏱️',
     'Safety': '🛡️'
   };
-  return icons[category] || '📝';
+  return Object.prototype.hasOwnProperty.call(icons, category) ? icons[category] : '📝';
 }
 
 function filterCookingHacks() {
@@ -7697,8 +7830,8 @@ function filterRecipesByNutrition() {
     return `
       <div class="recipe-card nutr-recipe-card">
         <div class="nutr-card-top">
-          <h4 class="nutr-card-name">${recipe.name}</h4>
-          <span class="nutr-card-servings">${recipe.currentServings} serving${recipe.currentServings !== 1 ? 's' : ''}</span>
+          <h4 class="nutr-card-name">${escapeHtml(recipe.name)}</h4>
+          <span class="nutr-card-servings">${escapeHtml(String(recipe.currentServings))} serving${recipe.currentServings !== 1 ? 's' : ''}</span>
         </div>
         ${hasNutrition ? `
         <div class="nutr-macros">
@@ -7721,11 +7854,11 @@ function filterRecipesByNutrition() {
           ${perServing.fiber > 0 ? `<div class="nutr-macro"><span class="nutr-macro-val">${perServing.fiber}g</span><span class="nutr-macro-lbl">fiber</span></div>` : ''}
         </div>` : `
         <p class="nutrition-missing-note">No nutrition data yet.
-          <button class="btn-link" onclick="openEditRecipeModal('${recipe.id}')">Add in recipe editor →</button>
+          <button class="btn-link" onclick="openEditRecipeModal('${escJAttr(recipe.id)}')">Add in recipe editor →</button>
         </p>`}
         <div class="nutr-card-actions">
-          <button class="btn btn--primary btn--sm" onclick="addRecipeToPlanFromNutrition('${recipe.id}')">+ Add to Plan</button>
-          ${!hasNutrition ? `<button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${recipe.id}')">Set Nutrition</button>` : ''}
+          <button class="btn btn--primary btn--sm" onclick="addRecipeToPlanFromNutrition('${escJAttr(recipe.id)}')">+ Add to Plan</button>
+          ${!hasNutrition ? `<button class="btn btn--outline btn--sm" onclick="openEditRecipeModal('${escJAttr(recipe.id)}')">Set Nutrition</button>` : ''}
         </div>
       </div>
     `;
@@ -7960,7 +8093,7 @@ function addRecipeToPlanFromNutrition(recipeId) {
     </label>
     <div style="display:flex;gap:.5rem;justify-content:flex-end">
       <button onclick="document.getElementById('quick-plan-picker').remove()" style="padding:.5rem 1rem;border:1px solid var(--color-border);border-radius:6px;background:none;cursor:pointer;">Cancel</button>
-      <button onclick="confirmQuickPlan('${recipeId}')" style="padding:.5rem 1rem;border:none;border-radius:6px;background:var(--color-primary);color:#fff;cursor:pointer;">Add</button>
+      <button onclick="confirmQuickPlan('${escJAttr(recipeId)}')" style="padding:.5rem 1rem;border:none;border-radius:6px;background:var(--color-primary);color:#fff;cursor:pointer;">Add</button>
     </div>
   `;
   document.body.appendChild(picker);
@@ -8151,16 +8284,16 @@ function unionStrings(a, b) {
 
 // Fill only EMPTY plan slots from an imported plan — never overwrite a meal you
 // already planned. Snacks are unioned.
-function mergeWeeklyPlan(imported) {
+function mergeWeeklyPlan(imported, state = AppState) {
   ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].forEach(function(day) {
     if (!imported[day]) return;
-    if (!AppState.weeklyPlan[day]) AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
+    if (!state.weeklyPlan[day]) state.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
     ['breakfast', 'lunch', 'dinner'].forEach(function(meal) {
-      if (!AppState.weeklyPlan[day][meal] && imported[day][meal]) AppState.weeklyPlan[day][meal] = imported[day][meal];
+      if (!state.weeklyPlan[day][meal] && imported[day][meal]) state.weeklyPlan[day][meal] = imported[day][meal];
     });
-    var cur = AppState.weeklyPlan[day].snacks || [];
+    var cur = state.weeklyPlan[day].snacks || [];
     (imported[day].snacks || []).forEach(function(id) { if (cur.indexOf(id) < 0) cur.push(id); });
-    AppState.weeklyPlan[day].snacks = cur;
+    state.weeklyPlan[day].snacks = cur;
   });
 }
 
@@ -8199,12 +8332,12 @@ function normalizePlannedBatches(list) {
 
 // Fill-only, same rule as mergeWeeklyPlan(): add batches whose id is missing, never
 // overwrite or drop one already planned.
-function mergePlannedBatches(incoming) {
-  var cur = normalizePlannedBatches(AppState.plannedBatches);
+function mergePlannedBatches(incoming, state = AppState) {
+  var cur = normalizePlannedBatches(state.plannedBatches);
   var have = {};
   cur.forEach(function(b) { have[b.id] = true; });
   normalizePlannedBatches(incoming).forEach(function(b) { if (!have[b.id]) cur.push(b); });
-  AppState.plannedBatches = cur;
+  state.plannedBatches = cur;
 }
 
 function importData() {
@@ -8214,89 +8347,28 @@ function importData() {
   input.onchange = function(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     const reader = new FileReader();
     reader.onload = function(e) {
       try {
         const importedData = JSON.parse(e.target.result);
-        
-        // Accept any meal-prep export that has at least one known field.
-        var KNOWN = ['recipes', 'weeklyPlan', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'groceryList', 'cookedMeals', 'mealConsumptions', 'mealConsumptionConflicts'];
-        if (!importedData || typeof importedData !== 'object' || !KNOWN.some(function(k) { return importedData[k]; })) {
-          throw new Error('Invalid data format');
-        }
-
+        validateSnapshotData(importedData);
         var newRecipeCount = (importedData.recipes || []).filter(function(r) {
           return r && r.id != null && !AppState.recipes.some(function(x) { return String(x.id) === String(r.id); });
         }).length;
-
         var bodyMsg = newRecipeCount > 0
           ? 'Add <strong>' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + '</strong> and any other data from this file to your collection?<br><br>Nothing is removed — imported items are merged into what you already have.'
-          : 'Merge this file\'s data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.';
+          : "Merge this file's data into your collection?<br><br>Nothing is removed — existing items win on any duplicates.";
         showConfirmDialog('Import data?', bodyMsg, 'Import', 'Cancel', async function() {
+          var savedLocally = false;
           try {
-            // Snapshot current data first so this can be undone via "Restore Backup".
-            createBackup('Import');
-
-            // Explicit import overrides prior deletion — a re-imported item should
-            // not be silently filtered on the next signed-in reload by a tombstone
-            // left over from a previous Clear All Data that included it.
-            TOMBSTONE_KEYS.forEach(function(key) {
-              (importedData[key] || []).forEach(function(it) {
-                if (it && it.id != null) clearTombstone(key, it.id);
-              });
-            });
-
-            // MERGE, don't replace — union list-type data by id (existing items
-            // win on a collision, so re-importing your own backup is a no-op).
-            AppState.recipes = unionById(AppState.recipes, importedData.recipes || []);
-            patchMissingNutrition(AppState.recipes);
-            AppState.customIngredients = unionById(AppState.customIngredients, importedData.customIngredients || []);
-            AppState.customHacks = unionById(AppState.customHacks, importedData.customHacks || []);
-            AppState.flavors = normalizeFlavors(unionById(AppState.flavors, importedData.flavors || []));
-            AppState.preparedFlavors = normalizePreparedFlavors(unionById(AppState.preparedFlavors, importedData.preparedFlavors || []));
-            AppState.pantry = unionById(AppState.pantry, importedData.pantry || []);
-            AppState.userIngredients = unionById(AppState.userIngredients, importedData.userIngredients || []);
-            AppState.cookedMeals = normalizeCookedMeals(unionById(AppState.cookedMeals, importedData.cookedMeals || []));
-            // Append-only facts, never edited after creation — merged via the canonical
-            // id+content primitive (not unionById's array-order/precedence union): identical
-            // facts on a same id dedupe, a genuinely differing same-id record is an explicit
-            // conflict, never a silent overwrite.
-            reconcileMealConsumptions(importedData.mealConsumptions || []);
-            reconcileMealConsumptionConflicts(importedData.mealConsumptionConflicts || []);
-            AppState.groceryList = unionById(AppState.groceryList, importedData.groceryList || []);
-
-            var importStampedAt = new Date().toISOString();
-            ['recipes', 'pantry', 'customIngredients', 'customHacks', 'flavors', 'preparedFlavors', 'userIngredients', 'cookedMeals', 'groceryList'].forEach(function(key) {
-              var importedIds = {};
-              (importedData[key] || []).forEach(function(it) {
-                if (it && it.id != null) importedIds[String(it.id)] = true;
-              });
-              (AppState[key] || []).forEach(function(it) {
-                if (it && it.id != null && importedIds[String(it.id)]) it.updatedAt = importStampedAt;
-              });
-            });
-
-            // Plan: fill empty slots only (never wipe a planned meal).
-            if (importedData.weeklyPlan) mergeWeeklyPlan(importedData.weeklyPlan);
-            if (importedData.plannedBatches) mergePlannedBatches(importedData.plannedBatches);
-
-            // Maps + store lists: combine; current values win on conflicts.
-            AppState.ingredientPrices = Object.assign({}, importedData.ingredientPrices || {}, AppState.ingredientPrices);
-            AppState.myStores = unionStrings(AppState.myStores, importedData.myStores || []);
-            AppState.customStores = unionStrings(AppState.customStores, importedData.customStores || []);
-            // A manual confidence stamp, not a list — "merge" means keep whichever is NEWER,
-            // never regress an existing verification with an older imported file.
-            if (importedData.inventoryVerifiedAt && importedData.inventoryVerifiedAt > (AppState.inventoryVerifiedAt || '')) {
-              AppState.inventoryVerifiedAt = importedData.inventoryVerifiedAt;
-            }
-            cacheInlinePhotos();
-
-            var savePromise = saveData();
-
-            // Refresh every view immediately — AppState is already updated
+            var next = prepareSnapshotChange(importedData, false);
+            if (!createBackup('Import')) return;
+            var saving = commitSnapshotChange(next);
+            if (!saving) return;
+            savedLocally = true;
             renderRecipes();
             renderWeeklyPlanner();
+            renderGroceryList();
             renderStorageGuide();
             renderCookingHacks();
             renderFlavors();
@@ -8308,16 +8380,16 @@ function importData() {
             updateFreshnessBadges();
             renderFreshnessBanner();
             renderInventoryVerifiedStatus();
-
-            // Wait for Firestore to commit before declaring success — closes the race
-            // window where a refresh could land on the pre-import cloud version.
-            await savePromise;
-            showSuccessMessage(newRecipeCount > 0
-              ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
-              : 'Imported and merged into your data.');
+            var synced = await saving;
+            showSuccessMessage(AppState.currentUser && !synced
+              ? 'Imported on this device. Cloud sync is pending.' : newRecipeCount > 0
+                ? 'Imported! Added ' + newRecipeCount + ' new recipe' + (newRecipeCount === 1 ? '' : 's') + ' to your collection.'
+                : 'Imported and merged into your data.');
           } catch (importErr) {
             console.error('Error applying import:', importErr);
-            showErrorMessage('Import failed while applying data. Your existing data is unchanged.');
+            showErrorMessage(savedLocally
+              ? 'Data was imported locally, but the view could not refresh. Reload to view it.'
+              : 'Import failed while applying data. Your existing data is unchanged.');
           }
         });
       } catch (error) {
@@ -8696,9 +8768,9 @@ function recordLocalDeletions() {
 }
 
 // Union two tombstone maps; the later deletedAt wins.
-function mergeDeletions(remote) {
+function mergeDeletions(remote, state = AppState) {
   remote = normalizeDeletions(remote);
-  var local = ensureDeletions();
+  var local = state.deletions = normalizeDeletions(state.deletions);
   TOMBSTONE_KEYS.forEach(function(collection) {
     Object.keys(remote[collection] || {}).forEach(function (id) {
       if (!local[collection][id] || remote[collection][id] > local[collection][id]) {
@@ -9056,8 +9128,11 @@ async function saveToFirestore() {
           mergeDeletions(remote.deletions);       // combine tombstones from the concurrent writer
           payload = mergeCloudConflict(remote, payload);
           payload.deletions = normalizeDeletions(AppState.deletions); // carry the merged tombstones
-          TOMBSTONE_KEYS.forEach(function (key) { // and drop anything either side deleted
-            payload[key] = (payload[key] || []).filter(function (it) { return !it || it.id == null || !readTombstone(key, it.id); });
+          TOMBSTONE_KEYS.forEach(function (key) { // same LWW rule as applyTombstones(), including explicit restores
+            payload[key] = (payload[key] || []).filter(function (it) {
+              var deletedAt = it && it.id != null && readTombstone(key, it.id);
+              return !deletedAt || (it.updatedAt && it.updatedAt > deletedAt);
+            });
           });
           console.warn('Concurrent edit detected (cloud v' + remoteVersion + ') — merged, no data lost');
         }
@@ -9776,7 +9851,7 @@ function clearRecipeForm() {
 // ── Grocery List — Print & Copy ───────────────────────────────────────────────
 
 function getGroceryByCategory() {
-  const categories = {};
+  const categories = Object.create(null);
   AppState.groceryList.forEach(item => {
     if (!categories[item.category]) categories[item.category] = [];
     categories[item.category].push(item);
@@ -9794,10 +9869,10 @@ function printGroceryList() {
   const date = new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const rows = Object.keys(categories).map(cat =>
-    '<h3>' + cat + '</h3>' +
+    '<h3>' + escapeHtml(cat) + '</h3>' +
     categories[cat].map(item =>
       '<div class="gp-item"><span class="gp-box"></span><span>' +
-      (item.quantity ? formatQuantity(item.quantity) + ' ' + (item.unit || '') + ' ' : '') +
+      (item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : '') +
       '<strong>' + escapeHtml(item.name) + '</strong></span></div>'
     ).join('')
   ).join('');
@@ -9925,8 +10000,8 @@ function openPrepMode(session) {
       prepCheckState[key] = !!checked[key];
       const qty = ing.baseQuantity || ing.quantity || '';
       return `
-        <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
-          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
+        <label class="prep-check-row" onclick="togglePrepCheck('${escJAttr(key)}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
+          <input type="checkbox" id="chk-${escapeHtml(key)}" onchange="togglePrepCheck('${escJAttr(key)}')"${prepCheckState[key] ? ' checked' : ''}>
           <span>${escapeHtml(ing.name)}${qty ? ' — ' + escapeHtml(qty) + ' ' + escapeHtml(ing.unit || '') : ''}</span>
         </label>`;
     }).join('');
@@ -9935,8 +10010,8 @@ function openPrepMode(session) {
       const key = `${recipe.id}-step-${i}`;
       prepCheckState[key] = !!checked[key];
       return `
-        <label class="prep-check-row" onclick="togglePrepCheck('${key}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
-          <input type="checkbox" id="chk-${key}" onchange="togglePrepCheck('${key}')"${prepCheckState[key] ? ' checked' : ''}>
+        <label class="prep-check-row" onclick="togglePrepCheck('${escJAttr(key)}')"${prepCheckState[key] ? ' style="opacity:0.45"' : ''}>
+          <input type="checkbox" id="chk-${escapeHtml(key)}" onchange="togglePrepCheck('${escJAttr(key)}')"${prepCheckState[key] ? ' checked' : ''}>
           <span>${escapeHtml(step)}</span>
         </label>`;
     }).join('');
@@ -10193,10 +10268,10 @@ function renderBatchPickerResults() {
     var alreadyPlanned = !!planned[String(r.id)];
     var addBtn = alreadyPlanned
       ? '<span class="batch-picker-added">Added ✓</span>'
-      : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
+      : '<button type="button" class="btn btn--secondary btn--sm batch-add-btn" onclick="addPlannedBatch(\'' + escJAttr(String(r.id)) + '\');renderBatchPickerResults()">+ Add</button>';
     // Title details, favorite, and +Add/Added are separate actions (TASK-064/TASK-074).
-    var nameBtn = '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJ(String(r.id)) + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
-    var favBtn = '<button type="button" class="recipe-fav-btn' + (r.favorite ? ' active' : '') + '" onclick="toggleFavorite(\'' + escJ(String(r.id)) + '\');renderBatchPickerResults()" title="' + (r.favorite ? 'Remove from favorites' : 'Add to favorites') + '" aria-label="' + (r.favorite ? 'Remove ' + escapeHtml(r.name) + ' from favorites' : 'Add ' + escapeHtml(r.name) + ' to favorites') + '">♥</button>';
+    var nameBtn = '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJAttr(String(r.id)) + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>';
+    var favBtn = '<button type="button" class="recipe-fav-btn' + (r.favorite ? ' active' : '') + '" onclick="toggleFavorite(\'' + escJAttr(String(r.id)) + '\');renderBatchPickerResults()" title="' + (r.favorite ? 'Remove from favorites' : 'Add to favorites') + '" aria-label="' + (r.favorite ? 'Remove ' + escapeHtml(r.name) + ' from favorites' : 'Add ' + escapeHtml(r.name) + ' to favorites') + '">♥</button>';
     return '<div class="batch-result">' +
       '<div class="batch-info">' + nameBtn +
       (meta.length ? '<span class="batch-meta">' + escapeHtml(meta.join(' · ')) + '</span>' : '') + '</div>' +
@@ -10210,7 +10285,7 @@ window.renderBatchPickerResults = renderBatchPickerResults;
 function plannedBatchRowHtml(b, mode) {
   var recipe = findRecipeById(b.recipeId);
   var name = recipe ? recipe.name : 'Unknown recipe (deleted)';
-  var idArg = escJ(b.id);
+  var idArg = escJAttr(b.id);
   var servingsText = b.servings ? b.servings + ' servings' : 'servings not set';
   var controls;
   if (mode === 'prep') {
@@ -10230,7 +10305,7 @@ function plannedBatchRowHtml(b, mode) {
   // The title button, servings stepper, and remove control stay separate (TASK-074).
   var inspectable = mode !== 'prep' && recipe;
   var nameHtml = inspectable
-    ? '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJ(String(recipe.id)) + '\')" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
+    ? '<button type="button" class="batch-name batch-name-btn" onclick="openRecipeDetailsModal(\'' + escJAttr(String(recipe.id)) + '\')" aria-label="View ' + escapeHtml(name) + ' recipe details">' + escapeHtml(name) + '</button>'
     : '<span class="batch-name">' + escapeHtml(name) + '</span>';
   return '<div class="batch-row" data-batch-id="' + escapeHtml(b.id) + '">' +
     '<div class="batch-info">' + nameHtml +
@@ -10453,7 +10528,7 @@ function renderPrepTab() {
         var days = e.sources.filter(function(s) { return s !== 'batch'; });
         return '<div class="batch-row"><div class="batch-info"><span class="batch-name">' + escapeHtml(e.recipe.name) + '</span>' +
           '<span class="batch-meta">' + escapeHtml(days.join(', ')) + '</span></div>' +
-          '<button type="button" class="btn btn--secondary btn--sm" onclick="markRecipeCooked(\'' + escJ(String(e.recipe.id)) + '\', this)">Cooked → Fridge</button></div>';
+          '<button type="button" class="btn btn--secondary btn--sm" onclick="markRecipeCooked(\'' + escJAttr(String(e.recipe.id)) + '\', this)">Cooked → Fridge</button></div>';
       }).join('') + '</div>';
   }
   listEl.innerHTML = html;
@@ -10568,9 +10643,9 @@ function openCSVPreviewModal(recipes) {
 
   const rows = recipes.map(r => `
     <tr style="border-bottom:1px solid var(--border-color,#e0e0e0);">
-      <td style="padding:0.5rem 0.75rem;">${r.name}</td>
-      <td style="padding:0.5rem 0.75rem;">${r.category}</td>
-      <td style="padding:0.5rem 0.75rem;">${r.baseServings}</td>
+      <td style="padding:0.5rem 0.75rem;">${escapeHtml(String(r.name))}</td>
+      <td style="padding:0.5rem 0.75rem;">${escapeHtml(String(r.category))}</td>
+      <td style="padding:0.5rem 0.75rem;">${escapeHtml(String(r.baseServings))}</td>
       <td style="padding:0.5rem 0.75rem;">${r.baseIngredients.length} item${r.baseIngredients.length !== 1 ? 's' : ''}</td>
     </tr>`).join('');
 
@@ -14792,8 +14867,13 @@ function escJ(str) {
   return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+function escJAttr(str) {
+  return escapeHtml(escJ(str).replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'));
+}
+
 function escapeHtml(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r/g, '&#13;').replace(/\n/g, '&#10;');
 }
 
 function getCatEmoji(cat) {

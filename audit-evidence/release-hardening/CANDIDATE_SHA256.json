@@ -1,0 +1,5 @@
+{
+  "app.js": "c71e93cb54cc1f0a8f30ef11c358f4aef1ae2df3dee92b01165ce310aa5ec5f3",
+  "tests/release-hardening.spec.js": "b5975ec81de3f565d773bb35915327977fc9c84608caf4497303d8064ed11779",
+  "tests/reliability-recovery-v1.spec.js": "897fee2c3356799feda1fb916beb7a3bfa598491991bc419b5bb1e0e4746a984"
+}

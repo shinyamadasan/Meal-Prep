@@ -1,0 +1,457 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/reliability-recovery-v1.spec.js",
+      "--project=local",
+      "--workers=2",
+      "--grep=review supplied pantry|review correction|signed-in clear|partial weekly",
+      "--reporter=json",
+      "--output=test-results/final-before"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-recovery-baseline/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-recovery-baseline/test-results/final-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-recovery-baseline/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-recovery-baseline/test-results/final-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-recovery-baseline/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "reliability-recovery-v1.spec.js",
+      "file": "reliability-recovery-v1.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "rejected review supplied pantry quantity import leaves runtime, storage, backup and tombstones unchanged",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5587,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:142:59",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 59,
+                      "line": 142
+                    },
+                    "snippet": "  140 |     await acceptIfShown(page);\n  141 |     await expect.poll(() => page.evaluate(() => document.body.innerText.includes('Failed to import') ||\n> 142 |       document.body.innerText.includes('Import failed'))).toBe(true);\n      |                                                           ^\n  143 |     expect(await dataSnapshot(page)).toEqual(before);\n  144 |   });\n  145 | }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 59,
+                        "line": 142
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32mtrue\u001b[39m\nReceived: \u001b[31mfalse\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  140 |     await acceptIfShown(page);\n  141 |     await expect.poll(() => page.evaluate(() => document.body.innerText.includes('Failed to import') ||\n> 142 |       document.body.innerText.includes('Import failed'))).toBe(true);\n      |                                                           ^\n  143 |     expect(await dataSnapshot(page)).toEqual(before);\n  144 |   });\n  145 | }\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:142:59"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:08:51.920Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\test-results\\final-before\\reliability-recovery-v1-re-80b8e-up-and-tombstones-unchanged-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 59,
+                    "line": 142
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-80dac6c115f01c720efe",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 135,
+          "column": 3
+        },
+        {
+          "title": "review correction dialog treats grocery id string-shopping-id as data",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 724,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"executed\": false,\u001b[22m\n\u001b[32m-   \"pantry\": 0,\u001b[39m\n\u001b[31m+   \"pantry\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"executed\": false,\u001b[22m\n\u001b[32m-   \"pantry\": 0,\u001b[39m\n\u001b[31m+   \"pantry\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:198:8",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 8,
+                      "line": 198
+                    },
+                    "snippet": "  196 |     await page.locator('.nik-fix-btn').click();\n  197 |     expect(await page.evaluate(() => ({ pantry: AppState.pantry.length, executed: !!window.__recoveryId })))\n> 198 |       .toEqual({ pantry: 0, executed: false });\n      |        ^\n  199 |   });\n  200 | }\n  201 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 8,
+                        "line": 198
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"executed\": false,\u001b[22m\n\u001b[32m-   \"pantry\": 0,\u001b[39m\n\u001b[31m+   \"pantry\": 1,\u001b[39m\n\u001b[2m  }\u001b[22m\n\n  196 |     await page.locator('.nik-fix-btn').click();\n  197 |     expect(await page.evaluate(() => ({ pantry: AppState.pantry.length, executed: !!window.__recoveryId })))\n> 198 |       .toEqual({ pantry: 0, executed: false });\n      |        ^\n  199 |   });\n  200 | }\n  201 |\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:198:8"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:08:58.143Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\test-results\\final-before\\reliability-recovery-v1-re-af968--string-shopping-id-as-data-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 8,
+                    "line": 198
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-fa6bd8e9c5142927ba4e",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 190,
+          "column": 3
+        },
+        {
+          "title": "review correction dialog treats grocery id 0);window.__recoveryId=true;// as data",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 722,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"executed\": false,\u001b[39m\n\u001b[31m+   \"executed\": true,\u001b[39m\n\u001b[2m    \"pantry\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"executed\": false,\u001b[39m\n\u001b[31m+   \"executed\": true,\u001b[39m\n\u001b[2m    \"pantry\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:198:8",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 8,
+                      "line": 198
+                    },
+                    "snippet": "  196 |     await page.locator('.nik-fix-btn').click();\n  197 |     expect(await page.evaluate(() => ({ pantry: AppState.pantry.length, executed: !!window.__recoveryId })))\n> 198 |       .toEqual({ pantry: 0, executed: false });\n      |        ^\n  199 |   });\n  200 | }\n  201 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 8,
+                        "line": 198
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[32m-   \"executed\": false,\u001b[39m\n\u001b[31m+   \"executed\": true,\u001b[39m\n\u001b[2m    \"pantry\": 0,\u001b[22m\n\u001b[2m  }\u001b[22m\n\n  196 |     await page.locator('.nik-fix-btn').click();\n  197 |     expect(await page.evaluate(() => ({ pantry: AppState.pantry.length, executed: !!window.__recoveryId })))\n> 198 |       .toEqual({ pantry: 0, executed: false });\n      |        ^\n  199 |   });\n  200 | }\n  201 |\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:198:8"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:08:59.511Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\test-results\\final-before\\reliability-recovery-v1-re-68840-dow-recoveryId-true-as-data-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 8,
+                    "line": 198
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-51744e98dca50b43cb55",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 190,
+          "column": 3
+        },
+        {
+          "title": "signed-in clear and restore publish complete backup fields before cloud reload and stale-marker replay",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 834,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m1\u001b[39m\nReceived length: \u001b[31m0\u001b[39m\nReceived array:  \u001b[31m[]\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m1\u001b[39m\nReceived length: \u001b[31m0\u001b[39m\nReceived array:  \u001b[31m[]\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:219:32",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 32,
+                      "line": 219
+                    },
+                    "snippet": "  217 |   await expect.poll(() => page.evaluate(() => window.__recoveryWrites.length)).toBeGreaterThan(0);\n  218 |   const restored = await page.evaluate(() => window.__recoveryCloud);\n> 219 |   expect(restored.cookHistory).toHaveLength(1);\n      |                                ^\n  220 |   expect(restored.prepModeSession.active).toBe(true);\n  221 |   expect(restored.mealConsumptions).toEqual([FACT]);\n  222 |   await page.evaluate(deletions => {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 32,
+                        "line": 219
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m1\u001b[39m\nReceived length: \u001b[31m0\u001b[39m\nReceived array:  \u001b[31m[]\u001b[39m\n\n  217 |   await expect.poll(() => page.evaluate(() => window.__recoveryWrites.length)).toBeGreaterThan(0);\n  218 |   const restored = await page.evaluate(() => window.__recoveryCloud);\n> 219 |   expect(restored.cookHistory).toHaveLength(1);\n      |                                ^\n  220 |   expect(restored.prepModeSession.active).toBe(true);\n  221 |   expect(restored.mealConsumptions).toEqual([FACT]);\n  222 |   await page.evaluate(deletions => {\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:219:32"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:09:00.828Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\test-results\\final-before\\reliability-recovery-v1-si-9e6e4-oad-and-stale-marker-replay-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 32,
+                    "line": 219
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-4a864562d62bb8c75fbd",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 202,
+          "column": 1
+        },
+        {
+          "title": "partial weekly plan in an older backup restores all seven usable days",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 487,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m7\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[\"Monday\"]\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m7\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[\"Monday\"]\u001b[39m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:242:29",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                      "column": 29,
+                      "line": 242
+                    },
+                    "snippet": "  240 |   });\n  241 |   const plan = await page.evaluate(() => AppState.weeklyPlan);\n> 242 |   expect(Object.keys(plan)).toHaveLength(7);\n      |                             ^\n  243 |   expect(plan.Monday).toEqual({ breakfast: null, lunch: null, dinner: 'recovery', snacks: [] });\n  244 |   expect(plan.Tuesday).toEqual({ breakfast: null, lunch: null, dinner: null, snacks: [] });\n  245 | });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                        "column": 29,
+                        "line": 242
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoHaveLength\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\nExpected length: \u001b[32m7\u001b[39m\nReceived length: \u001b[31m1\u001b[39m\nReceived array:  \u001b[31m[\"Monday\"]\u001b[39m\n\n  240 |   });\n  241 |   const plan = await page.evaluate(() => AppState.weeklyPlan);\n> 242 |   expect(Object.keys(plan)).toHaveLength(7);\n      |                             ^\n  243 |   expect(plan.Monday).toEqual({ breakfast: null, lunch: null, dinner: 'recovery', snacks: [] });\n  244 |   expect(plan.Tuesday).toEqual({ breakfast: null, lunch: null, dinner: null, snacks: [] });\n  245 | });\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js:242:29"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T19:09:02.261Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\test-results\\final-before\\reliability-recovery-v1-pa-c8cd4-tores-all-seven-usable-days-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-recovery-baseline\\tests\\reliability-recovery-v1.spec.js",
+                    "column": 29,
+                    "line": 242
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "6895064c671e98c934d6-533d6c968fba85a057ab",
+          "file": "reliability-recovery-v1.spec.js",
+          "line": 234,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T19:08:51.174Z",
+    "duration": 12039.11,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 5,
+    "flaky": 0
+  }
+}

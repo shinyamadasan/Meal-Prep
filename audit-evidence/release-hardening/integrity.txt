@@ -1,0 +1,2 @@
+Preserved prior evidence: 47/47 sizes and SHA-256 match.
+Documentation warnings: exact baseline/candidate output identical: True.
