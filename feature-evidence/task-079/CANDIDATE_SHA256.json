@@ -1,0 +1,18 @@
+{
+  "app.js": {
+    "sha256": "fe61d7e430ae21625a8418e83efcd3bbd8b7257179362a159872f57f5f633d17",
+    "gitBlob": "8aea7d0d708cde56a6ae5419eb73bb8cff1b6954"
+  },
+  "style.css": {
+    "sha256": "d541ea072bc903d903b873f4fbdb31390f6672b084d2fc45a52fb7a88571ee1f",
+    "gitBlob": "ac55dddfe2477eb586d90e22df1be1c4335eb594"
+  },
+  "tests/home-favorites-air-fryer.spec.js": {
+    "sha256": "b2ec4dc25231a1338e4b231c09bc1667b10fb99f25725e7f8dcb090bcd95a016",
+    "gitBlob": "72f0ec2ca0d5af8f5d0adabfb4c983847359118e"
+  },
+  "tests/paste-import-metadata-and-ranges.spec.js": {
+    "sha256": "97c62e9627f026d54a0439c95e96974329581c7e6bfc3877cd2db76e612044d5",
+    "gitBlob": "f81ef1154292feef8803188a7abba2f7d8b1489e"
+  }
+}

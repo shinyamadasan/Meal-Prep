@@ -3964,3 +3964,56 @@ and compatibility with the earlier grocery repair are reviewed, not every import
 full-app XSS clearance. Real devices, production sync/MCP and actual service-worker upgrades were
 not tested. Single-slot capacity, clock skew and broader concurrent-edit risks remain. Phase 2
 and production rollout were not performed. No task status was changed by this reviewer.
+
+## Independent Review TASK-079 — Scoped PASS
+Date: 2026-11-06
+branch: task-079-home-favorites-air-fryer
+verdict: both scoped features and completed local verification pass; owner integration pending
+
+Separate reviewer /root/release_hardening_review inspected TASK-079, the complete app/style diff
+against e497156, new tests, the existing paste-test adjustment, D-085 and scoped documentation,
+REPORT.md, and actual red/green evidence. This append is the reviewer's only file change; all
+prior reviews remain intact. No app/test/status edit, commit, push, merge, deployment or live
+MCP/production operation was performed.
+
+Reviewed application SHA-256:
+- app.js: fe61d7e430ae21625a8418e83efcd3bbd8b7257179362a159872f57f5f633d17
+- style.css: d541ea072bc903d903b873f4fbdb31390f6672b084d2fc45a52fb7a88571ee1f
+
+No remaining must-fix was identified:
+- renderHomeFavorites derives every strict favorite without a cap, filter dependency or new
+  persisted state. Its three actions reuse read-only details, the existing favorite toggle and
+  addPlannedBatch duplicate prevention. Existing recipe/dashboard rendering refreshes the section
+  after favorite, edit, delete, import and planning actions. Text/category and all new handler id
+  arguments use existing escaping; numeric and malicious string ids have usable tested actions.
+- Air Fryer is an explicit equipment vocabulary member and primary filter only. Generic form,
+  normalization, paste and persistence/import/export paths retain it alongside other equipment.
+  The filter matches only air-fryer, composes with existing filters and retains existing zero-match
+  guidance/empty-library policy. No oven inference, sample backfill or recommendation change exists.
+- The application diff adds only 30 app.js lines and 22 scoped CSS lines. Inventory, shopping,
+  sync and MCP implementations are unchanged. Existing Add to Plan derived shopping refresh is
+  reused. No new framework, dependency, collection, storage key, schema or export version exists.
+
+Actual feature-evidence/task-079 verification:
+- before.json plus review-before.json: 21 new cases on the unchanged base, one existing-policy
+  compatibility pass and 20 failures, no skips/flaky or runner errors.
+- focused-final.json: 109 local passes including all 21 new cases; paste-final.json: 12 local
+  passes. Final full-regression.json/full-console.txt: all 834 actual results are local and expected,
+  zero failures/skips/flaky or runner errors, duration 283738.91 ms. Independently enumerated results.
+- Initial full 833/834 result is preserved. Its obsolete expectation that Air fryer is unknown
+  was legitimately updated for the new requirement. The same input and exact-array assertion
+  still reject Sous vide machine; unknown-equipment validation was not weakened. No app fix was
+  hidden by that test change. The final complete rerun passes.
+- Independently recomputed all four source/test hashes in CANDIDATE_SHA256.json: all match.
+  Documentation outputs are byte-identical with 55 existing warnings; 118 decision pointers pass.
+  git diff --check passes. Worker/MCP source is unchanged; live service tests were not performed.
+- Viewed all four final Home/Air Fryer desktop/mobile PNGs with view_image. Home cards show two
+  desktop columns and one mobile column, visible actions and no overlap. Air Fryer chip/result and
+  method badge are readable. Existing mobile Recipes toolbar clipping is disclosed and unchanged.
+
+GO for owner review/integration of these two features. Merge/deployment remain gated on owner
+authorization. Limits: uncapped favorites make Home longer; existing recipes require explicit
+Air Fryer tagging, and older clients cannot recognize that slug until refreshed. Synthetic local
+Chromium viewports do not establish real iOS/Android, production sync or live MCP behavior. No
+broader UI redesign or existing security/recovery limitation is resolved by this task. No task
+status was changed by this reviewer.

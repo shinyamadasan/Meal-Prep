@@ -595,6 +595,7 @@ var RECIPE_EQUIPMENT = [
   { id: 'instant-pot', label: 'Instant Pot', icon: '⏲️' },
   { id: 'pressure-cooker', label: 'Pressure cooker', icon: '⏲️' },
   { id: 'oven', label: 'Oven', icon: '🔥' },
+  { id: 'air-fryer', label: 'Air Fryer', icon: '🍟' },
   { id: 'pan', label: 'Pan', icon: '🍳' },
   { id: 'egg-boiler', label: 'Egg boiler', icon: '🥚' },
   { id: 'microwave', label: 'Microwave', icon: '⚡' },
@@ -4948,6 +4949,10 @@ var RECIPE_QUICK_FILTERS = [
     match: function(r) { return recipeHasEquipment(r, ['oven']); },
     empty: 'Open a recipe, tick <b>Oven</b> under Cooking method, and it will show up here.' },
 
+  { id: 'air-fryer', icon: '🍟', label: 'Air Fryer', primary: true,
+    match: function(r) { return recipeHasEquipment(r, ['air-fryer']); },
+    empty: 'Open a recipe, tick <b>Air Fryer</b> under Cooking method, and it will show up here.' },
+
   { id: 'pressure', icon: '⏲️', label: 'Instant Pot', primary: true,
     match: function(r) { return recipeHasEquipment(r, ['instant-pot', 'pressure-cooker']); },
     empty: 'Open a recipe, tick <b>Instant Pot</b> or <b>Pressure cooker</b> under Cooking method, and it will show up here.' },
@@ -5522,6 +5527,7 @@ function isSampleRecipe(r) {
 }
 
 function renderRecipes() {
+  renderHomeFavorites();
   renderGettingStarted();
   renderCookSuggestions();
   renderStarterPackPrompt();
@@ -6220,6 +6226,28 @@ function getCookableRecipes() {
   return results.sort(function(a, b) { return a.missing - b.missing || b.matched - a.matched; });
 }
 
+function renderHomeFavorites() {
+  var el = document.getElementById('home-favorites');
+  if (!el) return;
+  var favorites = AppState.recipes.filter(function(r) { return r.favorite === true; });
+  var planned = new Set(normalizePlannedBatches(AppState.plannedBatches).map(function(b) { return b.recipeId; }));
+  var cards = favorites.map(function(r) {
+    var id = escJAttr(String(r.id));
+    var added = planned.has(String(r.id));
+    return '<article class="home-favorite-card">' +
+      '<div class="batch-info">' +
+        '<button type="button" class="batch-name batch-name-btn home-favorite-name" onclick="openRecipeDetailsModal(\'' + id + '\')" aria-label="View ' + escapeHtml(r.name) + ' recipe details">' + escapeHtml(r.name) + '</button>' +
+        '<span class="batch-meta">' + escapeHtml(r.category) + '</span>' +
+      '</div>' +
+      '<button type="button" class="recipe-fav-btn active" onclick="toggleFavorite(\'' + id + '\')" aria-label="Remove ' + escapeHtml(r.name) + ' from favorites" aria-pressed="true" title="Remove from favorites">♥</button>' +
+      '<button type="button" class="btn btn--secondary btn--sm" onclick="addPlannedBatch(\'' + id + '\')"' + (added ? ' disabled' : '') + '>' + (added ? 'Added to Plan' : 'Add to Plan') + '</button>' +
+      '</article>';
+  }).join('');
+  el.innerHTML = '<h2 class="recipe-title" id="home-favorites-title">❤️ My Favorites</h2>' +
+    (favorites.length ? '<div class="home-favorites-grid">' + cards + '</div>' :
+      '<p class="home-favorites-empty">Tap the heart on a recipe to keep your favorites here.</p>');
+}
+
 function renderDashboard() {
   var el = document.getElementById('dashboard');
   if (!el) return;
@@ -6478,9 +6506,11 @@ function renderDashboard() {
     renderReadyFoodCard() +
     level1Card +
     leftoverPromptCard +
+    '<section class="dash-card" id="home-favorites" aria-labelledby="home-favorites-title"></section>' +
     ideasCard +
     historyCard +
     '</div>';
+  renderHomeFavorites();
 }
 
 // This week at a glance, in flow order. Every number is derived from existing state:

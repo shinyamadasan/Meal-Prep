@@ -1288,3 +1288,22 @@ deviations: Offline/guest Restore is deliberately refused until online signed-in
   consistency retains the exact 55 baseline warnings (zero new); 115 decision pointers pass.
   Earlier audit/recovery evidence remains byte-identical (47 files, including original 27 artifacts).
 → status set to `review` in TASKS.md; Phase 2 unstarted. See the final independent REVIEW.md entry.
+
+
+## TASK-079 — Home Favorites and Air Fryer (branch: task-079-home-favorites-air-fryer)
+changed:
+  - app.js (+30 loc): renderHomeFavorites derives all strict favorites; existing details,
+    toggleFavorite and addPlannedBatch actions; Home/recipe-render refresh; air-fryer vocabulary
+    and explicit primary method filter. No oven inference or new persisted state.
+  - style.css (+22 loc): scoped responsive Home favorite cards using existing tokens/styles.
+  - tests/home-favorites-air-fryer.spec.js (21 new cases); existing paste-import equipment test
+    now expects air-fryer while retaining the exact rejection of unknown Sous vide equipment.
+  - docs/FEATURES.md, DATA_MODEL.md, DECISIONS.md D-085 and feature-evidence/task-079/: scoped
+    behavior, compatibility, red/green/full results, four reviewed desktop/mobile screenshots.
+tests: focused 109/109; affected paste 12/12; complete npm local 834/834, zero skips/flaky.
+  Before new features: 20 failed / 1 existing empty-library compatibility pass across 21 cases.
+blockers: none for owner review; no merge/deploy authorization. Real-device checks remain human.
+deviations: Initial full run 833/834 exposed the obsolete Air-Fryer-is-unknown test expectation;
+  updated only that expectation/comment, then reran affected and complete gates. Initial evidence
+  retained. Inventory/shopping/sync/MCP implementations and historical evidence remain untouched.
+→ status set to `review` in TASKS.md; independent verdict in REVIEW.md.

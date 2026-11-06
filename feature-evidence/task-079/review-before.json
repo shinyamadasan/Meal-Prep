@@ -1,0 +1,412 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/home-favorites-air-fryer.spec.js",
+      "--grep",
+      "review ",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/task079-review-before"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-review-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-review-before",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "home-favorites-air-fryer.spec.js",
+      "file": "home-favorites-air-fryer.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "review numeric favorite ids reuse details, planning and removal",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 30110,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                        "column": 118,
+                        "line": 219
+                      },
+                      "message": "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#home-favorites .home-favorite-card').filter({ hasText: 'Numeric favorite' }).getByRole('button', { name: 'View Numeric favorite recipe details' })\u001b[22m\n\n\n  217 | test('review numeric favorite ids reuse details, planning and removal', async ({ page }) => {\n  218 |   await loadApp(page, [makeRecipe(7901, 'Numeric favorite', { favorite: true })]);\n> 219 |   await favoriteCard(page, 'Numeric favorite').getByRole('button', { name: 'View Numeric favorite recipe details' }).click();\n      |                                                                                                                      ^\n  220 |   await expect(page.locator('#recipe-name')).toHaveValue('Numeric favorite');\n  221 |   await page.locator('#recipe-modal .modal-close').click();\n  222 |   await favoriteCard(page, 'Numeric favorite').getByRole('button', { name: 'Add to Plan', exact: true }).click();\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:219:118"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:08:21.397Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\test-results\\task079-review-before\\home-favorites-air-fryer-r-16e98-etails-planning-and-removal-local\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-b36fcb2ee8d96c506bcc",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 217,
+          "column": 1
+        },
+        {
+          "title": "review editing and deleting a favorite refreshes Home immediately",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 5866,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\u001b[22m\n\u001b[2m    14 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\u001b[22m\n\u001b[2m    14 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:233:56",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                      "column": 56,
+                      "line": 233
+                    },
+                    "snippet": "  231 |   await page.locator('#recipe-name').fill('Renamed favorite');\n  232 |   await page.locator('#recipe-submit-btn').click();\n> 233 |   await expect(favoriteCard(page, 'Renamed favorite')).toHaveCount(1);\n      |                                                        ^\n  234 |   await expect(favoriteCard(page, 'Air Fryer Carrots')).toHaveCount(0);\n  235 |   await page.evaluate(() => deleteRecipe('air'));\n  236 |   await page.locator('.confirm-ok-btn').click();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                        "column": 56,
+                        "line": 233
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveCount\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\nExpected: \u001b[32m1\u001b[39m\nReceived: \u001b[31m0\u001b[39m\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveCount\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('#home-favorites .home-favorite-card').filter({ hasText: 'Renamed favorite' })\u001b[22m\n\u001b[2m    14 × locator resolved to 0 elements\u001b[22m\n\u001b[2m       - unexpected value \"0\"\u001b[22m\n\n\n  231 |   await page.locator('#recipe-name').fill('Renamed favorite');\n  232 |   await page.locator('#recipe-submit-btn').click();\n> 233 |   await expect(favoriteCard(page, 'Renamed favorite')).toHaveCount(1);\n      |                                                        ^\n  234 |   await expect(favoriteCard(page, 'Air Fryer Carrots')).toHaveCount(0);\n  235 |   await page.evaluate(() => deleteRecipe('air'));\n  236 |   await page.locator('.confirm-ok-btn').click();\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:233:56"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:08:52.171Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\test-results\\task079-review-before\\home-favorites-air-fryer-r-52ff3--refreshes-Home-immediately-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                    "column": 56,
+                    "line": 233
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-5d888f830be1f8df85f4",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 228,
+          "column": 1
+        },
+        {
+          "title": "review Air Fryer respects favorites and category conjunction",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 30112,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                        "column": 23,
+                        "line": 248
+                      },
+                      "message": "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#recipe-quick-filters .rq-chip').filter({ hasText: 'Air Fryer' })\u001b[22m\n\n\n  246 |   ]);\n  247 |   await page.evaluate(() => showTab('recipes'));\n> 248 |   await airChip(page).click();\n      |                       ^\n  249 |   await page.locator('#favorites-filter').check();\n  250 |   await expect(page.locator('#recipes-grid .recipe-title')).toHaveText(['Favorite main air', 'Favorite breakfast air']);\n  251 |   await page.locator('#category-filter').selectOption('Main Dish');\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:248:23"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:08:58.707Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\test-results\\task079-review-before\\home-favorites-air-fryer-r-75e24-es-and-category-conjunction-local\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-172a5f83499bd263c370",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 240,
+          "column": 1
+        },
+        {
+          "title": "review empty recipe library keeps existing hidden-method policy",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 469,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:09:29.473Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-e4c3cd94b6999cdf13f8",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 255,
+          "column": 1
+        },
+        {
+          "title": "review pasted equipment metadata preserves explicit Air Fryer",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 503,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 0\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"air-fryer\",\u001b[39m\n\u001b[2m    \"oven\",\u001b[22m\n\u001b[2m  ]\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 0\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"air-fryer\",\u001b[39m\n\u001b[2m    \"oven\",\u001b[22m\n\u001b[2m  ]\u001b[22m\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:265:21",
+                    "location": {
+                      "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                      "column": 21,
+                      "line": 265
+                    },
+                    "snippet": "  263 |   await loadApp(page);\n  264 |   const equipment = await page.evaluate(() => parseRecipeText('Air fryer carrots\\nEquipment: Air Fryer, Oven\\nIngredients:\\n200 g carrot\\nInstructions:\\nAir fry until tender.').equipment);\n> 265 |   expect(equipment).toEqual(['air-fryer', 'oven']);\n      |                     ^\n  266 | });\n  267 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                        "column": 21,
+                        "line": 265
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 0\u001b[39m\n\n\u001b[2m  Array [\u001b[22m\n\u001b[32m-   \"air-fryer\",\u001b[39m\n\u001b[2m    \"oven\",\u001b[22m\n\u001b[2m  ]\u001b[22m\n\n  263 |   await loadApp(page);\n  264 |   const equipment = await page.evaluate(() => parseRecipeText('Air fryer carrots\\nEquipment: Air Fryer, Oven\\nIngredients:\\n200 g carrot\\nInstructions:\\nAir fry until tender.').equipment);\n> 265 |   expect(equipment).toEqual(['air-fryer', 'oven']);\n      |                     ^\n  266 | });\n  267 |\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:265:21"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:09:30.066Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\test-results\\task079-review-before\\home-favorites-air-fryer-r-d6954-reserves-explicit-Air-Fryer-local\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                    "column": 21,
+                    "line": 265
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-e2ed867cf0450164d7fe",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 262,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T21:08:20.628Z",
+    "duration": 70351.63500000001,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 4,
+    "flaky": 0
+  }
+}

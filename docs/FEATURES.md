@@ -40,11 +40,18 @@
 
 ## Dashboard (Home)
 - **Card order (D-078)** — greeting → **meal-prep flow** → **Ready to eat** → **What needs
-  attention?** → Record leftovers/takeout → **Need ideas?** (collapsed) → **Cook History**
+  attention?** → Record leftovers/takeout → **❤️ My Favorites** → **Need ideas?** (collapsed) → **Cook History**
   (collapsed). Ready to eat sits right under the flow card so "what can I eat right now?" is
   answered before anything else; the standalone L3 "Planning" strip (week-dot row + Planner/
   Nutrition links) was removed as a duplicate of the flow card's own Plan step and the Plan tab
   itself — Nutrition stays reachable from the top nav's "More" menu.
+- **❤️ My Favorites (D-085)** — Working · `#home-favorites`, `renderHomeFavorites()` · every
+  recipe with `favorite === true`, independent of Recipes search/filters, shown in compact cards
+  using existing recipe-picker styles. Titles reuse read-only `openRecipeDetailsModal()`; hearts
+  reuse `toggleFavorite()`; Add to Plan reuses `addPlannedBatch()` and its duplicate prevention.
+  Already-planned recipes show a disabled Added to Plan button. Recipe renders refresh this
+  section after favorite/edit/delete/import changes. Empty state guides the heart action; two
+  desktop columns become one on mobile. No separate favorite list or persistence field.
 - **Meal-prep flow card** — Implemented (D-076, extended D-078) · `renderMealPrepFlowCard()` ·
   first card: Plan / Shop / Prep / Fridge counts, each a tap into its tab, plus one **factual next
   action** derived from those same counts (add meals → buy → prep → "nothing left"), never a new
@@ -108,7 +115,12 @@
 - **Grocery → Inventory on check** — Working · `toggleGroceryItem()` → `stockPurchasedGroceryItem()` · checking a row transfers it to inventory with **no further input**: category, storage, shelf life and purchase date are all inferred. Buying more of something you already have updates the existing record (`findMergeableStock()` → `canMergePurchaseInto()` → `applyPurchaseToStock()`) rather than creating a duplicate; a printed-expiry, already-expired, or different-unit record stays separate (D-069 — quantities are added, never converted). Buying a low staple sets `stockLevel: 'full'` and clears its auto shopping row. Unchecking undoes the transfer exactly, via the `stocked` receipt. Check-off now persists (it previously never called `saveData()`). See DECISIONS D-057.
 
 ### Low-effort discovery
-- **Cooking-method quick filters** — Working · `renderRecipeQuickFilters()` / `setRecipeQuickFilter()` → `#recipe-quick-filters` · `All | Lowest effort | Rice cooker | Oven | Instant Pot | No-cook | Pan`, plus `Rice + steamer` and `Batch-friendly` refinements. One chip at a time, ANDed on top of the existing search/category/time/favourites filters; `All` or tapping the active chip clears it. **A PRIMARY cooking-method chip never hides, even at zero** — it renders muted (`.is-empty`) and its empty state names the editor field that fills it; only the refinements hide when empty. That is the D-060 fix: a chip that disappears when it matches nothing is a capability nobody can discover. Transient view state — not persisted, not synced. See DECISIONS D-060.
+- **Cooking-method quick filters** — Working · `renderRecipeQuickFilters()` / `setRecipeQuickFilter()` → `#recipe-quick-filters` · `All | Lowest effort | Rice cooker | Oven | Air Fryer | Instant Pot | No-cook | Pan`, plus `Rice + steamer` and `Batch-friendly` refinements. One chip at a time, ANDed on top of the existing search/category/time/favourites filters; `All` or tapping the active chip clears it. **A PRIMARY cooking-method chip never hides, even at zero** — it renders muted (`.is-empty`) and its empty state names the editor field that fills it; only the refinements hide when empty. That is the D-060 fix: a chip that disappears when it matches nothing is a capability nobody can discover. Transient view state — not persisted, not synced. See DECISIONS D-060.
+- **Air Fryer (D-085)** — Working · explicit `air-fryer` in `RECIPE_EQUIPMENT`, automatically
+  available in create/edit Cooking method controls and normalization/paste/import/export paths.
+  Its primary quick-filter chip matches only that tag, combines with existing filters, and shows
+  editor guidance at zero matches. Oven-only recipes are never retagged. Empty recipe libraries
+  retain the existing hidden-chip-row policy. No recommendation-ranking change.
 - **Cooking method is a presentation grouping** — Working · `Rice cooker` matches `rice-cooker` AND `rice-cooker-steamer`; `Instant Pot` matches `instant-pot` AND `pressure-cooker`. There is no `cookingMethod` field and no migration — the grouping sits over the existing `recipe.equipment[]` slugs, which stay individually filterable through the refinement chips. See DECISIONS D-060.
 - **Lowest effort ranks by work, not clock** — Working · uses `recipeEffortScore() <= 2`, the same honesty gate the Home "Easiest" pick uses, so the chip and the recommendation can never disagree about what counts as easy. Results are ordered easiest-first by the existing D-059 ranking helpers with raw hands-on minutes as the tie-break, so a 60-minute mostly-unattended recipe outranks a 45-minute hands-on one. See DECISIONS D-060.
 - **Low-effort starter recipes** — Working · 14 seeded recipes (ids 27–40): 4 rice cooker, 4 oven, 3 Instant Pot, 3 no-cook. Each is written FOR its appliance — the instructions say how it is cooked in that device — and a test greps each recipe's own instructions to prove the claim. The 26 original Filipino recipes are all `pan` and were never retagged to populate a chip. See DECISIONS D-061.

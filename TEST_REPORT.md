@@ -1019,3 +1019,24 @@ self-review: SELF_REVIEW.md Code Health checklist passes; would ship scoped cand
 untested: real iOS Safari/Android devices; actual service-worker upgrade on devices; production
   cloud/MCP smoke and multi-device network races. Fake Firebase reads/transactions are synthetic.
   No production data/services changed. No merge/deploy/migration. Phase 2 unstarted.
+
+
+## TASK-079 · 2026-11-06
+suite: npm test -- -- --config=feature-evidence/task-079/offline-playwright.config.cjs --workers=2
+result: 834 passed, 0 failed, 0 skipped, 0 flaky, 0 runner errors; 283.739 seconds; coverage not
+  instrumented. Enumerated all 834 actual results: local project only; external browser requests blocked.
+focused: 109/109 (new 21 + cooking-method/discovery/metadata/recipe-preservation/plan-picker).
+  Affected pasted-import suite 12/12. New-case baseline: 20 fail / 1 empty-library compatibility pass.
+intermediate: first green20/21 fixed a new hidden-checkbox test selector to click the existing visible
+  label. First full833/834 found an obsolete Air Fryer unknown-vocabulary expectation; unchanged
+  mixed input still rejects Sous vide, now retains the supported slug. Final full rerun is clean.
+other: node --check app/new spec/updated paste spec/config; git diff --check; 118 decision pointers;
+  docs scanner 55 exact baseline warnings, zero new; bounded added credential signatures zero.
+visual: home-1280.png, home-390.png, air-fryer-1280.png, air-fryer-390.png in
+  feature-evidence/task-079; implementer and independent reviewer visually inspected all four.
+self-review: SELF_REVIEW.md Code Health passes; would ship scoped candidate: yes. QA.md scoped
+  AI checks pass, existing scanner debt disclosed; task evidence in TASKS.md/journals. REVIEW.md
+  holds the separate final verdict. No inventory/shopping/sync/MCP implementation changed.
+untested: real iOS Safari/Android devices and production/live cloud or MCP checks. Existing
+  Worker code was not changed; its separate Node suites were not rerun for this frontend-only task.
+  Old clients require refresh to recognize air-fryer. No production writes, merge or deployment.

@@ -1,0 +1,872 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/home-favorites-air-fryer.spec.js",
+      "--project=local",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/task079-after"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\playwright.config.js",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-after",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false
+    }
+  },
+  "suites": [
+    {
+      "title": "home-favorites-air-fryer.spec.js",
+      "file": "home-favorites-air-fryer.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Home shows every strict favorite with usable mobile cards at 1280px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 675,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:49.341Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-5874ba14f80096e7eb32",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 39,
+          "column": 3
+        },
+        {
+          "title": "Air Fryer chip filters explicit tags without relabeling ovens at 1280px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 734,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:50.748Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-4462776b197f2f041598",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 53,
+          "column": 3
+        },
+        {
+          "title": "Home shows every strict favorite with usable mobile cards at 390px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 499,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:51.498Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-a54a9cd90de075155c23",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 39,
+          "column": 3
+        },
+        {
+          "title": "Air Fryer chip filters explicit tags without relabeling ovens at 390px",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 654,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:52.011Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-1e11de26b19fd918fede",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 53,
+          "column": 3
+        },
+        {
+          "title": "Home empty state remains visible when there are no favorites",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 421,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:52.679Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-d0c9bc101336ef3f4278",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 67,
+          "column": 1
+        },
+        {
+          "title": "Home includes all favorites independently of recipe-list search and method filters",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 433,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:53.116Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-c2249298d81fcaa00b8e",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 74,
+          "column": 1
+        },
+        {
+          "title": "Home opens existing read-only recipe details without changing saved data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 525,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:53.573Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-74ebe071e7e9c63cff1d",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 81,
+          "column": 1
+        },
+        {
+          "title": "Home reuses Add to Plan, avoids duplicate batches and persists through reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 731,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:54.115Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-0ea3b755e981c2c113a6",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 92,
+          "column": 1
+        },
+        {
+          "title": "Home removal updates existing favorite state and survives reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 670,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:54.861Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-c1078022bbbb3e644386",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 106,
+          "column": 1
+        },
+        {
+          "title": "favoriting in Recipes and picker refreshes Home immediately",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 782,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:55.545Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-12f42e5b384e87e4079d",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 116,
+          "column": 1
+        },
+        {
+          "title": "new Home recipe text and handler arguments stay inert",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 622,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:56.341Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-b7c24a68a254719773d2",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 126,
+          "column": 1
+        },
+        {
+          "title": "Air Fryer normalization preserves multi-equipment tags and legacy defaults",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 401,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:56.975Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-2906c69300acae1a6fc2",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 142,
+          "column": 1
+        },
+        {
+          "title": "Air Fryer remains discoverable with zero matches and combines with existing filters",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 529,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:57.391Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-cf70c476081fad938a6c",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 152,
+          "column": 1
+        },
+        {
+          "title": "Air Fryer can be selected on create, retained on edit and persisted through reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1428,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:57.932Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-6a3c9e99d1af6488dfd4",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 165,
+          "column": 1
+        },
+        {
+          "title": "JSON 1.1 import and export preserve Air Fryer and favorite state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1255,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:10:59.372Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-fbe1df82c403210ac86c",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 194,
+          "column": 3
+        },
+        {
+          "title": "JSON 1.6 import and export preserve Air Fryer and favorite state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 793,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:00.642Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-7a294d27e5d6a9c52687",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 194,
+          "column": 3
+        },
+        {
+          "title": "review numeric favorite ids reuse details, planning and removal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 930,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:01.450Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-b36fcb2ee8d96c506bcc",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 217,
+          "column": 1
+        },
+        {
+          "title": "review editing and deleting a favorite refreshes Home immediately",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 833,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:02.397Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-5d888f830be1f8df85f4",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 228,
+          "column": 1
+        },
+        {
+          "title": "review Air Fryer respects favorites and category conjunction",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 30107,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js",
+                        "column": 43,
+                        "line": 249
+                      },
+                      "message": "Error: locator.check: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#favorites-filter')\u001b[22m\n\u001b[2m    - locator resolved to <input type=\"checkbox\" id=\"favorites-filter\" onchange=\"filterRecipes()\"/>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    57 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\n\n  247 |   await page.evaluate(() => showTab('recipes'));\n  248 |   await airChip(page).click();\n> 249 |   await page.locator('#favorites-filter').check();\n      |                                           ^\n  250 |   await expect(page.locator('#recipes-grid .recipe-title')).toHaveText(['Favorite main air', 'Favorite breakfast air']);\n  251 |   await page.locator('#category-filter').selectOption('Main Dish');\n  252 |   await expect(page.locator('#recipes-grid .recipe-title')).toHaveText(['Favorite main air']);\n    at C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\tests\\home-favorites-air-fryer.spec.js:249:43"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:03.246Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\test-results\\task079-after\\home-favorites-air-fryer-r-75e24-es-and-category-conjunction-local\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-172a5f83499bd263c370",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 240,
+          "column": 1
+        },
+        {
+          "title": "review empty recipe library keeps existing hidden-method policy",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 540,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:33.924Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-e4c3cd94b6999cdf13f8",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 255,
+          "column": 1
+        },
+        {
+          "title": "review pasted equipment metadata preserves explicit Air Fryer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 425,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:11:34.604Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "05f641731225fcce73d9-e2ed867cf0450164d7fe",
+          "file": "home-favorites-air-fryer.spec.js",
+          "line": 262,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T21:10:48.641Z",
+    "duration": 46779.337,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}
