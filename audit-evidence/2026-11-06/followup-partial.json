@@ -1,0 +1,136 @@
+{
+  "ui": [
+    {
+      "width": 1280,
+      "actions": [
+        "Plan",
+        "Add meals",
+        "Add recipe",
+        "Close picker",
+        "Shop",
+        "Buy ingredient",
+        "Prep",
+        "Prepped",
+        "Confirm prep",
+        "Fridge",
+        "Used 1"
+      ],
+      "clicks": 11,
+      "state": {
+        "batches": 0,
+        "pantry": 0,
+        "ready": 1,
+        "portions": 3,
+        "facts": 1,
+        "overflow": 0
+      },
+      "errors": [],
+      "afterReload": {
+        "portions": 3,
+        "facts": 1
+      },
+      "batchTemplate": {
+        "batches": 1,
+        "template": null,
+        "message": true
+      },
+      "clearWeekRemainingBatches": 1,
+      "planReload": {
+        "before": {
+          "batches": 1,
+          "grocery": 1
+        },
+        "after": {
+          "batches": 1,
+          "grocery": 0
+        }
+      }
+    },
+    {
+      "width": 390,
+      "actions": [
+        "Plan",
+        "Add meals",
+        "Add recipe",
+        "Close picker",
+        "Shop",
+        "Buy ingredient",
+        "Prep",
+        "Prepped",
+        "Confirm prep",
+        "Fridge",
+        "Used 1"
+      ],
+      "clicks": 11,
+      "state": {
+        "batches": 0,
+        "pantry": 0,
+        "ready": 1,
+        "portions": 3,
+        "facts": 1,
+        "overflow": 0
+      },
+      "errors": [],
+      "afterReload": {
+        "portions": 3,
+        "facts": 1
+      },
+      "batchTemplate": {
+        "batches": 1,
+        "template": null,
+        "message": true
+      },
+      "clearWeekRemainingBatches": 1,
+      "planReload": {
+        "before": {
+          "batches": 1,
+          "grocery": 1
+        },
+        "after": {
+          "batches": 1,
+          "grocery": 0
+        }
+      }
+    }
+  ],
+  "realClearRestore": {
+    "pantry": 1,
+    "cookHistory": 0,
+    "prepModeSession": null,
+    "tombstone": "2026-11-06T18:22:27.040Z",
+    "afterMockCloudRead": {
+      "loaded": "loaded",
+      "pantry": 0
+    }
+  },
+  "invalidImport": {
+    "newRecipePresent": true,
+    "changedPlan": "imported_audit",
+    "message": true,
+    "savedRecipes": 1
+  },
+  "expiredRawSuggestions": {
+    "cookable": [
+      {
+        "name": "Audit Chicken Rice",
+        "missing": 0
+      }
+    ],
+    "expirySuggestions": [
+      {
+        "name": "Audit Chicken Rice",
+        "ingredient": "Chicken Breast"
+      }
+    ],
+    "eatSuggestions": [
+      {
+        "name": "Audit Chicken Rice",
+        "reasons": [
+          "Uses Chicken Breast",
+          "5 min active",
+          "Have everything"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1108 @@
+{
+  "environment": {
+    "browser": "149.0.7827.55",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "network": "all non-loopback blocked",
+    "initial": {
+      "recipes": 40,
+      "pantry": 0,
+      "firebase": false,
+      "user": null
+    }
+  },
+  "shopping": [
+    {
+      "pantry": {
+        "id": "a",
+        "name": "Chicken Breast",
+        "quantity": 50,
+        "unit": "g",
+        "category": "Protein",
+        "staple": false
+      },
+      "need": "Chicken Breast",
+      "checked": true,
+      "row": "500 g Chicken Breast  In stockNot anymore?\n≈ ₱100",
+      "daysLeft": null
+    },
+    {
+      "pantry": {
+        "id": "a",
+        "name": "Chicken Breast",
+        "quantity": 0,
+        "unit": "g",
+        "category": "Protein",
+        "staple": false
+      },
+      "need": "Chicken Breast",
+      "checked": true,
+      "row": "500 g Chicken Breast  In stockNot anymore?\n≈ ₱100",
+      "daysLeft": null
+    },
+    {
+      "pantry": {
+        "id": "a",
+        "name": "Chicken Breast",
+        "quantity": 500,
+        "unit": "g",
+        "category": "Protein",
+        "staple": false,
+        "dateMode": "expiry",
+        "expiryDate": "2000-01-01"
+      },
+      "need": "Chicken Breast",
+      "checked": true,
+      "row": "500 g Chicken Breast  In stockNot anymore?\n≈ ₱100",
+      "daysLeft": -9806
+    },
+    {
+      "pantry": {
+        "id": "a",
+        "name": "Rice",
+        "quantity": 1,
+        "unit": "kg",
+        "category": "Grain",
+        "staple": false
+      },
+      "need": "Rice Vinegar",
+      "checked": true,
+      "row": "500 g Rice Vinegar  In stockNot anymore?\n≈ ₱27.5",
+      "daysLeft": null
+    }
+  ],
+  "groceryAggregation": [
+    {
+      "id": 1793989061641.0452,
+      "category": "Protein",
+      "name": "Chicken Breast",
+      "quantity": 501,
+      "unit": "g",
+      "sources": [
+        "Audit r1 (4 servings)",
+        "Audit r2 (4 servings)"
+      ],
+      "checked": false
+    },
+    {
+      "id": 1793989061641.6814,
+      "category": "Protein",
+      "name": "Salt",
+      "quantity": 0,
+      "unit": "",
+      "sources": [
+        "Audit r3 (4 servings)"
+      ],
+      "checked": false
+    }
+  ],
+  "deductions": {
+    "countAlias": {
+      "before": 12,
+      "required": "2 pieces",
+      "summary": {
+        "deducted": [
+          "−200 pcs Eggs"
+        ],
+        "outOfStock": [
+          "Eggs"
+        ]
+      },
+      "after": []
+    },
+    "multipleLots": {
+      "beforeTotal": 500,
+      "required": 300,
+      "summary": {
+        "deducted": [
+          "−300 g Chicken Breast"
+        ],
+        "outOfStock": [
+          "Chicken Breast"
+        ]
+      },
+      "after": [
+        {
+          "id": "lot2",
+          "name": "Chicken Breast",
+          "quantity": 400,
+          "unit": "g",
+          "category": "Protein",
+          "staple": false
+        }
+      ]
+    },
+    "fuzzyWrongItem": {
+      "selected": "Rice",
+      "summary": {
+        "deducted": [
+          "−100 g Rice"
+        ],
+        "outOfStock": []
+      },
+      "after": [
+        {
+          "id": "rice",
+          "name": "Rice",
+          "quantity": 900,
+          "unit": "g",
+          "category": "Grain",
+          "staple": false
+        },
+        {
+          "id": "vinegar",
+          "name": "Rice Vinegar",
+          "quantity": 500,
+          "unit": "ml",
+          "category": "Pantry",
+          "staple": false
+        }
+      ]
+    }
+  },
+  "emptyStaple": {
+    "changed": true,
+    "grocery": []
+  },
+  "planSaveOrder": {
+    "memory": {
+      "batches": 1,
+      "grocery": 1
+    },
+    "saved": {
+      "batches": 1,
+      "grocery": 0
+    }
+  },
+  "changedDemand": {
+    "before": {
+      "demand": 500,
+      "stock": [
+        500
+      ]
+    },
+    "after": {
+      "batch": {
+        "id": "pb_1793989061661_aws5f",
+        "recipeId": "r1",
+        "servings": 5,
+        "addedAt": "2026-11-06T18:17:41.661Z"
+      },
+      "grocery": [
+        {
+          "quantity": 625,
+          "checked": true
+        }
+      ],
+      "stock": [
+        500
+      ]
+    }
+  },
+  "backupFields": {
+    "snapshotKeys": [
+      "recipes",
+      "weeklyPlan",
+      "groceryList",
+      "nutritionGoals",
+      "customIngredients",
+      "customHacks",
+      "flavors",
+      "preparedFlavors",
+      "pantry",
+      "userIngredients",
+      "ingredientPrices",
+      "myStores",
+      "customStores",
+      "cookedMeals",
+      "mealConsumptions",
+      "mealConsumptionConflicts",
+      "recentRecipes",
+      "deletions",
+      "inventoryVerifiedAt",
+      "plannedBatches"
+    ],
+    "storedBackupKeys": [
+      "recipes",
+      "weeklyPlan",
+      "groceryList",
+      "nutritionGoals",
+      "customIngredients",
+      "customHacks",
+      "flavors",
+      "preparedFlavors",
+      "pantry",
+      "userIngredients",
+      "ingredientPrices",
+      "myStores",
+      "customStores",
+      "cookedMeals",
+      "mealConsumptions",
+      "mealConsumptionConflicts",
+      "recentRecipes",
+      "deletions",
+      "inventoryVerifiedAt",
+      "plannedBatches"
+    ],
+    "savedKeys": [
+      "recipes",
+      "weeklyPlan",
+      "groceryList",
+      "nutritionGoals",
+      "customIngredients",
+      "customHacks",
+      "flavors",
+      "preparedFlavors",
+      "pantry",
+      "userIngredients",
+      "ingredientPrices",
+      "myStores",
+      "customStores",
+      "cookedMeals",
+      "mealConsumptions",
+      "mealConsumptionConflicts",
+      "cookHistory",
+      "recentRecipes",
+      "prepModeSession",
+      "deletions",
+      "inventoryVerifiedAt",
+      "plannedBatches",
+      "version",
+      "lastSaved"
+    ]
+  },
+  "restoreTombstone": {
+    "restoredBeforeSync": 1,
+    "afterSyncTombstoneApplication": 0,
+    "deletions": {
+      "recipes": {},
+      "pantry": {
+        "restore1": "2026-11-06T12:00:00Z"
+      },
+      "customIngredients": {},
+      "customHacks": {},
+      "flavors": {},
+      "preparedFlavors": {},
+      "cookedMeals": {},
+      "userIngredients": {}
+    }
+  },
+  "syncMerge": {
+    "remote": {
+      "pantry": [
+        {
+          "id": "a",
+          "quantity": 5,
+          "updatedAt": "2026-11-06T10:00:00Z"
+        }
+      ],
+      "plannedBatches": [
+        {
+          "id": "pb",
+          "servings": 4
+        }
+      ],
+      "mealConsumptions": []
+    },
+    "staleLocal": {
+      "pantry": [
+        {
+          "id": "a",
+          "quantity": 6,
+          "updatedAt": "2026-11-06T09:00:00Z"
+        }
+      ],
+      "plannedBatches": [],
+      "mealConsumptions": []
+    },
+    "merged": {
+      "pantry": [
+        {
+          "id": "a",
+          "quantity": 6,
+          "updatedAt": "2026-11-06T09:00:00Z"
+        }
+      ],
+      "plannedBatches": [],
+      "mealConsumptions": [],
+      "recipes": [],
+      "cookedMeals": [],
+      "userIngredients": [],
+      "groceryList": [],
+      "customIngredients": [],
+      "customHacks": [],
+      "flavors": [],
+      "preparedFlavors": [],
+      "mealConsumptionConflicts": []
+    }
+  },
+  "normalWorkflow": {
+    "planned": {
+      "batches": 1,
+      "shopping": 1,
+      "ready": 0
+    },
+    "bought": {
+      "pantry": [
+        {
+          "name": "Chicken Breast",
+          "quantity": 500
+        }
+      ],
+      "ready": 0
+    },
+    "prepped": {
+      "batches": 0,
+      "pantry": 0,
+      "ready": 1,
+      "portions": 4
+    },
+    "used": {
+      "portions": 3,
+      "facts": 1
+    },
+    "savedPortions": 3
+  },
+  "viewports": [
+    {
+      "width": 1280,
+      "tab": "dashboard",
+      "overflow": 0,
+      "visibleButtons": 12,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "tab": "planner",
+      "overflow": 0,
+      "visibleButtons": 18,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "tab": "grocery",
+      "overflow": 0,
+      "visibleButtons": 6,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "tab": "prep",
+      "overflow": 0,
+      "visibleButtons": 3,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "tab": "fridge",
+      "overflow": 0,
+      "visibleButtons": 10,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "tab": "recipes",
+      "overflow": 0,
+      "visibleButtons": 533,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 69,
+          "h": 33
+        },
+        {
+          "name": "Plan",
+          "w": 60,
+          "h": 33
+        },
+        {
+          "name": "Shop",
+          "w": 65,
+          "h": 33
+        },
+        {
+          "name": "Prep",
+          "w": 62,
+          "h": 33
+        },
+        {
+          "name": "Fridge",
+          "w": 72,
+          "h": 33
+        },
+        {
+          "name": "Recipes",
+          "w": 83,
+          "h": 33
+        },
+        {
+          "name": "⋯ More",
+          "w": 80,
+          "h": 33
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "dashboard",
+      "overflow": 0,
+      "visibleButtons": 12,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 49,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 40,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 44,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 51,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 60,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "planner",
+      "overflow": 0,
+      "visibleButtons": 18,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 46,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 37,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 42,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 49,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 57,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "grocery",
+      "overflow": 0,
+      "visibleButtons": 6,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "prep",
+      "overflow": 0,
+      "visibleButtons": 3,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "fridge",
+      "overflow": 0,
+      "visibleButtons": 10,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "tab": "recipes",
+      "overflow": 0,
+      "visibleButtons": 533,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "dashboard",
+      "overflow": 0,
+      "visibleButtons": 12,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "planner",
+      "overflow": 0,
+      "visibleButtons": 18,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "grocery",
+      "overflow": 0,
+      "visibleButtons": 6,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "prep",
+      "overflow": 0,
+      "visibleButtons": 3,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "fridge",
+      "overflow": 0,
+      "visibleButtons": 10,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "width": 360,
+      "tab": "recipes",
+      "overflow": 0,
+      "visibleButtons": 533,
+      "smallTargets": [
+        {
+          "name": "Home",
+          "w": 45,
+          "h": 44
+        },
+        {
+          "name": "Plan",
+          "w": 36,
+          "h": 44
+        },
+        {
+          "name": "Shop",
+          "w": 41,
+          "h": 44
+        },
+        {
+          "name": "Prep",
+          "w": 38,
+          "h": 44
+        },
+        {
+          "name": "Fridge",
+          "w": 48,
+          "h": 44
+        },
+        {
+          "name": "⋯ More",
+          "w": 56,
+          "h": 44
+        }
+      ]
+    }
+  ],
+  "performance": [
+    {
+      "recipes": 40,
+      "renderRecipesMs": 15.1,
+      "saveLocalMs": 0.7,
+      "storedBytes": 27522,
+      "domNodes": 11823
+    },
+    {
+      "recipes": 300,
+      "renderRecipesMs": 85.9,
+      "saveLocalMs": 1.3,
+      "storedBytes": 109822,
+      "domNodes": 34963
+    },
+    {
+      "recipes": 1000,
+      "renderRecipesMs": 213.9,
+      "saveLocalMs": 3.3,
+      "storedBytes": 331722,
+      "domNodes": 97263
+    }
+  ],
+  "errors": []
+}
