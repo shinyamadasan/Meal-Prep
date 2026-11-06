@@ -998,3 +998,24 @@ review: independent agent PASS, recorded in REVIEW.md; reviewed app SHA-256 c722
 intermediate evidence: corrected a mock read-readiness helper before the authoritative baseline; fixed a price-input attribute regression caught during focused testing; stopped a pre-final 771-case gate for final reviewer repairs and reran the complete frozen 776-case candidate. None of those intermediate runs is claimed as the final pass.
 untested: real iOS/Android devices, production smokes, actual Firestore/accounts, and true concurrent devices. Mock sign-in, transactions, stale-marker realtime replay and local reload are tested with synthetic data without bypassing cloudReady. General stale-cloud sign-in may still overwrite offline-restored cookHistory/prepModeSession; unrelated recipe/hack/storage XSS remains outside this grocery-boundary repair. No production-read/write, merge, push, deployment, migration or Phase 2 work was performed.
 evidence: audit-evidence/recovery-v1/REPORT.md, application.patch, focused-final.json, full-regression.json, worker-tests.txt and bridge-tests.txt.
+
+
+## TASK-078 release hardening · 2026-11-06
+suite: npm test -- -- --config=audit-evidence/release-hardening/offline-playwright.config.cjs --workers=2
+result: 813 passed, 0 failed, 0 skipped, 0 flaky, 0 runner errors; 268.836 seconds; coverage not
+  instrumented. Executed results are local project only; external browser requests blocked.
+focused: new hardening + original recovery + tombstone + consumption durability + ledger fixture
+  135/135 pass. Same final new 37 tests against detached 6f03531: 2 compatibility passes/35 fails;
+  after: 37/37. Existing recovery assertions retained; three mockCloud eligibility setup additions.
+other: npm run test:worker 9/9; npm run test:bridge 254/254; node --check app/specs and git diff
+  --check pass; 115/115 decision pointers; docs checker 55 historical warnings, byte-identical to
+  baseline (not globally clean); 47/47 previous artifact hashes/sizes match. Bounded added-content
+  credential signature scan: zero token-boundary matches; initial task-slug false positives recorded.
+evidence: audit-evidence/release-hardening/REPORT.md, before-final.json, focused-final.json,
+  full-regression.json, worker-tests.txt, bridge-tests.txt, CANDIDATE_SHA256.json, application.patch.
+self-review: SELF_REVIEW.md Code Health checklist passes; would ship scoped candidate: yes.
+  QA.md AI checks pass for assigned scope; unchanged scanner debt disclosed; legacy planning
+  bookkeeping references are represented by active TASKS.md/journals. Independent verdict: REVIEW.md.
+untested: real iOS Safari/Android devices; actual service-worker upgrade on devices; production
+  cloud/MCP smoke and multi-device network races. Fake Firebase reads/transactions are synthetic.
+  No production data/services changed. No merge/deploy/migration. Phase 2 unstarted.

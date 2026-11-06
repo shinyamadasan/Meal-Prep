@@ -1267,3 +1267,24 @@ blockers: none within Phase 1. Generic docs scan still reports 55 historical war
 deviations: independent review extended the same grocery import security boundary to Print, Prices and Not anymore? handlers, plus malformed nested data. No unrelated feature work or Phase 2. Existing broader import XSS and stale-cloud overwriting offline-restored history/session remain disclosed limitations.
 self-review: Code Health PASS; bounded repair is ready for owner review. Actual-device and live-cloud checks were not performed.
 → status set to `review` in TASKS.md; no merge, push, deployment, production writes or migrations.
+
+
+## TASK-078 — Phase 1 release hardening (branch: task-078-reliability-recovery-v1)
+changed:
+  - app.js (100 insertions, 84 deletions): inert imported recipe/Storage Guide/Cooking Hacks
+    output and related handlers; escJAttr; safe nested ingredient form and CSV preview; guarded
+    same-account online restore via canRestoreBackup and honest local-only cloud-failure result.
+  - tests/release-hardening.spec.js (37 synthetic cases); reliability-recovery-v1.spec.js
+    (three cloud-ready setup additions, all existing assertions retained).
+  - docs/FEATURES.md, DATA_MODEL.md, ARCHITECTURE.md, DECISIONS.md D-084: bounded Restore
+    restriction and output escaping; no new persistence schema, export version or infrastructure.
+  - audit-evidence/release-hardening/: preserved artifact hashes, red/green/full results, patch,
+    independent-review handoff, PR description, deployment/rollback checklist and final report.
+tests: 37 new cases: 2 pass/35 fail on preserved 6f03531, then 37/37 pass. Focused 135/135;
+  complete npm local 813/813 (zero skips/flaky); Worker 9/9; conversational bridge 254/254.
+blockers: none for bounded owner review. Production merge/deploy/writes remain unauthorized.
+deviations: Offline/guest Restore is deliberately refused until online signed-in cloud readiness;
+  failed cloud confirmation retains the backup for retry before sign-out/reload. Documentation
+  consistency retains the exact 55 baseline warnings (zero new); 115 decision pointers pass.
+  Earlier audit/recovery evidence remains byte-identical (47 files, including original 27 artifacts).
+→ status set to `review` in TASKS.md; Phase 2 unstarted. See the final independent REVIEW.md entry.

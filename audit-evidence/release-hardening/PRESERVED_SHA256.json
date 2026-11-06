@@ -1,0 +1,190 @@
+{
+  "audit-evidence/2026-11-06/.gitattributes": {
+    "bytes": 107,
+    "sha256": "04d69dd04c026117f1c6981535ccd0c4f9910d42c614451e02217a78258d3760"
+  },
+  "audit-evidence/2026-11-06/1280-dashboard.png": {
+    "bytes": 36094,
+    "sha256": "fac65fe4ae73e1e0ffe1f0868e02c488103b6e0f9742ccaff2a95086b551061a"
+  },
+  "audit-evidence/2026-11-06/1280-fridge.png": {
+    "bytes": 58865,
+    "sha256": "bf01576ee9d6f2bfe06b829419cf225b215700c5711c783f71dd987f25be5bea"
+  },
+  "audit-evidence/2026-11-06/1280-grocery.png": {
+    "bytes": 23284,
+    "sha256": "a434acd5075919e4b1919cb5a1931d72aef5b380b0ab4552ab40e3efc403c45b"
+  },
+  "audit-evidence/2026-11-06/1280-planner.png": {
+    "bytes": 25646,
+    "sha256": "0ee6fcf43587df6550100029a36ce7c259473da4d2b1f0a4360361f975a7573e"
+  },
+  "audit-evidence/2026-11-06/1280-prep.png": {
+    "bytes": 24483,
+    "sha256": "007422265de637f2039942d4dac98f64f374e27f8d8f8c2b5c31edb96a3cbedc"
+  },
+  "audit-evidence/2026-11-06/1280-recipes.png": {
+    "bytes": 62359,
+    "sha256": "b8f99f9e7f276b3dcf6c959894f36f4b58343c537884eeb8a4db6c7cd1c81919"
+  },
+  "audit-evidence/2026-11-06/390-dashboard.png": {
+    "bytes": 30516,
+    "sha256": "0cce9b17a76a928750c9f0e8060be6b3b26c5288db54f5566b16ab3201c4d8f5"
+  },
+  "audit-evidence/2026-11-06/390-fridge.png": {
+    "bytes": 31610,
+    "sha256": "d2c93c09dd02a1966b57f752c50c4c7ecba389ee3fe623ea16346c9ed9c977aa"
+  },
+  "audit-evidence/2026-11-06/390-grocery.png": {
+    "bytes": 14950,
+    "sha256": "05cf2b1e042fef042879deaaabe16d632371bd9deb1656aefaffe6374242d486"
+  },
+  "audit-evidence/2026-11-06/390-planner.png": {
+    "bytes": 17407,
+    "sha256": "c66868fa0930ba50ed8b29ff10d62c954d583b67a29b79787c487cd10c0ad21c"
+  },
+  "audit-evidence/2026-11-06/390-prep.png": {
+    "bytes": 15945,
+    "sha256": "e304d904748c93102294cd8051a39ba6305ef86de28d9b72f3c1bf1a2b5855be"
+  },
+  "audit-evidence/2026-11-06/390-recipes.png": {
+    "bytes": 33917,
+    "sha256": "517a508985e90d2ba1a607c3748aec3c1405213f45374066c0f218eddd1255db"
+  },
+  "audit-evidence/2026-11-06/audit-followup.cjs": {
+    "bytes": 9421,
+    "sha256": "8a50549e4e7fb8a64cc251d859fbf07ef4b6030a43878fb68cabcba0d98782c3"
+  },
+  "audit-evidence/2026-11-06/audit.cjs": {
+    "bytes": 9585,
+    "sha256": "f6326297a224ac16450eb7e7a347fff256ec9f5e8d9ebabf5e6614954778fac8"
+  },
+  "audit-evidence/2026-11-06/followup-partial.json": {
+    "bytes": 2588,
+    "sha256": "a9492e2b2fffe6a0545a5f0af48b3d380f52aab4af50745b279a4d9b60cf90f1"
+  },
+  "audit-evidence/2026-11-06/followup-results.json": {
+    "bytes": 3946,
+    "sha256": "5d1f4dcc013acd5911d8ca82e3590492bf0d8d3947b5a531c90f73f0a55fe730"
+  },
+  "audit-evidence/2026-11-06/MEAL-PREP-AUDIT.md": {
+    "bytes": 21185,
+    "sha256": "fe5b3f61120201575793f8560c924f1b848eed495c3b3a6e52f1ebd7d36f3e70"
+  },
+  "audit-evidence/2026-11-06/results-core.json": {
+    "bytes": 7502,
+    "sha256": "6be791faf76baa666035f6c50484510caa021f11a9275e143fb2475cdacb2380"
+  },
+  "audit-evidence/2026-11-06/results.json": {
+    "bytes": 20162,
+    "sha256": "2826a379d89fd4ec54f8b426bd3d2dd9f12eb22ad0eab09651db1546f5fec41f"
+  },
+  "audit-evidence/2026-11-06/SHA256SUMS.json": {
+    "bytes": 4361,
+    "sha256": "cccac982b3c7806beb20fe6cb57fcd9dda2f98bc2f77df543357a546f6386612"
+  },
+  "audit-evidence/2026-11-06/ui-1280-fridge.png": {
+    "bytes": 56676,
+    "sha256": "8c1f04760ffdd502796f58e99daafbe7f47a835648aea6ce0cd5fde41c51c18f"
+  },
+  "audit-evidence/2026-11-06/ui-390-fridge.png": {
+    "bytes": 41546,
+    "sha256": "0afcf4bab840c6b15b0cc18aa1eb59bb6f7a379a2bfc299ac71aae8892e5b73e"
+  },
+  "audit-evidence/2026-11-06/playwright-results/.last-run.json": {
+    "bytes": 194,
+    "sha256": "ff9be1548fcef535df81222d9409c73c9ce7916713f151ff600a165320ce7a0d"
+  },
+  "audit-evidence/2026-11-06/recheck-results/.last-run.json": {
+    "bytes": 45,
+    "sha256": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903"
+  },
+  "audit-evidence/2026-11-06/playwright-results/cross-repo-life-ledger-fix-1193a-se-adapter-cross-repo-suite-local/cross-repo-life-ledger-fixture.json": {
+    "bytes": 4709,
+    "sha256": "049a856ad635ea656c44b203afef04308db88ab6fed92b6e2a732984098c78cc"
+  },
+  "audit-evidence/2026-11-06/playwright-results/plan-persistence-and-picke-2be07--recipe-modal-close-handler-local/error-context.md": {
+    "bytes": 8412,
+    "sha256": "a7d58af82599c82986baea8b0e147c7c880d8576edfdc274b0c0bb684fe60a5d"
+  },
+  "audit-evidence/2026-11-06/playwright-results/plan-persistence-and-picke-5d9f7--inset-from-the-modal-edges-local/error-context.md": {
+    "bytes": 12539,
+    "sha256": "b6b5ea3583a99e859f3d1012d15108f67411347efd81e694a5c3ef274fa09904"
+  },
+  "audit-evidence/2026-11-06/playwright-results/prepared-flavors-MUTATION--841d2-orePayload-loses-it-on-save-local/error-context.md": {
+    "bytes": 10042,
+    "sha256": "1f80bf9c1608abe9ac34221a1c68aaf9a718a5830e32b34d6d3f64eb81169cb9"
+  },
+  "audit-evidence/recovery-v1/.gitattributes": {
+    "bytes": 126,
+    "sha256": "d4688d60c3a041bab1dfa76b56e884b6035b4895416d88afb094d65df1122282"
+  },
+  "audit-evidence/recovery-v1/after-corrected.json": {
+    "bytes": 31479,
+    "sha256": "b25d5e049d49981f6a666e79137927668832fb0a20b81d65c56270c255135e3b"
+  },
+  "audit-evidence/recovery-v1/after.json": {
+    "bytes": 42573,
+    "sha256": "721e7c28592001744c455f95d20d3d2fdd34553693073e99a9a4a54c7719d844"
+  },
+  "audit-evidence/recovery-v1/application.patch": {
+    "bytes": 33457,
+    "sha256": "05ad82c49efd997600160bb5ac9d4cc4e6b00b557458c02c4155772352ca8f2f"
+  },
+  "audit-evidence/recovery-v1/before-corrected.json": {
+    "bytes": 280852,
+    "sha256": "e07302119a81959afc194ac07a05b1cf3f63a56a20f34a80e0a95907071ca214"
+  },
+  "audit-evidence/recovery-v1/before.json": {
+    "bytes": 275199,
+    "sha256": "ed1d14011961ccc209f7380bd6fd3d70ae8e1448ea0a8a9071ad3114fa0bba81"
+  },
+  "audit-evidence/recovery-v1/bridge-tests.txt": {
+    "bytes": 27414,
+    "sha256": "0d15e9462d310ac8d86aeb06ec6b347935a20632fc7e9b3768946bc52a28d5cd"
+  },
+  "audit-evidence/recovery-v1/decision-verification.txt": {
+    "bytes": 64,
+    "sha256": "3c621a55317386fcaf8689102b65514e27e15f97223cb72b9188965055b81302"
+  },
+  "audit-evidence/recovery-v1/docs-consistency-baseline.txt": {
+    "bytes": 5448,
+    "sha256": "92bac2d70ec90e4e97c627c24b1b4860abe81eafcc4fbcfb2736ba89910a9be7"
+  },
+  "audit-evidence/recovery-v1/docs-consistency.txt": {
+    "bytes": 5448,
+    "sha256": "92bac2d70ec90e4e97c627c24b1b4860abe81eafcc4fbcfb2736ba89910a9be7"
+  },
+  "audit-evidence/recovery-v1/final-before.json": {
+    "bytes": 27625,
+    "sha256": "bbba3c7c30d2f2be46f33f207aa59120a11a1cc996fac4950446c600d18fd3ec"
+  },
+  "audit-evidence/recovery-v1/focused-final.json": {
+    "bytes": 118575,
+    "sha256": "a10662b08e6b3a7fa2fe0e5c242f901609811288cfecb065885f5bedf143df87"
+  },
+  "audit-evidence/recovery-v1/focused.json": {
+    "bytes": 116532,
+    "sha256": "fb547eb06d2de099fa89a751a77a85d650a5283aeb6409c471de750d089cc365"
+  },
+  "audit-evidence/recovery-v1/full-regression.json": {
+    "bytes": 864035,
+    "sha256": "cd0cb4781ebbdd5437a7205f5a8b6cd8c4c572a4a1b517fc45649d704e286719"
+  },
+  "audit-evidence/recovery-v1/offline-playwright.config.cjs": {
+    "bytes": 745,
+    "sha256": "c2cdc68950715ce1d40c7a16c9eead1c941a36aa446cfdc370d41073915869eb"
+  },
+  "audit-evidence/recovery-v1/REPORT.md": {
+    "bytes": 11501,
+    "sha256": "4d30771864537510e7b7ad0853a2c340cb661413c81a501aa89708c101ee7f91"
+  },
+  "audit-evidence/recovery-v1/review-before.json": {
+    "bytes": 178011,
+    "sha256": "27d2b5a4e4e7f556fc86935e02224d0f90c50dcb6f970419d408aaf35c93a702"
+  },
+  "audit-evidence/recovery-v1/worker-tests.txt": {
+    "bytes": 1015,
+    "sha256": "51276b20a33b08a492cefee6f5aa9daf012e6770847870e459ab7afd9c8a4a5d"
+  }
+}

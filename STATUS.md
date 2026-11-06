@@ -4531,3 +4531,12 @@ Investigate before the next scheduled run. Nothing further was committed, pushed
 ## 2026-08-23 21:02 -- AUTOMATION HALTED: Check-DocsConsistency.ps1 threw an error: The term 'Check-DocsConsistency.ps1' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
 Investigate before the next scheduled run. No further planning-doc changes were committed or pushed
 this run (a Telegram notification was sent separately, see Send-Notification).
+
+
+## TASK-078 Phase 1 release hardening · 2026-11-06
+Existing task branch prepared for owner review. Full local regression 813/813, focused 135/135,
+Worker 9/9, bridge 254/254. See audit-evidence/release-hardening/REPORT.md and REVIEW.md.
+No merge, deployment or production data write authorized/performed. Phase 2 unstarted.
+Needs human verification: isolated synthetic iOS Safari/Android Chrome checks for mobile controls,
+layout, animation, Restore restriction/error copy and actual service-worker refresh. Real cloud
+smoke writes require separate explicit authorization. See RELEASE_CHECKLIST.md before any release.

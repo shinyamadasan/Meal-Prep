@@ -6121,7 +6121,7 @@ acceptance:
 constraints:
   - Isolated branch task-078-reliability-recovery-v1 from origin/main at 144c7f5; leave the
     original checkout and its untracked screenshots untouched. Synthetic local/mock data only.
-  - No merge, push, deployment, live cloud/connector writes, migrations, secrets changes, Phase 2,
+  - No merge, push to main, deployment, live cloud/connector writes, migrations, secrets changes, Phase 2,
     stock-math repair, shopping redesign, or new framework/dependency.
   - Keep JSON export 1.6 and legacy partial-import support. Missing fields remain optional;
     keep duplicate-id local precedence and fill-only plans; reject malformed provided structures.
@@ -6145,6 +6145,33 @@ evidence:
   - No merge, push, deployment, migration, production access/write, or Phase 2 work. Broad unrelated
     import XSS and offline-restore/stale-cloud scalar sync risks remain explicitly documented.
 
+
+release-hardening assignment (owner, 2026-11-06):
+  Continue the completed Phase 1 candidate at 6f03531; preserve its implementation and evidence.
+  Additional files: tests/release-hardening.spec.js, audit-evidence/release-hardening/**,
+  scoped documentation/journals (including docs/ARCHITECTURE.md and STATUS.md) and a PR/deployment/rollback checklist. REVIEW.md remains
+  independent-reviewer-owned. No Phase 2, production writes, merge or deployment.
+release-hardening acceptance:
+  - [x] Reproduce and escape import-controlled recipe, Storage Guide and Cooking Hacks output,
+        including inline handlers and reachable Plan/Prep/Nutrition views. Preserve string/numeric ids.
+  - [x] Restrict Restore to an online, signed-in account after its cloud read, checking again at
+        confirmation. Preserve the backup and report unsuccessful cloud confirmation accurately.
+        This deliberately avoids account-unsafe scalar sync precedence or a general sync redesign.
+  - [x] New regressions fail on the preserved candidate and pass after repair; existing recovery,
+        Shop/Prep/Fridge, ledger and MCP tests remain green. Full offline-isolated npm test passes.
+  - [x] Final independent review, self-review and QA pass; record remaining limits and rollback.
+  - [x] Commit verified changes on the existing task branch and prepare the PR/release handoff.
+        Feature-branch publication for a draft PR is authorized by this assignment; never push main.
+release-hardening evidence:
+  - audit-evidence/release-hardening/REPORT.md, application.patch, RELEASE_CHECKLIST.md and PR_BODY.md.
+  - New 37 cases: 2 pass/35 fail on preserved 6f03531; after 37/37. Focused 135/135;
+    complete local npm 813/813 (zero skip/flaky); Worker 9/9; bridge 254/254.
+  - Independent release-hardening review PASS appended to REVIEW.md; no must-fix remaining.
+    All 47 prior evidence files unchanged; 115 decision pointers pass; 55 identical docs warnings.
+verification addendum:
+  - Preserve earlier evidence unchanged. Capture new red/green results, full suite, worker/bridge,
+    syntax/whitespace, decision pointers, documentation warning delta and original audit integrity.
+
 <!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>
@@ -6153,8 +6180,8 @@ source: BQ-<id>
 depends-on: none
 files: path/to/file.js, path/to/other.js
 acceptance:
-  - [ ] criterion 1
-  - [ ] criterion 2
+  - [x] criterion 1
+  - [x] criterion 2
 constraints: <any hard limits — deps to use/avoid, perf, backward compat>
 notes: see ADR or PRD reference if applicable
 

@@ -3507,3 +3507,31 @@ exported-history coverage, stock math, account isolation or any Phase 2 work. No
 merge or deployment are authorized by this decision.
 Verify: app.js contains "function prepareSnapshotChange(data, restoring)"
 Verify: tests/reliability-recovery-v1.spec.js contains "stale conflict markers lose while later deletions win"
+
+
+## D-084 — Phase 1 release hardening: inert imported output and cloud-ready Restore
+Date: 2026-11-06 · Status: Candidate; independent review PASS, owner integration pending
+Context: The Phase 1 reviewer documented raw imported recipe/storage/hack HTML and handler
+surfaces, and offline restoration losing history/session when a stale cloud document loads.
+Decision: Escape imported text and attribute output without rewriting stored values. `escJAttr()`
+combines JavaScript string escaping and HTML escaping, including line terminators, only at HTML
+handler sinks; the separate CSS-selector use of `escJ()` remains unchanged. Storage/hack CRUD
+retains strict numeric/string id types through JSON literals plus HTML escaping. Hack grouping
+uses a null-prototype map. Existing arithmetic serving controls coerce the plus operand to a
+number, preventing imported string concatenation into executable handlers.
+
+Local backups have no account owner; automatically preferring their scalar fields at future
+sign-in would risk account contamination. `canRestoreBackup()` instead requires an online,
+signed-in account with its cloud read completed and a transaction-capable client. The same uid
+and eligibility are checked again immediately before restore mutation. Refusal changes neither
+runtime data, primary storage nor backup. An unconfirmed cloud save is explicitly local-only,
+retains the backup and directs retry before sign-out/reload. Clear confirmation discloses the
+online/signed-in Restore restriction.
+
+Trade-off: Guest/offline users must sign in and reconnect to Restore. Network failure after the
+eligibility check can still leave a local-only result; the retained backup is the retry source,
+not an account-bound automatic sync guarantee. No new persisted field, schema, dependency,
+framework, account-isolation redesign, export change or Phase 2 is introduced.
+Verify: app.js contains "function escJAttr(str)"
+Verify: app.js contains "function canRestoreBackup(userId)"
+Verify: tests/release-hardening.spec.js contains "offline backup survives stale-cloud sign-in"

@@ -464,6 +464,12 @@ otherwise it becomes `null` (unknown) rather than an invented number.
 `snapshotData()` / `mealPrepBackup.data` include all locally persisted domain fields, including
 `cookHistory` and `prepModeSession`; cloud revision and last-save bookkeeping are excluded.
 Older backups lacking those two fields restore them as `[]` and `null`. JSON export 1.6 is unchanged.
+Local backups have no account ownership metadata. D-084 therefore restricts `restoreBackup()` to
+an online signed-in account after its cloud read, with the same account checked at confirmation.
+No pending-restore field or scalar merge precedence is added. Refused restore leaves local state
+and backup untouched; failed cloud confirmation retains the backup and warns that later cloud
+loads can replace locally restored history/session data. Imported text is escaped at rendering,
+without sanitizing or changing persisted content, ids, export format, or ledger facts.
 Import remains a duplicate-id/local-wins merge with fill-only planning. Backup restore replaces
 mutable collections, but consumption facts and conflict evidence always use their canonical unions.
 

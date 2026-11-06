@@ -233,6 +233,7 @@ test('signed-in clear and restore publish complete backup fields before cloud re
 
 test('partial weekly plan in an older backup restores all seven usable days', async ({ page }) => {
   await loadApp(page);
+  await mockCloud(page, await page.evaluate(() => ({ ...snapshotData(), version: 1 })));
   await page.evaluate(() => {
     const data = JSON.parse(JSON.stringify(snapshotData())); data.weeklyPlan = { Monday: { dinner: 'recovery' } };
     localStorage.setItem(BACKUP_KEY, JSON.stringify({ data }));
@@ -306,6 +307,7 @@ test('clear, reload and restore recover history/session, retain facts and surviv
   });
   await page.waitForLoadState('domcontentloaded');
   await waitForRestored(page, () => AppState.recipes.length === 0);
+  await mockCloud(page, await page.evaluate(() => ({ ...snapshotData(), version: 1 })));
   await page.evaluate(() => {
     AppState.deletions.customHacks = { buy_recovery: '2026-11-01T00:00:00.000Z' };
     reconcileMealConsumptions([{ id: 'mc_after_backup', cookedMealId: 'cm_recovery', recipeId: 'recovery',
@@ -350,6 +352,7 @@ test('restore clears only restored ids, and stale conflict markers lose while la
 
 test('older backups without history/session keep supported defaults and recover records', async ({ page }) => {
   await loadApp(page);
+  await mockCloud(page, await page.evaluate(() => ({ ...snapshotData(), version: 1 })));
   await page.evaluate(() => {
     const old = JSON.parse(JSON.stringify(snapshotData())); delete old.cookHistory; delete old.prepModeSession;
     localStorage.setItem(BACKUP_KEY, JSON.stringify({ label: 'legacy', data: old }));
