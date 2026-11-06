@@ -1,0 +1,13 @@
+{
+  "node --check app.js": "PASS",
+  "node --check tests/home-favorites-air-fryer.spec.js": "PASS",
+  "node --check feature-evidence/task-079/offline-playwright.config.cjs": "PASS",
+  "git diff --check": "PASS",
+  "scope": "app.js adds only equipment/filter and Home rendering; style.css adds only Home styles. No inventory/shopping/sync/MCP code modified.",
+  "docs-warning-delta": "55 identical baseline warnings; zero new",
+  "decision-pointers": "118/118 pass",
+  "node --check tests/paste-import-metadata-and-ranges.spec.js": "PASS",
+  "all four frozen hashes": "PASS",
+  "prior audit-evidence changes": "none",
+  "paste regression suite": "12/12 PASS"
+}

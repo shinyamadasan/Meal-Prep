@@ -61,7 +61,7 @@ AppState.plannedBatches     // [] this week's meal-prep batches, NO day required
   freezerLife,         // days
   storageNotes,
   instructions,
-  favorite,            // boolean (♥ toggle)
+  favorite,            // boolean (♥ toggle); Home derives favorites from strict === true
   highlights,          // string[] tag chips — rendered but NO edit-form UI to set
 
   // ── Low-effort cooking metadata — ALL OPTIONAL, all additive ──
@@ -70,7 +70,7 @@ AppState.plannedBatches     // [] this week's meal-prep batches, NO day required
   // exactly as it did; a valid value is never overwritten, an unknown one is dropped.
   equipment,           // string[] of slugs from RECIPE_EQUIPMENT:
                        //   'rice-cooker' | 'rice-cooker-steamer' | 'instant-pot' |
-                       //   'pressure-cooker' | 'oven' | 'pan' | 'egg-boiler' |
+                       //   'pressure-cooker' | 'oven' | 'air-fryer' | 'pan' | 'egg-boiler' |
                        //   'microwave' | 'no-cook'. Multiple values allowed.
   effort,              // 'assembly' | 'very-low' | 'low' | 'normal', or null
   activeTime,          // minutes you actually have to DO something, or null.

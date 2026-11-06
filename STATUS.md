@@ -4540,3 +4540,11 @@ No merge, deployment or production data write authorized/performed. Phase 2 unst
 Needs human verification: isolated synthetic iOS Safari/Android Chrome checks for mobile controls,
 layout, animation, Restore restriction/error copy and actual service-worker refresh. Real cloud
 smoke writes require separate explicit authorization. See RELEASE_CHECKLIST.md before any release.
+
+
+## TASK-079 · Home Favorites and Air Fryer · 2026-11-06
+Feature branch prepared for owner review. Full local regression834/834, focused109/109 and
+paste suite12/12 pass. See feature-evidence/task-079/REPORT.md and the independent REVIEW.md entry.
+Needs human verification: isolated real iOS Safari/Android checks for card tap targets/focus,
+scrolling, equipment-selector wrapping and refreshed clients recognizing air-fryer. Desktop/mobile
+Chromium screenshots are captured. No merge, deployment or production data writes performed.

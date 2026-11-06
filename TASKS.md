@@ -6172,6 +6172,56 @@ verification addendum:
   - Preserve earlier evidence unchanged. Capture new red/green results, full suite, worker/bridge,
     syntax/whitespace, decision pointers, documentation warning delta and original audit integrity.
 
+
+### TASK-079 · Home Favorites and Air Fryer cooking method
+status: review
+owner: codex (explicit owner implementation assignment, 2026-11-06)
+source: Owner request: exactly two small feature improvements
+objective:
+  Show all strictly favorited recipes visibly on Home with existing details/planning/favorite
+  actions, and add explicit air-fryer equipment/editor/quick-filter support without retagging ovens.
+files:
+  - app.js, style.css
+  - tests/home-favorites-air-fryer.spec.js
+  - tests/paste-import-metadata-and-ranges.spec.js (existing Air Fryer vocabulary expectation only)
+  - docs/FEATURES.md, docs/DATA_MODEL.md, docs/DECISIONS.md (scoped notes)
+  - feature-evidence/task-079/** (tests, screenshots, report, offline test config, PR body)
+  - TASKS.md (this entry), CHANGELOG.md, TEST_REPORT.md, STATUS.md
+  - REVIEW.md (independent reviewer only)
+acceptance:
+  - [x] Visible Home section titled "❤️ My Favorites" shows every recipe with favorite === true,
+        without a cap or dependency on recipe-list filters; simple empty state and mobile layout.
+  - [x] Reuse existing read-only recipe details, favorite state/toggle and Add to Plan batch action;
+        favorite changes immediately refresh Home. Existing plan duplicate prevention is preserved.
+  - [x] Imported names/ids remain inert text/literal handler arguments in the new surface.
+  - [x] air-fryer is a recognized equipment slug with create/edit checkbox and visible primary
+        Air Fryer chip, including a useful zero-match state. Match explicit tags only; no oven retagging.
+  - [x] Normalization, edits, local reload, existing JSON imports/exports and combined filters retain
+        air-fryer alongside other equipment; legacy recipes remain compatible.
+  - [x] Focused browser tests, full local npm regression, syntax/whitespace, self-review, AI QA and
+        separate independent review pass. Capture and visually inspect desktop/mobile screenshots.
+  - [x] Commit on new task branch and prepare a draft PR; stop at review, never merge/deploy.
+constraints:
+  - Branch task-079-home-favorites-air-fryer from origin/main e497156. Original checkout/screenshots
+    and earlier evidence untouched. Synthetic data only; no production writes or live MCP calls.
+  - Exactly these two features. No inventory, shopping, sync or MCP code changes; planning reuses
+    the existing Add to Plan flow and its existing derived shopping refresh, without altering it.
+  - No new frameworks, dependencies, persisted collections, schema or export version. No sample or
+    oven equipment inference/backfill. No merge, main push or deployment without owner approval.
+verification:
+  - New tests before implementation then green focused suite plus existing method/discovery,
+    recipe preservation, details/favorite picker and plan-flow coverage; full npm test local only.
+  - External browser requests blocked; node --check, git diff --check, decision pointers and docs
+    warning delta; source review confirms prohibited domains unchanged. Independent review append.
+
+evidence:
+  - feature-evidence/task-079/REPORT.md, CANDIDATE_SHA256.json, four screenshots and PR_BODY.md.
+  - New21: baseline20fail/1compatibilitypass; focused109/109, affectedpaste12/12,
+    final full834/834 withzero skip/flaky/errors. Initialfull833/834 retained; existing obsolete
+    Air-Fryer-is-unknown expectation updated without weakening unknown-equipment rejection.
+  - 118 decision pointers; docs 55 identical baseline warnings; independent Scoped PASS in REVIEW.md.
+    No remaining must-fix. Commit and draft PR handoff follow on this task branch only.
+
 <!-- TASK TEMPLATE — copy and fill:
 
 ### TASK-001 · <short title>

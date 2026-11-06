@@ -1,0 +1,1 @@
+All 118 Verify: pointer(s) across docs/DECISIONS.md hold true.

@@ -3535,3 +3535,28 @@ framework, account-isolation redesign, export change or Phase 2 is introduced.
 Verify: app.js contains "function escJAttr(str)"
 Verify: app.js contains "function canRestoreBackup(userId)"
 Verify: tests/release-hardening.spec.js contains "offline backup survives stale-cloud sign-in"
+
+
+## D-085 — Home Favorites and explicit Air Fryer equipment
+Date: 2026-11-06 · Status: Candidate; independent review PASS, owner integration pending
+Context: Owner requested exactly two small improvements: direct access to favorite recipes on
+Home and a real Air Fryer cooking-method option, without inventory/shopping/sync/MCP changes.
+Decision: `renderHomeFavorites()` derives every strict favorite from AppState.recipes and uses
+existing picker card styles, read-only recipe details, favorite toggle and Add to Plan action.
+Home contains a visible section outside the collapsed ideas panel. `renderRecipes()` refreshes
+that section after recipe/favorite changes; `renderDashboard()` populates it on Home entry and
+existing plan refresh. No favorite registry, synced state or collection is added. Names/categories
+and handler ids use existing escaping. Already-planned favorites retain duplicate prevention.
+
+Add only the explicit air-fryer slug to the existing equipment vocabulary and a primary method
+chip. Existing form generation, normalizers and generic recipe persistence/import/export retain
+it without a schema/export-version change. Pasted Equipment metadata uses the same vocabulary.
+No oven inference, sample backfill, inventory/shopping/sync/MCP behavior or recommendation ranking
+is changed. Zero-match guidance and empty-library chip hiding follow the existing method policy.
+
+Trade-off: Favorites are all visible as requested, so a large favorite library makes Home longer.
+Air Fryer is opt-in; users must tag existing recipes. Older clients with the previous equipment
+vocabulary cannot recognize the new slug until refreshed. Real-device checks remain a human gate.
+Verify: app.js contains "function renderHomeFavorites()"
+Verify: app.js contains "{ id: 'air-fryer', label: 'Air Fryer', icon: '🍟' }"
+Verify: tests/home-favorites-air-fryer.spec.js contains "review Air Fryer respects favorites and category conjunction"

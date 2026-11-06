@@ -105,9 +105,9 @@ test('7/8: multiple equipment values normalize; unknown equipment is dropped, ne
   }));
 
   expect(result.multi).toEqual(['rice-cooker-steamer', 'instant-pot', 'egg-boiler']);
-  // "Air fryer" and "Sous vide machine" are not in RECIPE_EQUIPMENT — dropped
-  // silently rather than becoming a made-up enum value; "Oven" still comes through.
-  expect(result.unknown).toEqual(['oven']);
+  // Air Fryer and Oven are recognized; Sous vide machine remains unknown and is
+  // dropped rather than becoming a made-up enum value.
+  expect(result.unknown).toEqual(['air-fryer', 'oven']);
 });
 
 test('9/10: effort text normalizes case/spacing variants; unrecognized effort stays unset', async ({ page }) => {

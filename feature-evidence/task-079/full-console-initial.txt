@@ -1,0 +1,878 @@
+
+> meal-prep-app@1.0.0 test
+> npm run test:local -- --config=feature-evidence/task-079/offline-playwright.config.cjs --workers=2
+
+
+> meal-prep-app@1.0.0 test:local
+> playwright test --project=local --config=feature-evidence/task-079/offline-playwright.config.cjs --workers=2
+
+
+Running 834 tests using 2 workers
+
+
+
+
+
+[1/834] [local] › tests\bulk-add-date-truth.spec.js:122:1 › 1. "eggs 12 pcs aug 8 2026" becomes four separate fields
+[2/834] [local] › tests\bulk-add-partial-retry.spec.js:101:1 › 1. two valid lines plus an ambiguous one: valid added, only the ambiguous line remains
+[3/834] [local] › tests\bulk-add-date-truth.spec.js:135:1 › 2. "eggs, 12, pcs aug 8 2026" works — commas plus a trailing date
+[4/834] [local] › tests\bulk-add-date-truth.spec.js:142:1 › 2b. "eggs, 12, pcs, aug 8 2026" no longer silently discards the date
+[5/834] [local] › tests\bulk-add-partial-retry.spec.js:113:1 › 2. correcting the remaining line adds only that item and re-processes nothing
+[6/834] [local] › tests\bulk-add-date-truth.spec.js:150:1 › 3. the full month form "august 8 2026" works
+[7/834] [local] › tests\bulk-add-date-truth.spec.js:157:1 › 3b. day-first and trailing-ISO forms also work
+[8/834] [local] › tests\bulk-add-date-truth.spec.js:172:1 › 3c. "Eggs 12 pcs Aug 8 26" parses like its four-digit twin
+[9/834] [local] › tests\bulk-add-partial-retry.spec.js:138:1 › 3. the partial summary reports added and needs-attention counts accurately
+[10/834] [local] › tests\bulk-add-date-truth.spec.js:190:1 › 3d. the other two-digit spellings work too
+[11/834] [local] › tests\bulk-add-date-truth.spec.js:215:1 › 3e. inside the window: previous year, current year and +10 all parse
+[12/834] [local] › tests\bulk-add-partial-retry.spec.js:151:1 › 4. a resolved duplicate is dropped from retry; actionable line stays
+[13/834] [local] › tests\bulk-add-date-truth.spec.js:227:1 › 3e2. outside the window: below the lower bound and above the upper bound
+[14/834] [local] › tests\bulk-add-date-truth.spec.js:242:1 › 3e3. the window MOVES with the clock - the same line parses in one era, not another
+[15/834] [local] › tests\bulk-add-partial-retry.spec.js:166:1 › 5. an all-valid batch still closes the modal and toasts as before
+[16/834] [local] › tests\bulk-add-date-truth.spec.js:260:1 › 3e4. the boundary is inclusive on both ends and exclusive one step past each
+[17/834] [local] › tests\bulk-add-date-truth.spec.js:283:1 › 3e5. a rejected short year is fixable by typing the four-digit year
+[18/834] [local] › tests\bulk-add-partial-retry.spec.js:182:1 › 6. an all-actionable batch adds nothing and keeps every line
+[19/834] [local] › tests\bulk-add-date-truth.spec.js:311:1 › 3e6. the window gates the two-digit SPELLING only, never a four-digit year
+[20/834] [local] › tests\bulk-add-date-truth.spec.js:328:1 › 3e7. an impossible calendar day is still "not a date", whatever its short year
+[21/834] [local] › tests\bulk-add-partial-retry.spec.js:194:1 › 7. an all-duplicate batch resolves every line and does not trap the user
+[22/834] [local] › tests\bulk-add-date-truth.spec.js:355:1 › 3e8. no exp: — an implausible short year is attention, not persisted, kept verbatim
+[23/834] [local] › tests\bulk-add-date-truth.spec.js:366:1 › 3e9. a valid exp: rescues the line, and the short year stays in the name
+[24/834] [local] › tests\bulk-add-partial-retry.spec.js:211:1 › 7b. a quantity-less duplicate line is still skipped, and leaves stock alone
+[25/834] [local] › tests\bulk-add-date-truth.spec.js:387:1 › 3e10. the shared expiry field does NOT rescue an implausible short year
+[26/834] [local] › tests\bulk-add-date-truth.spec.js:402:1 › 3e11. an INVALID exp: does not rescue an implausible short year
+[27/834] [local] › tests\bulk-add-partial-retry.spec.js:225:1 › 8. unresolved line text is preserved exactly, not rewritten
+[28/834] [local] › tests\bulk-add-date-truth.spec.js:418:1 › 3e12. a PLAUSIBLE trailing date plus exp: keeps the D-067 contract exactly
+[29/834] [local] › tests\bulk-add-date-truth.spec.js:437:1 › 4. the documented exp:YYYY-MM-DD syntax still works
+[30/834] [local] › tests\bulk-add-partial-retry.spec.js:233:1 › 9. unresolved line order is preserved
+[31/834] [local] › tests\bulk-add-date-truth.spec.js:444:1 › 5. exp: outranks both a trailing natural date and the shared field
+[32/834] [local] › tests\bulk-add-date-truth.spec.js:455:1 › 6. a trailing natural date outranks the shared expiry field
+[33/834] [local] › tests\bulk-add-date-truth.spec.js:462:1 › 5b. exp: still outranks a TWO-DIGIT trailing date, which is still stripped
+[34/834] [local] › tests\bulk-add-partial-retry.spec.js:245:1 › 10-11. shared Storage and Expiry are still set after a partial submit
+[35/834] [local] › tests\bulk-add-date-truth.spec.js:472:1 › 6b. a two-digit trailing date outranks the shared expiry field
+[36/834] [local] › tests\bulk-add-date-truth.spec.js:479:1 › 7. the shared expiry still applies when a line carries no date
+[37/834] [local] › tests\bulk-add-date-truth.spec.js:486:1 › 8. no date anywhere still means bought-date + shelf-life mode
+[38/834] [local] › tests\bulk-add-partial-retry.spec.js:263:1 › 12. exp:YYYY-MM-DD still works and still wins
+[39/834] [local] › tests\bulk-add-date-truth.spec.js:498:1 › 9. invalid dates are rejected, not rolled over or guessed
+[40/834] [local] › tests\bulk-add-date-truth.spec.js:529:1 › 9b. an all-numeric slash date is refused as ambiguous and reported
+[41/834] [local] › tests\bulk-add-partial-retry.spec.js:271:1 › 13. natural trailing-date parsing still works
+[42/834] [local] › tests\bulk-add-date-truth.spec.js:547:1 › 10. product names containing numbers are not corrupted
+[43/834] [local] › tests\bulk-add-date-truth.spec.js:561:1 › 10b. a year-like number alone is not treated as a date
+[44/834] [local] › tests\bulk-add-date-truth.spec.js:571:1 › 10c. adversarial two-digit names are not read as dates
+[45/834] [local] › tests\bulk-add-partial-retry.spec.js:283:1 › 13b. a two-digit trailing year resolves its line; a two-digit slash date does not
+[46/834] [local] › tests\bulk-add-date-truth.spec.js:594:1 › 11. one submission can mix natural, exp:, shared and no date
+[47/834] [local] › tests\bulk-add-date-truth.spec.js:617:1 › 12. structured fields survive a save and reload
+[48/834] [local] › tests\bulk-add-partial-retry.spec.js:315:1 › 13c. an impossible two-digit date behaves exactly like its four-digit twin
+[49/834] [local] › tests\bulk-add-date-truth.spec.js:636:1 › 12b. a two-digit-year record survives save and reload as the canonical ISO date
+[50/834] [local] › tests\bulk-add-date-truth.spec.js:657:1 › the two-digit-year path raises no console or page errors
+[51/834] [local] › tests\bulk-add-partial-retry.spec.js:331:1 › 13d. an implausible short year keeps its line for correction
+[52/834] [local] › tests\bulk-add-date-truth.spec.js:673:1 › 13. the card shows the D-066 absolute date plus the relative badge
+[53/834] [local] › tests\bulk-add-date-truth.spec.js:698:1 › 13b. the production repro no longer produces a derived 3-day guess
+[54/834] [local] › tests\bulk-add-partial-retry.spec.js:361:1 › 13e. exp: turns an implausible short year into a resolved line
+[55/834] [local] › tests\bulk-add-date-truth.spec.js:712:1 › existing free-text records are not migrated or re-parsed
+[56/834] [local] › tests\bulk-add-date-truth.spec.js:730:1 › the pre-existing no-comma and comma formats are unchanged
+[57/834] [local] › tests\bulk-add-date-truth.spec.js:746:1 › parseTrailingDate returns the right one of its three verdicts
+[58/834] [local] › tests\bulk-add-partial-retry.spec.js:395:1 › 14. slash dates remain refused
+[59/834] [local] › tests\bulk-add-date-truth.spec.js:811:3 › mobile two-digit years › 390px: a two-digit date parses and the modal still does not overflow
+[60/834] [local] › tests\bulk-add-partial-retry.spec.js:403:1 › 15. numeric product names remain intact
+[61/834] [local] › tests\cook-depletion-tombstones.spec.js:57:1 › cooking that empties one pantry item writes a tombstone for it
+[62/834] [local] › tests\cook-depletion-tombstones.spec.js:85:1 › cooking that empties six pantry items tombstones every removed id
+[63/834] [local] › tests\bulk-add-partial-retry.spec.js:414:1 › 16-17. save/reload shows each record exactly once after a retry cycle
+[64/834] [local] › tests\cook-depletion-tombstones.spec.js:129:1 › eight simultaneous depletions still tombstone one-for-one
+[65/834] [local] › tests\cook-depletion-tombstones.spec.js:155:1 › partially depleted items stay in the pantry with no tombstone and correct quantities
+[66/834] [local] › tests\cook-depletion-tombstones.spec.js:189:1 › a multiplier scales the deduction and only tombstones what it actually empties
+[67/834] [local] › tests\cook-depletion-tombstones.spec.js:216:1 › untracked-quantity pantry items are neither deducted nor tombstoned
+[68/834] [local] › tests\bulk-add-partial-retry.spec.js:435:1 › classification is by status, not by warning wording
+[69/834] [local] › tests\cook-depletion-tombstones.spec.js:248:1 › insufficient inventory still raises the warning dialog before cooking
+[70/834] [local] › tests\bulk-add-partial-retry.spec.js:445:1 › blank input still closes the modal without touching inventory
+[71/834] [local] › tests\cook-depletion-tombstones.spec.js:286:1 › a full cook still creates the batch, and every depleted id reaches storage and the cloud payload
+[72/834] [local] › tests\bulk-add-partial-retry.spec.js:459:3 › mobile partial success › 390px: partial feedback is readable and nothing overflows
+[73/834] [local] › tests\cook-depletion-tombstones.spec.js:359:1 › a depleted item cannot be resurrected by a stale remote copy
+[74/834] [local] › tests\cook-method-discovery.spec.js:91:3 › Cook exposes the quick filters › shipped default data makes the filter row visible on Cook
+[75/834] [local] › tests\cross-repo-life-ledger-fixture.spec.js:117:1 › capture real cookedMeal + mealConsumption output shapes for the ChronaSense adapter cross-repo suite
+[76/834] [local] › tests\cook-method-discovery.spec.js:109:3 › Cook exposes the quick filters › the row sits above the grid and needs no interaction to reach
+[77/834] [local] › tests\flavor-library.spec.js:166:1 › a saved document with no flavors key loads as an empty library, not a seeded one
+[78/834] [local] › tests\flavor-library.spec.js:196:1 › an old save is not rewritten with flavors until the user asks for them
+[79/834] [local] › tests\cook-method-discovery.spec.js:129:3 › Cook exposes the quick filters › All is active by default and reports the whole book
+[80/834] [local] › tests\flavor-library.spec.js:208:1 › normalization is idempotent over the whole starter set
+[81/834] [local] › tests\flavor-library.spec.js:220:1 › normalization fills absent fields honestly and drops garbage
+[82/834] [local] › tests\cook-method-discovery.spec.js:160:3 › cooking method grouping › 4 + 5: Rice cooker matches rice-cooker AND rice-cooker-steamer
+[83/834] [local] › tests\flavor-library.spec.js:251:1 › normalization never invents updatedAt — that would let a flavor beat its own tombstone
+[84/834] [local] › tests\flavor-library.spec.js:261:1 › every seeded flavor id carries the flv- prefix
+[85/834] [local] › tests\flavor-library.spec.js:268:1 › a user-created flavor gets a prefixed id, never a bare number
+[86/834] [local] › tests\cook-method-discovery.spec.js:167:3 › cooking method grouping › 6: Oven matches only the oven recipe
+[87/834] [local] › tests\flavor-library.spec.js:282:1 › an unprefixed inbound id is re-prefixed rather than left in the shared numeric space
+[88/834] [local] › tests\cook-method-discovery.spec.js:173:3 › cooking method grouping › 7: Instant Pot grouping covers instant-pot AND pressure-cooker
+[89/834] [local] › tests\flavor-library.spec.js:294:1 › prefixed flavor ids survive a numeric tombstone that deletes a recipe, hack and pantry item
+[90/834] [local] › tests\flavor-library.spec.js:326:1 › every flavor field survives a save and a reload
+[91/834] [local] › tests\cook-method-discovery.spec.js:180:3 › cooking method grouping › 8: No-cook works
+[92/834] [local] › tests\flavor-library.spec.js:354:1 › an activeTime of 0 survives as 0 and a blank one survives as null
+[93/834] [local] › tests\flavor-library.spec.js:373:1 › flavors are captured in a backup and come back on restore
+[94/834] [local] › tests\cook-method-discovery.spec.js:186:3 › cooking method grouping › 9: Pan works
+[95/834] [local] › tests\flavor-library.spec.js:392:1 › export includes flavors and import merges them without losing an edited local copy
+[96/834] [local] › tests\flavor-library.spec.js:415:1 › an export file written before flavors existed still imports
+[97/834] [local] › tests\flavor-library.spec.js:430:1 › the Firestore payload carries flavors
+[98/834] [local] › tests\cook-method-discovery.spec.js:192:3 › cooking method grouping › the refinement chip still isolates rice-cooker-steamer only
+[99/834] [local] › tests\flavor-library.spec.js:440:1 › a signed-in load pulls flavors out of the cloud document
+[100/834] [local] › tests\flavor-library.spec.js:452:1 › an account whose cloud doc predates flavors is not auto-seeded
+[101/834] [local] › tests\cook-method-discovery.spec.js:198:3 › cooking method grouping › 15: no recipe appears under a method its metadata does not support
+[102/834] [local] › tests\flavor-library.spec.js:459:1 › signing in UNIONS local flavors into the cloud copy instead of shadowing them
+[103/834] [local] › tests\flavor-library.spec.js:475:1 › a newer local edit wins the sign-in union over an older cloud copy (LWW)
+[104/834] [local] › tests\flavor-library.spec.js:490:1 › a concurrent cloud write is merged, not clobbered
+[105/834] [local] › tests\flavor-library.spec.js:511:1 › the realtime listener applies a flavor added on another device
+[106/834] [local] › tests\flavor-library.spec.js:524:1 › the realtime listener applies a flavor DELETED on another device
+[107/834] [local] › tests\flavor-library.spec.js:545:1 › deleting a flavor while signed in tombstones it through the normal save path
+[108/834] [local] › tests\flavor-library.spec.js:568:1 › a tombstoned flavor is not resurrected by a cloud copy that still has it
+[109/834] [local] › tests\flavor-library.spec.js:580:1 › a flavor genuinely re-added after its tombstone survives (LWW, not a blanket ban)
+[110/834] [local] › tests\cook-method-discovery.spec.js:221:3 › cooking method grouping › a microwave recipe surfaces under no cooking-method chip
+[111/834] [local] › tests\flavor-library.spec.js:599:1 › MUTATION: removing flavors from TOMBSTONE_KEYS resurrects a deleted flavor
+[112/834] [local] › tests\flavor-library.spec.js:636:1 › MUTATION: an unprefixed flavor id is destroyed by an unrelated numeric tombstone
+[113/834] [local] › tests\flavor-library.spec.js:663:1 › the starter pack adds all ten flavors once
+[114/834] [local] › tests\flavor-library.spec.js:675:1 › tapping Add repeatedly never duplicates
+[115/834] [local] › tests\flavor-library.spec.js:690:1 › an edited starter flavor is never overwritten by the starter pack
+[116/834] [local] › tests\flavor-library.spec.js:709:1 › a deleted starter flavor is not re-offered or resurrected
+[117/834] [local] › tests\flavor-library.spec.js:726:1 › added starter flavors are independent copies of the defaultFlavors constant
+[118/834] [local] › tests\cook-method-discovery.spec.js:237:3 › Lowest effort › 10: 5 min active + 35 unattended outranks 20 min stood over a pan
+[119/834] [local] › tests\flavor-library.spec.js:749:1 › the three preparation styles are all represented in the starter set
+[120/834] [local] › tests\flavor-library.spec.js:760:1 › a user can add, edit and delete a flavor through the UI
+[121/834] [local] › tests\cook-method-discovery.spec.js:267:3 › Lowest effort › a normal-effort cook is excluded from Lowest effort
+[122/834] [local] › tests\cook-method-discovery.spec.js:278:3 › Lowest effort › ordering falls back through active time, both declared low
+[123/834] [local] › tests\flavor-library.spec.js:814:1 › an edit stamps updatedAt so it can win a later merge
+[124/834] [local] › tests\cook-method-discovery.spec.js:289:3 › Lowest effort › Lowest effort agrees with the Home "Easiest" honesty gate
+[125/834] [local] › tests\flavor-library.spec.js:832:1 › the three preparation styles render distinctly
+[126/834] [local] › tests\flavor-library.spec.js:853:1 › compatibility filtering is deterministic and only returns compatible flavors
+[127/834] [local] › tests\cook-method-discovery.spec.js:307:3 › composition and legacy data › 11: search still works on top of a quick filter
+[128/834] [local] › tests\flavor-library.spec.js:875:1 › the protein filter narrows the visible list in the UI
+[129/834] [local] › tests\flavor-library.spec.js:895:1 › the style filter narrows to one preparation style
+[130/834] [local] › tests\flavor-library.spec.js:906:1 › search matches name, ingredient and protein
+[131/834] [local] › tests\cook-method-discovery.spec.js:324:3 › composition and legacy data › 12: clearing the filter returns the normal list
+[132/834] [local] › tests\flavor-library.spec.js:923:1 › opening a flavor shows its ingredients and instructions and mutates nothing
+[133/834] [local] › tests\flavor-library.spec.js:951:1 › flavors do not enter recipes, hacks, pantry, cooked meals or the grocery list
+[134/834] [local] › tests\flavor-library.spec.js:989:1 › the Cooking Hacks tab is unaffected by the flavor collection
+[135/834] [local] › tests\cook-method-discovery.spec.js:348:3 › composition and legacy data › 13: legacy recipes with no metadata still render and stay browseable
+[136/834] [local] › tests\flavor-library.spec.js:1004:1 › flavors add exactly one persisted key and one AppState collection
+[137/834] [local] › tests\flavor-library.spec.js:1030:3 › mobile › the flavor library fits a phone with no horizontal overflow
+[138/834] [local] › tests\flavor-library.spec.js:1051:3 › mobile › the add/edit modal is usable on a phone with no overflow
+[139/834] [local] › tests\flavor-library.spec.js:1068:1 › the whole flavor flow raises no page or console errors
+[140/834] [local] › tests\cook-method-discovery.spec.js:379:3 › composition and legacy data › an empty primary chip explains how to fill it instead of dead-ending
+[141/834] [local] › tests\food-attention-notifications.spec.js:89:1 › nothing asks for notification permission on page load
+[142/834] [local] › tests\food-attention-notifications.spec.js:96:1 › permission is requested only when the user taps the Settings row
+[143/834] [local] › tests\cook-method-discovery.spec.js:395:3 › built-in recipe metadata › 14: every seeded recipe carries a cooking method and effort
+[144/834] [local] › tests\food-attention-notifications.spec.js:111:1 › turning alerts back off does not re-prompt and stops notifying
+[145/834] [local] › tests\cook-method-discovery.spec.js:416:3 › built-in recipe metadata › the original 26 Filipino recipes were not retagged to populate filters
+[146/834] [local] › tests\cook-method-discovery.spec.js:428:3 › built-in recipe metadata › 14: the backfilled recipes appear under Pan and Lowest effort
+[147/834] [local] › tests\food-attention-notifications.spec.js:132:1 › a denied permission leaves the app fully working
+[148/834] [local] › tests\cook-method-discovery.spec.js:449:3 › built-in recipe metadata › 10: on the real seeded book, Lowest effort orders by work, not clock
+[149/834] [local] › tests\food-attention-notifications.spec.js:168:1 › a browser with no Notification API at all does not break the app
+[150/834] [local] › tests\food-attention-notifications.spec.js:209:1 › expired and use-soon come from the existing pantryDaysLeft boundaries
+[151/834] [local] › tests\food-attention-notifications.spec.js:238:1 › the notification layer defines no expiry rules of its own
+[152/834] [local] › tests\cook-method-discovery.spec.js:481:3 › built-in recipe metadata › no recipe claims an appliance its own instructions do not describe
+[153/834] [local] › tests\food-attention-notifications.spec.js:262:1 › expired copy asks the user to review, never to eat
+[154/834] [local] › tests\cook-method-discovery.spec.js:499:3 › built-in recipe metadata › a rice-cooker-steamer recipe actually uses the steamer basket
+[155/834] [local] › tests\food-attention-notifications.spec.js:281:1 › a mixed kitchen only ever offers the use-soon items for using
+[156/834] [local] › tests\food-attention-notifications.spec.js:301:1 › several attention items produce exactly one grouped notification
+[157/834] [local] › tests\cook-method-discovery.spec.js:525:5 › shipped recipe book populates every cooking method › Rice cooker returns real recipes on a fresh install
+[158/834] [local] › tests\food-attention-notifications.spec.js:321:1 › a long use-soon list is summarised rather than listed item by item
+[159/834] [local] › tests\food-attention-notifications.spec.js:338:1 › unchanged food does not notify again on later opens
+[160/834] [local] › tests\food-attention-notifications.spec.js:366:1 › the dedup ledger survives a reload
+[161/834] [local] › tests\cook-method-discovery.spec.js:525:5 › shipped recipe book populates every cooking method › Oven returns real recipes on a fresh install
+[162/834] [local] › tests\food-attention-notifications.spec.js:394:1 › a newly use-soon item and a newly expired item each notify once
+[163/834] [local] › tests\food-attention-notifications.spec.js:447:1 › food removed and later re-added can notify again
+[164/834] [local] › tests\cook-method-discovery.spec.js:525:5 › shipped recipe book populates every cooking method › Instant Pot returns real recipes on a fresh install
+[165/834] [local] › tests\food-attention-notifications.spec.js:477:1 › food kept today is never announced
+[166/834] [local] › tests\food-attention-notifications.spec.js:506:1 › tapping Keep after an alert stops the next alert
+[167/834] [local] › tests\food-attention-notifications.spec.js:531:1 › cooked meals in the fridge use their own shelf life and share the alert
+[168/834] [local] › tests\food-attention-notifications.spec.js:562:1 › pantry and cooked food are grouped into a single notification
+[169/834] [local] › tests\cook-method-discovery.spec.js:525:5 › shipped recipe book populates every cooking method › No-cook returns real recipes on a fresh install
+[170/834] [local] › tests\food-attention-notifications.spec.js:577:1 › a cooked meal with no shelf life is never announced
+[171/834] [local] › tests\food-attention-notifications.spec.js:591:1 › opening the app with newly expired food raises the alert
+[172/834] [local] › tests\food-attention-notifications.spec.js:606:1 › a notification lands the user on the Needs Attention card
+[173/834] [local] › tests\cook-method-discovery.spec.js:549:3 › shipped recipe book populates every cooking method › the Rice + steamer refinement is now populated too
+[174/834] [local] › tests\food-attention-notifications.spec.js:631:1 › returning to the foreground runs an attention pass
+[175/834] [local] › tests\food-attention-notifications.spec.js:650:1 › a saved file from before this wave loads and behaves
+[176/834] [local] › tests\cook-method-discovery.spec.js:563:3 › shipped recipe book populates every cooking method › Lowest effort is a mix of methods, not just the old stovetop book
+[177/834] [local] › tests\food-attention-notifications.spec.js:687:1 › a corrupt alert-prefs value falls back to off instead of throwing
+[178/834] [local] › tests\food-attention-notifications.spec.js:708:1 › notification bookkeeping stays out of AppState and out of the synced payload
+[179/834] [local] › tests\food-attention-notifications.spec.js:733:1 › the notifications row is reachable and readable on a phone
+[180/834] [local] › tests\cook-method-discovery.spec.js:599:3 › shipped recipe book populates every cooking method › the starter set is protein + vegetables + carb where it claims to be
+[181/834] [local] › tests\cook-method-discovery.spec.js:615:3 › shipped recipe book populates every cooking method › the starter set is genuinely low-friction: no normal-effort recipe in it
+[182/834] [local] › tests\fridge-prepared-flavors.spec.js:81:1 › 1. existing cooked food still renders in Fridge
+[183/834] [local] › tests\fridge-prepared-flavors.spec.js:91:1 › 2. prepared flavor stock renders in Fridge
+[184/834] [local] › tests\cook-method-discovery.spec.js:642:3 › Home "Easiest" after the backfill › 16: the seeded book now produces an Easiest pick that explains itself
+[185/834] [local] › tests\fridge-prepared-flavors.spec.js:97:1 › 3+4. Fridge reads the SAME preparedFlavors record — rendering creates no duplicate
+[186/834] [local] › tests\cook-method-discovery.spec.js:666:3 › Home "Easiest" after the backfill › the Easiest reason chips actually render on Home
+[187/834] [local] › tests\fridge-prepared-flavors.spec.js:110:1 › 5. Fridge prepared flavor shows storage
+[188/834] [local] › tests\fridge-prepared-flavors.spec.js:116:1 › 6. portions remaining show correctly
+[189/834] [local] › tests\fridge-prepared-flavors.spec.js:126:1 › 7. Used 1 from Fridge decrements the canonical preparedFlavor
+[190/834] [local] › tests\cook-method-discovery.spec.js:678:3 › Home "Easiest" after the backfill › pantry state can surface a starter-set recipe as Easiest
+[191/834] [local] › tests\fridge-prepared-flavors.spec.js:135:1 › 8. Flavor Library sees the same decremented count after a Fridge Used 1
+[192/834] [local] › tests\cook-method-discovery.spec.js:707:3 › Home "Easiest" after the backfill › no new Home card was added
+[193/834] [local] › tests\fridge-prepared-flavors.spec.js:144:1 › 9. zero portions follows existing Flavor Bomb removal/tombstone semantics
+[194/834] [local] › tests\fridge-prepared-flavors.spec.js:155:1 › 10. freezer prepared flavor displays as freezer
+[195/834] [local] › tests\cook-method-discovery.spec.js:721:1 › 19: the quick filter persists nothing
+[196/834] [local] › tests\fridge-prepared-flavors.spec.js:161:1 › 11. a deleted/orphaned flavor gracefully retains existing fallback behavior
+[197/834] [local] › tests\fridge-prepared-flavors.spec.js:172:1 › 12. no prepared flavors -> compact/omitted empty state (section hidden, no giant card)
+[198/834] [local] › tests\fridge-prepared-flavors.spec.js:184:1 › sorting: fridge items list before freezer items
+[199/834] [local] › tests\fridge-prepared-flavors.spec.js:198:1 › sorting: within the same storage, earlier expiry lists first
+[200/834] [local] › tests\fridge-prepared-flavors.spec.js:216:1 › 13. mobile Fridge has no horizontal overflow
+[201/834] [local] › tests\cook-method-discovery.spec.js:757:3 › mobile › 20: no horizontal PAGE overflow with the filter row on screen
+[202/834] [local] › tests\fridge-prepared-flavors.spec.js:233:1 › 14. existing cookedMeal Used 1 remains unchanged
+[203/834] [local] › tests\fridge-prepared-flavors.spec.js:245:1 › 15. Flavor Library prepared-stock UI remains unchanged (same card markup, same container)
+[204/834] [local] › tests\cook-method-discovery.spec.js:772:3 › mobile › 21: the chips are reachable and tappable on a phone viewport
+[205/834] [local] › tests\fridge-prepared-flavors.spec.js:252:1 › 16. Meal Lego compatibility/ranking output is unchanged by the Fridge mirror rendering
+[206/834] [local] › tests\fridge-prepared-flavors.spec.js:265:1 › no console/page errors rendering Fridge with both cooked meals and prepared flavors
+[207/834] [local] › tests\home-favorites-air-fryer.spec.js:39:3 › Home shows every strict favorite with usable mobile cards at 1280px
+[208/834] [local] › tests\home-favorites-air-fryer.spec.js:53:3 › Air Fryer chip filters explicit tags without relabeling ovens at 1280px
+[209/834] [local] › tests\home-favorites-air-fryer.spec.js:39:3 › Home shows every strict favorite with usable mobile cards at 390px
+[210/834] [local] › tests\cook-method-discovery.spec.js:807:1 › 22: no page or console errors while using the filters
+[211/834] [local] › tests\home-favorites-air-fryer.spec.js:53:3 › Air Fryer chip filters explicit tags without relabeling ovens at 390px
+[212/834] [local] › tests\home-favorites-air-fryer.spec.js:67:1 › Home empty state remains visible when there are no favorites
+[213/834] [local] › tests\home-favorites-air-fryer.spec.js:74:1 › Home includes all favorites independently of recipe-list search and method filters
+[214/834] [local] › tests\home-favorites-air-fryer.spec.js:81:1 › Home opens existing read-only recipe details without changing saved data
+[215/834] [local] › tests\home-favorites-air-fryer.spec.js:92:1 › Home reuses Add to Plan, avoids duplicate batches and persists through reload
+[216/834] [local] › tests\home-favorites-air-fryer.spec.js:106:1 › Home removal updates existing favorite state and survives reload
+[217/834] [local] › tests\inventory-expiry-display.spec.js:63:1 › the quick-add form has its own quantity, unit and expiry fields
+[218/834] [local] › tests\home-favorites-air-fryer.spec.js:116:1 › favoriting in Recipes and picker refreshes Home immediately
+[219/834] [local] › tests\inventory-expiry-display.spec.js:72:1 › adding an item stores name, quantity, unit and expiry in separate fields
+[220/834] [local] › tests\inventory-expiry-display.spec.js:90:1 › the add form is cleared after a successful add
+[221/834] [local] › tests\home-favorites-air-fryer.spec.js:126:1 › new Home recipe text and handler arguments stay inert
+[222/834] [local] › tests\inventory-expiry-display.spec.js:100:1 › a past printed expiry reads as expired, not as fresh
+[223/834] [local] › tests\home-favorites-air-fryer.spec.js:142:1 › Air Fryer normalization preserves multi-equipment tags and legacy defaults
+[224/834] [local] › tests\home-favorites-air-fryer.spec.js:152:1 › Air Fryer remains discoverable with zero matches and combines with existing filters
+[225/834] [local] › tests\inventory-expiry-display.spec.js:115:1 › a card shows the absolute expiry date next to the relative days-left badge
+[226/834] [local] › tests\home-favorites-air-fryer.spec.js:165:1 › Air Fryer can be selected on create, retained on edit and persisted through reload
+[227/834] [local] › tests\inventory-expiry-display.spec.js:134:1 › an item with no printed date shows a derived "Best by", not a fake "Expires"
+[228/834] [local] › tests\inventory-expiry-display.spec.js:148:1 › the rendered date and the days-left badge always describe the same day
+[229/834] [local] › tests\inventory-expiry-display.spec.js:183:1 › an item that tracks no date at all renders no date chip and no badge
+[230/834] [local] › tests\home-favorites-air-fryer.spec.js:194:3 › JSON 1.1 import and export preserve Air Fryer and favorite state
+[231/834] [local] › tests\inventory-expiry-display.spec.js:225:3 › mobile add form › 390px: the page does not scroll horizontally
+[232/834] [local] › tests\inventory-expiry-display.spec.js:235:3 › mobile add form › 390px: the item-name input keeps a usable typing width
+[233/834] [local] › tests\home-favorites-air-fryer.spec.js:194:3 › JSON 1.6 import and export preserve Air Fryer and favorite state
+[234/834] [local] › tests\inventory-expiry-display.spec.js:245:3 › mobile add form › 390px: quantity, unit, expiry and Add are all reachable
+[235/834] [local] › tests\inventory-expiry-display.spec.js:268:3 › mobile add form › 390px: the fields have not been stacked into an unreadable single column
+[236/834] [local] › tests\home-favorites-air-fryer.spec.js:217:1 › review numeric favorite ids reuse details, planning and removal
+[237/834] [local] › tests\inventory-expiry-display.spec.js:278:3 › mobile add form › 390px: an expiry entered on a phone persists and renders as date + freshness
+[238/834] [local] › tests\home-favorites-air-fryer.spec.js:228:1 › review editing and deleting a favorite refreshes Home immediately
+[239/834] [local] › tests\inventory-expiry-display.spec.js:313:3 › narrow phone › 320px: no horizontal overflow and the name input stays usable
+[240/834] [local] › tests\inventory-quantity-truth.spec.js:79:1 › 1-7. editing Fish 1 kg → 2 kg changes the quantity and nothing else
+[241/834] [local] › tests\home-favorites-air-fryer.spec.js:240:1 › review Air Fryer respects favorites and category conjunction
+[242/834] [local] › tests\home-favorites-air-fryer.spec.js:255:1 › review empty recipe library keeps existing hidden-method policy
+[243/834] [local] › tests\inventory-quantity-truth.spec.js:137:1 › blank quantity means unknown; an explicit 0 stays 0
+[244/834] [local] › tests\home-favorites-air-fryer.spec.js:262:1 › review pasted equipment metadata preserves explicit Air Fryer
+[245/834] [local] › tests\inventory-quantity-truth.spec.js:154:1 › 8. the card offers no unit editor, so there is no unit edit to lose
+[246/834] [local] › tests\inventory-verification.spec.js:52:1 › 17. never verified -> correct empty state
+[247/834] [local] › tests\inventory-quantity-truth.spec.js:171:1 › setting a quantity from the Price Book keeps the expiry, the id and the staple state
+[248/834] [local] › tests\inventory-verification.spec.js:64:1 › 18. clicking Inventory checked stores a timestamp
+[249/834] [local] › tests\inventory-quantity-truth.spec.js:204:1 › 9-11,16. Eggs 6 pcs + Bulk Add "Eggs 12 pcs" = 18 pcs, reported as updated stock
+[250/834] [local] › tests\inventory-verification.spec.js:74:1 › 19. reload preserves the timestamp
+[251/834] [local] › tests\inventory-verification.spec.js:88:1 › 20. export includes inventoryVerifiedAt; import adopts a newer imported value
+[252/834] [local] › tests\inventory-verification.spec.js:114:1 › 21. a second verification replaces the prior timestamp
+[253/834] [local] › tests\inventory-quantity-truth.spec.js:232:1 › 12. re-pressing Add after a merge cannot double-count the purchase
+[254/834] [local] › tests\inventory-verification.spec.js:128:1 › 22. display says relative time truthfully for a known past date
+[255/834] [local] › tests\inventory-verification.spec.js:139:1 › 23. no inventory item is mutated by verification
+[256/834] [local] › tests\inventory-quantity-truth.spec.js:253:1 › 13. buying more of an expired item makes a new record, not a revived one
+[257/834] [local] › tests\inventory-verification.spec.js:152:1 › 24. no notification is created by verification
+[258/834] [local] › tests\inventory-verification.spec.js:169:1 › 25. no recommendation ranking changes as a result of verification
+[259/834] [local] › tests\inventory-quantity-truth.spec.js:274:1 › 14. Eggs exp Aug 28 + "Eggs 12 pcs Sep 10 2026" stays two truthful records
+[260/834] [local] › tests\inventory-verification.spec.js:186:1 › 26. old saved data without the field still loads
+[261/834] [local] › tests\inventory-verification.spec.js:203:1 › inventoryVerifiedAt round-trips through localStorage
+[262/834] [local] › tests\inventory-quantity-truth.spec.js:295:1 › a printed expiry on the new line is not folded into a bought-date record
+[263/834] [local] › tests\inventory-verification.spec.js:213:1 › buildFirestorePayload() includes inventoryVerifiedAt
+[264/834] [local] › tests\inventory-verification.spec.js:220:1 › backup/restore round-trips inventoryVerifiedAt
+[265/834] [local] › tests\inventory-verification.spec.js:233:1 › MUTATION: removing inventoryVerifiedAt from buildFirestorePayload() loses it on save
+[266/834] [local] › tests\inventory-quantity-truth.spec.js:311:1 › 4. merging into a bought-date record does not refresh purchaseDate
+[267/834] [local] › tests\kitchen-truth.spec.js:40:1 › checking a grocery item transfers it to inventory with no further input
+[268/834] [local] › tests\inventory-quantity-truth.spec.js:336:1 › 15. unknown + known never fabricates a number
+[269/834] [local] › tests\kitchen-truth.spec.js:86:1 › storage location is inferred per item, not defaulted to one bucket
+[270/834] [local] › tests\kitchen-truth.spec.js:106:1 › an unknown quantity stays unknown — the app never invents a number
+[271/834] [local] › tests\inventory-quantity-truth.spec.js:352:1 › known + unknown never destroys the known number
+[272/834] [local] › tests\kitchen-truth.spec.js:124:1 › unchecking a mis-tapped item undoes the transfer exactly
+[273/834] [local] › tests\kitchen-truth.spec.js:155:1 › buying more of something you already have updates the existing record
+[274/834] [local] › tests\inventory-quantity-truth.spec.js:368:1 › 17. 500 g + 1 kg stays two records instead of becoming 501
+[275/834] [local] › tests\kitchen-truth.spec.js:186:1 › a merge never revives expired stock — it stays a separate record
+[276/834] [local] › tests\kitchen-truth.spec.js:221:1 › a printed-expiry record is never merged into
+[277/834] [local] › tests\kitchen-truth.spec.js:248:1 › an unknown quantity on either side leaves the merged record unknown
+[278/834] [local] › tests\inventory-quantity-truth.spec.js:384:1 › grocery check-off also refuses to add across incompatible units
+[279/834] [local] › tests\kitchen-truth.spec.js:268:1 › fuzzy name matches are not merged — Chicken stays out of Chicken Breast
+[280/834] [local] › tests\inventory-quantity-truth.spec.js:400:1 › a blank unit on either side still merges and adopts the unit
+[281/834] [local] › tests\kitchen-truth.spec.js:292:1 › buying a low staple restores it to full and clears the auto shopping row
+[282/834] [local] › tests\inventory-quantity-truth.spec.js:418:1 › an explicit different storage keeps the purchase in its own record
+[283/834] [local] › tests\kitchen-truth.spec.js:321:1 › Have / Low / Gone stays a one-tap cycle on the existing stockLevel field
+[284/834] [local] › tests\kitchen-truth.spec.js:344:1 › Needs Attention separates expired from use-soon across pantry and cooked food
+[285/834] [local] › tests\inventory-quantity-truth.spec.js:434:1 › a purchase tops up the mergeable copy even when an unmergeable one sorts first
+[286/834] [local] › tests\kitchen-truth.spec.js:376:1 › Home renders the attention card with per-row Keep / Remove and a bulk action
+[287/834] [local] › tests\kitchen-truth.spec.js:408:1 › one tap removes a single expired item and tombstones it
+[288/834] [local] › tests\inventory-quantity-truth.spec.js:454:1 › the summary names each outcome separately
+[289/834] [local] › tests\kitchen-truth.spec.js:437:1 › bulk cleanup removes every expired record and nothing else
+[290/834] [local] › tests\inventory-quantity-truth.spec.js:476:1 › a two-digit trailing year enters the same merge path as its four-digit twin
+[291/834] [local] › tests\kitchen-truth.spec.js:490:1 › use-soon food is never removed in bulk, even at the boundary
+[292/834] [local] › tests\kitchen-truth.spec.js:515:1 › Keep quiets an expired item for the day without touching its dates
+[293/834] [local] › tests\kitchen-truth.spec.js:557:1 › Keep is a one-day acknowledgement — the item is actionable again tomorrow
+[294/834] [local] › tests\kitchen-truth.spec.js:644:1 › Keep can be tapped again the next day, and re-suppresses for that day only
+[295/834] [local] › tests\inventory-quantity-truth.spec.js:527:1 › two-digit explicit-expiry separation matches the four-digit behaviour
+[296/834] [local] › tests\kitchen-truth.spec.js:685:1 › the Inventory tab Clear-expired button now matches what the badges say
+[297/834] [local] › tests\kitchen-truth.spec.js:713:1 › a grocery transfer survives a localStorage round-trip and reload
+[298/834] [local] › tests\kitchen-truth.spec.js:751:1 › old saved data without the new fields still loads and classifies
+[299/834] [local] › tests\inventory-quantity-truth.spec.js:549:1 › two-digit unit-incompatible and unknown-quantity cases match the four-digit ones
+[300/834] [local] › tests\kitchen-truth.spec.js:782:1 › export and the Firestore payload carry the new fields without new collections
+[301/834] [local] › tests\kitchen-truth.spec.js:836:1 › Ready Food First and low-effort suggestions still work after the wave
+[302/834] [local] › tests\kitchen-truth.spec.js:864:1 › Home still renders Ready to eat above the cook suggestions
+[303/834] [local] › tests\kitchen-truth.spec.js:883:1 › mobile: expired cleanup is reachable and tappable on a phone viewport
+[304/834] [local] › tests\inventory-quantity-truth.spec.js:586:1 › an implausible short year leaves existing stock completely untouched
+[305/834] [local] › tests\kitchen-truth.spec.js:928:1 › the whole grocery → attention → cleanup loop runs with no console errors
+[306/834] [local] › tests\inventory-quantity-truth.spec.js:607:1 › an exp:-rescued short-year line follows the normal merge rules
+[307/834] [local] › tests\ledger-source-contract.spec.js:45:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §3 closed six-field consumption schema › chaos: a renamed portionsConsumed field is rejected by the real canonicalizeMealConsumption(), not coerced
+[308/834] [local] › tests\ledger-source-contract.spec.js:54:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §3 closed six-field consumption schema › chaos: a fractional portionsConsumed is rejected by the real source function
+[309/834] [local] › tests\inventory-quantity-truth.spec.js:634:1 › no new top-level AppState collection was introduced
+[310/834] [local] › tests\ledger-source-contract.spec.js:63:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §3 closed six-field consumption schema › chaos: an extra unrecognized key on an otherwise-valid record is rejected, proving the schema is genuinely closed
+[311/834] [local] › tests\inventory-quantity-truth.spec.js:653:1 › the whole quantity-truth loop raises no console or page errors
+[312/834] [local] › tests\ledger-source-contract.spec.js:72:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §3 closed six-field consumption schema › the real generateMealConsumptionId() produces the mc_ + UUID shape
+[313/834] [local] › tests\ledger-source-contract.spec.js:81:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §4 append-only merge / conflict evidence › append-only union: disjoint ids from both sides all survive
+[314/834] [local] › tests\ledger-source-contract.spec.js:91:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §4 append-only merge / conflict evidence › chaos ("realtime snapshot replacement"): merging a smaller incoming array never drops existing unique ids — no wholesale replacement
+[315/834] [local] › tests\inventory-quantity-truth.spec.js:680:3 › mobile › 390px: the quantity editor is usable, the new value shows on collapse, nothing overflows
+[316/834] [local] › tests\ledger-source-contract.spec.js:103:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §4 append-only merge / conflict evidence › chaos ("backup rollback"): a stale backup record with different facts under the same id produces a conflict, never a silent rollback
+[317/834] [local] › tests\inventory-quantity-truth.spec.js:711:3 › mobile › 390px: the Bulk Add summary separates updated stock from skipped rows
+[318/834] [local] › tests\ledger-source-contract.spec.js:119:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §4 append-only merge / conflict evidence › an exact duplicate (same id, identical facts) from both sides dedupes to one, no conflict recorded
+[319/834] [local] › tests\ledger-source-contract.spec.js:131:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §5 deletion evidence (mass-delete guard, cloud-sync gating) › chaos: more than MASS_DELETE_GUARD simultaneous vanishes are NOT tombstoned (treated as a transient load race)
+[320/834] [local] › tests\local-harness-origin.spec.js:26:1 › no local spec loads the app from file://
+[321/834] [local] › tests\local-harness-origin.spec.js:51:1 › the local project serves the app over http with no service worker
+[322/834] [local] › tests\local-harness-origin.spec.js:58:1 › a fresh test starts with empty storage — nothing leaks between tests
+[323/834] [local] › tests\ledger-source-contract.spec.js:148:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — §5 deletion evidence (mass-delete guard, cloud-sync gating) › a real one-at-a-time delete (within the guard) IS tombstoned by recordLocalDeletions
+[324/834] [local] › tests\local-harness-origin.spec.js:63:1 › the last of several rapid saves is exactly what the first reload restores
+[325/834] [local] › tests\ledger-source-contract.spec.js:163:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — benign changes must not break normalization › benign: an unrelated extra property on a cookedMeal record survives normalizeCookedMeals() untouched
+[326/834] [local] › tests\low-effort-discovery.spec.js:108:1 › quick filters surface low-effort recipes and every cooking method
+[327/834] [local] › tests\ledger-source-contract.spec.js:174:3 › MEAL_LEDGER_SOURCE_CONTRACT_V1 — benign changes must not break normalization › benign: cookedDate is never touched/reinterpreted by normalizeCookedMeal — it only manages portion counts
+[328/834] [local] › tests\low-effort-discovery.spec.js:168:1 › quick filters stack with the existing search, category and favourites filters
+[329/834] [local] › tests\low-effort-metadata.spec.js:50:1 › a recipe saved without the new metadata still loads, normalizes and renders
+[330/834] [local] › tests\low-effort-metadata.spec.js:101:1 › metadata normalization keeps valid values, drops garbage, and is idempotent
+[331/834] [local] › tests\low-effort-discovery.spec.js:203:1 › Home suggests easiest / use-soon / something-different from existing data
+[332/834] [local] › tests\low-effort-metadata.spec.js:160:1 › the metadata strip renders only what a recipe actually declares
+[333/834] [local] › tests\low-effort-discovery.spec.js:252:1 › a category with nothing behind it is omitted rather than invented
+[334/834] [local] › tests\low-effort-metadata.spec.js:188:1 › export -> import -> reload preserves the new recipe metadata
+[335/834] [local] › tests\low-effort-discovery.spec.js:292:1 › recent cook history nudges variety without blocking anything
+[336/834] [local] › tests\low-effort-metadata.spec.js:248:1 › the low-effort recipe patterns from the brief are all representable
+[337/834] [local] › tests\low-effort-discovery.spec.js:334:1 › the recipe editor saves and reloads the new metadata
+[338/834] [local] › tests\low-effort-zero-time.spec.js:53:1 › the time helpers keep a real zero instead of falling through to undefined
+[339/834] [local] › tests\low-effort-zero-time.spec.js:78:1 › a zero cook-time recipe shows 0m everywhere, never NaN
+[340/834] [local] › tests\low-effort-zero-time.spec.js:125:1 › the edit form loads a zero cook time as 0, not "undefined"
+[341/834] [local] › tests\low-effort-zero-time.spec.js:141:1 › a scaled zero cook-time recipe still shows 0m in its base annotation
+[342/834] [local] › tests\low-effort-discovery.spec.js:422:1 › the low-effort cooking hacks exist and backfill onto an older install
+[343/834] [local] › tests\meal-consumption-durability.spec.js:97:1 › merge: identical facts under the same id dedupe to one record
+[344/834] [local] › tests\low-effort-discovery.spec.js:472:1 › the hacks render on the Hacks tab
+[345/834] [local] › tests\meal-consumption-durability.spec.js:104:1 › merge: different facts under the same id are an explicit conflict — the original is kept, never overwritten
+[346/834] [local] › tests\low-effort-discovery.spec.js:495:1 › the Plan -> Shop -> Cook flow and grocery scaling are unchanged
+[347/834] [local] › tests\meal-consumption-durability.spec.js:116:1 › conflict evidence has one stable full-evidence id regardless of variant order or reconnect replay
+[348/834] [local] › tests\meal-consumption-durability.spec.js:131:1 › merge: disjoint ids on both sides all survive — append-only, order-independent
+[349/834] [local] › tests\meal-consumption-events.spec.js:56:1 › using a portion appends exactly one consumption fact with the expected shape
+[350/834] [local] › tests\meal-consumption-durability.spec.js:139:1 › merge: a record missing from the incoming side is NOT treated as a deletion
+[351/834] [local] › tests\meal-consumption-events.spec.js:84:1 › consuming the last portion still records exactly one fact and removes the batch
+[352/834] [local] › tests\meal-consumption-durability.spec.js:146:1 › closed source schema rejects unknown meal-consumption fields instead of silently comparing them
+[353/834] [local] › tests\meal-consumption-events.spec.js:103:1 › repeated taps each record their own fact, one per portion
+[354/834] [local] › tests\meal-consumption-durability.spec.js:159:1 › mergeMealConsumptions canonicalization: portionsConsumed 1 and 99 are valid, everything else is rejected
+[355/834] [local] › tests\meal-consumption-events.spec.js:123:1 › the Done button (removeCookedMeal) never records a consumption fact
+[356/834] [local] › tests\meal-consumption-durability.spec.js:188:1 › an import / backup-restore snapshot carrying portionsConsumed 100 is rejected, existing facts preserved
+[357/834] [local] › tests\meal-consumption-events.spec.js:137:1 › an untracked batch never records a consumption fact, even via useCookedPortion
+[358/834] [local] › tests\meal-consumption-durability.spec.js:203:1 › a same-id candidate with an out-of-range portion count is rejected outright, not stored as conflict evidence
+[359/834] [local] › tests\meal-consumption-events.spec.js:155:1 › removing an expired item never records a consumption fact
+[360/834] [local] › tests\meal-consumption-durability.spec.js:223:1 › normal useCookedPortion() still records exactly one portion per tap
+[361/834] [local] › tests\meal-consumption-events.spec.js:168:1 › a manual double-tap after a meal is already gone is a safe no-op
+[362/834] [local] › tests\meal-consumption-durability.spec.js:241:1 › a stale/older snapshot with fewer facts cannot erase a local consumption already recorded
+[363/834] [local] › tests\meal-consumption-events.spec.js:181:1 › a quota/storage failure rolls back the Used 1 fact and portion decrement without success UI
+[364/834] [local] › tests\meal-consumption-durability.spec.js:253:1 › a same-id-different-facts snapshot never silently overwrites the locally-known fact
+[365/834] [local] › tests\meal-consumption-events.spec.js:204:1 › a serialization failure rolls back the Used 1 fact and last-portion removal
+[366/834] [local] › tests\meal-consumption-durability.spec.js:263:1 › duplicate snapshot / reconnect replay never creates a second record for the same id
+[367/834] [local] › tests\meal-consumption-events.spec.js:228:1 › consumption facts survive save, reload, export, import merge and the Firestore payload
+[368/834] [local] › tests\meal-consumption-durability.spec.js:275:1 › two genuine consumptions produce two distinct ids and both survive reconciliation
+[369/834] [local] › tests\meal-consumption-durability.spec.js:300:1 › mealConsumptions is included in loadUserData's sign-in reconciliation, not silently omitted
+[370/834] [local] › tests\meal-consumption-events.spec.js:293:1 › mealConsumptions is not a TOMBSTONE_KEYS collection — no deletion capability is claimed in V1
+[371/834] [local] › tests\meal-consumption-durability.spec.js:317:1 › a concurrent cloud fact X and local fact Y both survive the root-document transaction
+[372/834] [local] › tests\meal-lego.spec.js:78:1 › 1–6. each family returns only flavors whose worksWith names that family
+[373/834] [local] › tests\meal-consumption-durability.spec.js:330:1 › same-id conflict retains the accepted cloud fact and durable exact evidence across reload and reconnect
+[374/834] [local] › tests\meal-consumption-durability.spec.js:352:1 › a Firestore transaction retry rereads and unions the latest remote facts
+[375/834] [local] › tests\meal-lego.spec.js:111:1 › 7,8. cooked salmon matches salmon-specific AND generic fish flavors
+[376/834] [local] › tests\meal-consumption-durability.spec.js:365:1 › missing transaction API fails closed without a setDoc root write
+[377/834] [local] › tests\meal-consumption-durability.spec.js:375:1 › exact duplicate facts remain one fact through a cloud save and repeated reconnect snapshots
+[378/834] [local] › tests\meal-lego.spec.js:133:1 › 9. a salmon-specific flavor ranks before a generic fish flavor when otherwise comparable
+[379/834] [local] › tests\meal-consumption-durability.spec.js:391:1 › generateMealConsumptionId never reuses an id already present in AppState.mealConsumptions
+[380/834] [local] › tests\meal-lego.spec.js:150:1 › 10,11. cooked tuna matches tuna-specific AND generic fish flavors
+[381/834] [local] › tests\meal-consumption-durability.spec.js:414:1 › a forced browser probe that always returns the same UUID is detected and refused rather than silently reused
+[382/834] [local] › tests\meal-lego.spec.js:167:1 › 12,13. cooked GENERIC fish never matches a salmon-only or tuna-only flavor
+[383/834] [local] › tests\meal-lego.spec.js:187:1 › 14. mixed returns no automatic suggestions and does not union constituent families
+[384/834] [local] › tests\meal-consumption-durability.spec.js:440:1 › normal id generation produces distinct mc_<uuid>-shaped ids, not the old timestamp+small-random scheme
+[385/834] [local] › tests\meal-lego.spec.js:204:1 › 15. none returns no automatic protein-flavor suggestions and does NOT map to vegetables
+[386/834] [local] › tests\meal-prep-first.spec.js:35:1 › "Not anymore?" is offered only on untouched In-stock rows; tapping the row keeps its D-069 top-up meaning
+[387/834] [local] › tests\meal-lego.spec.js:221:1 › 16. unknown returns no suggestions
+[388/834] [local] › tests\meal-prep-first.spec.js:54:1 › "Not anymore?" removes the stale kitchen record, and it stays gone after reload
+[389/834] [local] › tests\meal-lego.spec.js:234:1 › 17,18. name-shaped batches ("Landers Lechon Manok", "Chicken of the Sea") stay unknown — no name parsing
+[390/834] [local] › tests\meal-lego.spec.js:251:1 › 19. explicitly pinning those same records enables the correct suggestions — without inspecting the name
+[391/834] [local] › tests\meal-prep-first.spec.js:92:1 › a loose match never deletes unrelated stock: only the tapped record changes
+[392/834] [local] › tests\meal-lego.spec.js:269:1 › 20. lower activeTime wins when specificity is equal
+[393/834] [local] › tests\meal-prep-first.spec.js:113:1 › a staple the user says is gone is marked empty, not deleted, and stops counting as in stock
+[394/834] [local] › tests\meal-lego.spec.js:286:1 › 21. specificity beats supertype even when the supertype flavor is otherwise better
+[395/834] [local] › tests\meal-prep-first.spec.js:136:1 › buying ingredients never creates a Fridge meal
+[396/834] [local] › tests\meal-lego.spec.js:302:1 › 22. make-fresh breaks a tie, then name, then id — and the order is stable across calls
+[397/834] [local] › tests\meal-prep-first.spec.js:200:1 › a batch can be planned with no day, shops at its own servings, and survives reload
+[398/834] [local] › tests\meal-lego.spec.js:322:1 › 23. at most 3 suggestions are returned
+[399/834] [local] › tests\meal-lego.spec.js:334:1 › 24. a flavor removed from AppState.flavors cannot appear (tombstoned flavors are already gone)
+[400/834] [local] › tests\meal-prep-first.spec.js:226:1 › Plan tab: "+ Add meals" opens a full recipe picker; a tap adds a batch and it can be removed
+[401/834] [local] › tests\meal-lego.spec.js:363:1 › 25. a known-protein Ready Food card shows a "Try with" row
+[402/834] [local] › tests\meal-lego.spec.js:374:1 › 26. an unknown Ready Food card fabricates NO "Try with" — only the secondary set-protein hint
+[403/834] [local] › tests\meal-prep-first.spec.js:249:1 › Plan tab: adding an already-planned recipe again does not create a duplicate row
+[404/834] [local] › tests\meal-prep-first.spec.js:260:1 › the low-effort filter uses the existing effort signals; turning it off shows everything
+[405/834] [local] › tests\meal-lego.spec.js:384:1 › 27. a mixed Ready Food card fabricates no suggestions and shows no set-protein hint
+[406/834] [local] › tests\meal-prep-first.spec.js:276:1 › prepping a batch is what puts servings in the Fridge
+[407/834] [local] › tests\meal-lego.spec.js:396:1 › 28. Used 1 still decrements exactly one portion with the Meal Lego row present
+[408/834] [local] › tests\meal-prep-first.spec.js:298:1 › AI Prep Brief quotes source facts, scales amounts, lists shared ingredients, and marks missing data
+[409/834] [local] › tests\meal-lego.spec.js:405:1 › 29. protein correction still works and updates the Try with row live
+[410/834] [local] › tests\meal-prep-first.spec.js:334:1 › Copy AI Prep Brief copies exactly the deterministic brief
+[411/834] [local] › tests\meal-lego.spec.js:417:1 › 30. clicking a Try with chip opens the Flavor Library entry
+[412/834] [local] › tests\meal-prep-first.spec.js:360:1 › Home leads with the Plan -> Shop -> Prep -> Fridge flow; "what to cook" is demoted, not deleted
+[413/834] [local] › tests\meal-lego.spec.js:426:1 › openFlavorFromReadyFood does NOT mutate the user's flavor filters
+[414/834] [local] › tests\meal-prep-first.spec.js:384:1 › 390px: Plan batches, Prep and the Home flow card do not scroll sideways
+[415/834] [local] › tests\meal-lego.spec.js:440:1 › a chip for a flavor hidden by the current filter shows a notice, not a silent filter reset
+[416/834] [local] › tests\meal-lego.spec.js:454:1 › 31. Home "Eat this first" may show ONE concise flavor line
+[417/834] [local] › tests\meal-prep-first.spec.js:425:1 › REGRESSION: changing an unrelated batch's servings keeps a checked weekly-plan row checked (and its undo receipt)
+[418/834] [local] › tests\meal-lego.spec.js:470:1 › 32,33,34. Ready Food ordering is unchanged by adding flavors (expiring > fridge > freezer preserved)
+[419/834] [local] › tests\meal-prep-first.spec.js:451:1 › REGRESSION: a checked batch ingredient stays checked when that batch's servings change; quantity updates
+[420/834] [local] › tests\meal-lego.spec.js:490:1 › 35. What Should We Eat category selection is unchanged — only presentation metadata is added
+[421/834] [local] › tests\meal-prep-first.spec.js:467:1 › regeneration: a removed ingredient leaves no ghost row, a new one starts unchecked, custom rows are untouched
+[422/834] [local] › tests\meal-lego.spec.js:514:1 › 36,37,38. rendering Meal Lego suggestions writes nothing — localStorage and Firestore payload untouched
+[423/834] [local] › tests\meal-prep-first.spec.js:494:1 › regeneration identity is exact: a checked "Rice" never lends its state to "Rice Vinegar"
+[424/834] [local] › tests\meal-lego.spec.js:553:1 › no new AppState key and no new cookedMeal / flavor field is introduced by Meal Lego
+[425/834] [local] › tests\meal-prep-first.spec.js:515:1 › Home empty state points to the Fridge, not a tab named Inventory
+[426/834] [local] › tests\meal-lego.spec.js:592:1 › 390px: Try with wraps cleanly, no horizontal overflow, Used 1 still reachable
+[427/834] [local] › tests\mobile-home-polish.spec.js:52:3 › Home attention panel — compact by default › attention details are CLOSED by default even when expired items exist
+[428/834] [local] › tests\meal-lego.spec.js:622:1 › the whole Meal Lego flow raises no page or console errors
+[429/834] [local] › tests\mobile-home-polish.spec.js:68:3 › Home attention panel — compact by default › the compact summary shows truthful expired / use-soon counts
+[430/834] [local] › tests\mobile-home-polish.spec.js:77:3 › Home attention panel — compact by default › tapping Review opens the details
+[431/834] [local] › tests\mobile-layout.spec.js:8:1 › no horizontal overflow on any tab (mobile)
+[432/834] [local] › tests\mobile-home-polish.spec.js:86:3 › Home attention panel — compact by default › Review forces open rather than toggling — a second tap stays open
+[433/834] [local] › tests\mobile-home-polish.spec.js:97:3 › Home attention panel — compact by default › the global banner's View action opens Home's attention details
+[434/834] [local] › tests\mobile-home-polish.spec.js:113:3 › Home attention panel — compact by default › openAttentionView() opens the details (notification / deep-link path)
+[435/834] [local] › tests\mobile-home-polish.spec.js:126:3 › Home attention panel — compact by default › Keep / Remove / Remove expired remain reachable once opened
+[436/834] [local] › tests\mobile-home-polish.spec.js:138:3 › Home attention panel — compact by default › manually opening the card survives the next render (view state preserved)
+[437/834] [local] › tests\mobile-home-polish.spec.js:152:3 › Home hierarchy and secondary surfaces › Ready to eat renders above the attention details
+[438/834] [local] › tests\mobile-home-polish.spec.js:178:3 › Home hierarchy and secondary surfaces › Record leftovers / takeout stays a compact, reachable row
+[439/834] [local] › tests\mobile-home-polish.spec.js:196:3 › Home hierarchy and secondary surfaces › Need ideas? and Cook History stay collapsed by default
+[440/834] [local] › tests\mobile-home-polish.spec.js:216:3 › Greeting — no orphaned emoji › the wave emoji is glued to the last word with a non-breaking space
+[441/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:71:1 › Lemon Chicken paste: metadata maps to fields, never pollutes instructions
+[442/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:100:1 › 7/8: multiple equipment values normalize; unknown equipment is dropped, never invented
+  1) [local] › tests\paste-import-metadata-and-ranges.spec.js:100:1 › 7/8: multiple equipment values normalize; unknown equipment is dropped, never invented 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Array [
+    +   "air-fryer",
+        "oven",
+      ]
+
+      108 |   // "Air fryer" and "Sous vide machine" are not in RECIPE_EQUIPMENT — dropped
+      109 |   // silently rather than becoming a made-up enum value; "Oven" still comes through.
+    > 110 |   expect(result.unknown).toEqual(['oven']);
+          |                          ^
+      111 | });
+      112 |
+      113 | test('9/10: effort text normalizes case/spacing variants; unrecognized effort stays unset', async ({ page }) => {
+        at C:\Users\Admin\AppData\Local\Temp\meal-prep-home-favorites-air-fryer\tests\paste-import-metadata-and-ranges.spec.js:110:26
+
+    Error Context: test-results\task079-full\paste-import-metadata-and--03e0f-t-is-dropped-never-invented-local\error-context.md
+
+
+
+
+[443/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:113:1 › 9/10: effort text normalizes case/spacing variants; unrecognized effort stays unset
+[444/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:132:1 › 11: Active Time parses simple minute forms
+[445/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:147:1 › 12: metadata heading matching is case-insensitive
+[446/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:157:1 › 13: ordinary instruction prose mentioning equipment/effort words is not misclassified
+[447/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:174:1 › 14: normal integer/decimal ingredient quantities still parse exactly as before
+[448/834] [local] › tests\mobile-layout.spec.js:47:3 › the 5 primary tabs + More fit without the nav scrolling sideways (390px)
+[449/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:191:1 › 15/16/17/18: unparseable amounts stay honest instead of fabricating 1 piece
+[450/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:219:1 › range-shaped ingredients also stay honest through the URL-import safety net
+[451/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:231:1 › full Lemon Chicken paste never fabricates a false quantity/unit for any range ingredient
+[452/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:249:1 › paste import fills the form metadata controls, saves, and survives reload
+[453/834] [local] › tests\paste-import-metadata-and-ranges.spec.js:344:1 › 20: paste-imported metadata survives export -> import round-trip
+[454/834] [local] › tests\plan-persistence-and-picker.spec.js:81:1 › clearDay() persists: the cleared day stays cleared after reload, and its stale freshness warning does not come back
+[455/834] [local] › tests\mobile-layout.spec.js:47:3 › the 5 primary tabs + More fit without the nav scrolling sideways (360px)
+[456/834] [local] › tests\plan-persistence-and-picker.spec.js:111:1 › clearWeeklyPlan() persists across reload and does not touch plannedBatches
+[457/834] [local] › tests\plan-persistence-and-picker.spec.js:143:1 › removeRecipeFromSlot() persists across reload (single-slot remove, not just Clear Day/Week)
+[458/834] [local] › tests\plan-persistence-and-picker.spec.js:159:1 › a legitimate weekly plan (never cleared) survives reload unchanged
+[459/834] [local] › tests\plan-persistence-and-picker.spec.js:174:1 › mergeCloudConflict() is local-wins for weeklyPlan/plannedBatches: a stale remote cannot resurrect an explicit clear
+[460/834] [local] › tests\plan-persistence-and-picker.spec.js:194:1 › Plan tab: a batch title opens read-only details by stable id without changing servings or removing the batch
+[461/834] [local] › tests\plan-persistence-and-picker.spec.js:220:1 › Plan tab: batch title opens read-only recipe details with mouse and keyboard
+[462/834] [local] › tests\mobile-layout.spec.js:95:3 › current-tab indicator when Recipes is reached through More › mobile: selecting Recipes via More visibly marks More as the active tab
+[463/834] [local] › tests\plan-persistence-and-picker.spec.js:259:1 › Plan tab: servings −/+ and remove never open the recipe detail
+[464/834] [local] › tests\plan-persistence-and-picker.spec.js:275:1 › Add-meals picker: title opens read-only details above the picker; closing returns with search and plan intact
+[465/834] [local] › tests\plan-persistence-and-picker.spec.js:303:1 › Add-meals picker: + Add and favorite never open the recipe detail
+[466/834] [local] › tests\plan-persistence-and-picker.spec.js:327:1 › Add-meals picker: only the title opens details; Add, Added and favorite remain independent
+[467/834] [local] › tests\mobile-layout.spec.js:119:3 › current-tab indicator when Recipes is reached through More › desktop: Recipes stays a normal primary tab; More is not active for it
+[468/834] [local] › tests\plan-persistence-and-picker.spec.js:355:1 › Add-meals picker: read-only inspection preserves filters and domain state, then Add creates one batch
+[469/834] [local] › tests\plan-persistence-and-picker.spec.js:407:1 › Add-meals picker: several recipe details can be inspected sequentially without losing the search
+[470/834] [local] › tests\plan-persistence-and-picker.spec.js:425:1 › closing Plan preview restores Add Recipe controls and allows saving
+[471/834] [local] › tests\prepared-flavors.spec.js:127:1 › 1. a saved document with no preparedFlavors key loads as empty stock
+[472/834] [local] › tests\prepared-flavors.spec.js:133:1 › 24. old saved data (recipes/pantry/flavors, no preparedFlavors) remains fully compatible
+[473/834] [local] › tests\prepared-flavors.spec.js:156:1 › 2+3. a prepared flavor can be created from a Flavor Library flavor and flavorId stays linked
+[474/834] [local] › tests\plan-persistence-and-picker.spec.js:455:1 › closing Plan preview restores Edit Recipe controls and keeps later previews read-only
+[475/834] [local] › tests\prepared-flavors.spec.js:173:1 › 5+6. fridge and freezer storage both round-trip
+[476/834] [local] › tests\prepared-flavors.spec.js:187:1 › 7. preparedAt round-trips as today's local date
+[477/834] [local] › tests\prepared-flavors.spec.js:197:1 › 8. blank expiresAt remains blank and is never inferred
+[478/834] [local] › tests\prepared-flavors.spec.js:207:1 › 9. user-entered expiresAt round-trips
+[479/834] [local] › tests\prepared-flavors.spec.js:217:1 › 26. an invalid/unknown flavorId does not silently attach a prepared batch to another flavor
+[480/834] [local] › tests\plan-persistence-and-picker.spec.js:484:1 › Plan recipe title has keyboard focus and details remain scrollable on a narrow viewport
+[481/834] [local] › tests\prepared-flavors.spec.js:226:1 › 31. one active batch per flavorId is enforced — a second "I made this" replaces, never duplicates
+[482/834] [local] › tests\prepared-flavors.spec.js:250:1 › 10. Used 1 decrements exactly once locally
+[483/834] [local] › tests\plan-persistence-and-picker.spec.js:509:1 › Plan tab batches: only title opens details; servings and remove remain independent
+[484/834] [local] › tests\prepared-flavors.spec.js:257:1 › 11. Used 1 cannot drive portions negative
+[485/834] [local] › tests\prepared-flavors.spec.js:268:1 › 12+13. the last Used 1 removes the batch and writes an explicit tombstone
+[486/834] [local] › tests\prepared-flavors.spec.js:279:1 › 15. a partial decrement (not reaching zero) writes no deletion tombstone
+[487/834] [local] › tests\plan-persistence-and-picker.spec.js:544:1 › Plan tab: a batch whose recipe was deleted is not inspectable
+[488/834] [local] › tests\prepared-flavors.spec.js:286:1 › 30. Used 1 creates no cookHistory entry — it is not a "cooked" event
+[489/834] [local] › tests\plan-persistence-and-picker.spec.js:559:1 › closing another modal does not run the recipe modal close handler
+[490/834] [local] › tests\prepared-flavors.spec.js:297:1 › 16. preparedFlavors round-trips through localStorage
+[491/834] [local] › tests\plan-persistence-and-picker.spec.js:575:1 › a long recipe name in the batch list wraps instead of overflowing horizontally
+[492/834] [local] › tests\prepared-flavors.spec.js:306:1 › 17. export/import round-trips preparedFlavors (union merge, existing wins)
+[493/834] [local] › tests\plan-persistence-and-picker.spec.js:593:1 › the freshness warning links a recipe by the same stable id the plan slot stores
+[494/834] [local] › tests\prepared-flavors.spec.js:317:1 › 18. backup/restore round-trips preparedFlavors
+[495/834] [local] › tests\prepared-flavors.spec.js:332:1 › 19. buildFirestorePayload() includes preparedFlavors
+[496/834] [local] › tests\plan-persistence-and-picker.spec.js:611:3 › Add-meals picker has no horizontal overflow at 360px and content is inset from the modal edges
+[497/834] [local] › tests\prepared-flavors.spec.js:340:1 › 20. sign-in merge (loadUserData UKEYS union) preserves preparedFlavors made offline
+[498/834] [local] › tests\plan-persistence-and-picker.spec.js:611:3 › Add-meals picker has no horizontal overflow at 390px and content is inset from the modal edges
+[499/834] [local] › tests\prepared-flavors.spec.js:350:1 › 21. the realtime listener path recognizes preparedFlavors from another device
+[500/834] [local] › tests\plan-persistence-and-picker.spec.js:611:3 › Add-meals picker has no horizontal overflow at 1280px and content is inset from the modal edges
+[501/834] [local] › tests\prepared-flavors.spec.js:367:1 › 22. a tombstone suppresses a stale prepared-flavor record on load
+[502/834] [local] › tests\plan-persistence-and-picker.spec.js:640:1 › picker favorite toggle: star toggles recipe.favorite, persists, and never touches plannedBatches or Added state
+[503/834] [local] › tests\prepared-flavors.spec.js:378:1 › 23. a deleted prepared flavor does not resurrect from a stale remote copy (sign-in union)
+[504/834] [local] › tests\prepared-flavors.spec.js:388:1 › 14. 6+ simultaneous prepared-flavor disappearances are suppressed by MASS_DELETE_GUARD, not tombstoned as real deletes
+[505/834] [local] › tests\prepared-flavors.spec.js:408:1 › 25. a malformed preparedFlavor record does not crash rendering
+[506/834] [local] › tests\prepared-flavors.spec.js:423:1 › normalization repairs an incoherent portions pair by raising initial, never clamping remaining
+[507/834] [local] › tests\plan-persistence-and-picker.spec.js:662:1 › adding a recipe does not favorite it; an Added-✓ recipe can still be favorited; title inspection still works alongside both
+[508/834] [local] › tests\prepared-flavors.spec.js:430:1 › normalization never invents updatedAt
+[509/834] [local] › tests\prepared-flavors.spec.js:436:1 › normalizePreparedFlavors is idempotent
+[510/834] [local] › tests\prepared-flavors.spec.js:452:1 › 27. Flavor Library recipe/knowledge data is unchanged when prepared stock changes
+[511/834] [local] › tests\plan-persistence-and-picker.spec.js:682:1 › duplicate display names cannot cross-toggle favorite state — identity is by recipeId
+[512/834] [local] › tests\prepared-flavors.spec.js:460:1 › 28. cookedMeals is unchanged when prepared-flavor stock changes
+[513/834] [local] › tests\plan-persistence-and-picker.spec.js:703:1 › Favorites chip filters the picker to favorited recipes only, and composes with Low effort
+[514/834] [local] › tests\prepared-flavors.spec.js:472:1 › 29. Meal Lego compatibility output is unchanged by prepared-flavor stock
+[515/834] [local] › tests\prepared-flavors.spec.js:484:1 › 32. deleting a Flavor Library flavor does not mutate its prepared-stock record (orphan, not cascade-deleted)
+[516/834] [local] › tests\ready-food-contract.spec.js:3:1 › manual ready-food entry reads source and freshness defaults from the shared contract
+[517/834] [local] › tests\prepared-flavors.spec.js:496:1 › orphaned prepared stock (flavor deleted) renders honestly instead of crashing
+[518/834] [local] › tests\ready-food-home.spec.js:43:1 › ready food ranks expiring fridge food ahead of fridge, and fridge ahead of freezer
+[519/834] [local] › tests\prepared-flavors.spec.js:508:1 › 39. Prepared Flavors card has no horizontal overflow at mobile width
+[520/834] [local] › tests\ready-food-home.spec.js:78:1 › expired food is never suggested as something to eat
+[521/834] [local] › tests\prepared-flavors.spec.js:517:1 › 40. no console/page errors from load through Used 1
+[522/834] [local] › tests\ready-food-home.spec.js:110:1 › advancing the clock across the exact expiry boundary changes the result — proves the fixture is date-relative, not date-lucky
+[523/834] [local] › tests\prepared-flavors.spec.js:537:1 › MUTATION: removing preparedFlavors from buildFirestorePayload() loses it on save
+[524/834] [local] › tests\prepared-flavors.spec.js:551:1 › MUTATION: removing the explicit tombstone write from removePreparedFlavor() lets a zero-batch resurrect from a stale cloud copy
+[525/834] [local] › tests\ready-food-home.spec.js:128:1 › Home shows ready food ABOVE the cook suggestions, and keeps both
+[526/834] [local] › tests\prepared-flavors.spec.js:575:1 › MUTATION: bypassing the existing-batch lookup in savePreparedFlavor() duplicates instead of replacing
+[527/834] [local] › tests\ready-food-home.spec.js:176:1 › the ready card is omitted entirely when there is no ready food
+[528/834] [local] › tests\ready-food-portions.spec.js:47:1 › a cooked meal saved without portion fields still loads and renders
+[529/834] [local] › tests\ready-food-home.spec.js:193:1 › the ready card caps at 3 items rather than listing the whole fridge
+[530/834] [local] › tests\ready-food-portions.spec.js:91:1 › portion normalization is idempotent and repairs incoherent pairs
+[531/834] [local] › tests\ready-food-home.spec.js:219:1 › ready food reuses the recipe mealBalance as a side-dish hint
+[532/834] [local] › tests\ready-food-portions.spec.js:140:1 › Used 1 decrements by one tap and never goes negative
+[533/834] [local] › tests\ready-food-home.spec.js:256:1 › one tap from Home consumes a portion without opening anything
+[534/834] [local] › tests\ready-food-home.spec.js:285:1 › the Landers lechon manok workflow works with no special-case code
+[535/834] [local] › tests\ready-food-portions.spec.js:194:1 › portions can never be driven negative, even by repeated calls
+[536/834] [local] › tests\ready-food-portions.spec.js:216:1 › Used 1 on an untracked batch finishes it instead of counting
+[537/834] [local] › tests\ready-food-portions.spec.js:228:1 › marking a recipe cooked stores the portion count from the dialog
+[538/834] [local] › tests\ready-food-home.spec.js:380:1 › the portions cooking hack ships with the defaults
+[539/834] [local] › tests\ready-food-protein-hardening.spec.js:111:1 › 1. an existing manual batch saved as Unknown can be changed to Chicken in place
+[540/834] [local] › tests\ready-food-protein-hardening.spec.js:145:1 › 2. a wrong explicit choice can be corrected — Chicken to Beef
+[541/834] [local] › tests\ready-food-protein-hardening.spec.js:160:1 › 11. a legacy pre-wave batch is classified without recreating it
+[542/834] [local] › tests\ready-food-portions.spec.js:278:1 › a blank portion field keeps the pre-wave untracked behaviour
+[543/834] [local] › tests\ready-food-protein-hardening.spec.js:186:1 › a correction stamps updatedAt so it wins last-write-wins against an older cloud copy
+[544/834] [local] › tests\ready-food-protein-hardening.spec.js:199:1 › correcting an id that does not exist is a no-op, not a new record
+[545/834] [local] › tests\ready-food-protein-hardening.spec.js:212:1 › 9,14. clearing the selection REMOVES the field rather than persisting "unknown"
+[546/834] [local] › tests\ready-food-protein-hardening.spec.js:231:1 › 9. clearing a recipe-backed batch returns it to recipe-derived identity
+[547/834] [local] › tests\ready-food-portions.spec.js:311:1 › portion data survives save, reload, export and the Firestore payload
+[548/834] [local] › tests\ready-food-protein-hardening.spec.js:256:1 › the Auto option names the derived answer instead of pretending it is unknown
+[549/834] [local] › tests\ready-food-protein-hardening.spec.js:292:1 › CHARACTERIZATION: an UNPINNED recipe-backed batch follows a later recipe edit
+[550/834] [local] › tests\ready-food-portions.spec.js:363:1 › the fridge/freezer freshness behaviour is unchanged by portions
+[551/834] [local] › tests\ready-food-protein-hardening.spec.js:323:1 › 6,8. pinning a recipe-derived Chicken freezes it against a later recipe edit
+[552/834] [local] › tests\ready-food-protein-identity.spec.js:111:1 › 3+4. a manual meal named "Landers Lechon Manok" stays unknown — the name is never read
+[553/834] [local] › tests\ready-food-protein-hardening.spec.js:356:1 › 7. a recipe-derived Chicken can be explicitly overridden to Beef
+[554/834] [local] › tests\ready-food-protein-identity.spec.js:128:1 › 3. names that LOOK like a protein are never parsed — chaos set stays unknown
+[555/834] [local] › tests\ready-food-protein-hardening.spec.js:378:1 › 10. a dangling recipeId with no explicit value stays unknown after a correction is cleared
+[556/834] [local] › tests\ready-food-protein-identity.spec.js:152:1 › 5. the same "Landers Lechon Manok" explicitly marked Chicken resolves chicken
+[557/834] [local] › tests\ready-food-protein-hardening.spec.js:399:1 › 18. correction never reads the name — three trap names stay unknown until chosen
+[558/834] [local] › tests\ready-food-protein-identity.spec.js:160:1 › 3. an explicit value always beats the name, even a contradictory one
+[559/834] [local] › tests\ready-food-protein-hardening.spec.js:435:1 › 17. exact ingredient matching still holds — no substring inference crept in
+[560/834] [local] › tests\ready-food-protein-identity.spec.js:170:1 › 6,7,8,9. single-protein recipes resolve their family from structured ingredients
+[561/834] [local] › tests\ready-food-protein-hardening.spec.js:459:1 › 16. an imported Protein category is read through whitespace and case
+[562/834] [local] › tests\ready-food-protein-identity.spec.js:198:1 › 10. a recipe with two distinct protein families resolves mixed, not a favourite
+[563/834] [local] › tests\ready-food-protein-hardening.spec.js:499:1 › 16. category normalisation does not change any IDENTIFIABLE recipe outcome
+[564/834] [local] › tests\ready-food-protein-identity.spec.js:215:1 › 11. a meatless recipe resolves none — it does not fabricate a protein
+[565/834] [local] › tests\ready-food-protein-hardening.spec.js:515:1 › 12. non-string persisted proteinType values are dropped, never coerced
+[566/834] [local] › tests\ready-food-protein-identity.spec.js:231:1 › 12. an unidentifiable Protein ingredient forces unknown for the whole recipe
+[567/834] [local] › tests\ready-food-protein-hardening.spec.js:544:1 › a dropped non-string value resolves unknown rather than the coerced lookalike
+[568/834] [local] › tests\ready-food-protein-identity.spec.js:251:1 › no substring matching: a name CONTAINING a known ingredient does not match it
+[569/834] [local] › tests\ready-food-protein-hardening.spec.js:558:1 › 13. mixed is not accepted as an explicit selection, from the UI or from storage
+[570/834] [local] › tests\ready-food-protein-identity.spec.js:267:1 › a dangling recipeId (recipe deleted after cooking) falls back to unknown
+[571/834] [local] › tests\ready-food-protein-hardening.spec.js:586:1 › 14. "unknown" is likewise never a stored value or an offered option
+[572/834] [local] › tests\ready-food-protein-identity.spec.js:276:1 › an explicit value survives the recipe being edited to a different protein
+[573/834] [local] › tests\ready-food-protein-hardening.spec.js:609:1 › 15. none IS a valid explicit meatless selection and survives a correction
+[574/834] [local] › tests\ready-food-protein-identity.spec.js:294:1 › 1. manual add can explicitly select Chicken, and it is stored
+[575/834] [local] › tests\ready-food-protein-hardening.spec.js:631:1 › 19. the cooked-protein vocabulary is pinned exactly and cannot drift silently
+[576/834] [local] › tests\ready-food-protein-hardening.spec.js:673:1 › 19. the add-form selector is generated from the vocabulary, not written out twice
+[577/834] [local] › tests\ready-food-protein-identity.spec.js:309:1 › 2. manual add defaults to Unknown and stores no field at all
+[578/834] [local] › tests\ready-food-protein-hardening.spec.js:692:1 › 19. the card selector offers exactly the same vocabulary as the add form
+[579/834] [local] › tests\ready-food-protein-identity.spec.js:324:1 › the selector resets to Unknown on every open — a previous choice never carries over
+[580/834] [local] › tests\ready-food-protein-hardening.spec.js:715:1 › 25. the correction control adds no horizontal overflow at 390px
+[581/834] [local] › tests\ready-food-protein-hardening.spec.js:751:1 › 3. a correction survives save + reload
+[582/834] [local] › tests\ready-food-protein-identity.spec.js:334:1 › "No protein (meatless)" is selectable and is distinct from unknown
+[583/834] [local] › tests\ready-food-protein-hardening.spec.js:773:1 › 3. clearing a correction survives save + reload as an ABSENT field
+[584/834] [local] › tests\ready-food-protein-identity.spec.js:348:1 › the HTML selector and the code vocabulary cannot drift apart
+[585/834] [local] › tests\ready-food-protein-hardening.spec.js:794:1 › 4. a correction reaches the Firestore payload and a cloud load restores it
+[586/834] [local] › tests\ready-food-protein-identity.spec.js:365:1 › 24. the manual add modal stays usable on a phone with no horizontal overflow
+[587/834] [local] › tests\ready-food-protein-identity.spec.js:387:1 › 18. a flavor worksWith list joins deterministically to a known cooked-food protein
+[588/834] [local] › tests\ready-food-protein-hardening.spec.js:821:1 › 4. a cloud copy carrying an invalid proteinType loads as unknown, not coerced
+[589/834] [local] › tests\ready-food-protein-identity.spec.js:403:1 › 19. unknown / mixed / none cooked food returns NO flavors rather than a guess
+[590/834] [local] › tests\ready-food-protein-hardening.spec.js:839:1 › 4. the sign-in union merge keeps a corrected batch
+[591/834] [local] › tests\ready-food-protein-identity.spec.js:422:1 › the cooked-food vocabulary is a subset of the flavor worksWith vocabulary
+[592/834] [local] › tests\ready-food-protein-hardening.spec.js:864:1 › 5. export / import round-trips a correction and drops an invalid one
+[593/834] [local] › tests\ready-food-protein-identity.spec.js:434:1 › 20. no new top-level AppState collection was introduced
+[594/834] [local] › tests\ready-food-protein-hardening.spec.js:896:1 › 24. no new top-level AppState key and no TOMBSTONE_KEYS change
+[595/834] [local] › tests\ready-food-protein-identity.spec.js:478:1 › 21. save + reload preserves an explicit classification
+[596/834] [local] › tests\ready-food-protein-hardening.spec.js:937:1 › 20,21. Ready Food and What Should We Eat ranking are unchanged by corrections
+[597/834] [local] › tests\ready-food-protein-identity.spec.js:498:1 › 22. the Firestore payload carries it, and a cloud load restores it
+[598/834] [local] › tests\ready-food-protein-hardening.spec.js:963:1 › 23. Used 1 still decrements exactly one portion on a corrected batch
+[599/834] [local] › tests\ready-food-protein-identity.spec.js:523:1 › 23. export and import round-trip the field through the generic cookedMeals flows
+[600/834] [local] › tests\ready-food-protein-hardening.spec.js:981:1 › 22. Flavor Library CRUD is unchanged
+[601/834] [local] › tests\ready-food-protein-identity.spec.js:550:1 › 13. cooked meals saved before this wave load untouched and read unknown
+[602/834] [local] › tests\ready-food-protein-hardening.spec.js:1003:1 › 26. correcting, clearing and re-correcting raises no page or console errors
+[603/834] [local] › tests\ready-food-protein-identity.spec.js:583:1 › a legacy recipe-backed batch resolves once its recipe is present
+[604/834] [local] › tests\ready-food-protein-hardening.spec.js:1059:1 › 27. a derived family with no FLAVOR_PROTEINS label degrades to Unknown and leaves the Fridge list usable
+[605/834] [local] › tests\ready-food-protein-identity.spec.js:594:1 › an unrecognised stored value is dropped rather than trusted
+[606/834] [local] › tests\ready-food-protein-hardening.spec.js:1277:1 › P3-2 A: a newer local unpin beats a stale cloud pin through the real sign-in merge
+[607/834] [local] › tests\ready-food-protein-identity.spec.js:611:1 › 14. Ready Food ranking is unchanged by the presence of protein data
+[608/834] [local] › tests\ready-food-protein-identity.spec.js:631:1 › 15. What Should We Eat ranking is unchanged
+[609/834] [local] › tests\ready-food-protein-hardening.spec.js:1301:1 › P3-2 B (reverse): a newer cloud pin beats a stale local unpin — proves the test is about LWW, not "unpin wins"
+[610/834] [local] › tests\ready-food-protein-identity.spec.js:648:1 › 16. Used 1 still decrements exactly one portion
+[611/834] [local] › tests\ready-food-protein-hardening.spec.js:1312:1 › P3-2 setup proof: setCookedProteinType(id, "") deletes the field and restamps — it never persists "unknown"
+[612/834] [local] › tests\ready-food-protein-identity.spec.js:665:1 › 17. Flavor Library CRUD is unchanged
+[613/834] [local] › tests\recipe-actions.spec.js:28:1 › clicking a sample recipe card opens the editor (numeric id)
+[614/834] [local] › tests\ready-food-protein-identity.spec.js:683:1 › 25. the whole protein-identity flow raises no page or console errors
+[615/834] [local] › tests\recipe-actions.spec.js:43:1 › serving +/- works on a sample recipe
+[616/834] [local] › tests\recipe-card-empty-ingredients.spec.js:56:1 › a recipe without ingredients shows an empty-state message, not a blank list
+[617/834] [local] › tests\recipe-card-empty-ingredients.spec.js:75:1 › a recipe with ingredients still lists them and shows no empty-state message
+[618/834] [local] › tests\recipe-edit-preservation.spec.js:88:1 › an unrelated edit preserves favorite, highlights, provenance and metadata
+[619/834] [local] › tests\recipe-import-normalization.spec.js:17:1 › duration parsing keeps unknown invalid values as null
+[620/834] [local] › tests\recipe-import-normalization.spec.js:40:1 › yield parsing preserves text and only derives clear meal servings
+[621/834] [local] › tests\recipe-edit-preservation.spec.js:150:1 › preserved properties survive a save and reload
+[622/834] [local] › tests\recipe-import-normalization.spec.js:61:1 › ingredient normalization preserves raw lines and avoids fabricated quantity/unit
+[623/834] [local] › tests\recipe-import-normalization.spec.js:89:1 › instructions normalize section-aware S2 output into textarea-compatible text
+[624/834] [local] › tests\recipe-import-normalization.spec.js:105:1 › nutrition normalization parses source strings without inventing missing values
+[625/834] [local] › tests\recipe-edit-preservation.spec.js:190:1 › the form stays authoritative for the fields it does own
+[626/834] [local] › tests\recipe-import-normalization.spec.js:125:1 › representative Paksiw source normalizes into a transient draft
+[627/834] [local] › tests\recipe-import-normalization.spec.js:182:1 › partial and malformed source objects stay safe and reviewable
+[628/834] [local] › tests\recipe-edit-preservation.spec.js:238:1 › clearing every nutrition input still clears the recipe nutrition
+[629/834] [local] › tests\recipe-import-production-polish.spec.js:50:1 › imported recipe cards render missing nutrition as unavailable, not NaN or zero
+[630/834] [local] › tests\recipe-import-production-polish.spec.js:88:1 › recipe-card instructions render newline-delimited imported directions as ordered escaped steps
+[631/834] [local] › tests\recipe-edit-preservation.spec.js:264:1 › adding a brand-new recipe is unaffected by the preservation path
+[632/834] [local] › tests\recipe-import-production-polish.spec.js:121:1 › existing numbered directions do not duplicate numbering in cards or Prep Mode
+[633/834] [local] › tests\recipe-import-production-polish.spec.js:146:1 › single-paragraph instructions remain one readable card step
+[634/834] [local] › tests\recipe-import-s6-verification.spec.js:59:1 › imported recipe persists across reload with provenance and no transient modal state
+[635/834] [local] › tests\recipe-import-save.spec.js:46:1 › clean URL import saves a canonical recipe with provenance and no transient draft fields
+[636/834] [local] › tests\recipe-import-s6-verification.spec.js:89:1 › imported recipe uses normal serving scaling, grocery, nutrition, cooked, and prep paths
+[637/834] [local] › tests\recipe-import-save.spec.js:83:1 › review save requires corrected servings and ingredients before persisting
+[638/834] [local] › tests\recipe-import-save.spec.js:123:1 › duplicate source URL warns before save and import-anyway persists only after explicit choice
+[639/834] [local] › tests\recipe-import-s6-verification.spec.js:128:1 › modal switching/reset and double save keep transient state out of persistence
+[640/834] [local] › tests\recipe-import-save.spec.js:164:1 › normal editing an imported recipe preserves provenance while manual recipes stay untagged
+[641/834] [local] › tests\recipe-import-s6-verification.spec.js:157:1 › import preview and saved recipe render imported markup as inert text
+[642/834] [local] › tests\recipe-import-ui.spec.js:28:1 › URL import renders a compact transient preview from a mocked Worker response
+[643/834] [local] › tests\recipe-storage-persistence.spec.js:20:1 › recipe storage life can remain unknown end-to-end
+[644/834] [local] › tests\recipe-storage-persistence.spec.js:118:1 › manual recipe save uses the canonical persist path for add and edit
+[645/834] [local] › tests\release-hardening.spec.js:101:5 › recipes imported markup is inert at 1280px and after reload
+[646/834] [local] › tests\recipe-import-ui.spec.js:63:1 › URL import shows configuration and Worker errors without exposing internals
+[647/834] [local] › tests\release-hardening.spec.js:101:5 › customIngredients imported markup is inert at 1280px and after reload
+[648/834] [local] › tests\release-hardening.spec.js:101:5 › customHacks imported markup is inert at 1280px and after reload
+[649/834] [local] › tests\recipe-import-ui.spec.js:79:1 › reviewing an imported draft opens the form and saves through the import flow
+[650/834] [local] › tests\release-hardening.spec.js:101:5 › recipes imported markup is inert at 390px and after reload
+[651/834] [local] › tests\release-hardening.spec.js:101:5 › customIngredients imported markup is inert at 390px and after reload
+[652/834] [local] › tests\reliability-recovery-v1.spec.js:85:3 › imported grocery text stays inert at 1280px, including category and row fields
+[653/834] [local] › tests\release-hardening.spec.js:101:5 › customHacks imported markup is inert at 390px and after reload
+[654/834] [local] › tests\reliability-recovery-v1.spec.js:85:3 › imported grocery text stays inert at 390px, including category and row fields
+[655/834] [local] › tests\release-hardening.spec.js:129:5 › customIngredients number id edits the correct record without execution
+[656/834] [local] › tests\reliability-recovery-v1.spec.js:103:1 › numeric and string imported grocery ids remain usable and cannot inject handlers
+[657/834] [local] › tests\release-hardening.spec.js:129:5 › customIngredients string id edits the correct record without execution
+[658/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected day snacks object import leaves runtime, storage, backup and tombstones unchanged
+[659/834] [local] › tests\release-hardening.spec.js:129:5 › customHacks number id edits the correct record without execution
+[660/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected collection object import leaves runtime, storage, backup and tombstones unchanged
+[661/834] [local] › tests\release-hardening.spec.js:129:5 › customHacks string id edits the correct record without execution
+[662/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected null ingredient import leaves runtime, storage, backup and tombstones unchanged
+[663/834] [local] › tests\release-hardening.spec.js:144:3 › hack category constructor stays usable
+[664/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected non-text pantry name import leaves runtime, storage, backup and tombstones unchanged
+[665/834] [local] › tests\release-hardening.spec.js:144:3 › hack category __proto__ stays usable
+[666/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected non-text grocery source import leaves runtime, storage, backup and tombstones unchanged
+[667/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected non-object price map import leaves runtime, storage, backup and tombstones unchanged
+[668/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in card handlers
+[669/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review recipe highlights object import leaves runtime, storage, backup and tombstones unchanged
+[670/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in planner handlers
+[671/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review grocery quantity string import leaves runtime, storage, backup and tombstones unchanged
+[672/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in selection handlers
+[673/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review missing storage-guide text import leaves runtime, storage, backup and tombstones unchanged
+[674/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in nutrition handlers
+[675/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review nested price list import leaves runtime, storage, backup and tombstones unchanged
+[676/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in quick-plan handlers
+[677/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review reserved id import leaves runtime, storage, backup and tombstones unchanged
+[678/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in prep handlers
+[679/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review inherited id import leaves runtime, storage, backup and tombstones unchanged
+[680/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in batch handlers
+[681/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review malformed tombstone import leaves runtime, storage, backup and tombstones unchanged
+[682/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review malformed conflict import leaves runtime, storage, backup and tombstones unchanged
+[683/834] [local] › tests\release-hardening.spec.js:153:3 › imported recipe id stays literal in home handlers
+[684/834] [local] › tests\reliability-recovery-v1.spec.js:135:3 › rejected review supplied pantry quantity import leaves runtime, storage, backup and tombstones unchanged
+[685/834] [local] › tests\release-hardening.spec.js:174:1 › planned recipe text stays inert in Plan, picker, alerts and Nutrition
+[686/834] [local] › tests\reliability-recovery-v1.spec.js:147:1 › review grocery category/unit remain inert in print and price views, including reserved category names
+[687/834] [local] › tests\release-hardening.spec.js:182:1 › editing imported nested ingredient values cannot break input attributes
+[688/834] [local] › tests\reliability-recovery-v1.spec.js:165:1 › review price-input handlers cannot execute imported item or store names
+[689/834] [local] › tests\release-hardening.spec.js:191:1 › cook suggestion with backslash and quote searches literally
+[690/834] [local] › tests\reliability-recovery-v1.spec.js:176:1 › review malformed nested prep session backup is rejected atomically
+[691/834] [local] › tests\release-hardening.spec.js:200:1 › CSV recipe preview renders imported text inertly
+[692/834] [local] › tests\reliability-recovery-v1.spec.js:190:3 › review correction dialog treats grocery id string-shopping-id as data
+[693/834] [local] › tests\release-hardening.spec.js:208:3 › restore refuses signed-out before mutation and retains backup
+[694/834] [local] › tests\reliability-recovery-v1.spec.js:190:3 › review correction dialog treats grocery id 0);window.__recoveryId=true;// as data
+[695/834] [local] › tests\release-hardening.spec.js:208:3 › restore refuses offline before mutation and retains backup
+[696/834] [local] › tests\reliability-recovery-v1.spec.js:202:1 › signed-in clear and restore publish complete backup fields before cloud reload and stale-marker replay
+[697/834] [local] › tests\release-hardening.spec.js:208:3 › restore refuses unread-cloud before mutation and retains backup
+[698/834] [local] › tests\release-hardening.spec.js:222:1 › restore rechecks eligibility after confirmation opens
+[699/834] [local] › tests\reliability-recovery-v1.spec.js:234:1 › partial weekly plan in an older backup restores all seven usable days
+[700/834] [local] › tests\release-hardening.spec.js:232:1 › failed restore cloud confirmation retains backup and warns about sign-in loss
+[701/834] [local] › tests\reliability-recovery-v1.spec.js:248:1 › a late preparation error rejects the detached candidate without leaking changes
+[702/834] [local] › tests\release-hardening.spec.js:244:1 › restore refuses an account change while confirmation is open
+[703/834] [local] › tests\reliability-recovery-v1.spec.js:257:1 › a failed primary local save rejects the import without cloud writes or changed runtime
+[704/834] [local] › tests\release-hardening.spec.js:254:1 › offline backup survives stale-cloud sign-in and eligible restore survives cloud reload
+[705/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.1 partial export still merges, preserves unknown recipe fields and local duplicates
+[706/834] [local] › tests\release-hardening.spec.js:279:3 › review entity recipe id survives card and prep handlers literally
+[707/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.2 partial export still merges, preserves unknown recipe fields and local duplicates
+[708/834] [local] › tests\release-hardening.spec.js:279:3 › review multiline recipe id survives card and prep handlers literally
+[709/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.3 partial export still merges, preserves unknown recipe fields and local duplicates
+[710/834] [local] › tests\release-hardening.spec.js:292:3 › review storage-alert imported handler arguments stay literal
+[711/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.4 partial export still merges, preserves unknown recipe fields and local duplicates
+[712/834] [local] › tests\release-hardening.spec.js:292:3 › review what-to-eat imported handler arguments stay literal
+[713/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.5 partial export still merges, preserves unknown recipe fields and local duplicates
+[714/834] [local] › tests\release-hardening.spec.js:292:3 › review home-buy imported handler arguments stay literal
+[715/834] [local] › tests\reliability-recovery-v1.spec.js:274:3 › legacy 1.6 partial export still merges, preserves unknown recipe fields and local duplicates
+[716/834] [local] › tests\release-hardening.spec.js:292:3 › review expiry-plan imported handler arguments stay literal
+[717/834] [local] › tests\reliability-recovery-v1.spec.js:287:1 › backup includes every saved domain field, including cook history and prep session
+[718/834] [local] › tests\reliability-recovery-v1.spec.js:302:1 › clear, reload and restore recover history/session, retain facts and survive cloud reconciliation
+[719/834] [local] › tests\scroll-no-reload.spec.js:63:1 › mobile code path is actually installed for this user agent
+[720/834] [local] › tests\scroll-no-reload.spec.js:69:1 › a downward drag at the top of the page does not reload the app or lose typed input
+[721/834] [local] › tests\reliability-recovery-v1.spec.js:329:1 › restore clears only restored ids, and stale conflict markers lose while later deletions win
+[722/834] [local] › tests\scroll-no-reload.spec.js:89:1 › scrolling back up inside an open modal does not reload the app
+[723/834] [local] › tests\reliability-recovery-v1.spec.js:353:1 › older backups without history/session keep supported defaults and recover records
+[724/834] [local] › tests\scroll-no-reload.spec.js:108:1 › no touch handler in the app can trigger a page reload
+[725/834] [local] › tests\reliability-recovery-v1.spec.js:366:1 › malformed backup is refused without changing current data
+[726/834] [local] › tests\reliability-recovery-v1.spec.js:376:3 › failed backup prevents clear from changing user data
+[727/834] [local] › tests\seed-isolation.spec.js:58:1 › a Firebase-unavailable fresh boot still receives the whole starter set
+[728/834] [local] › tests\reliability-recovery-v1.spec.js:376:3 › failed backup prevents import from changing user data
+[729/834] [local] › tests\seed-isolation.spec.js:72:1 › no seeded recipe is the same object as its sampleRecipes entry
+[730/834] [local] › tests\starter-pack.spec.js:94:1 › an existing 26-recipe install is offered the whole pack
+[731/834] [local] › tests\seed-isolation.spec.js:98:1 › normal recipe interactions do not mutate sampleRecipes
+[732/834] [local] › tests\seed-isolation.spec.js:140:1 › a session-contaminated seed can no longer leak into the starter pack
+[733/834] [local] › tests\starter-pack.spec.js:111:1 › a partial install is offered only what it is missing, with a count
+[734/834] [local] › tests\seed-isolation.spec.js:168:1 › patchMissingNutrition hands out a copy, not the seed object
+[735/834] [local] › tests\seed-isolation.spec.js:188:1 › reload still restores the saved recipes and re-isolates them
+[736/834] [local] › tests\starter-pack.spec.js:123:1 › the prompt is absent on a fresh install, which seeds through the first-run path
+[737/834] [local] › tests\seed-isolation.spec.js:232:1 › an existing install with a deliberately empty recipe list stays empty
+[738/834] [local] › tests\starter-pack.spec.js:133:1 › the prompt retires itself once nothing is eligible
+[739/834] [local] › tests\seed-isolation.spec.js:261:1 › the opt-in pack path is unchanged and still isolates its copies
+[740/834] [local] › tests\starter-pack.spec.js:152:1 › adding brings the install to the full 40 and populates every method filter
+[741/834] [local] › tests\seed-isolation.spec.js:284:1 › a fresh first-run boot (Firebase path unavailable) marks itself initialized
+[742/834] [local] › tests\suite-classification.spec.js:34:1 › every spec that hits the deployed site is classified as prod
+[743/834] [local] › tests\suite-classification.spec.js:42:1 › every spec classified as prod actually hits the deployed site
+[744/834] [local] › tests\suite-classification.spec.js:50:1 › every spec named in PROD_SPECS exists
+[745/834] [local] › tests\suite-classification.spec.js:55:1 › the local suite is not empty and does not contain the deployed URL
+[746/834] [local] › tests\suite-classification.spec.js:67:1 › every tools script run-claude.ps1 invokes actually exists
+[747/834] [local] › tests\suite-classification.spec.js:78:1 › the docs-consistency check can never halt the overnight run
+[748/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:171:1 › repairs the 5 matched recipes: instructions cleaned, provable range quantities fixed, ids/counts/unrelated data untouched
+[749/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:255:1 › running the repair twice produces zero additional mutation (idempotent)
+[750/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:271:1 › the repair survives a save/reload round trip, including unresolved (null) ingredient quantities
+[751/834] [local] › tests\starter-pack.spec.js:184:1 › the added recipes persist through the normal save path
+[752/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:288:1 › the repair survives an export -> import round trip
+[753/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:319:1 › ambiguous title matching stops safely instead of guessing
+[754/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:344:1 › 7A: polluted recipe with empty metadata is safely repaired
+[755/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:356:1 › 7B: polluted recipe with a manually-changed equipment preserves it
+[756/834] [local] › tests\starter-pack.spec.js:217:1 › a user's own recipes are untouched
+[757/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:368:1 › 7C: polluted recipe with a manually-changed effort preserves it
+[758/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:380:1 › 7D: polluted recipe with manually-changed tags preserves them
+[759/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:392:1 › 7E: instructions that no longer show the known pollution signature are preserved, repair skips
+[760/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:413:1 › 7F: run twice on a manual-edit fixture — second run makes no further change
+[761/834] [local] › tests\starter-pack.spec.js:238:1 › an edited starter recipe already present is never overwritten
+[762/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:430:1 › 8.1/8.2/8.3: normalizeRecipes preserves null, preserves real 0, defaults only a truly-missing field
+[763/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:447:1 › 8.4: calculateScaledQuantity never turns null into 0, and preserves real 0/number/legacy-missing behavior
+[764/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:465:1 › 8.5: grocery generation never fabricates a numeric quantity for an unresolved ingredient
+[765/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:486:1 › 8.6: recipe cost never becomes NaN because of an unresolved ingredient
+[766/834] [local] › tests\starter-pack.spec.js:262:1 › a deleted starter recipe is not resurrected
+[767/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:503:1 › 8.7: nutrition calculation never fabricates a contribution from an unresolved quantity
+[768/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:518:1 › 8.8: recipe detail renders an unresolved quantity as blank without crashing, and a real 0 still shows
+[769/834] [local] › tests\task-058-followup-8-recipe-repair.spec.js:541:1 › 8.9/8.10: save/reload and export/import both preserve an unresolved (null) quantity outside the named-recipe repair too
+[770/834] [local] › tests\tombstone-namespace.spec.js:129:1 › BASE REPRO: old flat tombstones delete every collection sharing id 5
+[771/834] [local] › tests\starter-pack.spec.js:289:1 › deleting a starter recipe after adding it keeps it gone on the next offer
+[772/834] [local] › tests\tombstone-namespace.spec.js:159:1 › a recipes tombstone for id 5 deletes only recipe 5
+[773/834] [local] › tests\tombstone-namespace.spec.js:180:1 › pantry and hack tombstones stay in their own collection
+[774/834] [local] › tests\tombstone-namespace.spec.js:197:1 › flavor, cooked meal and user ingredient prefixes remain isolated
+[775/834] [local] › tests\tombstone-namespace.spec.js:220:1 › generic vanish-diff records collection identity and keeps MASS_DELETE_GUARD
+[776/834] [local] › tests\tombstone-namespace.spec.js:241:1 › multi-collection transient empty trips the aggregate MASS_DELETE_GUARD before small buckets write
+[777/834] [local] › tests\starter-pack.spec.js:311:1 › tapping Add repeatedly never duplicates
+[778/834] [local] › tests\tombstone-namespace.spec.js:264:1 › legitimate disappearances below the aggregate guard still write collection-specific tombstones
+[779/834] [local] › tests\tombstone-namespace.spec.js:287:1 › explicit tombstone writers record their own collections
+[780/834] [local] › tests\tombstone-namespace.spec.js:322:1 › expired cleanup writers are collection-aware even with shared ids
+[781/834] [local] › tests\tombstone-namespace.spec.js:342:1 › LWW and purge horizon are unchanged
+[782/834] [local] › tests\tombstone-namespace.spec.js:370:1 › legacy flat payloads migrate only exclusive prefixes and drop ambiguous ids
+[783/834] [local] › tests\starter-pack.spec.js:327:1 › the added copies are independent of the sampleRecipes constant
+[784/834] [local] › tests\tombstone-namespace.spec.js:394:1 › ambiguous legacy numeric tombstones no longer globally delete live records
+[785/834] [local] › tests\tombstone-namespace.spec.js:407:1 › localStorage round-trips namespaced tombstones
+[786/834] [local] › tests\tombstone-namespace.spec.js:426:1 › Firestore payload and load round-trip namespaced tombstones
+[787/834] [local] › tests\starter-pack.spec.js:345:1 › the starter pack introduces no new top-level state
+[788/834] [local] › tests\tombstone-namespace.spec.js:441:1 › sign-in union applies local recipe deletion without deleting same-id hack
+[789/834] [local] › tests\tombstone-namespace.spec.js:452:1 › concurrent cloud merge filters only the tombstoned collection
+[790/834] [local] › tests\tombstone-namespace.spec.js:469:1 › realtime remote deletion applies only to its collection
+[791/834] [local] › tests\tombstone-namespace.spec.js:482:1 › import clears only the imported collection tombstone
+[792/834] [local] › tests\starter-pack.spec.js:372:1 › no console errors through the whole opt-in flow
+[793/834] [local] › tests\tombstone-namespace.spec.js:502:1 › backup restore keeps current deletion semantics unchanged
+[794/834] [local] › tests\tombstone-namespace.spec.js:517:1 › MUTATION: collapsing namespaces recreates collateral deletion
+[795/834] [local] › tests\tombstone-namespace.spec.js:552:1 › MUTATION: bypassing the aggregate MASS_DELETE_GUARD writes phantom small-collection tombstones
+[796/834] [local] › tests\tombstone-namespace.spec.js:576:1 › clear all data tombstones every collection in its own namespace
+[797/834] [local] › tests\week-template-fill.spec.js:100:1 › a partly planned week keeps its meals and gains saved meals in empty slots
+[798/834] [local] › tests\starter-pack.spec.js:392:3 › mobile › the prompt is usable on a phone and causes no page overflow
+[799/834] [local] › tests\week-template-fill.spec.js:120:1 › non-empty snacks are preserved and empty snacks count as one filled slot
+[800/834] [local] › tests\week-template-fill.spec.js:135:1 › a deleted recipe id is skipped and ids are compared as strings
+[801/834] [local] › tests\week-template-fill.spec.js:156:1 › a saved week missing a day or snacks array keeps the slot shape
+[802/834] [local] › tests\starter-pack.spec.js:414:1 › instant-pot + pressure-cooker is one appliance, not two
+[803/834] [local] › tests\week-template-fill.spec.js:165:1 › a fully planned week is unchanged, not saved, and told there is nothing to fill
+[804/834] [local] › tests\starter-pack.spec.js:454:1 › the friction fix changes ranking only for the equivalent-label case
+[805/834] [local] › tests\week-template-fill.spec.js:180:1 › Cancel changes nothing
+[806/834] [local] › tests\what-should-we-eat.spec.js:72:1 › ready fridge food outranks cooking another recipe
+[807/834] [local] › tests\week-template-fill.spec.js:194:1 › the filled plan survives a reload through mealPrepAppData
+[808/834] [local] › tests\what-should-we-eat.spec.js:103:1 › ready fridge food nearing expiry outranks ordinary ready fridge food
+[809/834] [local] › tests\what-should-we-eat.spec.js:129:1 › expired ready food is never recommended as something to eat
+[810/834] [local] › tests\week-template-fill.spec.js:214:1 › the dialog says empty slots are filled and no longer says replace
+[811/834] [local] › tests\what-should-we-eat.spec.js:152:1 › freezer food is offered when there is nothing in the fridge
+[812/834] [local] › tests\week-template-fill.spec.js:225:1 › the grocery list includes a recipe added by the fill
+[813/834] [local] › tests\what-should-we-eat.spec.js:182:1 › a cook-now recipe outranks one missing ingredients
+[814/834] [local] › tests\what-should-we-eat.spec.js:218:1 › a balanced low-effort recipe ranks ahead of an unbalanced normal one
+[815/834] [local] › tests\what-should-we-eat.spec.js:255:1 › a recipe using a use-soon ingredient is boosted, from the SAME expiry scan
+[816/834] [local] › tests\what-should-we-eat.spec.js:295:1 › appliance metadata orders low-friction cooking, all else equal
+[817/834] [local] › tests\what-should-we-eat.spec.js:335:1 › minimal-cleanup is a real ranking advantage
+[818/834] [local] › tests\what-should-we-eat.spec.js:368:1 › active time beats total cook time — the walk-away pot wins
+[819/834] [local] › tests\what-should-we-eat.spec.js:411:1 › recent cooking lowers a recipe without hiding it
+[820/834] [local] › tests\what-should-we-eat.spec.js:455:1 › an empty cook history does not fabricate a Something Different
+[821/834] [local] › tests\what-should-we-eat.spec.js:475:1 › a normal-effort recipe is never mislabelled Easiest
+[822/834] [local] › tests\what-should-we-eat.spec.js:503:1 › an incomplete ready protein gets a simple completion hint
+[823/834] [local] › tests\what-should-we-eat.spec.js:544:1 › a manually added batch with no source recipe gets no invented hint
+[824/834] [local] › tests\what-should-we-eat.spec.js:563:1 › Home renders the card above the existing ones, with reasons and no scores
+[825/834] [local] › tests\what-should-we-eat.spec.js:630:1 › Used 1 works straight from the recommendation card
+[826/834] [local] › tests\what-should-we-eat.spec.js:657:1 › the card is omitted entirely when there is nothing honest to say
+[827/834] [local] › tests\what-should-we-eat.spec.js:678:1 › displaying a recommendation never touches inventory or notification state
+[828/834] [local] › tests\what-should-we-eat.spec.js:722:1 › no new top-level state is introduced, persisted or otherwise
+[829/834] [local] › tests\what-should-we-eat.spec.js:752:1 › the recipe equipment filters still work
+[830/834] [local] › tests\what-should-we-eat.spec.js:812:1 › old saved data with no recipe metadata still ranks and renders
+[831/834] [local] › tests\what-should-we-eat.spec.js:871:1 › an expiring ingredient outweighs a slightly easier rival
+[832/834] [local] › tests\what-should-we-eat.spec.js:906:1 › shopping outweighs convenience — a missing ingredient sinks an easier recipe
+[833/834] [local] › tests\what-should-we-eat.spec.js:946:1 › the card stays compact on a phone with no horizontal overflow
+[834/834] [local] › tests\what-should-we-eat.spec.js:997:1 › ranking and rendering raise no console or page errors
+  1 failed
+    [local] › tests\paste-import-metadata-and-ranges.spec.js:100:1 › 7/8: multiple equipment values normalize; unknown equipment is dropped, never invented 
+  833 passed (4.8m)

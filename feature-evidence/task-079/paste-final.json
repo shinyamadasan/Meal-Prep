@@ -1,0 +1,546 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Admin\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/paste-import-metadata-and-ranges.spec.js",
+      "--project=local",
+      "--config=feature-evidence/task-079/offline-playwright.config.cjs",
+      "--workers=2",
+      "--reporter=json",
+      "--output=test-results/task079-paste"
+    ],
+    "configFile": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer\\feature-evidence\\task-079\\offline-playwright.config.cjs",
+    "rootDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-paste",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "local",
+        "name": "local",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/test-results/task079-paste",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "prod",
+        "name": "prod",
+        "testDir": "C:/Users/Admin/AppData/Local/Temp/meal-prep-home-favorites-air-fryer/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "button-smoke.spec.js",
+          "buttons-functional.spec.js",
+          "production-smoke-attention-notifications.spec.js",
+          "production-smoke-cook-method.spec.js",
+          "production-smoke-bulk-add-dates.spec.js",
+          "production-smoke-bulk-add-partial-retry.spec.js",
+          "production-smoke-inventory-expiry.spec.js",
+          "production-smoke-inventory-quantity-truth.spec.js",
+          "production-smoke-cook-tombstones.spec.js",
+          "production-smoke-kitchen-truth.spec.js",
+          "production-smoke-low-effort.spec.js",
+          "production-smoke-plan-persistence.spec.js",
+          "production-smoke-ready-food.spec.js",
+          "production-smoke-what-should-we-eat.spec.js",
+          "smoke.spec.js"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.0",
+    "workers": 2,
+    "webServer": {
+      "command": "node tests/static-server.js",
+      "url": "http://127.0.0.1:47813/index.html",
+      "env": {
+        "LOCAL_APP_PORT": "47813"
+      },
+      "reuseExistingServer": false,
+      "cwd": "C:\\Users\\Admin\\AppData\\Local\\Temp\\meal-prep-home-favorites-air-fryer"
+    }
+  },
+  "suites": [
+    {
+      "title": "paste-import-metadata-and-ranges.spec.js",
+      "file": "paste-import-metadata-and-ranges.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Lemon Chicken paste: metadata maps to fields, never pollutes instructions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 475,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:21.992Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-cd3ef2f5106fb2da195a",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 71,
+          "column": 1
+        },
+        {
+          "title": "7/8: multiple equipment values normalize; unknown equipment is dropped, never invented",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 388,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:22.605Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-57137dd62704240351f0",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 100,
+          "column": 1
+        },
+        {
+          "title": "9/10: effort text normalizes case/spacing variants; unrecognized effort stays unset",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 462,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:23.013Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-dd59c67fb3bf373977de",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 113,
+          "column": 1
+        },
+        {
+          "title": "11: Active Time parses simple minute forms",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 556,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:23.492Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-b79fa4555a7e05e7f9c0",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 132,
+          "column": 1
+        },
+        {
+          "title": "12: metadata heading matching is case-insensitive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 436,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:24.064Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-972e33a877de5fed6605",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 147,
+          "column": 1
+        },
+        {
+          "title": "13: ordinary instruction prose mentioning equipment/effort words is not misclassified",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 548,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:24.515Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-e148ee19559144b4f7a5",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 157,
+          "column": 1
+        },
+        {
+          "title": "14: normal integer/decimal ingredient quantities still parse exactly as before",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:25.078Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-412e577c66f8d677c821",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 174,
+          "column": 1
+        },
+        {
+          "title": "15/16/17/18: unparseable amounts stay honest instead of fabricating 1 piece",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 427,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:25.519Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-0097dcd8dbadd5d36a34",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 191,
+          "column": 1
+        },
+        {
+          "title": "range-shaped ingredients also stay honest through the URL-import safety net",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:25.962Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-18cf1c68a694f3158090",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 219,
+          "column": 1
+        },
+        {
+          "title": "full Lemon Chicken paste never fabricates a false quantity/unit for any range ingredient",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 389,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:26.366Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-9b33e6446ce6eef5f235",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 231,
+          "column": 1
+        },
+        {
+          "title": "paste import fills the form metadata controls, saves, and survives reload",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1823,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:26.769Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-8bdb7dac2ad8d45484de",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 249,
+          "column": 1
+        },
+        {
+          "title": "20: paste-imported metadata survives export -> import round-trip",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "local",
+              "projectName": "local",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 533,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-06T21:19:28.608Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7fdc4b5e4573192ca018-1ea094b5f401ddc39f33",
+          "file": "paste-import-metadata-and-ranges.spec.js",
+          "line": 344,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-06T21:19:21.127Z",
+    "duration": 8593.866999999998,
+    "expected": 12,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
