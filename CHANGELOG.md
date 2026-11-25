@@ -1366,3 +1366,18 @@ tests: focused 5/5, full local 845/845, ledger contract 13/13. Syntax and diff c
 blockers: none.
 deviations: none.
 → status set to `review` in TASKS.md
+
+## TASK-082 — implemented (branch: task-082-ffs-no-plan-grocery)
+changed:
+  - `app.js` · `NO_PLAN_TEMPLATE`, `noPlanRole()`, `noPlanGaps()`, and `ingredientVersatility()`
+    derive shopping options from available stock, unchecked rows, and recipe usage.
+  - `index.html` and `style.css` · collapsed `#no-plan-grocery` card in Shop List.
+    Each option adds one row through `buyMissingIngredient()`.
+  - `tests/ffs-no-plan-grocery.spec.js` · seven synthetic cases for stock, rule ordering,
+    versatility, one-tap add, plan-generated rows, and responsive rendering.
+  - `docs/FEATURES.md` and `docs/ARCHITECTURE.md` · feature and data-flow notes.
+  - `feature-evidence/task-082/` · expanded Shop card at 390px and 1280px.
+tests: focused 7/7, full local 852/852, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md

@@ -117,6 +117,7 @@
 
 ## Shop (Grocery)
 - **Auto grocery list** — Working · `renderGroceryList()` · aggregated from plan, scaled, grouped by category (A→Z, "Other" last), per-item cost, in-stock badges, check-off, recipe source labels.
+- **No plan? Fill the gaps** — Working · `#no-plan-grocery` opens a guide based on Kylie Sakaida’s *So Easy So Good*. The seven roles count available ingredients and unchecked shopping rows. Short roles offer up to four choices, ranked by nutrition rules, recipe versatility, and convenience. Tap one chip to add that ingredient to Shop.
 - **In stock (D-086)** — `pantryMatchesForShop()` uses available lots and ingredient matches
   such as Jasmine Rice for Rice. `groceryItemChecked()` honors the shopper's manual check state.
 - Add custom item, Clear All, Copy to clipboard, Prices→Price Book, weekly cost summary.

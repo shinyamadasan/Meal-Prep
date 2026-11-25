@@ -26,7 +26,7 @@ Desktop is unchanged.
 |---|---|---|
 | Home / Dashboard | `#dashboard` | `renderDashboard()` → `renderMealPrepFlowCard()` first; the "what to cook/eat" cards sit in the collapsed `#dash-ideas` |
 | Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` (ends with `renderPlannedBatches()`); the "By day" scheduler is a collapsed `<details>`; `renderBatchPickerResults()` fills the "+ Add meals" picker modal |
-| Shop / Grocery | `#grocery` | `renderGroceryList()` |
+| Shop / Grocery | `#grocery` | `renderGroceryList()` → `renderNoPlanGrocery()` for the open `#no-plan-grocery` card |
 | Prep | `#prep` | `renderPrepTab()` |
 | Fridge (was "Inventory") | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |
 | Recipes (was "Cook") | `#recipes` | `renderRecipes()` |
@@ -95,6 +95,18 @@ unavailable. Non-staples also require a positive or unknown quantity and a curre
 expiry. `getExpirySuggestions()` limits its source lots to today through three days out.
 Fridge and Attention continue to show past-date items. The cooking write path uses its own
 `findPantryMatch()` rules under D-086.
+
+## No-plan grocery
+
+`noPlanGaps(state)` applies `NO_PLAN_TEMPLATE` and `noPlanRole()` to available pantry names
+and unchecked grocery rows. It counts matching names once per role and excludes all existing
+grocery rows and available lots from the options using D-086. Options that fill an unmet
+rule come first, followed by `ingredientVersatility()` and convenience. Recipe versatility
+counts recipe usage, distinct equipment, and quick uses. A named variety gets recipe credit
+for its own use and direct aliases.
+
+`renderNoPlanGrocery()` derives results for the open Shop List card independently of the plan.
+Rendering is read-only. A chip calls `buyMissingIngredient()` for a single custom grocery row.
 
 ## Fridge stock health (D-087)
 

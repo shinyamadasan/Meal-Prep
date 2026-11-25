@@ -6819,6 +6819,188 @@ function planRecipeForToday(recipeId) {
 }
 window.planRecipeForToday = planRecipeForToday;
 
+// So Easy So Good's no-plan framework, with generic foods for each role.
+const NO_PLAN_TEMPLATE = {
+  proteins: {
+    label: 'Proteins', target: 4, category: 'Protein',
+    candidates: ['Chicken Breast', 'Eggs', 'Tuna (Canned)', 'Tofu (Tokwa)', 'Greek Yogurt',
+      'Cottage Cheese', 'Canned Black Beans', 'Red Lentils', 'Edamame', 'Chicken Thigh',
+      'Sardines (Canned)', 'Salmon', 'Ground Beef', 'Shrimp', 'Quail Eggs'],
+    keywords: /\b(eggs?|chicken|turkey|beef|pork|fish|salmon|tuna|shrimp|tofu|tokwa|tempeh|seitan|beans?|lentils?|chickpeas?|edamame|monggo|munggo)\b/,
+    plant: /\b(tofu|tokwa|tempeh|seitan|beans?|lentils?|chickpeas?|edamame|monggo|munggo|mung dal)\b/,
+    lowPrep: /\b(canned|eggs?|yoghurts?|yogurts?|cottage cheese|tofu|tokwa|rotisserie|tuna in (oil|water)|tuna flakes|cooked|precooked)\b/,
+    convenience: /\b(canned|yoghurt|yogurt|cottage cheese|rotisserie|precooked)\b/,
+    rules: [
+      { attribute: 'lowPrep', minimum: 1, met: 'low-prep', missing: 'low-prep' },
+      { attribute: 'plant', minimum: 1, met: 'plant-based', missing: 'plant-based' }
+    ]
+  },
+  veggies: {
+    label: 'Veggies', target: 4, category: 'Vegetable',
+    candidates: ['Baby Carrots', 'Spring Mix', 'Mini Peppers', 'Frozen Green Beans',
+      'Frozen Broccoli', 'Spinach', 'Cucumber', 'Red Bell Pepper', 'Tomato (Kamatis)',
+      'Cabbage (Repolyo)', 'Cauliflower', 'Frozen Mixed Vegetables'],
+    keywords: /\b(spring mix|green beans?|snap peas?|snow peas?|vegetables|beets?|kale|zucchini|asparagus|brussels sprouts)\b/,
+    convenience: /\b(frozen|precut|baby carrots|spring mix|mini peppers)\b/,
+    guidance: 'Mix colors. Fresh, frozen or precut work.'
+  },
+  starches: {
+    label: 'Starches', target: 3, category: 'Grain',
+    candidates: ['Whole-Grain Bread', 'Microwave Quinoa', 'Frozen White Rice', 'Brown Rice',
+      'Rolled Oats', 'Whole-Wheat Pasta', 'Barley', 'Pasta', 'Sweet Potato (Kamote)', 'Pandesal'],
+    keywords: /\b(rice|quinoa|oats?|barley|bread|pasta|noodles?|tortillas?|potatoes|potato|couscous|buckwheat|bulgur)\b/,
+    wholeGrain: /\b(whole[ -](grain|wheat)|brown (\w+ )?rice|wild rice|quinoa|oats?|barley|bulgur|buckwheat|farro)\b/,
+    convenience: /\b(microwave|frozen|precooked|pouch|bread|pandesal)\b/,
+    rules: [{ attribute: 'wholeGrain', minimum: 2, met: '2 whole grains', missing: 'whole grain' }]
+  },
+  fruits: {
+    label: 'Fruits', target: 3, category: 'Fruit',
+    candidates: ['Banana (Saging)', 'Apple', 'Frozen Blueberries', 'Mixed Berries', 'Mango (Mangga)',
+      'Pineapple (Pinya)', 'Papaya', 'Grapes', 'Orange'],
+    keywords: /\b(blueberr(?:y|ies)|strawberr(?:y|ies)|raspberr(?:y|ies)|blackberr(?:y|ies)|grapes?|oranges?|pears?|peach(?:es)?|cherr(?:y|ies))\b/,
+    convenience: /\b(frozen|precut)\b/,
+    guidance: 'Fresh or frozen.'
+  },
+  snacks: {
+    label: 'Snacks', target: 3,
+    candidates: ['Pretzels', 'Roasted Chickpeas', 'Dark Chocolate', 'Granola', 'Cheese',
+      'Popcorn', 'Crackers', 'Almonds'],
+    keywords: /\b(pretzels?|roasted chickpeas?|chocolate|granola|cheese|popcorn|crackers?|nuts?|almonds?|walnuts?|pistachios?|trail mix)\b/,
+    convenience: /\b(pretzels?|roasted|chocolate|granola|crackers?|trail mix)\b/
+  },
+  flavors: {
+    label: 'Flavor enhancers', target: 3,
+    candidates: ['Balsamic Vinaigrette', 'Honey Mustard', 'Hummus', 'Soy Sauce (Toyo)',
+      'Gochujang', 'Chili Sauce', 'Vinegar (Suka)', 'Lemon', 'Lime', 'Ketchup'],
+    keywords: /\b(vinaigrette|dressing|mustard|hummus|sauces?|vinegar|gochujang|miso|sriracha|ketchup|mayonnaise|tahini|seasoning|spices?|dried herbs|salt|black pepper|white pepper|garlic powder|onion powder|peppercorns?|lemons?|limes?|calamansi)\b/,
+    convenience: /\b(vinaigrette|dressing|mustard|hummus|sauces?|gochujang|sriracha|ketchup)\b/
+  },
+  beverages: {
+    label: 'Beverages', target: 1, maxTarget: 2,
+    candidates: ['Herbal Tea', 'Sparkling Water', 'Milk (Gatas)', 'Unsweetened Tea', 'Water'],
+    keywords: /\b(tea|coffee|water|milk|juice|soda|kombucha|seltzer|lemonade)$/,
+    convenience: /\b(water|milk|bottled|ready-to-drink)\b/,
+    guidance: 'Choose drinks with little or no added sugar.'
+  }
+};
+
+function noPlanRole(name) {
+  const term = (name || '').trim().toLowerCase().split(',')[0].trim();
+  const words = ingredientMatchWords(term);
+  const entry = stockIngredientEntry(term) || stockIngredientEntry(words.join(' ')) ||
+    stockIngredientEntry(words[words.length - 1]);
+  const canonical = entry?.name.toLowerCase() || term;
+  // Give these forms precedence over the role of the underlying ingredient.
+  if (/\b(cottage cheese|yoghurts?|yogurts?)\b/.test(term)) return 'proteins';
+  if (/\b(coconut milk|condensed milk|evaporated milk)\b/.test(term + ' ' + canonical)) return 'flavors';
+  if (entry?.category === 'Protein') return 'proteins';
+  if (NO_PLAN_TEMPLATE.beverages.keywords.test(term) || canonical === 'milk (gatas)') return 'beverages';
+  if (NO_PLAN_TEMPLATE.flavors.keywords.test(term)) return 'flavors';
+  if (NO_PLAN_TEMPLATE.snacks.keywords.test(term) || canonical === 'cheese') return 'snacks';
+  if (NO_PLAN_TEMPLATE.veggies.keywords.test(term)) return 'veggies';
+  if (/\b(mung beans?|red lentils?)\b/.test(canonical)) return 'proteins';
+  if (NO_PLAN_TEMPLATE.starches.keywords.test(term)) return 'starches';
+  const roles = Object.keys(NO_PLAN_TEMPLATE);
+  return roles.find(role => entry && NO_PLAN_TEMPLATE[role].category === entry.category) ||
+    roles.find(role => NO_PLAN_TEMPLATE[role].keywords.test(term)) || null;
+}
+
+// Quick uses include assembly/no-cook recipes and staple ingredients used in quick meals.
+const NO_PLAN_QUICK_INGREDIENTS = /\b(silken tofu|tofu|tokwa|canned|greek yogurt|cottage cheese|rotisserie chicken|shredded chicken|frozen mixed vegetables|tortillas?|naan|wraps?|lemon|lime)\b/i;
+
+function ingredientVersatility(name, recipes = AppState.recipes) {
+  const candidateWords = ingredientMatchWords(name);
+  const candidateName = candidateWords.join(' ');
+  const methods = new Set();
+  let recipeCount = 0;
+  let quick = NO_PLAN_QUICK_INGREDIENTS.test(name);
+  for (const recipe of recipes) {
+    const usesIngredient = (recipe.baseIngredients || recipe.ingredients || []).some(ingredient => {
+      if (!ingredientNamesMatch(ingredient.name, name)) return false;
+      const words = ingredientMatchWords(ingredient.name);
+      // A generic recipe ingredient can use a substitute, but does not establish
+      // usage of a named variety (e.g. Eggs for Quail Eggs). Direct aliases do.
+      const generic = words.length < candidateWords.length &&
+        words[words.length - 1] === candidateWords[candidateWords.length - 1];
+      return !generic || INGREDIENT_AVAILABILITY_ALIASES.get(candidateName)?.has(words.join(' '));
+    });
+    if (!usesIngredient) continue;
+    recipeCount++;
+    const equipment = normalizeSlugList(recipe.equipment, EQUIPMENT_BY_ID);
+    equipment.forEach(method => methods.add(method));
+    if (normalizeEffort(recipe.effort) === 'assembly' || equipment.includes('no-cook')) quick = true;
+  }
+  return recipeCount + methods.size + Number(quick);
+}
+
+function uniqueNoPlanNames(names) {
+  // Keep named varieties ahead of generic labels such as Rice so the broadest
+  // match does not collapse otherwise distinct varieties into one.
+  const ordered = names.map(name => ({ name, specificity: ingredientMatchWords(name).length }))
+    .sort((a, b) => b.specificity - a.specificity);
+  const distinct = [];
+  for (const { name } of ordered) {
+    if (!distinct.some(other => ingredientNamesMatch(name, other))) distinct.push(name);
+  }
+  return distinct;
+}
+
+function noPlanGaps(state) {
+  const available = (state.pantry || []).filter(pantryLotAvailable).map(lot => lot.name);
+  const grocery = state.groceryList || [];
+  const matchesAvailable = name => available.some(other => ingredientNamesMatch(name, other));
+  const unchecked = grocery.filter(row => !row.checked).map(row => row.name);
+  const toBuy = unchecked.filter(name => !matchesAvailable(name));
+  const availableRoles = available.map(name => ({ name, role: noPlanRole(name) }));
+  const groceryRoles = toBuy.map(name => ({ name, role: noPlanRole(name) }));
+  return Object.fromEntries(Object.entries(NO_PLAN_TEMPLATE).map(([role, template]) => {
+    const haveNames = availableRoles.filter(item => item.role === role).map(item => item.name);
+    const onListNames = groceryRoles.filter(item => item.role === role).map(item => item.name);
+    const have = uniqueNoPlanNames(haveNames).length;
+    const onList = uniqueNoPlanNames(onListNames).length;
+    const target = template.target;
+    const short = Math.max(0, target - have - onList);
+    const rules = (template.rules || []).map(rule => ({
+      ...rule,
+      remaining: Math.max(0, rule.minimum - uniqueNoPlanNames([...haveNames, ...onListNames]
+        .filter(name => template[rule.attribute].test(name.toLowerCase()))).length)
+    }));
+    const options = short === 0 ? [] : template.candidates
+      .filter(name => !matchesAvailable(name) &&
+        !grocery.some(row => ingredientNamesMatch(name, row.name)))
+      .map(name => ({
+        name,
+        unmetRules: rules.filter(rule => rule.remaining && template[rule.attribute].test(name.toLowerCase())).length,
+        versatility: ingredientVersatility(name, state.recipes || []),
+        convenience: Number(template.convenience.test(name.toLowerCase()))
+      }))
+      .sort((a, b) => b.unmetRules - a.unmetRules || b.versatility - a.versatility || b.convenience - a.convenience)
+      .map(option => option.name);
+    return [role, { have, onList, target, short, rules, options }];
+  }));
+}
+
+function renderNoPlanGrocery() {
+  const card = document.getElementById('no-plan-grocery');
+  if (!card?.open || card.classList.contains('hidden')) return;
+  const gaps = noPlanGaps(AppState);
+  const chipLimit = 4;
+  const roles = card.querySelector('.no-plan-roles');
+  const restoreFocus = roles.contains(document.activeElement);
+  roles.innerHTML = Object.entries(NO_PLAN_TEMPLATE).map(([role, template]) => {
+    const { have, onList, target, short, rules, options } = gaps[role];
+    const goal = template.maxTarget ? target + '–' + template.maxTarget : target;
+    const status = rules.map(rule => rule.remaining ? 'needs ' + rule.missing : '✓ ' + rule.met);
+    if (template.guidance) status.push(template.guidance);
+    const chips = options.slice(0, chipLimit).map(name =>
+      `<button type="button" class="btn btn--outline btn--sm"
+        onclick="buyMissingIngredient(${escapeHtml(JSON.stringify(name))})">${escapeHtml(name)}</button>`);
+    return `<li><strong>${template.label} ${have + onList}/${goal}${short ? '' : ' ✓'}</strong>${status.length ? ' · ' + status.join(' · ') : ''}
+      ${chips.length ? '<div class="no-plan-chips">' + chips.join('') + '</div>' : ''}</li>`;
+  }).join('');
+  if (restoreFocus) card.querySelector('summary').focus({ preventScroll: true });
+}
+
 // Grocery list functions
 function generateGroceryList() {
   const ingredients = {};
@@ -6928,6 +7110,7 @@ function summarizeSources(sources) {
 }
 
 function renderGroceryList() {
+  renderNoPlanGrocery();
   const groceryListEl = document.getElementById('grocery-list');
 
   // The summary (meal count + cost) reflects the weekly plan, so hide it when
@@ -7169,10 +7352,12 @@ function clearGroceryList() {
 function switchShopTab(subTab) {
   var listEl = document.getElementById('grocery-list');
   var priceEl = document.getElementById('grocery-price-panel');
+  var noPlanCard = document.getElementById('no-plan-grocery');
   var summaryEl = document.getElementById('weekly-cost-summary');
   var listBtn = document.getElementById('shop-subtab-list');
   var pricesBtn = document.getElementById('shop-subtab-prices');
   if (!listEl || !priceEl) return;
+  noPlanCard?.classList.toggle('hidden', subTab === 'prices');
 
   if (subTab === 'prices') {
     listEl.classList.add('hidden');
@@ -7185,6 +7370,7 @@ function switchShopTab(subTab) {
     priceEl.classList.add('hidden');
     if (summaryEl) summaryEl.classList.remove('hidden');
     listEl.classList.remove('hidden');
+    if (noPlanCard?.open && !listBtn?.classList.contains('active')) renderNoPlanGrocery();
     if (pricesBtn) pricesBtn.classList.remove('active');
     if (listBtn) listBtn.classList.add('active');
   }

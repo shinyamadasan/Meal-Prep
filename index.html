@@ -201,6 +201,11 @@
                         <button class="shop-subtab active" id="shop-subtab-list" onclick="switchShopTab('list')">Shop List</button>
                         <button class="shop-subtab" id="shop-subtab-prices" onclick="switchShopTab('prices')">Price List</button>
                     </div>
+                    <details id="no-plan-grocery" class="no-plan-grocery" ontoggle="renderNoPlanGrocery()">
+                        <summary>No plan? Fill the gaps</summary>
+                        <p>Choose an ingredient to add it to your list. Based on <cite>So Easy So Good</cite> by Kylie Sakaida.</p>
+                        <ul class="no-plan-roles"></ul>
+                    </details>
                     <div class="grocery-controls" id="grocery-controls">
                         <button class="btn btn--outline btn--sm" id="clear-grocery">Clear All</button>
                         <button class="btn btn--secondary btn--sm" id="add-custom-item">Add Item</button>

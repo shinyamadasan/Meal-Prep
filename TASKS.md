@@ -6063,7 +6063,7 @@ verification:
     feature-evidence/task-081/. Full suite + ledger contract; SELF_REVIEW + QA notes.
 
 ### TASK-082 · FFS-2 No-plan grocery — "Fill the gaps" (Kylie's framework, inventory-aware)
-status: codex
+status: review
 owner: codex
 risk: Low (additive Shop card; adds rows only through the existing `buyMissingIngredient`
   path on tap). Merge gate: `approved` (owner deploy hold).

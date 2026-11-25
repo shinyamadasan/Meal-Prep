@@ -1098,3 +1098,22 @@ self-review: SELF_REVIEW.md Code Health passes, and the ship decision is yes for
 QA: applicable AI checks pass. `#stock-health` handlers resolve, colors use existing tokens,
   and the report's call chain performs no persistence, normalization, or ledger writes.
 untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
+
+## TASK-082 · 2026-11-25
+focused: `npx playwright test tests/ffs-no-plan-grocery.spec.js --project=local --workers=2`.
+  The first case failed on `f875953` because `#no-plan-grocery` was absent.
+  Final result: 7 passed, 0 failed.
+full: `npx playwright test --project=local --config=<temporary offline config> --workers=4`.
+  Complete local project behind `npm test`: 852 passed, 0 failed.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2`.
+  13 passed, 0 failed. The broad runs blocked off-origin browser connections.
+  Coverage was not instrumented.
+static: `node --check app.js`, syntax check of the new spec, and `git diff --check` passed.
+  Verified the existing availability, grocery-add, plan generation, stock deduction, and
+  Firestore write function bodies against the base branch.
+visual: `feature-evidence/task-082/fill-the-gaps-390.png` and `fill-the-gaps-1280.png`
+  show the expanded Shop card with synthetic records. Both widths passed overflow checks.
+self-review: SELF_REVIEW.md Code Health passes. The ship decision is yes for the scoped diff.
+QA: applicable AI checks pass. The disclosure and chip handlers resolve, the card render is
+  read-only, and the one-tap grocery row survives reload through the existing save path.
+untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
