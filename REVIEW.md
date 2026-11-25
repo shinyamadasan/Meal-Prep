@@ -4,6 +4,39 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-081 — APPROVED (held) — Claude independent review + QA, 2026-11-25
+candidate reviewed: `14d1046a3bed0e8c219bcf7dc530d78c442a0810` (base `99c4925` = TASK-080 approved head + ffs-v1).
+independent QA (Claude, separate clean worktree, own `npm ci`):
+focused `tests/ffs-stock-health.spec.js` 5/5 · full local 845/845 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Probe results (synthetic records, page.evaluate)
+- Classes: fresh basil / basil(Vegetable) / parsley(fridge) → perishable; dried basil, oregano,
+  soy sauce, rice vinegar, olive oil, black pepper, cloves → condiment; rice, canned tuna,
+  peanut butter, bread, honey → pantry staple; chicken(freezer) → frozen; garlic, bell pepper,
+  butter, eggs → perishable. Matches D-087.
+- Three signals stay separate: Milk 15 days → safety + data-stale, no expiration; Ketchup past
+  printed date → expiration + "Follow the printed date", no safety claim; frozen chicken 208 days
+  → stale only (270-day DB freezer window); freezer soup 147 days → quality note.
+- Consistency: zero-qty "full", empty staple, 0-portion cooked meal, duplicate vs mixed units —
+  same unit → "Possible duplicate", different units → the more specific mixed-unit finding
+  (Codex's flagged precedence question: correct).
+- Read-only: the input records and `AppState` are byte-identical after the report; no
+  `saveData()`; no deletions. Empty state and junk dates/quantities do not throw.
+- 390px evidence screenshot readable; collapsed by default.
+
+### Nits (not blocking → follow-up candidates)
+1. `stockFoodClass` treats any record carrying `fridgeLife`/`cookedDate`/`portionsRemaining` as a
+   cooked meal. No current pantry write path sets those fields, so this is fine today.
+2. An item named "Frozen …" with no `storage` value classifies as perishable. Records created in
+   the app get a storage value from `inferStorage`, so this only affects odd imported data.
+3. Frozen quality uses an exact-name/alias DB lookup, so a plural name ("Chicken thighs") gets no
+   quality window. It still gets the data-staleness signal.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold (2026-11-25) and
+red-zone-adjacent (inventory) — not `done`, not merged to `main`. Next: TASK-082 branches from this head.
+
+---
 ## Review TASK-080 — APPROVED (held) — Claude independent review + QA, 2026-11-25
 candidate reviewed: `297c3725967bfcb5e34839bf0cbaea8fdf677aa1` (Codex rework) + reviewer fix commit on top.
 independent QA (Claude, separate clean worktree, own `npm ci`):
