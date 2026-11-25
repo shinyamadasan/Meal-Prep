@@ -1337,3 +1337,18 @@ tests: focused 6 passed, 0 failed. Full local 839 passed, 1 failed. Ledger 13 pa
 blockers: the legacy loose-stock assertion in tests/meal-prep-first.spec.js requires Rice to
   count for Rice Vinegar. The task's file list excludes that spec.
 deviations: status set to `blocked` in TASKS.md because the full local suite must pass for review.
+
+## TASK-080 — Claude review rework (branch: task-080-ffs-truthful-availability)
+changed:
+  - `app.js` · `ingredientMatchWords()` strips prep clauses, leading descriptors, and trailing
+    units before availability matching. D-086 may show fewer items as available when the pantry
+    contains only a different ingredient with a similar name.
+  - `tests/ffs-truthful-availability.spec.js` · added the review's positive and negative pairs,
+    plus cases for a parenthetical comma, plural leaves, and a standalone unit word.
+  - `tests/meal-prep-first.spec.js` · only `buy_vin` matches Rice Vinegar. Correcting that record
+    preserves `buy_rice` and clears the Rice Vinegar stock claim.
+tests: focused 25/25, full local 840/840, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: the remote branch was already checked out in another worktree. The rework used a
+  local task branch from `6af568c` targeting the same remote branch.
+→ status set to `review` in TASKS.md

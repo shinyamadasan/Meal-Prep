@@ -1062,3 +1062,19 @@ self-review: Code Health passes for the scoped implementation. QA traced the acc
   and styles were outside the diff. The full-suite gate blocks the ship decision and review handoff.
 untested: real iOS/Android devices and production or live cloud/MCP/bridge services. All fixtures
   and ledger adapters used for verification were synthetic.
+
+## TASK-080 · 2026-11-25 · Claude review rework
+baseline: `6af568c`. With both specs updated and before the matcher fix, 24 passed and the
+  table-driven matcher test failed. The updated legacy assertion passed on the baseline.
+focused: local `tests/ffs-truthful-availability.spec.js` (6) and `tests/meal-prep-first.spec.js`
+  (19) · 25 passed.
+full: `npm test` (local project, four workers) · 840 passed.
+ledger: `npm run test:ledger-contract` (two workers) · 13 passed.
+results: 0 failed, 0 skipped, 0 flaky in final runs. Coverage was not instrumented. All three
+  runs used a temporary Playwright configuration that blocked off-origin Chromium traffic.
+static: `node --check app.js`, syntax checks on both changed specs, and `git diff --check`
+  passed. All 118 decision pointers passed. Synthetic probes covered all 21 leading words and
+  all 16 trailing units, including preservation of each unit as a standalone name.
+self-review and QA: Code Health passes and ship decision is yes. Diff inspection and the local
+  suites verify the read-side scope, the head-noun negatives, and stock correction by record ID.
+untested: production, live cloud/MCP/bridge services, and real devices.

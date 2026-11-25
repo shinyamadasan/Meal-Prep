@@ -102,12 +102,12 @@ test('a loose match never deletes unrelated stock: only the tapped record change
     return {
       matched,
       left: AppState.pantry.map((p) => p.id),
-      stillClaimsStock: isInPantry('Rice Vinegar') // Rice still loosely matches — shown honestly, not deleted
+      stillClaimsStock: isInPantry('Rice Vinegar') // Only vinegar counts toward vinegar stock.
     };
   });
-  expect(r.matched).toEqual(['buy_rice', 'buy_vin']);
+  expect(r.matched).toEqual(['buy_vin']);
   expect(r.left).toEqual(['buy_rice']);
-  expect(r.stillClaimsStock).toBe(true);
+  expect(r.stillClaimsStock).toBe(false);
 });
 
 test('a staple the user says is gone is marked empty, not deleted, and stops counting as in stock', async ({ page }) => {

@@ -7583,12 +7583,20 @@ function normalizeIngredientName(name) {
 }
 
 function ingredientMatchWords(name) {
-  var words = normalizeIngredientName(name || '').match(/[\p{L}\p{N}]+/gu) || [];
-  return words.map(function(word) {
+  var baseName = (name || '').replace(/\([^)]*\)/g, ' ').split(',', 1)[0];
+  // The shared normalizer already handles the other prep and size descriptors.
+  var normalized = normalizeIngredientName(baseName).replace(
+    /^(?:(?:canned|frozen|grated|peeled|skinless|low-sodium|reduced-sodium|of)(?:\s+|$))+/, ''
+  );
+  var words = (normalized.match(/[\p{L}\p{N}]+/gu) || []).map(function(word) {
+    if (word === 'leaves') return 'leaf';
     if (word.length <= 3) return word;
     return word.replace(/(potato|tomato|ch|sh|ss|x|zz)es$/, '$1')
       .replace(/([^sui])s$/, '$1');
   });
+  var unit = /^(?:clove|head|bunch|sprig|stalk|piece|slice|fillet|leaf|can|package|pack|bag|jar|bottle|floret)$/;
+  while (words.length > 1 && unit.test(words[words.length - 1])) words.pop();
+  return words;
 }
 
 function ingredientNamesMatch(a, b) {

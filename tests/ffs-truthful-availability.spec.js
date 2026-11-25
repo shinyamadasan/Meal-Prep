@@ -36,6 +36,8 @@ test('ingredient names match exact names, whole words with the same head noun, a
     ['Egg', 'Eggplant', false],
     ['Corn', 'Cornstarch', false],
     ['Garlic', 'Garlic Powder', false],
+    ['Garlic powder', 'Garlic cloves, minced', false],
+    ['Rice vinegar', 'Steamed rice, for serving', false],
     ['Black Pepper', 'Bell Pepper', false],
     ['Chicken Thigh', 'Chicken Leg', false],
     ['', '', false],
@@ -44,7 +46,17 @@ test('ingredient names match exact names, whole words with the same head noun, a
     ['Red Onion', 'Onion', true],
     ['Chicken', 'Chicken Breast', true],
     ['  Fresh Carrots  ', 'Carrot', true],
-    ['Brown Jasmine Rice', 'Brown Rice', true]
+    ['Brown Jasmine Rice', 'Brown Rice', true],
+    ['Garlic cloves, minced', 'Garlic', true],
+    ['Red bell pepper, thinly sliced', 'Bell Pepper', true],
+    ['Fresh ginger, peeled and grated', 'Ginger', true],
+    ['Canned black beans, drained and rinsed', 'Black Beans', true],
+    ['Dried red lentils, rinsed', 'Red Lentils', true],
+    ['Tomatoes', 'Cherry tomatoes, halved', true],
+    ['Reduced-sodium soy sauce', 'Soy Sauce', true],
+    ['Red (sweet, mild) onion', 'Red Onion', true],
+    ['Basil leaves', 'Basil', true],
+    ['Cloves', 'Clove', true]
   ];
   const matches = await page.evaluate(pairs => pairs.map(([a, b]) =>
     [ingredientNamesMatch(a, b), ingredientNamesMatch(b, a)]), cases);
