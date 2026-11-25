@@ -169,6 +169,14 @@ function pantryDaysLeft(p) {
   return daysLeftFrom(p.purchaseDate, shelf);
 }
 
+function pantryLotAvailable(p) {
+  if (p.stockLevel === 'empty') return false;
+  if (isStaple(p)) return true;
+  if (Number.isFinite(p.quantity) && p.quantity <= 0) return false;
+  var daysLeft = pantryDaysLeft(p);
+  return daysLeft == null || daysLeft >= 0;
+}
+
 // The calendar date pantryDaysLeft() is actually counting down to, and whether
 // that date is the user's own (a printed expiry off the pack) or an estimate the
 // app derived from the bought date plus a shelf life.
@@ -5020,14 +5028,13 @@ function renderRecipeQuickFilters() {
 
 // ── Home: up to three deterministic "what should I cook?" options ────────────
 
-// Recipes that use a pantry item expiring within 3 days. Lifted verbatim out of
-// renderDashboard() so the dashboard's own "Use before they expire" block and the
-// suggestion ranker below share one implementation instead of drifting apart.
+// Recipes that use an available pantry item expiring today or within 3 days.
+// Shared by Home's attention and recipe suggestions.
 function getExpirySuggestions(limit) {
   var nearExpiryNames = [];
   (AppState.pantry || []).forEach(function(p) {
     var dl = pantryDaysLeft(p);
-    if (dl != null && dl <= 3) nearExpiryNames.push(p.name.toLowerCase());
+    if (dl != null && dl >= 0 && dl <= 3 && pantryLotAvailable(p)) nearExpiryNames.push(p.name);
   });
   if (!nearExpiryNames.length) return [];
 
@@ -5035,8 +5042,7 @@ function getExpirySuggestions(limit) {
   (AppState.recipes || []).forEach(function(r) {
     if (!r.baseIngredients) return;
     var match = r.baseIngredients.find(function(ing) {
-      var n = ing.name.toLowerCase();
-      return nearExpiryNames.some(function(en) { return n.includes(en) || en.includes(n); });
+      return nearExpiryNames.some(function(name) { return ingredientNamesMatch(ing.name, name); });
     });
     if (match) out.push({ recipe: r, ingredient: match.name });
   });
@@ -6200,11 +6206,10 @@ function updateWeeklyStats() {
 // and at least 1 pantry match so noise recipes don't appear.
 function getCookableRecipes() {
   if (!AppState.pantry.length || !AppState.recipes.length) return [];
-  var pantryNames = AppState.pantry.map(function(p) { return p.name.toLowerCase().trim(); });
+  var availablePantry = AppState.pantry.filter(pantryLotAvailable);
 
   function pantryHas(ingName) {
-    var n = ingName.toLowerCase().trim();
-    return pantryNames.some(function(pn) { return n.includes(pn) || pn.includes(n); });
+    return availablePantry.some(function(p) { return ingredientNamesMatch(ingName, p.name); });
   }
 
   var results = [];
@@ -7575,6 +7580,33 @@ function normalizeIngredientName(name) {
     .replace(/\b(bone-in|boneless|fresh|dried|sliced|diced|chopped|minced|small|medium|large|thumb-sized|instant|whole|raw|cooked)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function ingredientMatchWords(name) {
+  var words = normalizeIngredientName(name || '').match(/[\p{L}\p{N}]+/gu) || [];
+  return words.map(function(word) {
+    if (word.length <= 3) return word;
+    return word.replace(/(potato|tomato|ch|sh|ss|x|zz)es$/, '$1')
+      .replace(/([^sui])s$/, '$1');
+  });
+}
+
+function ingredientNamesMatch(a, b) {
+  var aWords = ingredientMatchWords(a);
+  var bWords = ingredientMatchWords(b);
+  if (!aWords.length || !bWords.length) return false;
+  var aName = aWords.join(' ');
+  var bName = bWords.join(' ');
+  if (aName === bName) return true;
+
+  var shorter = aWords.length < bWords.length ? aWords : bWords;
+  var longer = shorter === aWords ? bWords : aWords;
+  if (shorter.length < longer.length &&
+      shorter[shorter.length - 1] === longer[longer.length - 1] &&
+      shorter.every(function(word) { return longer.includes(word); })) return true;
+
+  return (INGREDIENT_AVAILABILITY_ALIASES.get(aName)?.has(bName) ||
+          INGREDIENT_AVAILABILITY_ALIASES.get(bName)?.has(aName)) === true;
 }
 
 function findIngredientNutrition(name) {
@@ -11881,17 +11913,9 @@ function parseIngredientLine(line) {
 
 // â”€â”€ Pantry Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// The kitchen records that make the Shop list say "In stock" for `name`. Same loose
-// two-way name match the Shop list has always used; a staple the user marked EMPTY is
-// not stock — it is the very thing they need to buy.
+// The available kitchen records behind a Shop row's "In stock" label.
 function pantryMatchesForShop(name) {
-  const n = (name || '').toLowerCase();
-  if (!n) return [];
-  return AppState.pantry.filter(p => {
-    const pn = (p.name || '').toLowerCase();
-    if (!pn || !(n.includes(pn) || pn.includes(n))) return false;
-    return !(isStaple(p) && p.stockLevel === 'empty');
-  });
+  return AppState.pantry.filter(p => ingredientNamesMatch(name, p.name) && pantryLotAvailable(p));
 }
 
 function isInPantry(name) {
@@ -16140,6 +16164,17 @@ const INGREDIENT_DB = [
   { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['gochujang', 'Korean chili paste', 'Korean red pepper paste', 'gochuchang'], fridgeDays: 365, freezerDays: null, trackExpiry: true, priceValue: 250, minStockQty: null },
   { name: 'Mung Beans', unit: 'g', category: 'Grain', price: '₱80/500g', store: 'Palengke / Supermarket', storage: 'counter', shelfLifeDays: 365, aliases: ['mung beans', 'monggo', 'green mung beans', 'munggo', 'mung dal'], fridgeDays: null, freezerDays: null, trackExpiry: false, priceValue: 80, minStockQty: 200 },
 ];
+
+// Index direct aliases once for the availability checks that run on each render.
+const INGREDIENT_AVAILABILITY_ALIASES = new Map();
+INGREDIENT_DB.forEach(function(entry) {
+  var name = ingredientMatchWords(entry.name).join(' ');
+  var aliases = INGREDIENT_AVAILABILITY_ALIASES.get(name) || new Set();
+  (entry.aliases || []).forEach(function(alias) {
+    aliases.add(ingredientMatchWords(alias).join(' '));
+  });
+  INGREDIENT_AVAILABILITY_ALIASES.set(name, aliases);
+});
 
 function filterIngredients(query) {
   var q = query.toLowerCase();

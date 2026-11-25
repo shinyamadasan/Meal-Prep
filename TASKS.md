@@ -5915,7 +5915,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-080 · FFS-0 Truthful availability — read path only
-status: codex
+status: blocked
 owner: codex
 risk: Medium (logic change on read paths; no stock writes). Merge gate: `approved` (owner deploy hold).
 source: BQ-027 · PROP-035 · audit-evidence/2026-11-06 F1, F2 · D-086
@@ -5959,19 +5959,19 @@ design (binding):
   5. Past-date items must stay visible where they already are (Fridge cards, Attention list).
      Verify the Attention list still surfaces expired items; do not add a new surface.
 acceptance:
-  - [ ] `ingredientNamesMatch`: false for Rice/Rice Vinegar, Rice/Rice Noodles, Egg/Eggplant,
+  - [x] `ingredientNamesMatch`: false for Rice/Rice Vinegar, Rice/Rice Noodles, Egg/Eggplant,
         Corn/Cornstarch, Garlic/Garlic Powder, Black Pepper/Bell Pepper; true for Jasmine Rice/Rice,
         Eggs/Egg, Red Onion/Onion, Chicken/Chicken Breast (alias). Table-driven unit test.
-  - [ ] `pantryLotAvailable`: 0 g, negative qty, `stockLevel:'empty'`, and past-date non-staple
+  - [x] `pantryLotAvailable`: 0 g, negative qty, `stockLevel:'empty'`, and past-date non-staple
         lots → false; null-quantity in-date lot → true; staple `low` → true; staple `empty` → false.
-  - [ ] Audit F1 repro: a 0 g / expired / empty lot no longer auto-ticks its Shop row; a user-ticked
+  - [x] Audit F1 repro: a 0 g / expired / empty lot no longer auto-ticks its Shop row; a user-ticked
         row (`userSet`) is unchanged; Rice in stock does not tick "Rice Vinegar".
-  - [ ] Audit F2 repro: an expired raw lot does not appear in "use soon" cooking suggestions; a lot
+  - [x] Audit F2 repro: an expired raw lot does not appear in "use soon" cooking suggestions; a lot
         with 0–3 days left still does.
-  - [ ] Cookable tiers no longer count Eggplant as available because Eggs are stocked.
-  - [ ] Rendering Home, Shop and Fridge with the fixtures leaves `AppState.pantry`,
+  - [x] Cookable tiers no longer count Eggplant as available because Eggs are stocked.
+  - [x] Rendering Home, Shop and Fridge with the fixtures leaves `AppState.pantry`,
         `AppState.groceryList` and `AppState.cookedMeals` deep-equal to before (no writes).
-  - [ ] Cooking a recipe deducts exactly as before (existing deduction tests unchanged and green).
+  - [x] Cooking a recipe deducts exactly as before (existing deduction tests unchanged and green).
   - [ ] `npm test` green; `npm run test:ledger-contract` green; `node --check app.js`;
         `git diff --check` clean.
 constraints:
@@ -5986,6 +5986,14 @@ verification:
   - Full `npm test` (local project) + `npm run test:ledger-contract`; record exact counts.
   - Complete `SELF_REVIEW.md` and AI-verifiable `QA.md` items; note results in TEST_REPORT.md.
   - Commit on the task branch with a descriptive message; push the task branch only.
+
+blocker:
+  - The full local suite has one failing legacy assertion in
+    `tests/meal-prep-first.spec.js` ("a loose match never deletes unrelated stock"). It expects
+    `pantryMatchesForShop('Rice Vinegar')` to return Rice and `isInPantry('Rice Vinegar')` to
+    remain true after the vinegar is removed. TASK-080 requires the opposite Shop result.
+    The spec is outside the task's file list. Authorize updating those expectations while
+    retaining the assertion that correcting the vinegar leaves the Rice record intact.
 
 ### TASK-081 · FFS-1 Stock health — read-only inventory review by food class
 status: codex

@@ -1040,3 +1040,25 @@ self-review: SELF_REVIEW.md Code Health passes; would ship scoped candidate: yes
 untested: real iOS Safari/Android devices and production/live cloud or MCP checks. Existing
   Worker code was not changed; its separate Node suites were not rerun for this frontend-only task.
   Old clients require refresh to recognize air-fryer. No production writes, merge or deployment.
+
+## TASK-080 · 2026-11-25
+suite: `npm exec -- playwright test tests/ffs-truthful-availability.spec.js --project=local --workers=2 --reporter=list`
+result: 6 passed, 0 failed, 0 skipped, 0 flaky. Coverage not instrumented.
+red: focused spec on f230775 before app edits had 1 pass (expired visibility/render-state
+  compatibility) and 5 failures (missing helpers and reproduced Shop, expiry and Cook tier bugs).
+full: `npm test -- -- --config=<temporary offline config> --workers=4 --reporter=dot` ran the
+  complete local project. 839 passed, 1 failed, 0 skipped, 0 flaky. Includes all 9 unchanged
+  tests in tests/cook-depletion-tombstones.spec.js. The one failure is the pre-D-086 loose
+  match assertion in tests/meal-prep-first.spec.js, which expects Rice among the records for
+  Rice Vinegar. This conflicts with the new Shop acceptance criterion, and the legacy spec
+  falls outside the authorized file list.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2 --reporter=dot`
+  had 13 passed, 0 failed, 0 skipped, 0 flaky. Both broad runs blocked external browser connections.
+static: `node --check app.js`, `node --check tests/ffs-truthful-availability.spec.js` and
+  `git diff --check` passed. All 118 decision pointers passed. The docs checker reported 57
+  existing findings, down from 59 at f230775 because it now resolves both D-086 helpers.
+self-review: Code Health passes for the scoped implementation. QA traced the acceptance and
+  data-integrity checks through the affected renderers and confirmed the write paths, handlers
+  and styles were outside the diff. The full-suite gate blocks the ship decision and review handoff.
+untested: real iOS/Android devices and production or live cloud/MCP/bridge services. All fixtures
+  and ledger adapters used for verification were synthetic.

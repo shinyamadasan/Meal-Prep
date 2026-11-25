@@ -1307,3 +1307,33 @@ deviations: Initial full run 833/834 exposed the obsolete Air-Fryer-is-unknown t
   updated only that expectation/comment, then reran affected and complete gates. Initial evidence
   retained. Inventory/shopping/sync/MCP implementations and historical evidence remain untouched.
 → status set to `review` in TASKS.md; independent verdict in REVIEW.md.
+
+## TASK-080 — implementation blocked at verification (branch: task-080-ffs-truthful-availability)
+changed:
+  - app.js (+54 / −19) · `ingredientNamesMatch()` uses normalized whole words and direct
+    `INGREDIENT_DB` aliases. `pantryLotAvailable()` checks stock level, quantity and freshness.
+    `pantryMatchesForShop()` uses both. `groceryItemChecked()` still honors `userSet`.
+  - tests/ffs-truthful-availability.spec.js (6 synthetic cases) · name and lot rules, Shop,
+    use-soon boundaries, Cook tiers, expired visibility and render-state equality.
+  - docs/ARCHITECTURE.md and docs/FEATURES.md · D-086 read paths and visible behavior.
+Home and Cook availability audit:
+  - `getCookableRecipes()` uses both helpers. `renderDashboard()` and `renderCookSuggestions()`
+    use its tiers. Home's low-staple buy rows use `isStaple()` and `stockLevel === 'low'`.
+  - `getExpirySuggestions()` uses both helpers and requires 0–3 days left via `pantryDaysLeft()`.
+    Home Attention's recipe suggestions use that scan.
+  - `getCookSuggestions()` uses the shared tiers and expiry suggestions, with effort and
+    cook-history ranking. Its recipe-library fallback supplies ideas when the tiers are empty.
+  - `getWhatShouldWeEatSuggestions()` uses `getReadyFoodSuggestions()` for cooked batches and
+    `eatCookCandidates()` for recipes. The latter uses the shared tiers and expiry suggestions.
+    It shows "Have everything" only for pantry-informed recipes in the zero-missing tier.
+  - `getReadyFoodSuggestions()` checks cooked batch names, tracked portions and cooked shelf
+    life. `getCompatibleFlavorsForCookedMeal()` compares cooked protein IDs to library pairings.
+  - `collectAttentionItems()` uses `attentionDaysLeft()`, `isKeptToday()`, and low staple levels.
+    Its notification helpers consume those buckets. `getFreshnessAlerts()` counts dates via
+    `pantryDaysLeft()` and `cookedShelfLife()`. Past-date lots remain visible in Attention and Fridge.
+  - `renderMealPrepFlowCard()` uses `groceryItemChecked()` for Shop and
+    `getReadyFoodSuggestions()` for Fridge.
+tests: focused 6 passed, 0 failed. Full local 839 passed, 1 failed. Ledger 13 passed, 0 failed.
+blockers: the legacy loose-stock assertion in tests/meal-prep-first.spec.js requires Rice to
+  count for Rice Vinegar. The task's file list excludes that spec.
+deviations: status set to `blocked` in TASKS.md because the full local suite must pass for review.

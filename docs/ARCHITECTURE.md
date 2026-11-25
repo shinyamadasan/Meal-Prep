@@ -88,6 +88,14 @@ Legacy inline photos are auto-migrated on load. In-memory `recipePhotoCache` att
 Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngredients` in 3 tiers
 (can cook / missing 1 / missing 2). Missing-1 cards expose `buyMissingIngredient()`.
 
+`getCookableRecipes()`, `getExpirySuggestions()`, and `pantryMatchesForShop()` share
+`ingredientNamesMatch()` and `pantryLotAvailable()` (D-086). Matching uses normalized names,
+whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. Empty lots are
+unavailable. Non-staples also require a positive or unknown quantity and a current or unknown
+expiry. `getExpirySuggestions()` limits its source lots to today through three days out.
+Fridge and Attention continue to show past-date items. The cooking write path uses its own
+`findPantryMatch()` rules under D-086.
+
 ## Cook → inventory loop
 `markRecipeCooked()`:
 1. adds a cooked batch to the Inventory cooked-meals list (with shelf life),
@@ -193,7 +201,7 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
 5. A purchase lands in `AppState.pantry` (raw ingredients) ONLY. It never creates a `cookedMeals`
    record — that happens only through prep (see "Meal-prep flow" below). D-076.
 6. **Correcting a stale "In stock"** — `pantryMatchesForShop()` names the kitchen records behind a
-   row's claim (the same loose match `isInPantry()` always used, minus staples marked `empty`). The
+   row's claim using D-086 availability and ingredient matching rules. The
    row's **Not anymore?** button opens `openNotInKitchenDialog()`, which lists each matched record;
    `correctKitchenStock()` acts on the ONE record tapped: a staple is set `stockLevel: 'empty'`,
    anything else is removed with an explicit `writeTombstone('pantry', …)`. Any grocery row whose
