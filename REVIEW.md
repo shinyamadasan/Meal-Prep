@@ -4,6 +4,36 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-080 — APPROVED (held) — Claude independent review + QA, 2026-11-25
+candidate reviewed: `297c3725967bfcb5e34839bf0cbaea8fdf677aa1` (Codex rework) + reviewer fix commit on top.
+independent QA (Claude, separate clean worktree, own `npm ci`):
+focused 6/6 · full local `npm test` 840/840 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Rework items
+1. Prep-note matching — fixed by Codex (comma/parenthetical strip, descriptor and container words).
+2. Legacy expectation — fixed; "only the tapped record changes" assertion kept.
+
+### Reviewer fix (trivial, applied by Claude per CLAUDE.md delegation policy)
+Probing with real cookbook/pasted names found one remaining regression vs the old substring rule:
+`'Boneless, skinless chicken thighs'` → cut at the first comma to "boneless" → no match with
+"Chicken Thigh". Fix: skip leading comma segments made only of descriptors; also drop a
+"packed in …" clause ("Albacore tuna packed in water" ↔ "Tuna"). Both added as test rows.
+
+### Known limitation (pre-existing, not introduced here) → follow-up
+Compound product names whose head noun is a generic food still match it: "Coconut milk" ↔
+"Milk", "Peanut butter" ↔ "Butter". The old substring matcher had the same false positives.
+Candidate for a small exception list in a later task; not blocking.
+
+### Verification of constraints
+Write paths untouched (`findPantryMatch`, `deductIngredientsForRecipe`, `checkMissingIngredients`,
+`toGrams`, merges, staple replenish, workers/). No persisted-shape change. Expired items remain
+visible in Home Attention (separate expired scan). ChronaSense contract green.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold (2026-11-25) — not
+`done`, not merged to `main`. Next: TASK-081 branches from this head.
+
+---
 ## Review TASK-080 — REWORK (Claude independent review, 2026-11-25)
 candidate: `da18016c27b65dbfe172589ebcb20d2b2955efe1` on `task-080-ffs-truthful-availability`
 builder evidence: focused 6/6 (1/6 on base), full local 839/840, ledger contract 13/13, syntax + diff checks pass.

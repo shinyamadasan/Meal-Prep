@@ -7583,7 +7583,14 @@ function normalizeIngredientName(name) {
 }
 
 function ingredientMatchWords(name) {
-  var baseName = (name || '').replace(/\([^)]*\)/g, ' ').split(',', 1)[0];
+  // Prep notes follow the first comma, except a leading run of descriptors
+  // ("Boneless, skinless chicken thighs") which belongs to the name itself.
+  var segments = (name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+packed\s+in\s.*$/i, '').split(',');
+  var baseName = segments[0];
+  for (var i = 1; i < segments.length &&
+       /^(?:\s*(?:boneless|skinless|fresh|dried|canned|frozen|raw|cooked|large|medium|small|whole|low-sodium|reduced-sodium)\s*)+$/i.test(baseName); i++) {
+    baseName = segments[i];
+  }
   // The shared normalizer already handles the other prep and size descriptors.
   var normalized = normalizeIngredientName(baseName).replace(
     /^(?:(?:canned|frozen|grated|peeled|skinless|low-sodium|reduced-sodium|of)(?:\s+|$))+/, ''

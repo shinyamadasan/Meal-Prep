@@ -48,6 +48,8 @@ test('ingredient names match exact names, whole words with the same head noun, a
     ['  Fresh Carrots  ', 'Carrot', true],
     ['Brown Jasmine Rice', 'Brown Rice', true],
     ['Garlic cloves, minced', 'Garlic', true],
+    ['Boneless, skinless chicken thighs', 'Chicken Thigh', true],
+    ['Albacore tuna packed in water (5-oz cans), drained', 'Tuna', true],
     ['Red bell pepper, thinly sliced', 'Bell Pepper', true],
     ['Fresh ginger, peeled and grated', 'Ginger', true],
     ['Canned black beans, drained and rinsed', 'Black Beans', true],
