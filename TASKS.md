@@ -6171,7 +6171,8 @@ design (binding at release; refine with the owner's review notes):
      "Quantities not yet verified" when `verifiedAt` is null.
   4. Categories for FFS-V1 use reuse existing fields (no new taxonomy):
      Cook Now = tag `cook-fresh` · Meal Prep = tags `batch-friendly` / `freezer-friendly` ·
-     Quick Eat = effort `assembly` / `very-low` (+ equipment `no-cook`) · Breakfast = category
+     Quick Eat = effort `assembly` OR equipment `no-cook` (NOT `very-low`: hands-off oven dishes are
+     low-supervision, not quick) · Breakfast = category
      `Breakfast` · Snacks = category `Snack` · Sauces & sides = NEW category option `Sauce & Side`
      (added to `#recipe-category` and any category normalizer; the only vocabulary addition).
      One extra Recipes quick-filter chip "📖 Cookbook" (recipes with a `source`). Existing effort,
@@ -6189,6 +6190,35 @@ acceptance (draft):
     npm test + ledger contract green; Hard Rules 3–6 respected; 390px clean.
 private data (NOT part of this task's commits): the curated recipe import file is prepared by
   Claude outside the repo at Desktop\Meal-Prep-private\cookbook\ and imported by the owner.
+  Status 2026-11-25: 21 curated recipes transcribed from PAGE IMAGES (not OCR) across Cook Now 8,
+  Meal Prep 8, Quick Eat 5, Breakfast 2, Sauces & sides 3, Snacks 4 (some in two groups);
+  20 verified, 1 escalated (Garlicky Roasted Chickpeas: roast step on a missing page). File:
+  Meal-Prep-private\cookbook\so-easy-so-good.private.json (outside the repo).
+
+### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
+status: todo
+owner: claude (integration + preview harness; no production code)
+risk: Low (no app-code changes; preview is local and offline). No merge to `main`, no deploy.
+depends-on: TASK-080, 081, 082 (wave 1) and TASK-083, 084 (wave 2) at `approved`
+objective:
+  Give the owner one local, offline build of all FFS-V1 work to test five scenarios before any
+  release decision: (1) grocery shopping without a meal plan; (2) cooking a fresh, healthy meal
+  from available ingredients; (3) batch cooking with minimal supervision; (4) eating a balanced
+  meal with almost no cooking; (5) improving the nutritional balance of an existing meal.
+design:
+  - Integration branch `ffs-v1-preview` = ffs-v1 + reviewed task heads (080 → 084), merged in
+    order; full `npm test` + `npm run test:ledger-contract` re-run on the merged head.
+  - Preview harness kept OUTSIDE the repo (Desktop\Meal-Prep-private\preview\): copies the app
+    files from the merged head, removes the Firebase SDK script tags (so nothing can sign in or
+    write to Firestore), adds a visible "PREVIEW — offline, nothing syncs" banner, and seeds
+    localStorage with a synthetic household (realistic pantry incl. stale/expired/zero-qty lots,
+    a ready-food leftover, no meal plan) plus the private cookbook pack. Served on
+    http://127.0.0.1:8765 only.
+  - A one-page scenario guide (private folder) with steps and what "good" looks like per scenario.
+acceptance:
+  - No Firebase network request is possible from the preview (verified in a browser run).
+  - Each of the five scenarios is walked through once by Claude in a browser with screenshots.
+  - Nothing is merged to `main`; nothing deployed; no production data touched.
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
