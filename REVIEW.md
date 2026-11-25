@@ -4,6 +4,57 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-080 — REWORK (Claude independent review, 2026-11-25)
+candidate: `da18016c27b65dbfe172589ebcb20d2b2955efe1` on `task-080-ffs-truthful-availability`
+builder evidence: focused 6/6 (1/6 on base), full local 839/840, ledger contract 13/13, syntax + diff checks pass.
+reviewer checks: read the app.js diff in full; probed `ingredientNamesMatch` with real-world
+ingredient strings by evaluating the branch's own functions; confirmed past-date items remain
+visible via the separate Attention "expired" scan (`dash-attn-row--expired`), so design item 5 holds.
+
+### What is right
+- `pantryLotAvailable` matches the D-086 rules; staples are unchanged except `empty`.
+- `getExpirySuggestions` lower bound and availability filter are correct; Attention still lists
+  expired lots via its own scan.
+- Deduction/write paths untouched (`findPantryMatch`, `deductIngredientsForRecipe`, workers/).
+- Alias index built once; no new persisted state.
+
+### Must fix
+1. **Matching regression on ingredient names that carry prep notes (blocking).** Real recipe
+   ingredient names include prep clauses and container words. On the candidate:
+   `ingredientNamesMatch('Garlic cloves, minced','Garlic')` → false;
+   `('Red bell pepper, thinly sliced','Bell Pepper')` → false;
+   `('Fresh ginger, peeled and grated','Ginger')` → false;
+   `('Canned black beans, drained and rinsed','Black Beans')` → false;
+   `('Dried red lentils, rinsed','Red Lentils')` → false;
+   `('Tomatoes','Cherry tomatoes, halved')` → false.
+   The old substring rule matched all of these, so Shop/cookable/use-soon would silently LOSE
+   correct matches for most pasted and cookbook recipes. Fix inside `ingredientMatchWords()`
+   (read-side only):
+   - drop everything from the first comma, and any parenthetical, before tokenizing
+     (keep `normalizeIngredientName` unchanged);
+   - drop leading form/prep descriptors: fresh, dried, canned, frozen, raw, cooked, chopped,
+     minced, diced, sliced, grated, peeled, large, medium, small, whole, boneless, skinless,
+     low-sodium, reduced-sodium, plus "of";
+   - drop trailing container/unit nouns when another word remains: clove, head, bunch, sprig,
+     stalk, piece, slice, fillet, leaf, can, package, pack, bag, jar, bottle, floret.
+   - Keep the head-noun rule, so Rice ≠ Rice Vinegar, Garlic ≠ Garlic Powder, Egg ≠ Eggplant,
+     Corn ≠ Cornstarch, Black Pepper ≠ Bell Pepper still hold.
+   Add every case above as positive rows in the table-driven test, keep all existing negatives,
+   and add: 'Reduced-sodium soy sauce' ↔ 'Soy Sauce' true; 'Garlic powder' ↔ 'Garlic cloves,
+   minced' false; 'Rice vinegar' ↔ 'Steamed rice, for serving' false.
+2. **Legacy test expectation (the blocked full-suite failure).** In
+   `tests/meal-prep-first.spec.js` "a loose match never deletes unrelated stock", update the
+   expectations to the corrected behavior: `matched` → `['buy_vin']`, `stillClaimsStock` → false.
+   Keep the core assertion unchanged: correcting the vinegar record leaves `buy_rice` intact
+   (`left` → `['buy_rice']`). Rename the comment so it describes the new truth.
+
+### Nice to have (non-blocking)
+- In CHANGELOG, note the behavior change for D-086 consequence ("may show fewer items available").
+
+**Disposition: REWORK → TASK-080 `status: codex`.** Gate after fix: `approved` (held) — owner deploy
+hold; never `done`, never merged to `main`.
+
+---
 ## Review TASK-038 — code review PASS; owner integration decision pending (2026-11-01)
 application candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527` (`bridge-CHAT-mealprep-task038-fill-empty-20261031-builder-1`); base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`.
 provenance: AI Dev OS produced candidate via one Claude Builder invocation and reported separate read-only Claude Reviewer PASS on the exact SHA; owner-relayed local validation was performed afterward in an isolated checkout. Reviewer was the same provider as Builder but a separate invocation. Codex cross-provider review NOT TESTED. The reviewer approval is NOT approval to merge/deploy.

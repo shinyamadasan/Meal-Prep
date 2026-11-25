@@ -5915,7 +5915,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-080 · FFS-0 Truthful availability — read path only
-status: blocked
+status: codex
 owner: codex
 risk: Medium (logic change on read paths; no stock writes). Merge gate: `approved` (owner deploy hold).
 source: BQ-027 · PROP-035 · audit-evidence/2026-11-06 F1, F2 · D-086
