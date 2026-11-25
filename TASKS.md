@@ -6153,6 +6153,81 @@ acceptance (draft):
     snack pairs always span ≥ 2 groups; render leaves AppState deep-equal; 390px clean;
     npm test + ledger contract green.
 
+### TASK-084 · FFS-4 Private cookbook recipes: source, original vs adaptation (WAVE 2 — prepared, NOT released)
+status: todo
+owner: claude (release to codex after wave 1 review; owner approved PROP-039 rev 2 on 2026-11-25,
+  "subject to implementation review after Wave 1")
+risk: High (adds optional fields to the Firestore-synced Recipe shape; D-032 red zone).
+  Merge gate: `approved` (held). Solo; never chained.
+source: BQ-031 · PROP-039 rev 2 · planning/flexible-food-system-v1/IMPLEMENTATION_PLAN.md FFS-4 rev 2
+depends-on: none in code (independent of TASK-080..083); released after wave 1
+objective:
+  Let the household cook selected So Easy So Good recipes directly in the app (ingredients,
+  verified quantities, instructions, page reference, original/adapted status) while ALL cookbook
+  text stays out of the public repo and the public app bundle. Content arrives only as the owner's
+  private recipe data via the existing JSON import.
+design (binding at release; refine with the owner's review notes):
+  1. Optional Recipe fields, patched on load in `patchMissingNutrition()` (Hard Rule 4):
+     `source: { book, author, page, kind: 'original'|'adaptation', verifiedAt, adaptedFrom }`,
+     `adaptationNotes: ''`. Absent on all existing recipes → no behavior change.
+  2. Originals preserved: `source.kind === 'original'` → content fields read-only in the editor
+     (name, ingredients, quantities, instructions, nutrition); favorite / plan / cook still work.
+     "Make our version" (existing duplicate path if present, else a small new action) creates a new
+     recipe with `kind:'adaptation'`, `adaptedFrom` = original id (quoted, Hard Rule 3), editable,
+     with an "Our changes" text field (`adaptationNotes`).
+  3. Badges on recipe card + details: "📖 <book> p. <page>" and "Original" / "Our adaptation";
+     "Quantities not yet verified" when `verifiedAt` is null.
+  4. Categories for FFS-V1 use reuse existing fields (no new taxonomy):
+     Cook Now = tag `cook-fresh` · Meal Prep = tags `batch-friendly` / `freezer-friendly` ·
+     Quick Eat = effort `assembly` OR equipment `no-cook` (NOT `very-low`: hands-off oven dishes are
+     low-supervision, not quick) · Breakfast = category
+     `Breakfast` · Snacks = category `Snack` · Sauces & sides = NEW category option `Sauce & Side`
+     (added to `#recipe-category` and any category normalizer; the only vocabulary addition).
+     One extra Recipes quick-filter chip "📖 Cookbook" (recipes with a `source`). Existing effort,
+     time and appliance filters must work unchanged on imported cookbook recipes.
+  5. Import/export (JSON) round-trips `source` and `adaptationNotes`; imported text stays inert
+     (D-084 escaping). Restore/backup unchanged otherwise.
+  6. Leak guards: `.gitignore` adds `*.private.json`, `private/`, `Meal-Prep-private/`; a test fails
+     if any tracked file matches `*.private.json`, and if app.js / index.html / sw.js / shared/
+     contain any canary phrase hash from a list kept in the test (hashes only, no text).
+     Fixtures use invented recipes, never book text.
+acceptance (draft):
+  - legacy recipes load identical; originals reject content edits; adaptations editable and linked;
+    badges render; "Sauce & Side" selectable; Cookbook chip filters; effort/time/appliance filters
+    match imported fixture recipes; JSON round-trip preserves fields; leak guard green;
+    npm test + ledger contract green; Hard Rules 3–6 respected; 390px clean.
+private data (NOT part of this task's commits): the curated recipe import file is prepared by
+  Claude outside the repo at Desktop\Meal-Prep-private\cookbook\ and imported by the owner.
+  Status 2026-11-25: 21 curated recipes transcribed from PAGE IMAGES (not OCR) across Cook Now 8,
+  Meal Prep 8, Quick Eat 5, Breakfast 2, Sauces & sides 3, Snacks 4 (some in two groups);
+  20 verified, 1 escalated (Garlicky Roasted Chickpeas: roast step on a missing page). File:
+  Meal-Prep-private\cookbook\so-easy-so-good.private.json (outside the repo).
+
+### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
+status: todo
+owner: claude (integration + preview harness; no production code)
+risk: Low (no app-code changes; preview is local and offline). No merge to `main`, no deploy.
+depends-on: TASK-080, 081, 082 (wave 1) and TASK-083, 084 (wave 2) at `approved`
+objective:
+  Give the owner one local, offline build of all FFS-V1 work to test five scenarios before any
+  release decision: (1) grocery shopping without a meal plan; (2) cooking a fresh, healthy meal
+  from available ingredients; (3) batch cooking with minimal supervision; (4) eating a balanced
+  meal with almost no cooking; (5) improving the nutritional balance of an existing meal.
+design:
+  - Integration branch `ffs-v1-preview` = ffs-v1 + reviewed task heads (080 → 084), merged in
+    order; full `npm test` + `npm run test:ledger-contract` re-run on the merged head.
+  - Preview harness kept OUTSIDE the repo (Desktop\Meal-Prep-private\preview\): copies the app
+    files from the merged head, removes the Firebase SDK script tags (so nothing can sign in or
+    write to Firestore), adds a visible "PREVIEW — offline, nothing syncs" banner, and seeds
+    localStorage with a synthetic household (realistic pantry incl. stale/expired/zero-qty lots,
+    a ready-food leftover, no meal plan) plus the private cookbook pack. Served on
+    http://127.0.0.1:8765 only.
+  - A one-page scenario guide (private folder) with steps and what "good" looks like per scenario.
+acceptance:
+  - No Firebase network request is possible from the preview (verified in a browser run).
+  - Each of the five scenarios is walked through once by Claude in a browser with screenshots.
+  - Nothing is merged to `main`; nothing deployed; no production data touched.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`

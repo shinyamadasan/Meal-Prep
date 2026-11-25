@@ -20,3 +20,8 @@ OPS_STATE.md
 # Untracked since it was created on 2026-08-09; kept locally, ignored so it stops
 # tripping the overnight automation clean-tree preflight. Root-anchored on purpose.
 /recipe-request.json
+
+# Private household data and cookbook content (FFS-V1, D-087/PROP-039): never commit.
+*.private.json
+private/
+Meal-Prep-private/

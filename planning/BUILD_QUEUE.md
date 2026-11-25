@@ -31,6 +31,11 @@
 - build: TASK-083 drafted at `status: todo`; Claude releases it to Codex after the owner reviews wave 1.
 - detail: TASKS.md TASK-083
 
+### BQ-031 — FFS-4 Private cookbook recipes (source refs, original vs adaptation)
+- source: PROP-039 rev 2 · priority: P2 · approved: 2026-11-25 (owner, chat — "subject to implementation review after Wave 1")
+- build: TASK-084 prepared at `status: todo`; released after wave 1. High risk → held merge. Cookbook content stays private (import file outside repo).
+- detail: TASKS.md TASK-084
+
 ### BQ-017 — Planner tab overflows horizontally on mobile (+23px at 390px width)
 - source: PROP-029 · priority: P1 · approved: 2026-07-03 (chat)
 - build: Real, reproducible bug caught by `tests/mobile-layout.spec.js` after its TASK-004 fixture fix — Planner is the only tab (of 7) with nonzero horizontal overflow at a 390px viewport. Root cause not yet traced; likely a fixed-width element in the planner day-grid/table that doesn't shrink/wrap below a breakpoint. Start with a code trace of the planner tab markup/CSS before proposing a fix.

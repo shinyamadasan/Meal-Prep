@@ -544,7 +544,7 @@
 - **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** pack content scope; DATA_MODEL and D-0NN needed
 - **why now vs later:** wave 2 or 3, after the owner decides on copyright scope
 - **AI-recommended priority:** **P2**
-- **status:** revision requested 2026-11-25 (owner) — revised in planning/flexible-food-system-v1/IMPLEMENTATION_PLAN.md (FFS-4 rev 2); awaiting owner approval
+- **status:** approved 2026-11-25 (owner, chat; rev 2, subject to implementation review after wave 1; + categories, page-image-verified quantities, curated start) → BQ-031 / TASK-084
 
 ---
 
