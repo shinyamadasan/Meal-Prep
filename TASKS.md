@@ -6145,6 +6145,51 @@ acceptance (draft):
     snack pairs always span ≥ 2 groups; render leaves AppState deep-equal; 390px clean;
     npm test + ledger contract green.
 
+### TASK-084 · FFS-4 Private cookbook recipes: source, original vs adaptation (WAVE 2 — prepared, NOT released)
+status: todo
+owner: claude (release to codex after wave 1 review; owner approved PROP-039 rev 2 on 2026-11-25,
+  "subject to implementation review after Wave 1")
+risk: High (adds optional fields to the Firestore-synced Recipe shape; D-032 red zone).
+  Merge gate: `approved` (held). Solo; never chained.
+source: BQ-031 · PROP-039 rev 2 · planning/flexible-food-system-v1/IMPLEMENTATION_PLAN.md FFS-4 rev 2
+depends-on: none in code (independent of TASK-080..083); released after wave 1
+objective:
+  Let the household cook selected So Easy So Good recipes directly in the app (ingredients,
+  verified quantities, instructions, page reference, original/adapted status) while ALL cookbook
+  text stays out of the public repo and the public app bundle. Content arrives only as the owner's
+  private recipe data via the existing JSON import.
+design (binding at release; refine with the owner's review notes):
+  1. Optional Recipe fields, patched on load in `patchMissingNutrition()` (Hard Rule 4):
+     `source: { book, author, page, kind: 'original'|'adaptation', verifiedAt, adaptedFrom }`,
+     `adaptationNotes: ''`. Absent on all existing recipes → no behavior change.
+  2. Originals preserved: `source.kind === 'original'` → content fields read-only in the editor
+     (name, ingredients, quantities, instructions, nutrition); favorite / plan / cook still work.
+     "Make our version" (existing duplicate path if present, else a small new action) creates a new
+     recipe with `kind:'adaptation'`, `adaptedFrom` = original id (quoted, Hard Rule 3), editable,
+     with an "Our changes" text field (`adaptationNotes`).
+  3. Badges on recipe card + details: "📖 <book> p. <page>" and "Original" / "Our adaptation";
+     "Quantities not yet verified" when `verifiedAt` is null.
+  4. Categories for FFS-V1 use reuse existing fields (no new taxonomy):
+     Cook Now = tag `cook-fresh` · Meal Prep = tags `batch-friendly` / `freezer-friendly` ·
+     Quick Eat = effort `assembly` / `very-low` (+ equipment `no-cook`) · Breakfast = category
+     `Breakfast` · Snacks = category `Snack` · Sauces & sides = NEW category option `Sauce & Side`
+     (added to `#recipe-category` and any category normalizer; the only vocabulary addition).
+     One extra Recipes quick-filter chip "📖 Cookbook" (recipes with a `source`). Existing effort,
+     time and appliance filters must work unchanged on imported cookbook recipes.
+  5. Import/export (JSON) round-trips `source` and `adaptationNotes`; imported text stays inert
+     (D-084 escaping). Restore/backup unchanged otherwise.
+  6. Leak guards: `.gitignore` adds `*.private.json`, `private/`, `Meal-Prep-private/`; a test fails
+     if any tracked file matches `*.private.json`, and if app.js / index.html / sw.js / shared/
+     contain any canary phrase hash from a list kept in the test (hashes only, no text).
+     Fixtures use invented recipes, never book text.
+acceptance (draft):
+  - legacy recipes load identical; originals reject content edits; adaptations editable and linked;
+    badges render; "Sauce & Side" selectable; Cookbook chip filters; effort/time/appliance filters
+    match imported fixture recipes; JSON round-trip preserves fields; leak guard green;
+    npm test + ledger contract green; Hard Rules 3–6 respected; 390px clean.
+private data (NOT part of this task's commits): the curated recipe import file is prepared by
+  Claude outside the repo at Desktop\Meal-Prep-private\cookbook\ and imported by the owner.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`
