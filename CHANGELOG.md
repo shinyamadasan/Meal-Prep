@@ -1352,3 +1352,17 @@ blockers: none.
 deviations: the remote branch was already checked out in another worktree. The rework used a
   local task branch from `6af568c` targeting the same remote branch.
 → status set to `review` in TASKS.md
+
+## TASK-081 — done (branch: task-081-ffs-stock-health)
+changed:
+  - `app.js` (+188) · `stockFoodClass()` and `stockHealthReport()` derive food classes and
+    independent findings. `renderStockHealth()` and `copyStockHealthReport()` expose the report.
+  - `index.html` (+11) and `style.css` (+64) · collapsed `#stock-health` panel in Fridge.
+  - `tests/ffs-stock-health.spec.js` · five synthetic cases for classification, report signals,
+    consistency findings and read-only copy at two widths.
+  - `docs/FEATURES.md` and `docs/ARCHITECTURE.md` · D-087 behavior and stable anchors.
+  - `feature-evidence/task-081/` · opened panel at 1280px and 390px.
+tests: focused 5/5, full local 845/845, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md

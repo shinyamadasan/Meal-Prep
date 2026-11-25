@@ -245,6 +245,17 @@
                         <button class="btn btn--secondary btn--sm" onclick="verifyInventoryChecked()">Inventory checked</button>
                     </div>
 
+                    <details id="stock-health" class="stock-health" ontoggle="renderStockHealth()">
+                        <summary>Stock health</summary>
+                        <div class="stock-health-body">
+                            <div id="stock-health-report"></div>
+                            <div class="stock-health-actions">
+                                <button type="button" class="btn btn--secondary btn--sm" onclick="copyStockHealthReport()">Copy report</button>
+                                <span id="stock-health-copy-status" role="status"></span>
+                            </div>
+                        </div>
+                    </details>
+
                     <!-- Cooked / prepped meals -->
                     <div id="cooked-meals-section" class="cooked-meals-section">
                         <div class="cooked-meals-header">

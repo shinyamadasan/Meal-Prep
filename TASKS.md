@@ -5996,7 +5996,7 @@ blocker:
     retaining the assertion that correcting the vinegar leaves the Rice record intact.
 
 ### TASK-081 · FFS-1 Stock health — read-only inventory review by food class
-status: codex
+status: review
 owner: codex
 risk: Low (render-only). Merge gate: `approved` (owner deploy hold).
 source: BQ-028 · PROP-036 (revised by owner 2026-11-25: no universal cutoff) · D-087

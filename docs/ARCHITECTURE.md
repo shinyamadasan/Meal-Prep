@@ -96,6 +96,21 @@ expiry. `getExpirySuggestions()` limits its source lots to today through three d
 Fridge and Attention continue to show past-date items. The cooking write path uses its own
 `findPantryMatch()` rules under D-086.
 
+## Fridge stock health (D-087)
+
+`renderStockHealth()` fills the open `#stock-health` panel from
+`stockHealthReport(AppState, todayISO())`. `STOCK_CLASS_RULES` classifies raw lots with storage,
+ingredient names, direct database aliases, and categories. Cooked batches come from
+`AppState.cookedMeals`. `STOCK_REVIEW_POLICY` sets the record-age checks at 7 days for perishables,
+90 for frozen stock, 180 for pantry staples, 365 for condiments, and 4 fridge / 90 freezer for
+cooked meals. Record age uses `updatedAt` with purchase or cook date as the fallback.
+
+Printed dates, age-based safety estimates, and record staleness are independent. Freezer quality
+guidance uses the ingredient's existing freezer estimate or the cooked batch policy. The
+consistency check reuses `pantryLotAvailable()` for empty staples, `ingredientNamesMatch()` for
+matching lots, and `portionCountOrNull()` for depleted cooked batches. The renderer and clipboard
+action read from the report without persisting inventory data.
+
 ## Cook → inventory loop
 `markRecipeCooked()`:
 1. adds a cooked batch to the Inventory cooked-meals list (with shelf life),

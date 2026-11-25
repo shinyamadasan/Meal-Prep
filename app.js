@@ -199,6 +199,192 @@ function pantryExpiryInfo(p) {
   return { date: d.getFullYear() + '-' + m + '-' + day, printed: false, shelfLifeDays: Number(shelf) };
 }
 
+// Stock health (D-087). The first matching rule wins. Food class is separate
+// from the pantry staple flag, which controls how the app tracks quantity.
+const STOCK_CLASS_RULES = {
+  order: ['cooked-meal', 'frozen', 'fresh-herb', 'condiment', 'dry-goods', 'perishable', 'pantry-staple'],
+  herbs: /\b(?:herbs?|basil|parsley|cilantro|coriander leaf|mint|dill|chives|oregano|thyme|rosemary|sage|tarragon)\b/,
+  dried: /\b(?:dry|dried|ground|powder(?:ed)?|flakes?)\b/,
+  fresh: /\bfresh\b/,
+  condiment: /\b(?:sauces?|oils?|vinegars?|spices?|seasonings?|pastes?|dressings?|condiments?|ketchup|catsup|mayonnaise|mayo|mustard|pesto|salsa|salt|peppercorns?|(?:black|white) pepper|paprika|cumin|turmeric|cinnamon|nutmeg|cardamom|allspice|annatto|masala|bay leaves|garlic powder|onion powder|chili flakes|chili powder|curry powder|gochujang|bagoong|miso|tahini|vanilla extract)\b|^cloves?$/,
+  dryGoods: /\b(?:canned|tinned|rice|pasta|flours?|oats|oatmeal|quinoa|couscous|lentils|cornstarch)\b/,
+  rawCategories: ['protein', 'vegetable', 'fruit', 'dairy'],
+  shelfCategories: ['pantry', 'grain']
+};
+
+const STOCK_REVIEW_POLICY = {
+  perishable: { label: 'Perishable', reviewAfterDays: 7, safetyNote: 'Based on the shelf-life estimate.' },
+  frozen: {
+    label: 'Frozen', reviewAfterDays: 90,
+    safetyNote: 'Past the estimated freezer quality window — check it.'
+  },
+  'pantry-staple': { label: 'Pantry staples', reviewAfterDays: 180, safetyNote: 'Follow the printed date.' },
+  condiment: { label: 'Condiments', reviewAfterDays: 365, safetyNote: 'Follow the printed date.' },
+  'cooked-meal': {
+    label: 'Cooked meals',
+    fridge: { reviewAfterDays: 4, safetyAfterDays: 4, safetyNote: 'Typical fridge window is 3–4 days.' },
+    freezer: {
+      reviewAfterDays: 90, qualityAfterDays: 90,
+      safetyNote: 'Past the typical freezer quality window of about 2–3 months — check it.'
+    }
+  }
+};
+
+function stockIngredientEntry(name) {
+  return INGREDIENT_DB.find(i => i.name.toLowerCase() === name) ||
+    INGREDIENT_DB.find(i => (i.aliases || []).some(alias => alias.toLowerCase() === name));
+}
+
+function stockFoodClass(record) {
+  const rules = STOCK_CLASS_RULES;
+  const name = (record.name || '').trim().toLowerCase();
+  const entry = stockIngredientEntry(name);
+  const dbName = (entry?.name || '').toLowerCase();
+  const category = (record.category || entry?.category || '').toLowerCase();
+  const herb = rules.herbs.test(name) || rules.herbs.test(dbName);
+  const freshHerb = herb && !rules.dried.test(name) &&
+    (rules.fresh.test(name) || record.storage === 'fridge' || category === 'vegetable');
+  const matches = {
+    'cooked-meal': 'cookedDate' in record || 'portionsRemaining' in record || 'fridgeLife' in record,
+    frozen: record.storage === 'freezer',
+    'fresh-herb': freshHerb,
+    condiment: rules.condiment.test(name.replace(/\bin oil\b/g, '')) || rules.condiment.test(dbName) || herb,
+    'dry-goods': rules.dryGoods.test(name) || rules.dryGoods.test(dbName),
+    perishable: rules.rawCategories.includes(category) ||
+      (!rules.shelfCategories.includes(category) && record.storage !== 'counter' && record.staple !== true),
+    'pantry-staple': true
+  };
+  const match = rules.order.find(key => matches[key]);
+  if (match === 'fresh-herb') return 'perishable';
+  if (match === 'dry-goods') return 'pantry-staple';
+  return match;
+}
+
+// Compare calendar days without daylight-saving rounding. Stored timestamps
+// use the same local calendar as todayISO(); date-only values keep their day.
+function stockCalendarDay(value) {
+  if (typeof value !== 'string' || !value) return null;
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  if (dateOnly && date.toISOString().slice(0, 10) !== value) return null;
+  const dayMs = 86400000;
+  return (dateOnly ? date.getTime() : Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / dayMs;
+}
+
+function stockUnitKey(value) {
+  const unit = (value || '').trim().toLowerCase();
+  const normalized = normalizeUnit(unit);
+  // The bulk-add parser defaults unfamiliar units to pieces. Keep the original
+  // unit for this comparison so a jar and a bag still produce a finding.
+  return normalized !== 'pieces' || /^(?:pcs?|pieces?)\.?$/.test(unit) ? normalized : unit;
+}
+
+function stockHealthReport(state, todayISO) {
+  const today = stockCalendarDay(todayISO);
+  const pantry = (state.pantry || []).filter(Boolean);
+  const cookedMeals = (state.cookedMeals || []).filter(Boolean);
+
+  function reportRow(record, foodClass, consistency) {
+    const cooked = foodClass === 'cooked-meal';
+    const name = record.name || 'Unnamed item';
+    const storage = record.storage || (cooked ? 'fridge' : inferStorage(name, record.category));
+    const classPolicy = STOCK_REVIEW_POLICY[foodClass];
+    const policy = cooked ? classPolicy[storage === 'freezer' ? 'freezer' : 'fridge'] : classPolicy;
+    const originDay = stockCalendarDay(cooked ? record.cookedDate : record.purchaseDate);
+    const updatedDay = stockCalendarDay(record.updatedAt) ?? originDay;
+    const printedDate = !cooked && record.dateMode === 'expiry' ? record.expiryDate : null;
+    const printedDay = /^\d{4}-\d{2}-\d{2}$/.test(printedDate) ? stockCalendarDay(printedDate) : null;
+    const age = today != null && originDay != null ? today - originDay : null;
+    const updatedAge = today != null && updatedDay != null ? today - updatedDay : null;
+    const entry = !cooked && stockIngredientEntry(name.toLowerCase().trim());
+    let safetyAfterDays = policy.safetyAfterDays;
+    let qualityAfterDays = policy.qualityAfterDays;
+    if (foodClass === 'perishable') {
+      // A fresh herb may share a name with a dried entry in the database.
+      const driedHerb = entry && STOCK_CLASS_RULES.herbs.test(entry.name.toLowerCase()) && entry.category === 'Pantry';
+      safetyAfterDays = record.shelfLifeDays ?? (driedHerb ? categoryShelfLife('Vegetable') :
+        ingredientShelfLife(entry?.name || name, record.category || entry?.category));
+    } else if (foodClass === 'frozen') {
+      qualityAfterDays = entry?.freezerDays;
+    }
+
+    const expiration = printedDay != null && today != null && printedDay < today
+      ? 'Past printed date (' + printedDate + ')' : null;
+    const safety = age != null && safetyAfterDays != null && age > safetyAfterDays
+      ? 'Past typical safe window — check it' : null;
+    const dataStale = updatedAge != null && updatedAge > policy.reviewAfterDays
+      ? 'Not updated in ' + updatedAge + ' days — still accurate?' : null;
+    const quality = age != null && qualityAfterDays != null && age > qualityAfterDays ? policy.safetyNote : null;
+    const note = safety || (expiration && (foodClass === 'pantry-staple' || foodClass === 'condiment'))
+      ? policy.safetyNote : null;
+    return { foodClass, name, storage, expiration, safety, dataStale, consistency, quality, note };
+  }
+
+  const units = pantry.map(p => stockUnitKey(p.unit));
+  const rows = pantry.map((p, i) => {
+    const consistency = [];
+    const staple = isStaple(p);
+    if (p.quantity < 0) consistency.push('Negative quantity.');
+    else if (p.quantity === 0 && ['full', 'ok'].includes(p.stockLevel)) {
+      consistency.push('Stock marked ' + p.stockLevel + ' with zero quantity.');
+    } else if (p.quantity === 0 && p.stockLevel !== 'empty') consistency.push('Zero quantity, still listed as non-empty.');
+    else if (!staple && p.quantity == null && units[i]) consistency.push('Unit recorded with no quantity.');
+    if (staple && !pantryLotAvailable(p)) consistency.push('Empty staple — check whether it needs restocking.');
+
+    // Compare each pair once. Different recorded units get the more specific
+    // message. Multiple earlier matches only add each finding once per row.
+    let duplicate = null;
+    let mixedUnits = null;
+    for (let j = 0; j < i; j++) {
+      if (!ingredientNamesMatch(p.name, pantry[j].name)) continue;
+      if (units[i] && units[j] && units[i] !== units[j]) mixedUnits ??= pantry[j].name;
+      else duplicate ??= pantry[j].name;
+    }
+    if (duplicate) consistency.push('Possible duplicate of ' + duplicate + '.');
+    if (mixedUnits) consistency.push('Different units from matching lot ' + mixedUnits + '.');
+    return reportRow(p, stockFoodClass(p), consistency);
+  });
+
+  return rows.concat(cookedMeals.map(meal => reportRow(meal, 'cooked-meal',
+    portionCountOrNull(meal.portionsRemaining, 0) === 0 ? ['Still listed as ready food with no portions remaining.'] : [])));
+}
+
+function renderStockHealth() {
+  const details = document.getElementById('stock-health');
+  if (!details?.open) return;
+  const report = stockHealthReport(AppState, todayISO());
+  const counts = [
+    [report.filter(row => row.expiration).length, 'past printed date'],
+    [report.filter(row => row.safety).length, 'safety estimate'],
+    [report.filter(row => row.dataStale).length, 'stale record'],
+    [report.reduce((total, row) => total + row.consistency.length, 0), 'consistency issue']
+  ];
+  const summary = '<ul class="stock-health-counts">' + counts.map(([count, label]) =>
+    '<li>' + count + ' ' + label + (count === 1 ? '' : 's') + '</li>').join('') + '</ul>';
+  const groups = Object.entries(STOCK_REVIEW_POLICY).map(([foodClass, policy]) => {
+    const rows = report.filter(row => row.foodClass === foodClass).map(row => {
+      const findings = [row.expiration, row.safety, row.dataStale, ...row.consistency, row.quality].filter(Boolean);
+      if (!findings.length) return '';
+      const storage = row.storage.charAt(0).toUpperCase() + row.storage.slice(1);
+      return '<li><strong>' + escapeHtml(row.name) + '</strong> · ' + escapeHtml(storage) +
+        '<ul>' + findings.map(text => '<li>' + escapeHtml(text) + '</li>').join('') + '</ul>' +
+        (row.note ? '<p class="stock-health-note">' + escapeHtml(row.note) + '</p>' : '') + '</li>';
+    }).join('');
+    return rows ? '<div class="stock-health-group"><h3>' + policy.label + '</h3><ul>' + rows + '</ul></div>' : '';
+  }).join('');
+  document.getElementById('stock-health-report').innerHTML = summary + (groups || '<p>No stock records to review.</p>');
+  document.getElementById('stock-health-copy-status').textContent = '';
+}
+
+function copyStockHealthReport() {
+  const report = document.getElementById('stock-health-report');
+  const status = document.getElementById('stock-health-copy-status');
+  copyTextToClipboard('Stock health\n' + report.innerText.replace(/\n{2,}/g, '\n'),
+    () => { status.textContent = 'Report copied.'; },
+    () => { status.textContent = 'Could not copy. You can select and copy the report text.'; });
+}
+
 // "Aug 10" within the current year, "Aug 10, 2026" outside it. Parsed at LOCAL
 // midnight (same as daysLeftFrom) so the rendered day is never off by one.
 function formatShortDate(isoStr) {
@@ -12090,6 +12276,7 @@ function renderPantry() {
   const list = document.getElementById('pantry-list');
   const count = document.getElementById('pantry-count');
   if (!list) return;
+  renderStockHealth();
 
   const n = AppState.pantry.length;
   count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
@@ -13936,6 +14123,7 @@ window.verifyInventoryChecked = verifyInventoryChecked;
 function renderCookedMeals() {
   var list = document.getElementById('cooked-meals-list');
   if (!list) return;
+  renderStockHealth();
   var section = document.getElementById('cooked-meals-section');
   var meals = AppState.cookedMeals || [];
 

@@ -1078,3 +1078,23 @@ static: `node --check app.js`, syntax checks on both changed specs, and `git dif
 self-review and QA: Code Health passes and ship decision is yes. Diff inspection and the local
   suites verify the read-side scope, the head-noun negatives, and stock correction by record ID.
 untested: production, live cloud/MCP/bridge services, and real devices.
+
+## TASK-081 · 2026-11-25
+focused: `npx playwright test tests/ffs-stock-health.spec.js --project=local --workers=2`.
+  Base `99c4925`: 0 passed, 5 failed because the report helpers and panel were absent.
+  Final: 5 passed. Both widths verified collapsed default, separate counts, clipboard text,
+  no horizontal overflow, unchanged `AppState` JSON, and zero `saveData()` calls.
+full: `npm test -- -- --config=<temporary offline config> --workers=4 --reporter=dot`.
+  Complete local project, 845 passed.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2 --reporter=dot`.
+  13 passed. Both broad runs blocked external browser connections. Final runs had zero failures,
+  skips, or flaky results. Coverage was not instrumented.
+static: `node --check app.js`, syntax check of the new spec, and `git diff --check` passed.
+  All 118 decision pointers passed. The docs consistency scan decreased from 57 to 55 existing
+  findings because both D-087 constants now resolve. It added zero findings.
+visual: `feature-evidence/task-081/stock-health-1280.png` and `stock-health-390.png` captured and
+  inspected with synthetic stock across all five classes.
+self-review: SELF_REVIEW.md Code Health passes, and the ship decision is yes for the scoped diff.
+QA: applicable AI checks pass. `#stock-health` handlers resolve, colors use existing tokens,
+  and the report's call chain performs no persistence, normalization, or ledger writes.
+untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
