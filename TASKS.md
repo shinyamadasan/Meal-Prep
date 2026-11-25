@@ -5900,6 +5900,251 @@ verification:
 merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and released on main;
   direct read-only GitHub Pages verification passed. No backend release or production-data writes.
 
+<!-- ═══════════════════════════════════════════════════════
+     FFS-V1 · Flexible Food System V1 — wave 1 (PROP-035/036/037 → BQ-027/028/029)
+     Risk: Medium · Execution: Solo (one task per Continue; Claude reviews each before the next)
+     Build order = dependency order: TASK-080 → TASK-081 → TASK-082. TASK-083 is wave 2 (held).
+     Branching: stacked off `ffs-v1` (planning branch). task-080 from ffs-v1; task-081 from the
+     reviewed task-080 head; task-082 from the reviewed task-081 head.
+     DEPLOY GATE (owner, 2026-11-25): "Do not deploy to production without my approval."
+     → No task in this group may be merged to `main`, pushed to `main`, or set to `done`.
+       The maximum landing state is `approved` (held). The owner merges.
+     Shared context: planning/flexible-food-system-v1/*.md · DECISIONS D-086, D-087.
+     Primary objective (owner): versatility — prep, cook fresh, or assemble low-effort meals from
+     the SAME kitchen inventory, with no extra admin work and no unnecessary UI complexity.
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-080 · FFS-0 Truthful availability — read path only
+status: codex
+owner: codex
+risk: Medium (logic change on read paths; no stock writes). Merge gate: `approved` (owner deploy hold).
+source: BQ-027 · PROP-035 · audit-evidence/2026-11-06 F1, F2 · D-086
+depends-on: none
+branch: task-080-ffs-truthful-availability (from `ffs-v1`)
+objective:
+  Make every "do we have it?" answer the app SHOWS honest, without changing any stored record and
+  without changing how cooking deducts stock. Today empty/0-quantity/expired lots count as in stock
+  and substring matching lets "Rice" satisfy "Rice Vinegar" and "Egg" satisfy "Eggplant".
+files:
+  - app.js (new pure helpers + the read-path call sites listed below)
+  - tests/ffs-truthful-availability.spec.js (new)
+  - docs/ARCHITECTURE.md, docs/FEATURES.md (short notes; stable anchors only)
+  - CHANGELOG.md, TEST_REPORT.md, TASKS.md (status field only)
+design (binding):
+  1. Add pure helper `ingredientNamesMatch(a, b)` → boolean:
+     - normalize both with existing `normalizeIngredientName()` (lowercase, trimmed, singular).
+     - match when normalized names are equal; OR the shorter name's word tokens are ALL whole
+       words of the longer name AND both names share the same final token (head noun)
+       ("jasmine rice" ↔ "rice", "red onion" ↔ "onion");
+       OR either name is an `INGREDIENT_DB` alias of the other's canonical entry
+       ("chicken" ↔ "Chicken Breast" via aliases).
+     - never by raw substring.
+  2. Add pure helper `pantryLotAvailable(p)` → boolean:
+     - staple (`isStaple(p)`): available unless `stockLevel === 'empty'` (unchanged rule).
+     - non-staple: NOT available if `stockLevel === 'empty'`; NOT available if `quantity` is a
+       finite number `<= 0`; NOT available if `pantryDaysLeft(p) < 0` (past its date);
+       `quantity == null` = unknown → available (unchanged).
+  3. Route ONLY these read paths through the two helpers:
+     `pantryMatchesForShop` (therefore `isInPantry`, `groceryItemChecked`, Shop "In stock"),
+     `getCookableRecipes` (its inner `pantryHas`), and `getExpirySuggestions`
+     (name match + lower bound: only `0 <= daysLeft <= 3` lots seed "use soon" suggestions;
+     past-date lots are excluded from cooking suggestions).
+     Audit every other Home/Cook suggestion helper (`getCookSuggestions`,
+     `getWhatShouldWeEatSuggestions`, `getReadyFoodSuggestions`, attention helpers) and list in
+     CHANGELOG which availability checks they use; switch any that do raw substring pantry
+     matching for availability to the helpers.
+  4. DO NOT change `findPantryMatch`, `deductIngredientsForRecipe`, `checkMissingIngredients`,
+     `toGrams`, quantity merge, staple replenish, or anything in `workers/`. Those are red-zone
+     stock WRITES (audit F3/F4/F9) and are explicitly deferred.
+  5. Past-date items must stay visible where they already are (Fridge cards, Attention list).
+     Verify the Attention list still surfaces expired items; do not add a new surface.
+acceptance:
+  - [ ] `ingredientNamesMatch`: false for Rice/Rice Vinegar, Rice/Rice Noodles, Egg/Eggplant,
+        Corn/Cornstarch, Garlic/Garlic Powder, Black Pepper/Bell Pepper; true for Jasmine Rice/Rice,
+        Eggs/Egg, Red Onion/Onion, Chicken/Chicken Breast (alias). Table-driven unit test.
+  - [ ] `pantryLotAvailable`: 0 g, negative qty, `stockLevel:'empty'`, and past-date non-staple
+        lots → false; null-quantity in-date lot → true; staple `low` → true; staple `empty` → false.
+  - [ ] Audit F1 repro: a 0 g / expired / empty lot no longer auto-ticks its Shop row; a user-ticked
+        row (`userSet`) is unchanged; Rice in stock does not tick "Rice Vinegar".
+  - [ ] Audit F2 repro: an expired raw lot does not appear in "use soon" cooking suggestions; a lot
+        with 0–3 days left still does.
+  - [ ] Cookable tiers no longer count Eggplant as available because Eggs are stocked.
+  - [ ] Rendering Home, Shop and Fridge with the fixtures leaves `AppState.pantry`,
+        `AppState.groceryList` and `AppState.cookedMeals` deep-equal to before (no writes).
+  - [ ] Cooking a recipe deducts exactly as before (existing deduction tests unchanged and green).
+  - [ ] `npm test` green; `npm run test:ledger-contract` green; `node --check app.js`;
+        `git diff --check` clean.
+constraints:
+  - Synthetic fixtures only. No production reads/writes, no live MCP/bridge calls.
+  - No new persisted fields, collections, schema/export-version change, framework or dependency.
+  - No UI additions in this task. Copy changes only where an existing label would now be wrong.
+  - Hard Rules 3–9 apply. Do not touch `saveToFirestore`, `cloudReady`, tombstones, merge,
+    `cookedMeals` / `mealConsumption` shapes (ChronaSense contract).
+  - Never merge or push to `main`. Never deploy. Stop at `status: review`.
+verification:
+  - Write the new tests first; show them failing on the base, then green.
+  - Full `npm test` (local project) + `npm run test:ledger-contract`; record exact counts.
+  - Complete `SELF_REVIEW.md` and AI-verifiable `QA.md` items; note results in TEST_REPORT.md.
+  - Commit on the task branch with a descriptive message; push the task branch only.
+
+### TASK-081 · FFS-1 Stock health — read-only inventory review by food class
+status: codex
+owner: codex
+risk: Low (render-only). Merge gate: `approved` (owner deploy hold).
+source: BQ-028 · PROP-036 (revised by owner 2026-11-25: no universal cutoff) · D-087
+depends-on: TASK-080 (uses `pantryLotAvailable`, `ingredientNamesMatch`)
+branch: task-081-ffs-stock-health (from reviewed task-080 head)
+objective:
+  Let the household see which kitchen records may be outdated or inconsistent, judged per food
+  class, with three separate signals that are never merged into one verdict. Investigation only:
+  nothing is edited, fixed, or deleted by this feature.
+files:
+  - app.js, index.html, style.css
+  - tests/ffs-stock-health.spec.js (new)
+  - docs/FEATURES.md, docs/ARCHITECTURE.md (notes)
+  - CHANGELOG.md, TEST_REPORT.md, TASKS.md (status field only)
+design (binding):
+  1. Pure `stockFoodClass(record)` → one of:
+     `perishable` (fridge/counter raw food: Protein, Vegetable, Fruit, Dairy, fresh herbs),
+     `frozen` (raw lot with `storage === 'freezer'`),
+     `pantry-staple` (shelf-stable dry goods: rice, pasta, canned goods, flour, oats …),
+     `condiment` (sauces, oils, vinegars, spices, pastes, dressings — keyword map on name and
+     `INGREDIENT_DB` entry), `cooked-meal` (records in `AppState.cookedMeals`, READ ONLY).
+     Classification order and keyword lists are a single constant `STOCK_CLASS_RULES`.
+  2. A single constant `STOCK_REVIEW_POLICY` per class with:
+     `reviewAfterDays` (data staleness) and `safetyNote` (food-safety guidance text). Defaults:
+     perishable 7 · frozen 90 · pantry-staple 180 · condiment 365 · cooked-meal fridge 4 / freezer 90.
+     Food-safety guidance (estimate, never a verdict): perishable = existing shelf-life estimate;
+     cooked-meal fridge 3–4 days, freezer quality ~2–3 months; frozen raw = quality, not safety;
+     pantry-staple / condiment = rely on the printed date only.
+  3. Pure `stockHealthReport(state, todayISO)` → per record, three INDEPENDENT signals:
+     a. `expiration` — ACTUAL: printed date (`dateMode === 'expiry'`) in the past →
+        "Past printed date (YYYY-MM-DD)". Estimated dates are NOT expiration.
+     b. `safety` — ESTIMATE: age since purchase/cook vs the class guidance →
+        "Past typical safe window — check it". Never says "unsafe"/"throw away".
+     c. `dataStale` — RECORD CONFIDENCE: days since `updatedAt` (fall back to purchase/cook date)
+        > class `reviewAfterDays` → "Not updated in N days — still accurate?".
+     Plus `consistency` issues: quantity ≤ 0 while not `empty`; negative quantity; null quantity
+     on a non-staple with a unit; same-name lots (via `ingredientNamesMatch`) in different units;
+     duplicate same-name lots; staple `empty` (needs restock); `stockLevel` full/ok with qty 0;
+     cooked meal with no portions remaining (per the app's existing remaining-portions helper)
+     still listed as ready food.
+  4. UI: one collapsed `<details>` "Stock health" section in the Fridge tab header area, showing
+     counts per signal, then grouped lists (class · name · storage · signal text). No buttons that
+     edit, fix, delete, restock, or mark anything. Optional "Copy report" (clipboard text) only.
+  5. Must not call `saveData()`, `saveToLocalStorage()`, `stampUpdated()` or mutate any record.
+acceptance:
+  - [ ] Each class is assigned correctly for a fixture of ≥ 15 representative records (incl.
+        soy sauce → condiment, rice → pantry-staple, frozen chicken → frozen, spinach → perishable,
+        a cooked meal → cooked-meal).
+  - [ ] The same record can show expiration, safety and staleness independently; a frozen item
+        with an old purchase date shows staleness/quality only, never "past printed date".
+  - [ ] No universal cutoff: a 60-day-old condiment is not flagged stale; a 10-day-old perishable is.
+  - [ ] Consistency fixtures (0 qty not empty, negative, mixed units, duplicates, empty staple)
+        each produce exactly one matching issue.
+  - [ ] Opening/closing the section and copying the report leaves `AppState` deep-equal (JSON) to
+        before and makes zero `saveData` calls (spy).
+  - [ ] No new persisted fields; cooked meals are read, never written (ledger-contract green).
+  - [ ] Mobile 390px: no horizontal overflow; section collapsed by default.
+  - [ ] `npm test` and `npm run test:ledger-contract` green; `node --check`; `git diff --check`.
+constraints:
+  - Same as TASK-080. No production data. No auto-cleanup of any kind. No delete affordance.
+  - Never merge or push to `main`. Never deploy. Stop at `status: review`.
+verification:
+  - Tests first (fail on base), then green. Screenshot desktop + 390px into
+    feature-evidence/task-081/. Full suite + ledger contract; SELF_REVIEW + QA notes.
+
+### TASK-082 · FFS-2 No-plan grocery — "Fill the gaps" (Kylie's framework, inventory-aware)
+status: codex
+owner: codex
+risk: Low (additive Shop card; adds rows only through the existing `buyMissingIngredient`
+  path on tap). Merge gate: `approved` (owner deploy hold).
+source: BQ-029 · PROP-037 · planning/flexible-food-system-v1/KNOWLEDGE_BASE.md F5 · D-086
+depends-on: TASK-080 (availability truth)
+branch: task-082-ffs-no-plan-grocery (from reviewed task-081 head)
+objective:
+  Without any meal plan, show a short, flexible shopping suggestion that tops up the kitchen to
+  Kylie Sakaida's no-plan framework, counting what is already available, never suggesting what we
+  already have, and preferring ingredients that serve many meals and cooking styles.
+files:
+  - app.js, index.html, style.css
+  - tests/ffs-no-plan-grocery.spec.js (new)
+  - docs/FEATURES.md, docs/ARCHITECTURE.md (notes)
+  - CHANGELOG.md, TEST_REPORT.md, TASKS.md (status field only)
+design (binding):
+  1. Constant `NO_PLAN_TEMPLATE` preserving the original framework exactly (source:
+     So Easy So Good, "A Plan for When You Don't Have a Plan"):
+     proteins 4 (rules: ≥1 low-prep, ≥1 plant-based) · veggies 4 (fresh or frozen, many colors;
+     precut is fine) · starches 3 (≥2 whole grain; precooked/frozen OK) · fruits 3 (fresh or
+     frozen) · snacks 3 · flavor enhancers 3 · beverages 1–2 (minimal added sugar).
+     Each role holds generic candidate names (the book's examples + matching `INGREDIENT_DB`
+     items) and attribute keyword lists (`plant`, `lowPrep`, `wholeGrain`, `convenience`).
+     The template text shown in the UI is our own short wording with "So Easy So Good" credit.
+     No verbatim book prose.
+  2. Pure `noPlanRole(name)` maps any pantry/grocery name to a role (INGREDIENT_DB category
+     Protein/Vegetable/Grain/Fruit + keyword map for snack/flavor/beverage; Dairy split: yogurt,
+     cottage cheese, eggs → protein; milk → beverage; cheese → snack).
+  3. Pure `noPlanGaps(state)` → per role: `have` (available lots via `pantryLotAvailable`, deduped
+     by `ingredientNamesMatch`), `onList` (unchecked grocery rows), `target`, `short` =
+     max(0, target − have − onList), rule status (e.g. "no plant protein yet"), and ranked
+     `options` (candidates NOT available and NOT already on the list).
+  4. Ranking = versatility first: `ingredientVersatility(name)` = number of household recipes
+     using it (via `ingredientNamesMatch`) + number of distinct cooking methods/equipment across
+     those recipes + 1 if it fits a quick/no-cook use (assembly/no-cook recipe or book quick
+     list); unmet-rule candidates (plant protein, low-prep, whole grain) sort first; ties by
+     convenience form. Derived on the fly, never stored.
+  5. UI: one collapsed card at the top of Shop: "No plan? Fill the gaps" with one line per role:
+     "Proteins 3/4 ✓ low-prep · needs plant-based" and up to 4 option chips. Tapping a chip calls
+     the existing `buyMissingIngredient(name)` (one item, one tap). Roles already met show ✓ and no
+     chips. No "add all", no auto-add, no plan required, no new navigation.
+  6. Works identically with zero `plannedBatches`; does not touch `generateGroceryList`.
+acceptance:
+  - [ ] With an empty plan and a fixture pantry, roles count available items; 0-qty/expired/empty
+        lots do not count (TASK-080 rules).
+  - [ ] Never suggests an item already available or already on the grocery list; a role whose
+        have + onList ≥ target shows ✓ with no chips (no unnecessary purchases).
+  - [ ] Rules surface correctly: no plant protein → plant options first; fewer than 2 whole-grain
+        starches → whole-grain options first.
+  - [ ] Options are flexible: at least 2 choices per short role when candidates exist; the user
+        picks any; picking one decrements that role's shortfall on re-render.
+  - [ ] Versatility ranking: with fixtures where "Eggs" are used by 5 recipes across 3 methods and
+        "Quail eggs" by 0, Eggs ranks above.
+  - [ ] Tap → exactly one grocery row via `buyMissingIngredient`; duplicate tap → existing
+        "already on your grocery list" message; no other state changes.
+  - [ ] Rendering the card alone leaves `AppState` deep-equal (no writes until a tap).
+  - [ ] Card collapsed by default; 390px no overflow; plan-driven grocery generation unchanged.
+  - [ ] `npm test` and `npm run test:ledger-contract` green; `node --check`; `git diff --check`.
+constraints:
+  - Same as TASK-080. No new persisted fields (grocery rows use the existing shape).
+  - Never merge or push to `main`. Never deploy. Stop at `status: review`.
+verification:
+  - Tests first (fail on base), then green. Screenshots desktop + 390px into
+    feature-evidence/task-082/. Full suite + ledger contract; SELF_REVIEW + QA notes.
+
+### TASK-083 · FFS-3 Balanced Plate hints + Snack Pack pairs (WAVE 2 — prepared, NOT released)
+status: todo
+owner: claude (release to codex only after the owner reviews wave 1)
+risk: Low. Merge gate: `approved` (owner deploy hold) unless the owner lifts it.
+source: BQ-030 · PROP-038 · KNOWLEDGE_BASE F2 (Balanced Plate), F6 (Snack Pack)
+depends-on: TASK-080, TASK-082 (`noPlanRole`, `ingredientVersatility`)
+objective:
+  On existing Home suggestion cards, add one quiet "make it a plate" hint built only from food we
+  actually have, and offer up to 3 Snack Pack pairs from stock. "Add, not subtract": no scores,
+  no warnings, no tracking.
+design (draft, finalize at release):
+  - Pure `plateGaps(recipeOrReadyItem)` → missing of {produce, protein, carb, fat}; use
+    `mealBalance` when present, else infer from ingredient roles (`noPlanRole`).
+  - One line per card in "What should we eat?" and "Ready to eat": "Make it a plate: add frozen
+    broccoli" — the suggestion must be an available lot (`pantryLotAvailable`), ranked by
+    versatility; omit the line when nothing in stock fills the gap.
+  - Snack Pack row (Quick Eat area of Home): up to 3 pairs from stock covering ≥ 2 of
+    {fiber-carb, protein, healthy fat}.
+  - No persisted state; render-only; no new tab; collapsed/inline only.
+acceptance (draft):
+  - plate hint appears only with an in-stock filler; never suggests an unavailable item;
+    snack pairs always span ≥ 2 groups; render leaves AppState deep-equal; 390px clean;
+    npm test + ledger contract green.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`

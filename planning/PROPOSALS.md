@@ -474,6 +474,94 @@
 
 ---
 
+<!-- Flexible Food System V1 — owner brief 2026-11-25. Full analysis: planning/flexible-food-system-v1/.
+     All six are deliberately "Decision: Clarify" so D-042 cannot auto-promote them: the brief says
+     "Do not implement or deploy changes until the proposal is reviewed and approved." -->
+
+### PROP-035 — FFS-0 Truthful availability (read path): stop counting empty/expired/substring matches as "have"
+- **▶ Decision: Clarify — recommend Approve (wave 1).** Every Cook Now, grocery and plate suggestion depends on it (audit F1/F2).
+- **▶ Risk: Low at idea time; build as Medium.** Read-side only (`isInPantry`, `findPantryMatch`, `pantryMatchesForShop`, `groceryItemChecked`, `getExpirySuggestions`). No record writes, no `saveData()` change.
+- **type:** bug · **source captures:** owner brief FFS-V1; audit-evidence/2026-11-06 F1, F2
+- **goal alignment:** supports — North-star #1 accurate core loop; prerequisite for the FFS-V1 objective
+- **expected user value:** High — recommendations stop suggesting food we don't really have
+- **evidence:** reproducible audit cases (0 g / expired → "In stock"; Rice satisfies Rice Vinegar; expired raw food suggested)
+- **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** whether `null` quantity counts as "have" (proposed: yes, unchanged)
+- **why now vs later:** now — the audit ranks it first
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat) → BQ-027 / TASK-080
+
+---
+
+### PROP-036 — FFS-1 Read-only "Stock health" report for outdated and inconsistent inventory
+- **▶ Decision: Clarify — recommend Approve (wave 1).** Fulfils "investigate outdated inventory records and inconsistent quantities without deleting or modifying them" against live data.
+- **▶ Risk: Low** — render-only; no edit or delete controls; test asserts `AppState` is unchanged.
+- **type:** feature · **source captures:** owner brief FFS-V1; CAPABILITY_AUDIT §3 (I-1…I-8)
+- **goal alignment:** supports — North-star #2 trustworthy data
+- **expected user value:** Medium–High — shows which records are stale without any manual audit
+- **evidence:** code-path analysis I-1…I-8; production data not yet inspected
+- **effort:** S · **dependencies:** none (better after PROP-035) · **confidence:** high · **ambiguity:** stale threshold (proposed: 60 days)
+- **why now vs later:** now — the owner asked for this investigation
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat; revised: per-class staleness, three separate signals, never delete) → BQ-028 / TASK-081
+
+---
+
+### PROP-037 — FFS-2 No-plan grocery "Fill the gaps" (Kylie's 4/4/3/3/3/3/1–2 template vs current stock)
+- **▶ Decision: Clarify — recommend Approve (wave 1).** This is the cookbook's signature framework, and the app has no grocery path for a week without a plan.
+- **▶ Risk: Low** — additive Shop card; adds grocery items only through the existing add path when tapped.
+- **type:** feature · **source captures:** owner brief FFS-V1 capability 4; KNOWLEDGE_BASE F5
+- **goal alignment:** supports — FFS-V1 objective (eat well without a plan); North-star #1
+- **expected user value:** High — a short, inventory-aware list instead of none
+- **evidence:** book pp ~58–59; `INGREDIENT_DB.category` already maps 4 of the 7 roles
+- **effort:** M · **dependencies:** PROP-035 · **confidence:** high · **ambiguity:** keyword map for snack, flavor and drink roles
+- **why now vs later:** now — core of the brief
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat; + flexible choices, avoid unnecessary purchases, versatility-first) → BQ-029 / TASK-082
+
+---
+
+### PROP-038 — FFS-3 Balanced Plate completion hints and Snack Pack pairs on Home suggestions
+- **▶ Decision: Clarify — recommend Approve (wave 2).**
+- **▶ Risk: Low** — pure functions and one hint line per card; suggests only items in stock.
+- **type:** feature · **source captures:** owner brief FFS-V1 capabilities 3 and 5; KNOWLEDGE_BASE F2, F6
+- **goal alignment:** supports — FFS-V1 nutrition goal without extra tracking
+- **expected user value:** Medium–High
+- **evidence:** `mealBalance` exists but is unused by suggestion surfaces
+- **effort:** S–M · **dependencies:** PROP-035 · **confidence:** med · **ambiguity:** inferring plate roles for recipes without `mealBalance`
+- **why now vs later:** after wave 1, so hints use truthful stock
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-11-25 as next wave (owner, chat) → BQ-030 / TASK-083 prepared at status todo
+
+---
+
+### PROP-039 — FFS-4 Recipe source and adaptation fields + private-safe "So Easy So Good" reference pack
+- **▶ Decision: Clarify — REVISED 2026-11-25 per owner:** full selected recipes (ingredients, verified quantities, instructions, page ref, original/adapted status) usable inside the private household app; copyrighted text kept out of the public repo and public app bundle. Content enters only through the owner's signed-in account via the existing import path, from a private file kept outside the repo. See IMPLEMENTATION_PLAN.md FFS-4 rev 2.
+- **▶ Risk: High** — adds fields to the Firestore-synced Recipe shape → D-032 red zone; merge held (`approved`).
+- **type:** feature · **source captures:** owner brief FFS-V1 capability 7 and the "preserve originals, distinguish adaptations" constraint
+- **goal alignment:** supports — FFS-V1 recipe knowledge
+- **expected user value:** Medium
+- **evidence:** no `source` field today; public repo makes verbatim recipe text unsuitable
+- **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** pack content scope; DATA_MODEL and D-0NN needed
+- **why now vs later:** wave 2 or 3, after the owner decides on copyright scope
+- **AI-recommended priority:** **P2**
+- **status:** revision requested 2026-11-25 (owner) — revised in planning/flexible-food-system-v1/IMPLEMENTATION_PLAN.md (FFS-4 rev 2); awaiting owner approval
+
+---
+
+### PROP-040 — FFS-5 Ingredient versatility score and hands-off tie-break in Cook Now
+- **▶ Decision: Clarify — recommend Approve (wave 2).**
+- **▶ Risk: Low** — derived and never stored; ordering only.
+- **type:** feature · **source captures:** owner brief FFS-V1 capabilities 6 and 8; KNOWLEDGE_BASE §4, F9
+- **goal alignment:** supports — versatility, simplicity, convenience
+- **expected user value:** Medium
+- **evidence:** no versatility ranking today; equipment already implies supervision level
+- **effort:** S · **dependencies:** PROP-037 · **confidence:** high · **ambiguity:** none
+- **why now vs later:** after PROP-037, which it orders
+- **AI-recommended priority:** **P3**
+- **status:** pending (owner review)
+
+---
+
 ## Proposal contract
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```

@@ -4,12 +4,48 @@
 
 ## Goal
 
+**Flexible Food System V1 — wave 1** (owner-approved 2026-11-25). Eat delicious, balanced meals
+whether or not we prepped, planned or decided — meal prep optional. Primary objective: versatility
+from ONE kitchen inventory (prep, cook fresh, or assemble low-effort meals), with no extra admin
+work and no unnecessary UI complexity. Inspired by Kylie Sakaida's *So Easy So Good*.
+
+## Approach
+
+- Solo, dependency order: TASK-080 (truthful availability, read path) → TASK-081 (stock health,
+  read-only, per food class) → TASK-082 (no-plan grocery "Fill the gaps").
+- Codex builds each on a stacked branch off `ffs-v1`; Claude runs independent QA (full suite +
+  `npm run test:ledger-contract` re-run on the candidate) and review before releasing the next.
+- **Owner deploy hold:** max landing state is `approved`. No merge/push to `main`, no deploy.
+- Wave 2 prepared: TASK-083 (Balanced Plate + Snack Pack) at `status: todo`.
+- PROP-039 (private cookbook recipes) revised, awaiting owner approval. PROP-040 pending.
+- Live inventory: read-only audit only; snapshot preserved outside the public repo (D-087).
+
+## Scope
+
+**In:** TASK-080, TASK-081, TASK-082 (BQ-027/028/029).
+**Out:** stock-write fixes (audit F3/F4/F9, deferred solo High-risk), bridge worker changes,
+cookbook content in the repo, any deletion/cleanup of inventory records.
+
+## Source
+
+PROP-035/036/037/038 → BQ-027..030; planning/flexible-food-system-v1/*; D-086, D-087.
+
+## Status
+
+in-progress — TASK-080 at `status: codex`.
+
+---
+
+## Previous milestone (archived)
+
+### Goal
+
 Close four real user-reported gaps from alpha use (PROP-030/031/033/034), all auto-promoted
 Low-risk P2 items via D-042. The previous milestone (TASK-014..016: automation gap fixes +
 /audit redesign) is complete — all TASK-014..024 are `status: done` or `status: approved`
 (the approved tasks are held at the `/merge` gate, not outstanding implementation work).
 
-## Approach
+### Approach
 
 - File order = build order: TASK-025 (P2) → TASK-026 (P2) → TASK-027 (P2) → TASK-028 (P2).
 - All four are app-feature/bug tasks touching `app.js` and `index.html` only — no automation
@@ -25,7 +61,7 @@ Low-risk P2 items via D-042. The previous milestone (TASK-014..016: automation g
   so it's one implicit checkpoint: Codex stops only once it runs out of ready tasks in the group,
   or hits a blocker/rework.
 
-## Scope
+### Scope
 
 **In:**
 - TASK-025 (P2) — BQ-023: recipe paste nutrition parse + stop instructions at Nutrition header
@@ -37,12 +73,12 @@ Low-risk P2 items via D-042. The previous milestone (TASK-014..016: automation g
 - PROP-032 (cloud sync failure, Risk: High) — awaiting human review before any BUILD_QUEUE entry
 - BQ-013/014/015 — still deferred; no change to their status
 
-## Source
+### Source
 
 - BQ-023..026: auto-promoted 2026-07-16 via D-042 (Decision: Approve + Risk: Low in PROPOSALS.md)
 - No BUILD_QUEUE item existed for TASK-014..016; those were authored directly from live chat.
 
-## Status
+### Status
 
 complete — TASK-025..028 all shipped and are `status: done`; TASK-017/021/022/024 have since landed
 as `done` too. **No task in `TASKS.md` is at `status: codex`**, so there is no active Codex queue.

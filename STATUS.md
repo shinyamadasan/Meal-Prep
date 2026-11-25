@@ -5,6 +5,19 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-11-25 — Flexible Food System V1: wave 1 approved, planning committed on `ffs-v1`
+
+**Owner decisions:** approve PROP-035/036/037 (build in dependency order, independent QA + review
+each); prepare PROP-038 as wave 2; revise PROP-039 (private full recipes, out of public repo);
+no universal staleness cutoff (D-087); read-only live inventory audit with a preserved backup;
+**no production deploy without owner approval**.
+**State:** TASK-080 `codex` → TASK-081 → TASK-082 (solo, stacked branches off `ffs-v1`).
+TASK-083 prepared `todo`. Nothing merged to `main`. Knowledge base, audit, gap analysis and plan in
+`planning/flexible-food-system-v1/`. Cookbook PDFs/extracts are NOT in the repo (public).
+**Blockers:** live inventory audit needs owner-provided read access (bridge token or app backup).
+
+---
+
 ## 2026-10-06 — TASK-074 CLOSED `done`: Plan recipe preview/details released
 
 **Review and integration:** the owner relayed the targeted independent reviewer verdict as PASS

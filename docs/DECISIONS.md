@@ -3560,3 +3560,37 @@ vocabulary cannot recognize the new slug until refreshed. Real-device checks rem
 Verify: app.js contains "function renderHomeFavorites()"
 Verify: app.js contains "{ id: 'air-fryer', label: 'Air Fryer', icon: '🍟' }"
 Verify: tests/home-favorites-air-fryer.spec.js contains "review Air Fryer respects favorites and category conjunction"
+
+## D-086 — Flexible Food System V1: availability truth is a read-path concern first
+Date: 2026-11-25 · Status: Accepted (owner approval of FFS-V1 wave 1); implementation TASK-080
+Context: Every FFS-V1 feature (Cook Now, no-plan grocery, Balanced Plate hints) answers "do we
+have it?". The 2026-11-06 audit (F1/F2) showed that answer is wrong: 0-qty, empty and expired lots
+count as stock, and raw substring matching lets "Rice" satisfy "Rice Vinegar".
+Decision: Introduce two pure helpers, `ingredientNamesMatch()` (normalized equality, whole-word
+token subset with a shared head noun, or an INGREDIENT_DB alias — never raw substring) and
+`pantryLotAvailable()` (empty / qty ≤ 0 / past-date non-staples are not available; null quantity
+stays "unknown = available"). Route display/suggestion read paths through them. Stock WRITE
+paths (`findPantryMatch` used by `deductIngredientsForRecipe`, quantity merge, staple replenish,
+the conversational-bridge worker) are deliberately untouched: they are red-zone and get their
+own solo High-risk task later (audit F3/F4/F9). No stored record is modified.
+Consequence: the app may show slightly FEWER items as available than before; that is the intended
+correction. Deduction and display can briefly disagree on fuzzy matches until the deferred write
+task aligns them — documented, accepted.
+Owner gate: all FFS-V1 tasks land at `approved` (held). Nothing merges to `main` or deploys
+without explicit owner approval (owner instruction 2026-11-25).
+
+## D-087 — Inventory staleness is per food class and split into three independent signals
+Date: 2026-11-25 · Status: Accepted (owner decision); implementation TASK-081
+Context: The first FFS-V1 proposal suggested a universal 60-day "stale" cutoff. The owner rejected
+it: a 60-day-old jar of soy sauce and a 60-day-old bag of spinach are not the same problem, and
+"record is old", "food may be unsafe" and "printed date has passed" are different facts.
+Decision: Classify each record as perishable, frozen, pantry-staple, condiment or cooked-meal
+(`STOCK_CLASS_RULES`) and evaluate three signals separately, never merged into one verdict:
+(1) expiration — only an ACTUAL printed date in the past; (2) food safety — an ESTIMATE from age
+vs class guidance, worded as "check it", never "unsafe"; (3) data staleness — record confidence,
+days since update vs a per-class review interval (`STOCK_REVIEW_POLICY`). Consistency problems
+(0/negative/null quantities, mixed units, duplicates, empty staples) are reported separately.
+Rules: the report is read-only. Records are NEVER deleted or changed automatically. Any future
+cleanup requires (a) an explicit owner request, (b) a full backup preserved first (app JSON export
+or a bridge read snapshot stored outside the public repo), (c) its own reviewed task.
+Cooked meals are read, never written, by this feature (ChronaSense ledger contract).
