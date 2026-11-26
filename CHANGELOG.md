@@ -1453,3 +1453,20 @@ tests: focused 8/8, full local 864/864, ledger contract 13/13. Syntax and diff c
 blockers: none.
 deviations: the printed-date selector uses the existing inline Fridge add and edit controls.
 → status set to `review` in TASKS.md
+
+## TASK-089 — implemented (branch: task-089-ffs-fill-gaps-polish)
+changed:
+  - `NO_PLAN_TEMPLATE` and `buyMissingIngredient()` supply a Shop category fallback for chips.
+    `noPlanRole()` keeps the shared Pantry category out of food-role classification.
+  - `noPlanGaps()` reuses the shared ingredient matchers to filter near-twins and ranks
+    candidates for unmet rules. One whole grain satisfies the starch rule.
+  - `#no-plan-grocery` keeps the card collapsed by default and offers Different ideas.
+    `renderNoPlanGrocery()` wraps the ranked suggestions with an in-memory offset.
+  - `tests/ffs-no-plan-grocery.spec.js` extends synthetic Shop coverage.
+  - `feature-evidence/task-089/` captures the open card at 1280px and 390px.
+tests: 13 focused passes, 883 full local passes per command, and 13 ledger contract passes.
+  Syntax and diff checks passed.
+blockers: none.
+deviations: none. The supporting change in `noPlanRole()` preserves existing role counts
+  when Pantry is used as a Shop fallback.
+→ status set to `review` in TASKS.md

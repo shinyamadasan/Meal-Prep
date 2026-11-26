@@ -1181,3 +1181,18 @@ visual: `feature-evidence/task-088/` includes Home Attention, the named confirma
 self-review: Code Health and the applicable AI checks in `QA.md` passed.
 untested: live Firestore, real mobile devices, and code coverage instrumentation. Firestore
   payload shape was verified with synthetic records.
+
+## TASK-089 · 2026-11-26
+focused: seven expected failures on base `5c3e6bf` across the first focused run and a
+  tightened near-twin fixture. All 13 cases in `tests/ffs-no-plan-grocery.spec.js`
+  passed after implementation. The tests cover categories, whole-grain suggestions,
+  near-twins, rotation, reload, and the responsive card.
+full: `npx playwright test --project=local` and `npm test` each passed 883 tests with
+  zero failures. Restored the two regenerated TASK-079 Home screenshots.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, the edited spec's syntax check, and `git diff --check`
+  passed. Source comparison confirmed the restock, planned grocery, and persistence paths.
+visual: inspected `feature-evidence/task-089/fill-the-gaps-1280.png` and
+  `fill-the-gaps-390.png`. Both viewports passed the horizontal overflow check.
+self-review: Code Health and the applicable AI QA checks passed.
+untested: production, real mobile devices, and coverage instrumentation.

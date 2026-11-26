@@ -6900,7 +6900,7 @@ function renderMealPrepFlowCard() {
     '</div>';
 }
 
-function buyMissingIngredient(ingName) {
+function buyMissingIngredient(ingName, category) {
   var already = (AppState.groceryList || []).some(function(g) {
     return g.name.toLowerCase() === ingName.toLowerCase();
   });
@@ -6909,7 +6909,7 @@ function buyMissingIngredient(ingName) {
   AppState.groceryList.push({
     id: Date.now() + Math.random(),
     name: ingName,
-    category: db ? db.category : 'Pantry',
+    category: db ? db.category : category || 'Pantry',
     quantity: null,
     unit: db ? db.unit : '',
     sources: [],
@@ -6993,7 +6993,7 @@ const NO_PLAN_TEMPLATE = {
     keywords: /\b(rice|quinoa|oats?|barley|bread|pasta|noodles?|tortillas?|potatoes|potato|couscous|buckwheat|bulgur)\b/,
     wholeGrain: /\b(whole[ -](grain|wheat)|brown (\w+ )?rice|wild rice|quinoa|oats?|barley|bulgur|buckwheat|farro)\b/,
     convenience: /\b(microwave|frozen|precooked|pouch|bread|pandesal)\b/,
-    rules: [{ attribute: 'wholeGrain', minimum: 2, met: '2 whole grains', missing: 'whole grain' }]
+    rules: [{ attribute: 'wholeGrain', minimum: 1, met: 'whole grain', missing: 'whole grain' }]
   },
   fruits: {
     label: 'Fruits', target: 3, category: 'Fruit',
@@ -7004,21 +7004,21 @@ const NO_PLAN_TEMPLATE = {
     guidance: 'Fresh or frozen.'
   },
   snacks: {
-    label: 'Snacks', target: 3,
+    label: 'Snacks', target: 3, category: 'Pantry',
     candidates: ['Pretzels', 'Roasted Chickpeas', 'Dark Chocolate', 'Granola', 'Cheese',
       'Popcorn', 'Crackers', 'Almonds'],
     keywords: /\b(pretzels?|roasted chickpeas?|chocolate|granola|cheese|popcorn|crackers?|nuts?|almonds?|walnuts?|pistachios?|trail mix)\b/,
     convenience: /\b(pretzels?|roasted|chocolate|granola|crackers?|trail mix)\b/
   },
   flavors: {
-    label: 'Flavor enhancers', target: 3,
+    label: 'Flavor enhancers', target: 3, category: 'Pantry',
     candidates: ['Balsamic Vinaigrette', 'Honey Mustard', 'Hummus', 'Soy Sauce (Toyo)',
       'Gochujang', 'Chili Sauce', 'Vinegar (Suka)', 'Lemon', 'Lime', 'Ketchup'],
     keywords: /\b(vinaigrette|dressing|mustard|hummus|sauces?|vinegar|gochujang|miso|sriracha|ketchup|mayonnaise|tahini|seasoning|spices?|dried herbs|salt|black pepper|white pepper|garlic powder|onion powder|peppercorns?|lemons?|limes?|calamansi)\b/,
     convenience: /\b(vinaigrette|dressing|mustard|hummus|sauces?|gochujang|sriracha|ketchup)\b/
   },
   beverages: {
-    label: 'Beverages', target: 1, maxTarget: 2,
+    label: 'Beverages', target: 1, maxTarget: 2, category: 'Pantry',
     candidates: ['Herbal Tea', 'Sparkling Water', 'Milk (Gatas)', 'Unsweetened Tea', 'Water'],
     keywords: /\b(tea|coffee|water|milk|juice|soda|kombucha|seltzer|lemonade)$/,
     convenience: /\b(water|milk|bottled|ready-to-drink)\b/,
@@ -7043,7 +7043,8 @@ function noPlanRole(name) {
   if (/\b(mung beans?|red lentils?)\b/.test(canonical)) return 'proteins';
   if (NO_PLAN_TEMPLATE.starches.keywords.test(term)) return 'starches';
   const roles = Object.keys(NO_PLAN_TEMPLATE);
-  return roles.find(role => entry && NO_PLAN_TEMPLATE[role].category === entry.category) ||
+  // Pantry is a Shop fallback shared by several roles. Those roles use their food keywords.
+  return roles.find(role => entry && entry.category !== 'Pantry' && NO_PLAN_TEMPLATE[role].category === entry.category) ||
     roles.find(role => NO_PLAN_TEMPLATE[role].keywords.test(term)) || null;
 }
 
@@ -7092,6 +7093,9 @@ function noPlanGaps(state) {
   const grocery = state.groceryList || [];
   const matchesAvailable = name => available.some(other => ingredientNamesMatch(name, other));
   const unchecked = grocery.filter(row => !row.checked).map(row => row.name);
+  const checked = grocery.filter(row => row.checked).map(row => row.name);
+  const covered = [...available, ...unchecked];
+  const isNearTwin = (name, other) => ingredientNamesMatch(name, other) || ingredientSwapMatch(name, other);
   const toBuy = unchecked.filter(name => !matchesAvailable(name));
   const availableRoles = available.map(name => ({ name, role: noPlanRole(name) }));
   const groceryRoles = toBuy.map(name => ({ name, role: noPlanRole(name) }));
@@ -7107,39 +7111,60 @@ function noPlanGaps(state) {
       remaining: Math.max(0, rule.minimum - uniqueNoPlanNames([...haveNames, ...onListNames]
         .filter(name => template[rule.attribute].test(name.toLowerCase()))).length)
     }));
-    const options = short === 0 ? [] : template.candidates
-      .filter(name => !matchesAvailable(name) &&
-        !grocery.some(row => ingredientNamesMatch(name, row.name)))
+    const unmet = rules.filter(rule => rule.remaining > 0);
+    const ranked = (short || unmet.length) ? template.candidates
+      .filter(name => !covered.some(other => isNearTwin(name, other)) &&
+        !checked.some(other => ingredientNamesMatch(name, other)))
       .map(name => ({
         name,
-        unmetRules: rules.filter(rule => rule.remaining && template[rule.attribute].test(name.toLowerCase())).length,
+        unmetRules: unmet.filter(rule => template[rule.attribute].test(name.toLowerCase())).length,
         versatility: ingredientVersatility(name, state.recipes || []),
         convenience: Number(template.convenience.test(name.toLowerCase()))
       }))
-      .sort((a, b) => b.unmetRules - a.unmetRules || b.versatility - a.versatility || b.convenience - a.convenience)
-      .map(option => option.name);
+      .filter(option => short || option.unmetRules)
+      .sort((a, b) => b.unmetRules - a.unmetRules || b.versatility - a.versatility || b.convenience - a.convenience) : [];
+    const options = [];
+    for (const { name } of ranked) {
+      if (!options.some(other => isNearTwin(name, other))) options.push(name);
+    }
     return [role, { have, onList, target, short, rules, options }];
   }));
+}
+
+const NO_PLAN_CHIP_LIMIT = 4;
+const NO_PLAN_RULE_CHIP_LIMIT = 2;
+let noPlanIdeasOffset = 0;
+
+function rotateNoPlanIdeas() {
+  noPlanIdeasOffset += NO_PLAN_CHIP_LIMIT;
+  renderNoPlanGrocery();
 }
 
 function renderNoPlanGrocery() {
   const card = document.getElementById('no-plan-grocery');
   if (!card?.open || card.classList.contains('hidden')) return;
   const gaps = noPlanGaps(AppState);
-  const chipLimit = 4;
   const roles = card.querySelector('.no-plan-roles');
   const restoreFocus = roles.contains(document.activeElement);
+  let hasDifferentIdeas = false;
   roles.innerHTML = Object.entries(NO_PLAN_TEMPLATE).map(([role, template]) => {
     const { have, onList, target, short, rules, options } = gaps[role];
     const goal = template.maxTarget ? target + '–' + template.maxTarget : target;
     const status = rules.map(rule => rule.remaining ? 'needs ' + rule.missing : '✓ ' + rule.met);
     if (template.guidance) status.push(template.guidance);
-    const chips = options.slice(0, chipLimit).map(name =>
+    const chipLimit = short ? NO_PLAN_CHIP_LIMIT : NO_PLAN_RULE_CHIP_LIMIT;
+    const canRotate = options.length > chipLimit && NO_PLAN_CHIP_LIMIT % options.length !== 0;
+    hasDifferentIdeas ||= canRotate;
+    const start = canRotate ? noPlanIdeasOffset % options.length : 0;
+    const rotated = options.slice(start).concat(options.slice(0, start));
+    const category = escapeHtml(JSON.stringify(template.category));
+    const chips = rotated.slice(0, chipLimit).map(name =>
       `<button type="button" class="btn btn--outline btn--sm"
-        onclick="buyMissingIngredient(${escapeHtml(JSON.stringify(name))})">${escapeHtml(name)}</button>`);
+        onclick="buyMissingIngredient(${escapeHtml(JSON.stringify(name))}, ${category})">${escapeHtml(name)}</button>`);
     return `<li><strong>${template.label} ${have + onList}/${goal}${short ? '' : ' ✓'}</strong>${status.length ? ' · ' + status.join(' · ') : ''}
       ${chips.length ? '<div class="no-plan-chips">' + chips.join('') + '</div>' : ''}</li>`;
   }).join('');
+  card.querySelector('.no-plan-different-ideas').classList.toggle('hidden', !hasDifferentIdeas);
   if (restoreFocus) card.querySelector('summary').focus({ preventScroll: true });
 }
 
