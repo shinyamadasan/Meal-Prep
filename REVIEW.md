@@ -4,6 +4,16 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-083 (lite) — APPROVED (held) after rework — Claude, 2026-11-26
+candidate: `18da165` (base `ddf4c71`). All three must-fix items resolved: flavor-base produce
+excluded from veg fillers (`BALANCED_PLATE_FLAVOR_BASE`); fillers ranked by generic-aware recipe
+count, then versatility (`ingredientVersatility` unchanged); hint shown under the recipe name in
+details mode and not in edit mode. Preview household now reads "add a veg — Carrot or Red Bell
+Pepper" (Adobo, Sinangag) and "add a carb — Jasmine Rice or Pasta" (Sinigang, Tinola).
+QA on merged `ffs-v1-refine`: full local 894/894 · ledger contract 13/13 · `node --check` ·
+`git diff --check`. gate: `approved` (owner deploy hold).
+
+---
 ## Review TASK-083 (lite) — REWORK after integrated preview walkthrough — Claude, 2026-11-26
 The unit-level approval above stands for structure and safety (render-only, optional, no score),
 but the preview household (40 built-in + 20 cookbook recipes, 42 lots) shows the suggestions are

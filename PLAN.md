@@ -35,7 +35,8 @@ Owner message "Flexible Food System — Final Refinement" (2026-11-26) · D-086 
 
 ## Status
 
-in-progress — plan committed on `ffs-v1-refine`; TASK-087 and TASK-088 released to Codex.
+review — TASK-087/088/089/083-lite approved (held) and integrated on `ffs-v1-refine`; integrated
+preview handed to the owner for household acceptance. Awaiting owner merge/deploy decision.
 
 ## Previous milestone (archived)
 

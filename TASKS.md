@@ -6234,6 +6234,11 @@ verification:
 
 ### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
 status: review
+checkpoint (2026-11-26, final refinement): integrated household-acceptance preview ready.
+  Branch `ffs-v1-refine` = wave 1 + TASK-087/088/089/083-lite, all `approved` (held). Full local
+  894/894, ledger contract 13/13 on the merged head. Preview rebuilt from it (private folder),
+  seed v2 adds best-before, fridge-check and freezer-quality cases; 8 acceptance checks walked at
+  390px; offline verified (only an external font request, blocked by CSP). TASK-084 deferred.
 checkpoint (2026-11-26): Wave-1-only preview ready for owner testing, per owner instruction "after
   Wave 1, prepare an integrated preview". Branch `ffs-v1-preview` = TASK-080/081/082/086 approved
   heads. Harness + SCENARIO-GUIDE.md + walkthrough screenshots in the private preview folder.
@@ -6571,7 +6576,7 @@ verification:
   - Screenshots desktop + 390px into feature-evidence/task-089/.
 
 ### TASK-083 · FFS-3 Balanced Plate — lightweight, optional suggestions (owner-approved lite)
-status: review
+status: approved
 owner: codex
 risk: Medium (render-only logic; no persisted state). Merge gate: `approved` (owner deploy hold).
 source: BQ-030 · PROP-038 · owner approval 2026-11-26 "Approve a lightweight version of TASK-083…
