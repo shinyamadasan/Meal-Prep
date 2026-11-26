@@ -4,6 +4,27 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Final verification round (owner request) — Claude, 2026-11-26 — 3 release blockers
+Build: `ffs-v1-refine` (offline preview). Probe: private `preview/verify-final.js`, results in
+`verify-final.json`. No code changed in this round.
+1. Prepared ingredients: PASS. Frozen minced garlic, frozen ginger, chopped onions, portioned
+   chicken/turkey and frozen vegetables satisfy everyday recipe lines; frozen lots never flagged;
+   a prepped item marked staple + Low restocks through the existing path; Fill the gaps does not
+   re-suggest them.
+2. TASK-088: backward compatibility PASS (legacy printed dates = use-by; no field written by
+   reading; old snapshots validate). Backup PASS (taken before bulk removal; restore preparation
+   revives every removed record and clears their tombstones; restore needs sign-in as before).
+   Safe deletion PASS (bulk = exactly the named printed/cooked set; Cancel removes nothing; one
+   tombstone per id). **BLOCKER B1**: raw fridge meat/poultry/fish past its safe window can be
+   made available by "Still good".
+3. Shopping modes: Fill the gaps never suggests listed items; restock vs planned does not double
+   buy. **BLOCKER B2**: planned rows duplicate manual / Fill the gaps / Cook Now rows.
+   **BLOCKER B3**: an Empty staple never reaches the Shop list (and causes a save on every Shop open).
+4. Cooking modes: PASS. No-cook, Lowest effort and Batch-friendly are first-row Recipes chips; Home
+   (Ready to eat, Cook this) works with no plan; nothing requires a plan or prep.
+Fix scope prepared as TASK-090 (`todo`, awaiting owner approval). Non-blocking items -> ROADMAP.
+
+---
 ## Review TASK-083 (lite) — APPROVED (held) after rework — Claude, 2026-11-26
 candidate: `18da165` (base `ddf4c71`). All three must-fix items resolved: flavor-base produce
 excluded from veg fillers (`BALANCED_PLATE_FLAVOR_BASE`); fillers ranked by generic-aware recipe

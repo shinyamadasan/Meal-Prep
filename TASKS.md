@@ -6627,6 +6627,61 @@ constraints:
 verification:
   - Screenshots desktop + 390px (Ready-to-eat + recipe modal) into feature-evidence/task-083/.
 
+### TASK-090 · FFS-V1 release blockers from the final verification round
+status: todo
+owner: claude (release to codex only after the owner approves the fix scope)
+risk: High (touches TASK-088 safety logic, Shop list generation and staple sync; synced data).
+  Solo build. Merge gate: `approved` (owner deploy hold).
+source: owner "one final verification round" 2026-11-26 · probe `verify-final.js` (private preview)
+depends-on: TASK-083/087/088/089 (approved, integrated on `ffs-v1-refine`)
+branch: task-090-ffs-release-blockers (from `ffs-v1-refine`)
+blockers (each reproduced on the integrated build with synthetic data):
+  B1 (introduced by TASK-086/088): raw meat, poultry and seafood stored in the fridge past their
+     INGREDIENT_DB fridge window (Chicken Breast/Thigh 2 d, ground pork 1 d, Bangus/Tilapia 2 d)
+     land in the Check bucket. One "Still good" tap (a look/smell judgement) makes them available
+     and Cook Now calls the recipe ready. Owner rule: visual inspection or smell alone must not
+     override an established food-safety limit.
+  B2 (pre-existing, violates "no duplicate purchases"): `generateGroceryList()` adds planned rows
+     next to existing manual rows for the same item. Fill the gaps "Frozen Blueberries" or Cook Now
+     "Buy Bay Leaves", then planning a recipe that uses them, gives two unticked rows for each.
+  B3 (pre-existing, violates "restock essentials"): a staple set to Empty never reaches the Shop
+     list. `syncStapleToGrocery()` adds a row only for Low, although `checkAndReplenishLowStock()`
+     and the `correctKitchenStock()` comment expect Low or Empty. Side effect: with any Empty staple,
+     `checkAndReplenishLowStock()` reports a change on every call, so opening Shop calls `saveData()`
+     every time.
+design (binding, smallest change):
+  B1: `pantryDateSignal()` returns 'expired' (not 'check') when the lot is raw animal protein in the
+     fridge (category Protein, `stockFoodClass` perishable, name not matching egg / tofu / tokwa /
+     tempeh / beans / lentils / canned / cooked / cured / smoked / dried) and its estimate has passed.
+     Effects use existing rules only: unavailable for Cook Now and suggestions; "Keep" stays a
+     today-only hide that never restores availability; per-row Remove stays a single explicit
+     choice. It is NOT added to bulk removal (bulk remains printed use-by dates plus cooked fridge
+     meals, per D-088), so no record is deleted solely on an estimate. Frozen raw protein is
+     unaffected (freezer = quality only). Label: "Past safe fridge time - do not use".
+  B2: before pushing a planned row, if an UNCHECKED custom row (manual, Fill the gaps or Cook Now
+     Buy; not a staple row) matches by `ingredientNamesMatch`, merge into it: append the planned
+     sources and add the planned quantity only when units match; push no second row. Staple rows
+     already avoid double buying (the planned row shows "In stock"); leave them unchanged.
+     Re-running `generateGroceryList()` must stay idempotent (no growing quantities or sources).
+  B3: `syncStapleToGrocery()` adds the "Running low" row for Low OR Empty (label "Out" for Empty);
+     keep `suggestDismissed` handling; `checkAndReplenishLowStock()` then becomes stable (a second
+     call returns false).
+acceptance:
+  - [ ] Raw chicken breast in the fridge bought 5 d ago (2-day window): Expired bucket, unavailable,
+        Cook Now lists it as missing even after Keep; not in any bulk-removal set; per-row Remove
+        removes only it. Frozen raw chicken 200 d old and fridge Spinach past estimate unchanged
+        (null / Check). Eggs, tofu, canned beans never take this path.
+  - [ ] Manual "Frozen Blueberries" + planned recipe using Frozen Blueberries -> one unticked row
+        with both sources; regenerate twice -> still one row, same quantity; checked manual rows and
+        staple rows unchanged.
+  - [ ] Staple set to Empty -> one "Running low/Out" row on Shop; second
+        `checkAndReplenishLowStock()` returns false; opening Shop twice triggers no extra
+        `saveData()`.
+  - [ ] Full local suite, `npm run test:ledger-contract`, `node --check app.js`, `git diff --check`.
+constraints:
+  - No new feature, field or UI surface. No change to tombstone/backup/restore code or workers/.
+    Never merge or push `main`/`ffs-v1`/`ffs-v1-refine`. Never deploy. Stop at `status: review`.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`

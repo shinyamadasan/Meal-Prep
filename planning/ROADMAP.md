@@ -123,6 +123,17 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
 - **Prep Mode** — no batch-cook ingredient aggregation across the week's recipes.
 - `LOCAL_NUTRITION_DB` still missing some common Filipino ingredients.
 
+- **FFS-V1 final verification backlog (2026-11-26, non-blocking).**
+  - "Ground ginger" (dried spice) matches a Frozen Ginger lot, because "ground" is dropped as a
+    prep word.
+  - The local safety backup has one slot: the next Clear, Import or bulk removal replaces it.
+    Restoring needs sign-in, as before.
+  - "Kale or swiss chard" order sensitivity (TASK-087 follow-up).
+  - Cabbage at quantity 0 still shows under Use soon.
+  - Cookbook ingredient names reach the Shop list verbatim (TASK-084, deferred).
+  - The "Keep" label on Expired rows reads like an override, though it only hides the row for
+    today. Consider "Not now".
+
 ### Dead / orphaned code
 - **`#storage` tab** — full UI + `renderStorageGuide()` but no nav button (superseded by Inventory).
 - ~~**Orphaned pantry reads**~~ — fixed in D-057; `addToPantry()` no longer reads the removed
