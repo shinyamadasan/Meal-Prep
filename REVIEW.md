@@ -4,6 +4,47 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-087 — REWORK — Claude independent review, 2026-11-26
+candidate reviewed: `18642b7` (base `bd4ce22`). Tests claimed 863/863 + ledger 13/13; matching
+logic probed in the offline preview household (20 cookbook + 40 built-in recipes).
+What is good: line roles, alternatives for the spec examples, identity-modifier guard, rice family
+rule, Home tiers, additive result shape. Keep all of that.
+
+must-fix:
+1. **Swaps are far too loose.** `ingredientSwapMatch` only checks a shared head noun, so it
+   returns true for: Black pepper ~ Red Bell Pepper, Cayenne pepper ~ Red Bell Pepper, Garlic
+   powder ~ Chili powder, Oyster sauce ~ Chili garlic sauce, Glutinous Rice (Malagkit) ~ Jasmine
+   Rice (Champorado shows "use Jasmine Rice"). A swap must be something a cook would actually
+   accept. Binding fix:
+   a. No swap when either name is a condiment/spice: `stockFoodClass({ name })` is 'condiment',
+      OR the head noun is one of: pepper (unless BOTH names contain "bell"), powder, sauce, paste,
+      seasoning, flakes, seeds, extract, vinegar, spice, salt, sugar, dressing.
+   b. Add to `INGREDIENT_IDENTITY_MODIFIERS`: glutinous, malagkit, sticky, sushi, sesame,
+      toasted. (Verify "Sesame Oil" still matches "toasted sesame oil" via the shared word, and a
+      generic "Oil" line is no longer satisfied by "Sesame Oil".)
+   c. Keep as swaps: Brown rice ~ Jasmine Rice; Cheddar cheese ~ Parmesan cheese; Red onion ~
+      White onion; Green bell pepper ~ Red Bell Pepper; Canola oil ~ Olive oil.
+   Add every pair above as a test row (true and false lists).
+2. **"or more to taste" is parsed as an alternative.** "Sriracha, or more to taste" yields
+   [sriracha taste, more to taste], so Onigiri lists Sriracha as missing although a Sriracha
+   staple is in stock. Strip trailing notes before splitting: ", or more to taste", "or more
+   if needed", "or as needed", "or more", "or to taste", ", plus more ...". Test rows: "Sriracha,
+   or more to taste" -> [sriracha]; "Garlic powder, or more to taste" -> [garlic powder]; "Fresh
+   lemon juice, or more to taste" -> [lemon juice] (do not add a new juice rule).
+3. **Two consumers call a swap result "ready".** `renderCookSuggestions` (Recipes tab) filters
+   tier 0 by `missing === 0`, so swap recipes show "Can cook now · All ingredients ✓"; the eat
+   picker reason (`cand.missing === 0` -> "Have everything") does the same. Use `tier`: the
+   Recipes tab gets the same "Cook with a swap" tier (badge "Swap"), and the picker says "Have
+   everything" only for tier ready and "Swap: use X" for tier swap.
+4. Nit (fix while there): the swap/optional note uses an inline `style=` attribute; move it to
+   a class in style.css (no new `:root`).
+
+re-verify: focused spec + new rows red on `18642b7` where behavior changes, then green; full
+local suite, `npm run test:ledger-contract`, `node --check app.js`, `git diff --check`; refresh
+feature-evidence/task-087/ screenshots.
+gate: `approved` (owner deploy hold) once fixed.
+
+---
 ## Review TASK-086 — APPROVED (held) — Claude independent review + QA, 2026-11-26
 candidate reviewed: `07aa5d14d67ad91af555d34d32bba62565bde491` (base `3d0a5c2` = TASK-082 approved head + plan).
 independent QA: new availability/no-plan rows fail on base app.js, 17/17 focused on candidate ·

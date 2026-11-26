@@ -6288,7 +6288,7 @@ acceptance:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-087 · FFS-V1 Cook Now ingredient matching: required vs optional, alternatives, swaps
-status: review
+status: codex
 owner: codex
 risk: Medium (read-path logic; no persisted change, no write path). Merge gate: `approved` (hold).
 source: owner approval 2026-11-26 "Approve finding A" + finding D (compound names) · D-086
