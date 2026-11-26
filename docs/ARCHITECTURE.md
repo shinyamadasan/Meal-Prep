@@ -85,12 +85,19 @@ Recipe photos are compressed (max 1000px JPEG ~0.7) and stored in a Firestore **
 Legacy inline photos are auto-migrated on load. In-memory `recipePhotoCache` attaches them at render.
 
 ## The "cook now" engine
-Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngredients` in 3 tiers
-(can cook / missing 1 / missing 2). Missing-1 cards expose `buyMissingIngredient()`.
+`getCookableRecipes()` matches available pantry lots against the required lines in a recipe's
+`baseIngredients`. A required line is covered when any of its alternatives matches, including
+water as an alternative. Missing optional and serving lines appear in `optionalMissing`.
+Water-only lines are skipped. Recipes need at least two required lines, at least one match,
+and up to two missing required lines. Home shows Can cook now, Cook with a swap, and Missing 1 or 2
+ingredients. A same-head variety swap covers a required line separately from exact availability.
+Missing-1 cards expose `buyMissingIngredient()`.
 
 `getCookableRecipes()`, `getExpirySuggestions()`, and `pantryMatchesForShop()` share
 `ingredientNamesMatch()` and `pantryLotAvailable()` (D-086). Matching uses normalized names,
-whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. Empty lots are
+whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. A subset match
+rejects added identity modifiers such as evaporated in evaporated milk. Generic descriptors
+such as white, steamed, and short-grain are ignored for names headed by rice. Empty lots are
 unavailable. Non-empty staples count as available. For non-staples, a finite quantity of zero or
 less or a valid printed date (`dateMode: 'expiry'`) before today makes the lot unavailable.
 Estimated shelf-life windows continue to drive freshness warnings in Fridge, Home Attention,

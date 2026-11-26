@@ -6389,34 +6389,60 @@ function updateWeeklyStats() {
   document.getElementById('planned-meals').textContent = plannedMeals;
 }
 
-// Returns recipes grouped by how many ingredients are missing from the pantry.
-// Tiers: missing 0 (can cook now), missing 1, missing 2. Requires ≥2 ingredients
-// and at least 1 pantry match so noise recipes don't appear.
+// Cook Now counts required lines. A swap can cover a gap without counting as a match.
 function getCookableRecipes() {
   if (!AppState.pantry.length || !AppState.recipes.length) return [];
   var availablePantry = AppState.pantry.filter(pantryLotAvailable);
-
-  function pantryHas(ingName) {
-    return availablePantry.some(function(p) { return ingredientNamesMatch(ingName, p.name); });
-  }
 
   var results = [];
   AppState.recipes.forEach(function(recipe) {
     var ings = recipe.baseIngredients || [];
     if (ings.length < 2) return;
+    var requiredTotal = 0;
     var matched = 0;
     var missingIngredients = [];
+    var swaps = [];
+    var optionalMissing = [];
     ings.forEach(function(ing) {
-      if (pantryHas(ing.name)) matched++;
+      var role = ingredientLineRole(ing);
+      if (role === 'water') return;
+
+      var alternatives = ingredientAlternatives(ing.name);
+      var haveLot = availablePantry.find(function(p) {
+        return alternatives.some(function(name) { return ingredientNamesMatch(name, p.name); });
+      });
+      var have = haveLot || alternatives.some(function(name) { return WATER_INGREDIENT_LINE.test(name); });
+      if (role !== 'required') {
+        if (!have) optionalMissing.push(ing.name);
+        return;
+      }
+
+      requiredTotal++;
+      if (have) {
+        matched++;
+        return;
+      }
+
+      var swapLot = availablePantry.find(function(p) {
+        return alternatives.some(function(name) { return ingredientSwapMatch(name, p.name); });
+      });
+      if (swapLot) swaps.push({ need: ing.name, use: swapLot.name });
       else missingIngredients.push(ing.name);
     });
-    var missing = ings.length - matched;
-    if (missing <= 2 && matched >= 1) {
-      results.push({ recipe: recipe, matched: matched, total: ings.length, missing: missing, missingIngredients: missingIngredients });
+    var missing = missingIngredients.length;
+    if (requiredTotal >= 2 && missing <= 2 && matched >= 1) {
+      results.push({
+        recipe: recipe, matched: matched, total: ings.length, missing: missing,
+        missingIngredients: missingIngredients, requiredTotal: requiredTotal,
+        swaps: swaps, optionalMissing: optionalMissing,
+        tier: missing > 0 ? 'buy' : swaps.length > 0 ? 'swap' : 'ready'
+      });
     }
   });
 
-  return results.sort(function(a, b) { return a.missing - b.missing || b.matched - a.matched; });
+  return results.sort(function(a, b) {
+    return a.missing - b.missing || a.swaps.length - b.swaps.length || b.matched - a.matched;
+  });
 }
 
 function renderHomeFavorites() {
@@ -6593,18 +6619,31 @@ function renderDashboard() {
     cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Recipes →</button></div>';
   } else {
     var cookTiers = [
-      { key: 0, label: 'Can cook now', cls: 'dash-cook-tier--ready' },
+      { key: 'ready', label: 'Can cook now', cls: 'dash-cook-tier--ready' },
+      { key: 'swap', label: 'Cook with a swap', cls: 'dash-cook-tier--swap' },
       { key: 1, label: 'Missing 1 ingredient', cls: 'dash-cook-tier--one' },
       { key: 2, label: 'Missing 2 ingredients', cls: 'dash-cook-tier--two' }
     ];
     cookPane = cookTiers.map(function(tier) {
-      var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 3);
+      var items = cookable.filter(function(s) { return s.tier === tier.key || s.missing === tier.key; }).slice(0, 3);
       if (!items.length) return '';
       var rows = items.map(function(s) {
         var sid = String(s.recipe.id);
-        var meta = tier.key === 0
-          ? '<span class="dash-cook-full">All ingredients ✓</span>'
-          : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
+        var meta = '';
+        var note = '';
+        if (tier.key === 'ready') {
+          meta = '<span class="dash-cook-full">All ingredients ✓</span>';
+          if (s.optionalMissing.length) {
+            var names = s.optionalMissing.slice(0, 2).map(function(name) {
+              return ingredientNameSegments(name)[0].replace(SERVING_INGREDIENT_NOTE, '').trim() || name;
+            });
+            note = '+ optional: ' + names.join(', ');
+          }
+        } else if (tier.key === 'swap') {
+          note = s.swaps.map(function(swap) { return 'use ' + swap.use + ' for ' + swap.need; }).join(' · ');
+        } else {
+          meta = '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
+        }
         var buyBtn = '';
         if (tier.key === 1 && s.missingIngredients && s.missingIngredients.length === 1) {
           buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJAttr(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
@@ -6612,7 +6651,9 @@ function renderDashboard() {
         return '<div class="dash-cook-row">' +
           '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJAttr(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
-          '</button>' + buyBtn + '</div>';
+          '</button>' +
+          (note ? '<div class="dash-cook-meta" style="white-space: normal; overflow-wrap: anywhere">' + escapeHtml(note) + '</div>' : '') +
+          buyBtn + '</div>';
       }).join('');
       return '<div class="dash-cook-tier ' + tier.cls + '">' +
         '<div class="dash-cook-tier-label">' + tier.label + '</div>' + rows + '</div>';
@@ -7956,14 +7997,73 @@ function normalizeIngredientName(name) {
     .trim();
 }
 
-function ingredientMatchWords(name) {
+const SERVING_INGREDIENT_NOTE = /\b(?:for (?:serving|garnish|drizzling|squeezing|coating|dipping)|to serve)\b/i;
+const WATER_INGREDIENT_LINE = /^\s*(?:(?:hot|cold|ice)\s+)?water(?:\s*,\s*plus more\b.*)?\s*$/i;
+
+function ingredientLineRole(ing) {
+  var name = ing.name || '';
+  if (ing.optional === true || /\(optional\)|,\s*optional\b/i.test(name)) return 'optional';
+  if (SERVING_INGREDIENT_NOTE.test(name) ||
+      (/\bday of serving\b/i.test(name) && /\bgarnish\b/i.test(name))) return 'serving';
+  if (WATER_INGREDIENT_LINE.test(name)) return 'water';
+  return 'required';
+}
+
+function ingredientNameSegments(name) {
   // Prep notes follow the first comma, except a leading run of descriptors
   // ("Boneless, skinless chicken thighs") which belongs to the name itself.
-  var segments = (name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+packed\s+in\s.*$/i, '').split(',');
-  var baseName = segments[0];
-  for (var i = 1; i < segments.length &&
-       /^(?:\s*(?:boneless|skinless|fresh|dried|canned|frozen|raw|cooked|large|medium|small|whole|low-sodium|reduced-sodium)\s*)+$/i.test(baseName); i++) {
-    baseName = segments[i];
+  var segments = (name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+packed\s+in\s.*$/i, '')
+    .replace(/\bshort-\s*,\s*medium-\s*,\s*(?:or\s+)?long-grain\s+(?=(?:white\s+)?rice\b)/gi, '')
+    .split(',').map(function(segment) { return segment.trim(); });
+  var descriptor = /^(?:(?:boneless|skinless|fresh|dried|canned|frozen|raw|cooked|large|medium|small|whole|low-sodium|reduced-sodium)(?:\s+|$))+$/i;
+  while (segments.length > 1 && descriptor.test(segments[0])) segments.shift();
+  return segments;
+}
+
+function ingredientAlternatives(name) {
+  var segments = ingredientNameSegments(name);
+  // A comma list ends at the segment containing "or". Prep wording after a
+  // comma, such as "chopped or torn", does not start an ingredient list.
+  var prepNote = /^(?:(?:finely|roughly|thinly|coarsely|freshly)\s+)*(?:chopped|torn|sliced|diced|minced|grated|peeled|crushed|drained|rinsed|divided|cooked|optional|plus|for|to serve)\b/i;
+  var lastChoice = segments.findIndex(function(segment) { return /\bor\s+/i.test(segment); });
+  if (lastChoice < 0 || segments.slice(1, lastChoice + 1).some(function(segment) { return prepNote.test(segment); })) {
+    return [name];
+  }
+
+  var candidates = segments.slice(0, lastChoice + 1).join(', ').toLowerCase()
+    .split(/\s*,\s*(?:or\s+)?|\s+or\s+/)
+    .map(function(candidate) { return candidate.replace(/^(?:(?:boneless|skinless|bone-in)\s+)+/, '').trim(); })
+    .filter(Boolean);
+
+  // Comma lists supply full names. In a pair, a bare word can share a
+  // trailing ingredient ("sunflower oil") or a leading one ("chicken thighs").
+  if (candidates.length === 2 && !candidates.some(function(candidate) { return WATER_INGREDIENT_LINE.test(candidate); })) {
+    var first = candidates[0].split(/\s+/);
+    var second = candidates[1].split(/\s+/);
+    if (first.length === 1 && second.length > 1) candidates[0] += ' ' + second[second.length - 1];
+    if (first.length > 1 && second.length === 1) candidates[1] = first[0] + ' ' + candidates[1];
+  }
+  return candidates;
+}
+
+// These modifiers can turn a shared head noun into a different ingredient.
+const INGREDIENT_IDENTITY_MODIFIERS = new Set([
+  'evaporated', 'condensed', 'coconut', 'almond', 'oat', 'soy', 'powdered',
+  'cream', 'peanut', 'sour', 'sweetened'
+]);
+
+function hasIngredientIdentityModifier(words, sharedWords = []) {
+  var head = words[words.length - 1];
+  return words.slice(0, -1).some(function(word) {
+    return INGREDIENT_IDENTITY_MODIFIERS.has(word) && !sharedWords.includes(word) &&
+      (word !== 'soy' || head === 'milk' || head === 'sauce');
+  });
+}
+
+function ingredientMatchWords(name) {
+  var baseName = ingredientNameSegments(name)[0];
+  if (/\brice$/i.test(baseName)) {
+    baseName = baseName.replace(/\b(?:white|steamed|cooked|plain|leftover|day-old|(?:short|medium|long)-grain)\b/gi, '');
   }
   // The shared normalizer already handles the other prep and size descriptors.
   var normalized = normalizeIngredientName(baseName).replace(
@@ -7992,10 +8092,20 @@ function ingredientNamesMatch(a, b) {
   var longer = shorter === aWords ? bWords : aWords;
   if (shorter.length < longer.length &&
       shorter[shorter.length - 1] === longer[longer.length - 1] &&
-      shorter.every(function(word) { return longer.includes(word); })) return true;
+      shorter.every(function(word) { return longer.includes(word); }) &&
+      !hasIngredientIdentityModifier(longer, shorter)) return true;
 
   return (INGREDIENT_AVAILABILITY_ALIASES.get(aName)?.has(bName) ||
           INGREDIENT_AVAILABILITY_ALIASES.get(bName)?.has(aName)) === true;
+}
+
+function ingredientSwapMatch(recipeName, lotName) {
+  var recipeWords = ingredientMatchWords(recipeName);
+  var lotWords = ingredientMatchWords(lotName);
+  return recipeWords.length > 1 && lotWords.length > 1 &&
+    recipeWords[recipeWords.length - 1] === lotWords[lotWords.length - 1] &&
+    !hasIngredientIdentityModifier(recipeWords) && !hasIngredientIdentityModifier(lotWords) &&
+    !ingredientNamesMatch(recipeName, lotName);
 }
 
 function findIngredientNutrition(name) {

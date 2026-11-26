@@ -1397,3 +1397,19 @@ tests: focused 22/22, full local 856/856 from both entry points, ledger contract
 blockers: none.
 deviations: used the existing clean `qa080` checkout of the task branch.
 → status set to `review` in TASKS.md
+
+## TASK-087 — implemented (branch: task-087-ffs-cook-now-matching)
+changed:
+  - `app.js` · `ingredientLineRole()` and `ingredientAlternatives()` classify recipe lines
+    and resolve alternatives. `ingredientNamesMatch()` handles identity modifiers and generic
+    rice descriptions. `ingredientSwapMatch()` identifies same-head variety swaps.
+  - `app.js` · `getCookableRecipes()` reports required gaps, optional gaps, and swaps.
+    The Home Cook this pane in `renderDashboard()` shows ready, swap, and buy tiers.
+  - `tests/ffs-cook-now-matching.spec.js` · seven synthetic Playwright cases.
+  - `docs/ARCHITECTURE.md` · updated the Cook Now matching and availability description.
+  - `feature-evidence/task-087/` · Home Cook this pane at 1280px and 390px.
+tests: seven expected failures on base, then seven passes. Both full local entry points
+  passed 863 tests. Ledger contract passed 13 tests. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md

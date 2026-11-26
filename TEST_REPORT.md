@@ -1132,3 +1132,17 @@ static: `node --check app.js`, syntax checks for both edited specs, and `git dif
   Source comparison verified that `pantryLotAvailable()` was the only application-code change.
 self-review: Code Health and applicable AI QA checks passed for the scoped change.
 untested: production, real devices, and code coverage instrumentation.
+
+## TASK-087 · 2026-11-26
+focused: `tests/ffs-cook-now-matching.spec.js` had 7 expected failures on base `bd4ce22`.
+  All 7 passed in the final local suite, alongside all 9 TASK-080 availability cases.
+full: `npx playwright test --project=local` and `npm test` each passed 863 tests with zero
+  failures. Restored the regenerated TASK-079 screenshots.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, the new spec's syntax check, and `git diff --check` passed.
+  All 118 decision pointers passed. The write-path functions, availability filter, and existing
+  suggestion consumers were compared with the base.
+visual: `feature-evidence/task-087/cook-now-1280.png` and `cook-now-390.png` show the three
+  Home tiers with synthetic data. Both viewports passed overflow and deep state equality checks.
+self-review: Code Health and applicable AI QA checks passed for the scoped change.
+untested: production, real devices, and code coverage instrumentation.
