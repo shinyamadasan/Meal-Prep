@@ -6254,7 +6254,12 @@ verification:
   - Tests first (red on base), then green. No screenshots needed (no visual change).
 
 ### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
-status: todo
+status: review
+checkpoint (2026-11-26): Wave-1-only preview ready for owner testing, per owner instruction "after
+  Wave 1, prepare an integrated preview". Branch `ffs-v1-preview` = TASK-080/081/082/086 approved
+  heads. Harness + SCENARIO-GUIDE.md + walkthrough screenshots in the private preview folder.
+  Offline verified (no Firebase/Sentry request, CSP blocks all external). Wave 2 (083/084)
+  still unreleased; scenario 5 partial until TASK-083.
 owner: claude (integration + preview harness; no production code)
 risk: Low (no app-code changes; preview is local and offline). No merge to `main`, no deploy.
 depends-on: TASK-080, 081, 082 (wave 1) and TASK-083, 084 (wave 2) at `approved`
