@@ -6510,7 +6510,7 @@ verification:
     feature-evidence/task-088/.
 
 ### TASK-089 · FFS-V1 Fill the gaps polish: categories, whole grain, near-twins, variety
-status: review
+status: approved
 owner: codex
 risk: Medium (render + suggestion logic; grocery rows use the existing shape). Gate: `approved`.
 source: owner approval 2026-11-26 "Approve finding C" + "Refine the grocery system" (B: rotate

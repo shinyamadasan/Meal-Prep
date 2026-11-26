@@ -6993,7 +6993,7 @@ const NO_PLAN_TEMPLATE = {
     keywords: /\b(rice|quinoa|oats?|barley|bread|pasta|noodles?|tortillas?|potatoes|potato|couscous|buckwheat|bulgur)\b/,
     wholeGrain: /\b(whole[ -](grain|wheat)|brown (\w+ )?rice|wild rice|quinoa|oats?|barley|bulgur|buckwheat|farro)\b/,
     convenience: /\b(microwave|frozen|precooked|pouch|bread|pandesal)\b/,
-    rules: [{ attribute: 'wholeGrain', minimum: 1, met: 'whole grain', missing: 'whole grain' }]
+    rules: [{ attribute: 'wholeGrain', minimum: 2, met: '2 whole grains', missing: 'whole grain' }]
   },
   fruits: {
     label: 'Fruits', target: 3, category: 'Fruit',

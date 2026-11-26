@@ -163,18 +163,19 @@ test('chips use the Shop role category when there is no ingredient DB entry', as
 });
 
 test('a full starch role offers up to two whole grains and clears the rule when one is added', async ({ page }) => {
+  // Kylie's framework asks for 2 whole-grain starches; one is already in stock.
   const card = await shop(page, {
-    pantry: [lot('Pandesal'), lot('White Rice')],
+    pantry: [lot('Pandesal'), lot('White Rice'), lot('Barley')],
     groceryList: [row('Sweet Potato (Kamote)'), row('Pasta')]
   });
   await card.locator('summary').click();
   const starches = role(card, 'Starches');
-  await expect(starches).toContainText('Starches 4/3 ✓ · needs whole grain');
+  await expect(starches).toContainText('Starches 5/3 ✓ · needs whole grain');
   const chips = starches.getByRole('button');
   await expect(chips).toHaveText(['Whole-Grain Bread', 'Microwave Quinoa']);
 
   await chips.first().click();
-  await expect(starches).toContainText('Starches 5/3 ✓ · ✓ whole grain');
+  await expect(starches).toContainText('Starches 6/3 ✓ · ✓ 2 whole grains');
   await expect(starches).not.toContainText('needs whole grain');
   await expect(chips).toHaveCount(0);
   await expect(page.locator('#grocery-list .grocery-category')

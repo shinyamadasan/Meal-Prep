@@ -4,6 +4,22 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-089 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `4beecb7` (base `5c3e6bf`). The Codex run ended on an API error after it had
+committed and recorded its evidence; Claude pushed the commit unchanged.
+Good: role categories (Shop fallback only, DB category wins); rule-only chips (≤ 2) when the
+count is met but a rule is not; near-twins filtered with the TASK-087 matchers against stock and
+unchecked list rows, and de-duplicated within chips; "↻ Different ideas" uses an in-memory offset
+(no persisted state), shown only when a role has more candidates than chips.
+must-fix (fixed by Claude in the integration commit, trivial): the implementation lowered the
+starch rule from Kylie's ≥ 2 whole-grain starches (KNOWLEDGE_BASE, IMPLEMENTATION_PLAN) to 1.
+The owner asked to preserve Kylie's framework, so it is back to `minimum: 2` ("2 whole grains").
+The rule-chip test now starts with one whole grain in stock.
+QA on the merged head (`ffs-v1-refine` + the fix): full local 883/883 · ledger contract 13/13 ·
+`node --check app.js` · `git diff --check`.
+gate: `approved` (owner deploy hold).
+
+---
 ## Integration ffs-v1-refine (TASK-087 + TASK-088) — Claude, 2026-11-26
 Merged `5e23e0f` (TASK-087) then `02c2962` (TASK-088) into `ffs-v1-refine`. Conflicts in
 getCookableRecipes / Home + Recipes-tab tiers / eat picker resolved into ONE tier field:
