@@ -1132,3 +1132,21 @@ static: `node --check app.js`, syntax checks for both edited specs, and `git dif
   Source comparison verified that `pantryLotAvailable()` was the only application-code change.
 self-review: Code Health and applicable AI QA checks passed for the scoped change.
 untested: production, real devices, and code coverage instrumentation.
+
+## TASK-088 · 2026-11-26
+focused: `tests/ffs-expiry-deletion-safety.spec.js` on `bd4ce22` failed all 8 cases as expected.
+  The base classified nine records as expired, showed a ready label for unchecked spinach,
+  omitted the named lists and date-type control, and removed a record that changed to
+  best-before while the confirmation was open. Final result was 8 passed, 0 failed.
+full: `npx playwright test --project=local` and `npm test` each passed 864, failed 0 on the
+  corrected source. The first direct run found two existing Cook Now stubs that omit the
+  new field. The renderers now accept an omitted `needsCheck`.
+ledger: `npm run test:ledger-contract` passed 13, failed 0.
+static: `node --check app.js` and `git diff --check` passed. Source comparison verified the
+  protected deletion, persistence, cooked-meal and Ready-to-eat functions against the base.
+visual: `feature-evidence/task-088/` includes Home Attention, the named confirmation, and
+  the date-type selector at desktop and 390px widths. Horizontal overflow checks passed.
+  Restored the unrelated regenerated `feature-evidence/task-079/` PNGs.
+self-review: Code Health and the applicable AI checks in `QA.md` passed.
+untested: live Firestore, real mobile devices, and code coverage instrumentation. Firestore
+  payload shape was verified with synthetic records.

@@ -6409,7 +6409,7 @@ verification:
     showing all three tiers into feature-evidence/task-087/.
 
 ### TASK-088 · FFS-V1 Food availability and deletion safety: expired vs check vs stale
-status: codex
+status: review
 owner: codex
 risk: High (deletion paths, tombstones, a new optional synced pantry field; D-032 red zone).
   Solo build. Merge gate: `approved` (hold).

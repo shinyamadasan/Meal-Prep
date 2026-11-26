@@ -4063,6 +4063,9 @@ select.form-control {
 
 .pad-field .form-control { width: 5.5rem; }
 .pad-field--date .form-control { width: 10rem; }
+.pantry-add-detail #pantry-expiry,
+.pantry-add-detail #pantry-printed-date-kind { font-size: 1rem; }
+.pantry-add-detail #pantry-printed-date-kind { width: auto; }
 
 .pantry-search-wrap {
   margin-bottom: 0.75rem;
@@ -4782,7 +4785,8 @@ select.form-control {
 
 /* Status color helpers, shared by pantry cards, cooked cards, and summaries */
 .fresh-ok { --fresh-color: var(--color-success); }
-.fresh-warn { --fresh-color: var(--color-warning); }
+.fresh-warn,
+.fresh-check { --fresh-color: var(--color-warning); }
 .fresh-expired { --fresh-color: var(--color-error); }
 
 .pantry-fresh-summary {
@@ -4836,7 +4840,8 @@ select.form-control {
 
 /* Left accent that reflects status on the whole card */
 .pantry-card.fresh-warn,
-.cooked-card.fresh-warn { border-left: 4px solid var(--color-warning); }
+.cooked-card.fresh-warn,
+.cooked-card.fresh-check { border-left: 4px solid var(--color-warning); }
 .pantry-card.fresh-expired,
 .cooked-card.fresh-expired { border-left: 4px solid var(--color-error); }
 
@@ -4877,6 +4882,8 @@ select.form-control {
   gap: 0.5rem;
   margin-bottom: 0.35rem;
 }
+.cooked-card.fresh-check .cooked-card-main { flex-wrap: wrap; }
+.cooked-card.fresh-check .cooked-badge { white-space: normal; }
 .cooked-name { font-weight: 600; }
 .cooked-source {
   display: inline-block;
@@ -5204,6 +5211,13 @@ select.form-control {
 .confirm-body p { margin: 0 0 0.5rem; }
 .confirm-body p:last-child { margin-bottom: 0; }
 .confirm-body strong { color: var(--color-text); }
+.confirm-expired-list {
+  max-height: min(9rem, 35dvh);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  margin: 0 0 0.75rem;
+  padding-inline-start: 1.2rem;
+}
 .confirm-btns {
   display: flex;
   gap: 0.5rem;
@@ -5759,6 +5773,7 @@ select.form-control {
   gap: 0.5rem;
   font-size: 0.875rem;
 }
+.pi-field--date { flex-wrap: wrap; }
 
 .pi-field-label {
   width: 3.5rem;
@@ -5821,6 +5836,8 @@ select.form-control {
 }
 .pt-stock { width: 70px; }
 .pt-date { width: 150px; }
+.pi-expand .pt-date,
+.pi-expand .pt-date-kind { font-size: 1rem; }
 .pt-unit { color: var(--color-text-secondary); font-size: 0.8rem; }
 
 /* Freshness status badge (pantry table "Status" column) */
@@ -5833,6 +5850,7 @@ select.form-control {
   white-space: nowrap;
   color: var(--fresh-color, var(--color-text-secondary));
 }
+.pantry-fresh-badge.fresh-check { white-space: normal; }
 
 /* Staple Low/OK/Full level selector (pantry table) */
 .pt-level { font-weight: 600; }
@@ -6522,14 +6540,21 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .dash-expiry-more { font-size: 0.77rem; color: var(--color-text-secondary); padding: 0.2rem 0; }
 .dash-l1-cta { display: block; margin-top: 0.5rem; font-size: 0.82rem; }
 
-/* Expired rows carry the only destructive actions on Home. Keep / Remove are
-   real tap targets (not the underlined text links used elsewhere) so a
-   one-handed phone tap can't miss and hit the wrong one. */
-.dash-attn-row--expired { gap: 0.35rem; flex-wrap: wrap; }
-.dash-attn-row--expired .dash-attn-name { flex: 1 1 6rem; margin-right: 0; }
+/* Action rows wrap to keep the named record and its buttons readable. */
+.dash-attn-row--expired,
+.dash-attn-row--check { gap: 0.35rem; flex-wrap: wrap; }
+.dash-attn-row--expired .dash-attn-name,
+.dash-attn-row--check .dash-attn-name { flex: 1 1 6rem; margin-right: 0; }
 .dash-expiry-tag--expired {
   color: #b91c1c;
   background: rgba(220, 38, 38, 0.12);
+}
+.dash-expiry-tag--check {
+  color: var(--color-warning);
+  background: var(--color-warning-light);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  flex-shrink: 1;
 }
 .dash-keep-btn,
 .dash-remove-btn {
@@ -6558,10 +6583,13 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   min-height: 34px;
   width: fit-content;
 }
-.confirm-note { font-size: 0.8rem; }
-
 @media (max-width: 480px) {
   .dash-attn-row--expired .dash-attn-name { flex: 1 1 100%; }
+  .dash-attn-row--check { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+  .dash-attn-row--check .dash-attn-name { grid-column: 1 / -1; white-space: normal; }
+  .dash-attn-row--check .dash-expiry-tag { justify-self: start; }
+  .pantry-fresh-badge.fresh-check { max-width: 9rem; }
+  .pi-row:has(.fresh-check) .pi-name { white-space: normal; overflow-wrap: anywhere; }
   .dash-keep-btn, .dash-remove-btn { min-height: 34px; padding: 0.35rem 0.7rem; }
 }
 
@@ -6614,11 +6642,13 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .dash-cook-item:hover .dash-cook-name { color: var(--color-primary); }
 .dash-cook-name { font-size: 0.88rem; font-weight: 500; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cook-meta { font-size: 0.7rem; color: var(--color-text-secondary); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.dash-cook-meta--check { max-width: 55%; white-space: normal; overflow-wrap: anywhere; }
 .dash-cook-full { font-size: 0.7rem; color: var(--color-primary); font-weight: 650; white-space: nowrap; flex-shrink: 0; }
 .dash-cook-tier { margin-top: 0.5rem; }
 .dash-cook-tier:first-child { margin-top: 0; }
 .dash-cook-tier-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.2rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--color-border); }
 .dash-cook-tier--ready .dash-cook-tier-label { color: var(--color-primary); }
+.dash-cook-tier--check .dash-cook-tier-label { color: var(--color-warning); }
 .dash-cook-tier--one .dash-cook-tier-label { color: #b45309; }
 .dash-cook-tier--two .dash-cook-tier-label { color: var(--color-text-secondary); }
 .dash-buy-row {

@@ -1397,3 +1397,24 @@ tests: focused 22/22, full local 856/856 from both entry points, ledger contract
 blockers: none.
 deviations: used the existing clean `qa080` checkout of the task branch.
 → status set to `review` in TASKS.md
+
+## TASK-088 — implemented (branch: task-088-ffs-expiry-deletion-safety)
+changed:
+  - `app.js` and `style.css` · `pantryDateSignal()` and `cookedDateSignal()` feed Expired,
+    Check and Use soon. Cook recommendations show a check note until a matching lot can
+    be used. Home and Fridge bulk removal list and revalidate each record, take a backup,
+    and use the existing explicit tombstone and save sequence.
+  - `index.html` and `app.js` · Fridge add and edit controls capture `printedDateKind`.
+    The optional field follows the existing pantry record through local and cloud storage.
+  - `docs/DATA_MODEL.md` and `docs/ARCHITECTURE.md` · date kind, attention, and deletion behavior.
+  - `tests/ffs-expiry-deletion-safety.spec.js` · synthetic signal, cook, deletion, persistence,
+    and responsive coverage.
+  - `tests/ffs-truthful-availability.spec.js`, `tests/food-attention-notifications.spec.js`,
+    `tests/kitchen-truth.spec.js`, `tests/mobile-home-polish.spec.js`, and
+    `tests/tombstone-namespace.spec.js` · aligned existing fixtures with printed expiry and
+    estimate checks.
+  - `feature-evidence/task-088/` · six desktop and 390px screenshots.
+tests: focused 8/8, full local 864/864, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: the printed-date selector uses the existing inline Fridge add and edit controls.
+→ status set to `review` in TASKS.md
