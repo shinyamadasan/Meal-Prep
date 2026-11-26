@@ -1211,3 +1211,19 @@ visual: Reviewed the four desktop and 390px PNGs in `feature-evidence/task-083/`
   overflow, and `AppState` deep equality checks.
 self-review: Code Health and applicable AI checks in `QA.md` passed.
 untested: production, real mobile devices, and code coverage instrumentation.
+
+## TASK-083 rework · 2026-11-26
+focused: The three new cases in `tests/ffs-balanced-plate.spec.js` failed on `ddf4c71` because
+  Ready to eat suggested Garlic, generic Rice usage gave Jasmine Rice no ranking credit, and the
+  hint was missing under the recipe name. All 11 focused cases passed with the fix.
+full: `npx playwright test --project=local` passed 894, failed 0. Playwright used port 47813.
+  Restored the two regenerated TASK-079 PNGs.
+ledger: `npm run test:ledger-contract` passed 13, failed 0.
+static: `node --check app.js`, the spec syntax check, and `git diff --check` passed. The app diff
+  confines ranking to `balancedPlateAdditions()` and leaves `ingredientVersatility()` and
+  `noPlanGaps()` intact.
+visual: Recaptured and inspected Ready to eat and Recipe Details at desktop and 390px in
+  `feature-evidence/task-083/`. The Ready to eat images match the tracked PNGs byte for byte.
+  Single-line, overflow, edit-mode visibility, and `AppState` deep equality checks passed.
+self-review: Code Health and applicable AI checks in `QA.md` passed.
+untested: production, real mobile devices, and code coverage instrumentation.

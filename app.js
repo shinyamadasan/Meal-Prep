@@ -1942,6 +1942,8 @@ function canSuggestBalancedPlate(recipe) {
   return recipe && recipe.category !== 'Sauce & Side' && recipe.category !== 'Snack';
 }
 
+const BALANCED_PLATE_FLAVOR_BASE = /\b(?:garlic|onions?|shallots?|ginger|scallions?|leeks?|chill?(?:is?|ies|es)|jalape[nñ]os?|siling|lemongrass|cilantro|parsley|basil|dill|mint|chives?|lemons?|limes?|calamansi)\b/i;
+
 function balancedPlateAdditions(recipe, state) {
   if (!canSuggestBalancedPlate(recipe)) return [];
   const balance = normalizeMealBalance(recipe.mealBalance);
@@ -1959,9 +1961,16 @@ function balancedPlateAdditions(recipe, state) {
   const optionLimit = 2;
 
   return parts.map(part => {
-    const candidates = pantry.filter(p => roles[part].includes(noPlanRole(p.name)))
-      .map(p => ({ name: p.name, score: ingredientVersatility(p.name, recipes) }))
-      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    const candidates = pantry.filter(({ name }) => roles[part].includes(noPlanRole(name)) &&
+      (part !== 'vegetables' || !BALANCED_PLATE_FLAVOR_BASE.test(name)))
+      .map(({ name }) => ({
+        name,
+        // ingredientNamesMatch is symmetric, so generic lines like Rice count for Jasmine Rice.
+        recipeCount: recipes.filter(r => (r.baseIngredients || r.ingredients || [])
+          .some(ingredient => ingredientNamesMatch(ingredient.name, name))).length,
+        versatility: ingredientVersatility(name, recipes)
+      }))
+      .sort((a, b) => b.recipeCount - a.recipeCount || b.versatility - a.versatility || a.name.localeCompare(b.name));
     const options = [];
     for (const { name } of candidates) {
       if (!options.some(option => ingredientNamesMatch(option, name))) options.push(name);
@@ -5000,11 +5009,12 @@ function renderRecipeMetaFields(recipe, mode) {
       if (el.parentNode) el.parentNode.classList.toggle('is-on', pair[1]);
     });
 
-  var balanceGroup = document.getElementById('balance-protein')?.closest('.form-group');
-  balanceGroup?.querySelector('.balanced-plate-hint')?.remove();
   var hint = mode === 'details' ? balancedPlateHint(recipe, AppState) : '';
-  if (hint && balanceGroup) {
-    balanceGroup.insertAdjacentHTML('beforeend', '<div class="balanced-plate-hint">' + escapeHtml(hint) + '</div>');
+  for (const id of ['recipe-name', 'balance-protein']) {
+    const group = document.getElementById(id)?.closest('.form-group');
+    if (!group) continue;
+    group.querySelector('.balanced-plate-hint')?.remove();
+    if (hint) group.insertAdjacentHTML('beforeend', '<div class="balanced-plate-hint">' + escapeHtml(hint) + '</div>');
   }
 }
 

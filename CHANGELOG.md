@@ -1482,3 +1482,17 @@ tests: 8 expected failures on `5c3e6bf`, then 8/8 focused, 886/886 in each full 
 blockers: none.
 deviations: none.
 → status set to `review` in TASKS.md
+
+## TASK-083 — rework complete (branch: task-083-ffs-balanced-plate-rework)
+changed:
+  - `balancedPlateAdditions()` excludes aromatics, herbs, and citrus from veg fillers. It ranks
+    stock by matching recipe count, including generic lines, then versatility, then name.
+  - `renderRecipeMetaFields()` shows the muted, single-line hint directly below the recipe name
+    in Recipe Details as well as by the balance tags.
+  - `tests/ffs-balanced-plate.spec.js` adds three synthetic regressions and verifies both hint
+    placements at desktop and 390px. Recaptured all four PNGs in `feature-evidence/task-083/`.
+tests: 3 expected failures on `ddf4c71`. Final results were 11/11 focused, 894/894 full local,
+  and 13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md

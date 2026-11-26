@@ -42,6 +42,37 @@ async function openDetails(page) {
   return page.getByRole('dialog', { name: 'Recipe Details' });
 }
 
+test('Balanced Plate rework suggests Broccoli when Garlic and Onion are also in stock', async ({ page }) => {
+  await seed(page, [lot('Garlic'), lot('Onion'), lot('Broccoli')]);
+  await expect(page.locator('.dash-card--ready .dash-ready-hint'))
+    .toHaveText('Optional: add a veg — Broccoli');
+});
+
+test('Balanced Plate rework ranks Jasmine Rice first based on generic Rice usage', async ({ page }) => {
+  const recipes = ['Rice', 'Rice', 'Rice', 'Pasta'].map((name, index) => ({
+    ...mealRecipe, id: `uses-${index}`, name: `Fixture Meal ${index}`, favorite: false,
+    baseIngredients: [{ name, baseQuantity: 1, unit: 'cup' }]
+  }));
+  await seed(page, [rice, lot('Flour Tortillas', { category: 'Grain' }), lot('Pasta', { category: 'Grain' })],
+    mealRecipe, recipes);
+  await expect(page.locator('.dash-card--ready .dash-ready-hint'))
+    .toHaveText(/^Optional: add a carb — Jasmine Rice(?: or |$)/);
+});
+
+test('Balanced Plate rework shows the hint below the recipe name in details mode only', async ({ page }) => {
+  await seed(page, [lot('Broccoli')]);
+  const modal = await openDetails(page);
+  const hint = modal.locator('#recipe-name + .balanced-plate-hint');
+  await expect(hint).toHaveText('Optional: add a veg — Broccoli');
+  await expect(hint).toBeInViewport();
+  await modal.getByRole('button', { name: 'Close' }).last().click();
+
+  await page.evaluate(id => openEditRecipeModal(id), mealRecipe.id);
+  const edit = page.getByRole('dialog', { name: 'Edit Recipe' });
+  await expect(edit).toBeVisible();
+  await expect(edit.getByText(/^Optional: add/)).toBeHidden();
+});
+
 async function expectSingleLine(hint) {
   expect(await hint.evaluate(el => {
     const range = document.createRange();
@@ -66,13 +97,15 @@ for (const [label, width, height] of [['desktop', 1366, 1000], ['390px', 390, 84
     await ready.screenshot({ path: path.join(evidence, `ready-to-eat-${label}.png`), animations: 'disabled' });
 
     const modal = await openDetails(page);
-    const modalHint = modal.getByText(suggestion, { exact: true });
-    await expect(modalHint).toBeVisible();
+    const modalHint = modal.locator('#recipe-name + .balanced-plate-hint');
+    await expect(modalHint).toHaveText(suggestion);
+    await expect(modalHint).toBeInViewport();
     await expectSingleLine(modalHint);
+    const balanceHint = modal.locator('.lowfx-form').getByText(suggestion, { exact: true });
+    await expect(balanceHint).toBeVisible();
+    await expectSingleLine(balanceHint);
     expect(await page.evaluate(() => structuredClone(AppState))).toEqual(before);
 
-    // Frame the balance controls inside the scrollable details dialog on both viewports.
-    await modalHint.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await modal.locator('.modal-content').screenshot({
       path: path.join(evidence, `recipe-details-${label}.png`), animations: 'disabled'
     });
@@ -91,7 +124,7 @@ test('Ready to eat skips unavailable lots and checks, then falls back to an avai
   const ready = page.locator('.dash-card--ready');
   await expect(ready.getByText('Optional: add a carb — Jasmine Rice', { exact: true })).toBeVisible();
   const modal = await openDetails(page);
-  await expect(modal.getByText('Optional: add a carb — Jasmine Rice', { exact: true })).toBeVisible();
+  await expect(modal.locator('#recipe-name + .balanced-plate-hint')).toHaveText('Optional: add a carb — Jasmine Rice');
   await modal.getByRole('button', { name: 'Close' }).last().click();
 
   await seed(page, [{ ...spinach, keptOn: '2026-11-26' }, rice]);
@@ -121,12 +154,17 @@ test('only meals with declared missing parts receive a suggestion or a generic f
   }
 });
 
-test('ranks stock by versatility, deduplicates matching names, and caps each part at two', async ({ page }) => {
+test('breaks stock usage ties by versatility, deduplicates matching names, and caps each part at two', async ({ page }) => {
   const broccoliRecipe = {
     ...mealRecipe, id: 'uses-broccoli', name: 'Broccoli Bowl', favorite: false, equipment: ['oven'],
     baseIngredients: [{ name: 'Broccoli', baseQuantity: 1, unit: 'pcs' }]
   };
-  await seed(page, [lot('Apple'), lot('Spinach'), lot('Broccoli'), lot('Frozen Broccoli'), rice], mealRecipe, [broccoliRecipe]);
+  const appleRecipe = {
+    ...mealRecipe, id: 'uses-apple', name: 'Apple Bowl', favorite: false,
+    baseIngredients: [{ name: 'Apple', baseQuantity: 1, unit: 'pcs' }]
+  };
+  await seed(page, [lot('Apple'), lot('Spinach'), lot('Broccoli'), lot('Frozen Broccoli'), rice],
+    mealRecipe, [broccoliRecipe, appleRecipe]);
   await expect(page.locator('.dash-card--ready').getByText('Optional: add a veg — Broccoli or Apple', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => balancedPlateAdditions(AppState.recipes[0], AppState))).toEqual([
     { part: 'vegetables', options: ['Broccoli', 'Apple'] },
@@ -183,5 +221,5 @@ test('a vegetable-only meal can get a named protein addition before a carb', asy
   const suggestion = 'Optional: add a protein — Tofu';
   await expect(ready.getByText(suggestion, { exact: true })).toBeVisible();
   const modal = await openDetails(page);
-  await expect(modal.getByText(suggestion, { exact: true })).toBeVisible();
+  await expect(modal.locator('#recipe-name + .balanced-plate-hint')).toHaveText(suggestion);
 });

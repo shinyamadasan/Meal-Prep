@@ -7286,12 +7286,16 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   white-space: nowrap;
 }
 
-.lowfx-form .form-group:has(> .balanced-plate-hint) {
+.recipe-form--readonly .form-group:has(> .balanced-plate-hint) {
   min-width: 0;
 }
 
-.lowfx-form .balanced-plate-hint {
+#recipe-form .balanced-plate-hint {
   margin-top: 0.4rem;
+}
+
+#recipe-form:not(.recipe-form--readonly) .balanced-plate-hint {
+  display: none;
 }
 
 /* The one tap this whole wave exists for — keep it a comfortable target. */
