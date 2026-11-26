@@ -4,6 +4,35 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-082 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `89e2fdecec935292df70591bd0cd84c69bf88dd3` (base `f875953` = TASK-081 approved head).
+independent QA (Claude, separate clean worktree): focused `tests/ffs-no-plan-grocery.spec.js`
+fails on base app code, 7/7 on candidate · full local 852/852 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Probe results (synthetic household, page.evaluate)
+- Roles: eggs/chicken/tofu/tuna/beans/bangus → proteins; rice/oats/bread/sweet potato/noodles →
+  starches; kangkong, sitaw, pechay, malunggay → veggies; soy sauce, calamansi, coconut milk →
+  flavors; milk, coffee → beverages; cheddar → snacks; Greek yogurt → protein (spec design 2).
+- Counting: expired spinach and 0-qty carrot do not count; unchecked grocery rows count as
+  `onList`; checked rows are never re-suggested. Plant rule met by tofu on the list; starches
+  1/3 → whole grains rank first. Beverages met at 1 (target 1–2) → ✓, no chips.
+- Pure: input state byte-identical after `noPlanGaps`; adds go only through `buyMissingIngredient`.
+- Content: framework counts + generic food names + credit line only; no book prose (design 1).
+
+### Follow-ups (not blocking)
+1. 31 of the candidates are not `INGREDIENT_DB` items, so `buyMissingIngredient` files them
+   under "Pantry" on the Shop list (e.g. Frozen Broccoli, Spring Mix). The role already knows
+   its category; pass it through as an optional fallback. Polish item for after the TASK-085 preview.
+2. Option ranking can suggest a near-twin of what is on hand (Chicken Thigh when Chicken Breast
+   is available). Consider a small variety bonus later.
+3. "Water" as a purchase chip is low value; chips are tall at 390px (card is long when opened,
+   collapsed by default).
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold — not `done`, not
+merged to `main`. Wave 1 (TASK-080/081/082) is complete and held on this stacked branch.
+
+---
 ## Review TASK-081 — APPROVED (held) — Claude independent review + QA, 2026-11-25
 candidate reviewed: `14d1046a3bed0e8c219bcf7dc530d78c442a0810` (base `99c4925` = TASK-080 approved head + ffs-v1).
 independent QA (Claude, separate clean worktree, own `npm ci`):
