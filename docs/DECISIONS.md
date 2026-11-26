@@ -3630,3 +3630,26 @@ New optional pantry field `printedDateKind` ('use-by' | 'best-before'), user-set
 means use-by, so existing records behave exactly as before. No migration, no automatic writes.
 Rules: tombstone / snapshotIdBaseline / saveData sequences and the MASS_DELETE_GUARD are not
 changed. Red zone (D-032): lands `approved`, held for the owner.
+
+## D-089 — Fridge safety limits for animal protein cannot be overridden by "Still good"
+**Date:** 2026-11-26 · **Task:** TASK-090 (B1, B2, B3) · **Status:** accepted, held for owner acceptance
+
+**Context.** The final verification round found raw fridge meat, poultry and seafood past their
+window in the Check bucket, where one "Still good" tap (a look/smell judgement) made them
+cookable. The owner's rule: visual inspection or smell alone must not override an established
+food-safety limit.
+
+**Decision.** `FRIDGE_SAFETY_LIMITS` holds food-specific refrigerator limits taken from the FDA
+Refrigerator & Freezer Storage Chart / FoodSafety.gov cold storage chart, at the conservative end
+of each range: poultry, ground meat, raw sausage, variety meats and seafood 2 days; whole cuts
+3 days; cured/processed 3–7 days; cooked leftovers 4 days. A lot past its limit, or with no bought
+date, is Expired with a `safety` reason: unusable, not restored by Keep/Still good, and never in a
+bulk-removal set (per-row Remove only). The clock is `purchaseDate`, never `updatedAt`. There is no
+thaw date in the data, so a lot moved from the freezer counts from purchase (conservative) and the
+user is told to set the bought date to the day it went in the fridge. Eggs stay an estimate.
+Shop rows consolidate equivalent needs (same identity guards as matching) only when units are
+compatible; incompatible ones stay separate with a visible note. Empty staples restock like Low.
+
+**Why.** Lost safety is not reversible; a conservative false "do not use" costs one edit. Bulk
+deletion stays limited to printed and actual-cook dates (D-088) so no record is removed on an
+estimate.

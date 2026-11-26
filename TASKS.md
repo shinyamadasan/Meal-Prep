@@ -6628,59 +6628,136 @@ verification:
   - Screenshots desktop + 390px (Ready-to-eat + recipe modal) into feature-evidence/task-083/.
 
 ### TASK-090 · FFS-V1 release blockers from the final verification round
-status: todo
-owner: claude (release to codex only after the owner approves the fix scope)
-risk: High (touches TASK-088 safety logic, Shop list generation and staple sync; synced data).
-  Solo build. Merge gate: `approved` (owner deploy hold).
-source: owner "one final verification round" 2026-11-26 · probe `verify-final.js` (private preview)
+status: codex
+owner: codex
+risk: High (TASK-088 safety logic, Shop list generation, staple sync, synced grocery rows).
+  Solo build, never chained. Merge gate: `approved` (owner deploy hold).
+source: owner approval of TASK-090 with refinements, 2026-11-26 · probe `verify-final.js` (private)
 depends-on: TASK-083/087/088/089 (approved, integrated on `ffs-v1-refine`)
-branch: task-090-ffs-release-blockers (from `ffs-v1-refine`)
-blockers (each reproduced on the integrated build with synthetic data):
-  B1 (introduced by TASK-086/088): raw meat, poultry and seafood stored in the fridge past their
-     INGREDIENT_DB fridge window (Chicken Breast/Thigh 2 d, ground pork 1 d, Bangus/Tilapia 2 d)
-     land in the Check bucket. One "Still good" tap (a look/smell judgement) makes them available
-     and Cook Now calls the recipe ready. Owner rule: visual inspection or smell alone must not
-     override an established food-safety limit.
-  B2 (pre-existing, violates "no duplicate purchases"): `generateGroceryList()` adds planned rows
-     next to existing manual rows for the same item. Fill the gaps "Frozen Blueberries" or Cook Now
-     "Buy Bay Leaves", then planning a recipe that uses them, gives two unticked rows for each.
-  B3 (pre-existing, violates "restock essentials"): a staple set to Empty never reaches the Shop
-     list. `syncStapleToGrocery()` adds a row only for Low, although `checkAndReplenishLowStock()`
-     and the `correctKitchenStock()` comment expect Low or Empty. Side effect: with any Empty staple,
-     `checkAndReplenishLowStock()` reports a change on every call, so opening Shop calls `saveData()`
-     every time.
-design (binding, smallest change):
-  B1: `pantryDateSignal()` returns 'expired' (not 'check') when the lot is raw animal protein in the
-     fridge (category Protein, `stockFoodClass` perishable, name not matching egg / tofu / tokwa /
-     tempeh / beans / lentils / canned / cooked / cured / smoked / dried) and its estimate has passed.
-     Effects use existing rules only: unavailable for Cook Now and suggestions; "Keep" stays a
-     today-only hide that never restores availability; per-row Remove stays a single explicit
-     choice. It is NOT added to bulk removal (bulk remains printed use-by dates plus cooked fridge
-     meals, per D-088), so no record is deleted solely on an estimate. Frozen raw protein is
-     unaffected (freezer = quality only). Label: "Past safe fridge time - do not use".
-  B2: before pushing a planned row, if an UNCHECKED custom row (manual, Fill the gaps or Cook Now
-     Buy; not a staple row) matches by `ingredientNamesMatch`, merge into it: append the planned
-     sources and add the planned quantity only when units match; push no second row. Staple rows
-     already avoid double buying (the planned row shows "In stock"); leave them unchanged.
-     Re-running `generateGroceryList()` must stay idempotent (no growing quantities or sources).
-  B3: `syncStapleToGrocery()` adds the "Running low" row for Low OR Empty (label "Out" for Empty);
-     keep `suggestDismissed` handling; `checkAndReplenishLowStock()` then becomes stable (a second
-     call returns false).
+branch: task-090-ffs-release-blockers (from `origin/ffs-v1-refine`)
+reference (authoritative limits, refrigerator at 40°F / 4°C):
+  FDA "Refrigerator & Freezer Storage Chart" (https://www.fda.gov/media/74435/download) and
+  FoodSafety.gov cold storage chart (https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts).
+  Chart rows used (fridge): fresh poultry whole/parts/giblets 1-2 d; hamburger, ground and stew
+  meat 1-2 d; raw sausage 1-2 d; variety meats (liver, kidney, heart, tongue) 1-2 d; steaks, chops,
+  roasts 3-5 d; lean/fatty fish and shrimp/scallops/squid 1-2 d; bacon 7 d; smoked links 7 d;
+  hot dogs opened 1 wk; lunch meat opened 3-5 d; ham slices 3-4 d; cooked meat/poultry/fish
+  leftovers, soups and stews 3-4 d. Freezer times are quality only.
+blockers (reproduced on the integrated build):
+  B1: raw meat/poultry/seafood in the fridge past its window lands in Check; one "Still good"
+      (look/smell) makes it available and Cook Now calls the recipe ready.
+  B2: planned rows duplicate manual / Fill the gaps / Cook Now / restock rows; planned rows of one
+      ingredient in different units are summed into one number (`addRecipeIngredients`).
+  B3: an Empty staple never reaches the Shop list; `checkAndReplenishLowStock()` reports a change
+      on every call (Empty staple, or a dismissed Low staple), so every Shop open calls `saveData()`.
+
+design (binding):
+B1 — food-specific fridge safety limits
+  1. One const `FRIDGE_SAFETY_LIMITS` (ordered rules, first match wins, comment cites the FDA chart),
+     matched on lot name + INGREDIENT_DB name/aliases, category Protein (or the cooked rule):
+       cooked-leftover  /cooked|leftover|adobo|curry|stew|soup/ name on a pantry lot ... 4 d
+       cured-processed  bacon, smoked link 7 · hot dog/hotdog 7 · ham, luncheon/lunch meat,
+                        deli meat, spam-type opened 3 (conservative end; opened state unknown)
+       raw-sausage      sausage, longganisa, chorizo (not "smoked") ................ 2 d
+       ground           ground, minced, giniling, hamburger, stew meat ............... 2 d
+       variety          liver, kidney, heart, tongue, giblets, tripe, atay, isaw ..... 2 d
+       poultry          chicken, turkey, duck, manok ................................. 2 d
+       seafood          fish, bangus, tilapia, salmon, tuna (not canned), galunggong,
+                        shrimp, prawn, hipon, squid, pusit, crab, mussels, clams,
+                        scallops, oysters, isda ...................................... 2 d
+       whole-cut        beef, pork, lamb, veal, goat, steak, chop, roast, ribs, brisket,
+                        sirloin, liempo, kasim ....................................... 3 d (low end of 3-5)
+     Effective limit = min(class days, INGREDIENT_DB fridgeDays when lower; e.g. liver 1,
+     crab/mussels/clams 1). Never exclude-list misses: egg(s), tofu, tokwa, tempeh, beans,
+     lentils, canned/tinned, dried, powder never take this path (eggs stay an estimate; out of scope).
+  2. Applies only when storage is not 'freezer' (fridge or counter). Frozen lots: unchanged
+     (quality only). Storage duration = days since `purchaseDate`. Never use `updatedAt`
+     (record age) or `keptOn` for this.
+  3. `pantryDateSignal()` returns, for a matched lot:
+       - past limit -> kind 'expired', `safety: 'past-limit'`, `limitDays`, `safetyClass`.
+       - no valid `purchaseDate` (unknown storage history) -> kind 'expired',
+         `safety: 'unknown-date'` (conservative: unusable until a bought date is entered).
+       - a printed use-by on the same lot still applies; the earlier of the two wins.
+       - inside the limit -> existing behaviour (use-soon etc.).
+  4. Thawed food: the data has no thaw date (moving a lot freezer -> fridge keeps `purchaseDate`),
+     so the clock counts from purchase — conservative. The row copy tells the user the one honest
+     correction: "Frozen until recently? Set its bought date to the day it went in the fridge."
+     No new field, no automatic date rewrite on move.
+  5. Effects: `pantryLotAvailable()` returns false for any `safety` signal — checked BEFORE the
+     staple early-return — so Cook Now, suggestions, Ready/Use-soon and Fill the gaps coverage
+     treat it as missing. `keptOn` / "Keep" / "Still good" never restore availability (Keep may
+     still hide the attention row for today). Labels: past-limit "Past safe fridge time - do not
+     use (<class>, <n>-day limit)"; unknown-date "No bought date - add it before use".
+  6. Deletion: `safety` lots are NEVER in `getExpiredPantryItems()`, `removeAllExpired()` /
+     `confirmExpiredRemoval()` or any bulk set (bulk stays printed use-by + cooked fridge meals,
+     D-088). Per-row Remove stays the only removal, one explicit tap, existing backup/tombstone
+     path unchanged. Nothing is ever deleted automatically.
+  7. Cooked meals (`cookedDateSignal`, fridge only): limit = min(recipe fridgeLife, 4); a missing
+     fridgeLife uses 4 (was: no signal). Freezer unchanged. Bulk rules for cooked fridge meals unchanged.
+B2 — one row per real need on the Shop list
+  1. Helper `groceryRowsEquivalent(a, b)`: `ingredientNamesMatch` in either direction with the
+     existing identity guards (rice != rice vinegar, milk != evaporated milk). Helper
+     `groceryUnitsCompatible(a, b)`: same `stockUnitKey`, or one side has quantity null.
+  2. `addRecipeIngredients`: key planned needs by category + name + unit key, so different units
+     are never summed into one number (they become separate planned rows).
+  3. `generateGroceryList()`: first clear `plannedNeed` from every custom row. For each planned
+     need, if an UNCHECKED custom row (manual, Fill the gaps, Cook Now Buy, or staple restock) is
+     equivalent and unit-compatible, store it on that row as
+     `plannedNeed = { quantity, unit, sources }` and push no planned row. Otherwise push the
+     planned row exactly as today (including "In stock" behaviour and checked carry-over).
+     One optional field on custom rows; recomputed on every run, so re-running is idempotent.
+  4. Display/purchase quantity of a row with `plannedNeed`: row quantity null -> planned quantity;
+     both numeric, same unit -> sum (independent needs); sources list both ("Added by you" /
+     "Running low" / "Cook Now" + planned recipes). Ticking the row runs the existing
+     grocery -> pantry path once with that quantity.
+  5. Equivalent but unit-incompatible rows stay separate; each renders a computed note "Also on
+     your list as <name> (<qty unit>) - check the amount" (render-time only, nothing stored).
+  6. Adds from other sources dedupe with the same helpers against UNCHECKED rows:
+     `buyMissingIngredient` (Cook Now, Fill the gaps) -> "already on your list";
+     `addCustomGroceryItem` with a compatible unchecked match -> merge quantity into it
+     (sum, or set when it was null) and say so; incompatible -> separate row (note in 5);
+     `syncStapleToGrocery` -> no restock row when an equivalent unchecked custom row exists.
+B3 — essentials restock without churn
+  1. `syncStapleToGrocery()` adds the restock row for Low OR Empty (source "Running low" / "Out"),
+     respecting `suggestDismissed` and B2.6. Never two rows for one staple.
+  2. `checkAndReplenishLowStock()`: `shouldBeInList` = (Low or Empty) and not dismissed, and
+     `inList` counts an equivalent unchecked row from any source. A second call with no data
+     change returns false; opening Shop with nothing changed calls `saveData()` zero times.
+
 acceptance:
-  - [ ] Raw chicken breast in the fridge bought 5 d ago (2-day window): Expired bucket, unavailable,
-        Cook Now lists it as missing even after Keep; not in any bulk-removal set; per-row Remove
-        removes only it. Frozen raw chicken 200 d old and fridge Spinach past estimate unchanged
-        (null / Check). Eggs, tofu, canned beans never take this path.
-  - [ ] Manual "Frozen Blueberries" + planned recipe using Frozen Blueberries -> one unticked row
-        with both sources; regenerate twice -> still one row, same quantity; checked manual rows and
-        staple rows unchanged.
-  - [ ] Staple set to Empty -> one "Running low/Out" row on Shop; second
-        `checkAndReplenishLowStock()` returns false; opening Shop twice triggers no extra
-        `saveData()`.
-  - [ ] Full local suite, `npm run test:ledger-contract`, `node --check app.js`, `git diff --check`.
+  - [ ] Fridge raw chicken breast bought 3 d ago -> Expired, "Past safe fridge time", unavailable;
+        Cook Now lists it missing; still missing after Keep and with a "Still good"-style keptOn.
+        Marked staple: still unavailable. Ground pork 3 d, bangus 3 d, liver 2 d -> same.
+        Pork chop 3 d -> fine (limit 3, day 3 inclusive per existing `daysLeft < 0` rule); 4 d -> expired.
+        Cooked "Chicken adobo" pantry lot 5 d -> expired.
+  - [ ] Raw chicken in the fridge with no purchaseDate -> "No bought date - add it before use",
+        unavailable; adding a date of today makes it available.
+  - [ ] Frozen raw chicken 200 d, eggs 40 d, tofu, canned tuna, canned beans, fridge spinach past
+        estimate: unchanged signals (null / Check / existing).
+  - [ ] Past-limit and unknown-date lots are absent from every bulk-removal set and the bulk
+        confirm text; per-row Remove removes only that lot and writes one tombstone; `updatedAt`
+        changes never move the safety clock.
+  - [ ] Cooked fridge meal with fridgeLife 7 cooked 5 d ago -> expired; fridgeLife missing,
+        cooked 5 d ago -> expired; freezer meals unchanged.
+  - [ ] Manual "Frozen Blueberries" (qty null) + planned recipe needing 1 pack -> one unticked row,
+        quantity 1 pack, both sources; `generateGroceryList()` x3 -> same single row, same quantity.
+        Manual 2 cup + planned 1 cup -> 3 cup. Manual 200 g + planned 1 cup -> two rows, each with
+        the "Also on your list" note. Checked manual row: planned row added as today.
+  - [ ] Cook Now "Buy Bay Leaves", then plan a recipe with bay leaves -> one row. Fill the gaps
+        chip for an item already planned/unticked -> "already on your list". Rice vs rice vinegar,
+        milk vs evaporated milk never merge.
+  - [ ] Staple Low -> one restock row; Empty -> one "Out" row; dismissed -> none; second
+        `checkAndReplenishLowStock()` returns false in each case; `showTab('grocery')` twice with
+        no data change -> zero `saveData()` calls. Staple Low + manual same item -> one row.
+  - [ ] Ticking a merged row adds stock once (pantry quantity increases once).
+  - [ ] Full local suite, `npm run test:ledger-contract` (13), `node --check app.js`,
+        `git diff --check`. New tests in `tests/ffs-release-blockers.spec.js`.
 constraints:
-  - No new feature, field or UI surface. No change to tombstone/backup/restore code or workers/.
-    Never merge or push `main`/`ffs-v1`/`ffs-v1-refine`. Never deploy. Stop at `status: review`.
+  - No new screen, button, recipe, or infrastructure. Only new stored field: optional
+    `plannedNeed` on custom grocery rows (B2.3). No change to tombstone, backup, restore,
+    `saveData()`/`cloudReady` guard, auth, ChronaSense or `workers/`.
+  - Never delete records automatically. Never merge/push `main`, `ffs-v1`, `ffs-v1-refine`. Never
+    deploy. Push only the task branch. Stop at `status: review` with CHANGELOG/TEST_REPORT entries.
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
