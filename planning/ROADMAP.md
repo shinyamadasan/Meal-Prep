@@ -106,6 +106,9 @@ needed to unblock. Resolve, then re-add to the top of the Task Queue.
 Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commit).
 
 ### Bugs / broken
+- **Stale production smoke specs (post FFS-V1)** — `production-smoke-kitchen-truth.spec.js` (3 tests) still
+  expects estimated-window items under Expired (TASK-088 moved them to Check); `production-smoke-low-effort.spec.js`
+  lacks `air-fryer` in the equipment vocabulary (TASK-079). App behavior is correct; the specs need updating.
 - **Family sharing acceptance flow** — invitations write to `familyInvitations` but there's no UI to
   accept; `status` stays `pending` forever. (Feature is Hidden anyway.)
 - **Sentry inactive** — code loads only when `SENTRY_DSN` is set; it's empty.

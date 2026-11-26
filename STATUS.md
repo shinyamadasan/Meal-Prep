@@ -5,6 +5,35 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-11-26 — Flexible Food System V1 RELEASED to production (PR #6)
+
+**Owner decisions:** release approved, conditional on backup recovery, data integrity, food-safety and
+ChronaSense checks passing; manual household acceptance waived on the strength of independent QA.
+Existing inventory must not be modified or cleaned up during release.
+**Shipped:** candidate `d0528fc` (`ffs-v1-refine`), merged into `main` as `102059e` (merge commit,
+parents `3c82258` + `d0528fc`). GitHub Pages build `built` for `102059e`; live `app.js`,
+`index.html` and `style.css` are byte-identical to `main`.
+**Pre-merge gates (all on `d0528fc`):** local suite 905/905; `test:ledger-contract` 13/13;
+`ready-food-contract` 1/1; `test:bridge` 254/254 (after `npm ci` in the worker folder — no worker
+code in the release). Production export (2026-11-26, 97 pantry rows) loaded by the new code in an
+offline, Firebase-free copy: all 20 collections byte-identical before and after reload, zero data
+writes on load, every tab renders, export round-trip identical. Clean-install import restored every
+record (only `updatedAt` restamped, by design); remove-then-reimport recovered the item. Integrity:
+no duplicate ids, missing names or invalid quantities. Food safety on real data: 8 expired
+(3 raw meats past the fridge limit flagged unsafe), 7 to check. Nothing removed.
+**Post-deploy smoke (live, signed out, no account writes):** `test:prod` 151 passed, 4 skipped,
+4 failed. All 4 failures are stale expectations, not regressions: 3 in
+`production-smoke-kitchen-truth.spec.js` still expect estimated-window items under **Expired**
+(TASK-088 moved them to **Check**), and `production-smoke-low-effort.spec.js` lacks `air-fryer`
+(TASK-079, shipped earlier). Live probe confirmed: past-limit fridge chicken and a passed printed
+expiry are flagged expired; frozen chicken and in-date eggs are not; estimated produce goes to Check.
+**Rollback:** `git revert -m 1 102059e && git push origin main` (Pages redeploys in ~1 min). Data is
+unaffected; restore from the 2026-11-26 export only if data itself is wrong.
+**Next:** refresh the 4 stale production smoke specs (ROADMAP Known Issues). PROP-041 remains a
+separate, held track.
+
+---
+
 ## 2026-11-25 — Flexible Food System V1: wave 1 approved, planning committed on `ffs-v1`
 
 **Owner decisions:** approve PROP-035/036/037 (build in dependency order, independent QA + review
