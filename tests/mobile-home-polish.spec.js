@@ -36,8 +36,8 @@ async function seedAttention(page) {
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'mhp_exp1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
-      { id: 'mhp_exp2', name: 'Old Milk', category: 'Dairy', purchaseDate: day(10), shelfLifeDays: 5, storage: 'fridge' },
+      { id: 'mhp_exp1', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' },
+      { id: 'mhp_exp2', name: 'Old Milk', category: 'Dairy', dateMode: 'expiry', expiryDate: day(5), storage: 'fridge' },
       { id: 'mhp_soon1', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
@@ -155,7 +155,7 @@ test.describe('Home hierarchy and secondary surfaces', () => {
       const day = eval(dayFnSrc);
       AppState.deletions = {};
       AppState.pantry = [
-        { id: 'mhp_exp3', name: 'Old Adobo Sauce', category: 'Pantry', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+        { id: 'mhp_exp3', name: 'Old Adobo Sauce', category: 'Pantry', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
       ];
       AppState.cookedMeals = normalizeCookedMeals([
         { id: 'mhp_cm1', name: 'Ready Lechon Manok', cookedDate: day(0), storage: 'fridge', fridgeLife: 4, freezerLife: 60, portionsRemaining: 2 }

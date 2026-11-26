@@ -201,6 +201,12 @@
                         <button class="shop-subtab active" id="shop-subtab-list" onclick="switchShopTab('list')">Shop List</button>
                         <button class="shop-subtab" id="shop-subtab-prices" onclick="switchShopTab('prices')">Price List</button>
                     </div>
+                    <details id="no-plan-grocery" class="no-plan-grocery" ontoggle="renderNoPlanGrocery()">
+                        <summary>No plan? Fill the gaps</summary>
+                        <p>Choose an ingredient to add it to your list. Based on <cite>So Easy So Good</cite> by Kylie Sakaida.</p>
+                        <button type="button" class="btn btn--outline btn--sm no-plan-different-ideas hidden" onclick="rotateNoPlanIdeas()">↻ Different ideas</button>
+                        <ul class="no-plan-roles"></ul>
+                    </details>
                     <div class="grocery-controls" id="grocery-controls">
                         <button class="btn btn--outline btn--sm" id="clear-grocery">Clear All</button>
                         <button class="btn btn--secondary btn--sm" id="add-custom-item">Add Item</button>
@@ -244,6 +250,17 @@
                         <span id="inventory-verify-status" class="inventory-verify-status"></span>
                         <button class="btn btn--secondary btn--sm" onclick="verifyInventoryChecked()">Inventory checked</button>
                     </div>
+
+                    <details id="stock-health" class="stock-health" ontoggle="renderStockHealth()">
+                        <summary>Stock health</summary>
+                        <div class="stock-health-body">
+                            <div id="stock-health-report"></div>
+                            <div class="stock-health-actions">
+                                <button type="button" class="btn btn--secondary btn--sm" onclick="copyStockHealthReport()">Copy report</button>
+                                <span id="stock-health-copy-status" role="status"></span>
+                            </div>
+                        </div>
+                    </details>
 
                     <!-- Cooked / prepped meals -->
                     <div id="cooked-meals-section" class="cooked-meals-section">
@@ -294,9 +311,13 @@
                                     <input type="text" id="pantry-unit" class="form-control" placeholder="pcs, g, kg" autocomplete="off" aria-label="Unit">
                                 </label>
                                 <label class="pad-field pad-field--date">
-                                    <span class="pad-label">Expires</span>
-                                    <input type="date" id="pantry-expiry" class="form-control" autocomplete="off" aria-label="Expiry date">
+                                    <span class="pad-label">Printed date</span>
+                                    <input type="date" id="pantry-expiry" class="form-control" autocomplete="off" aria-label="Printed date">
                                 </label>
+                                <select id="pantry-printed-date-kind" class="form-control" aria-label="Printed date type">
+                                    <option value="">Use by / expiry</option>
+                                    <option value="best-before">Best before</option>
+                                </select>
                             </div>
                             <div id="pantry-search-wrap" class="pantry-search-wrap hidden">
                                 <input type="text" id="pantry-search" class="form-control" placeholder="Search your kitchen…" autocomplete="off" aria-label="Search pantry items">

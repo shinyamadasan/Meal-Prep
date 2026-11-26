@@ -192,7 +192,7 @@ test('cook suggestion with backslash and quote searches literally', async ({ pag
   await loadApp(page);
   const name = "\\';window.__hardeningXss=true;//";
   await importHardening(page, { recipes: [{ ...RECIPE, id: 'hardening', name }] });
-  await page.evaluate(() => { window.getCookableRecipes = () => [{ recipe: AppState.recipes.find(r => r.id === 'hardening'), missing: 0 }]; renderCookSuggestions(); document.querySelector('.cs-card').click(); });
+  await page.evaluate(() => { window.getCookableRecipes = () => [{ recipe: AppState.recipes.find(r => r.id === 'hardening'), missing: 0, tier: 'ready' }]; renderCookSuggestions(); document.querySelector('.cs-card').click(); });
   await expect(page.locator('#recipe-search')).toHaveValue(name);
   expect(await page.evaluate(() => !!window.__hardeningXss)).toBe(false);
 });

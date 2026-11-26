@@ -79,6 +79,8 @@
 - **"What should we eat?"** — Working · `getWhatShouldWeEatSuggestions()` / `renderWhatShouldWeEatCard()` · up to 3 picks answering the whole question in one card: **Eat this first** (ready cooked food, straight from `getReadyFoodSuggestions()`), **Easiest** (lowest-cost cookable recipe, only when genuinely low-effort), **Something different** (only when there is a `cookHistory` to differ from). Deterministic additive cost, lower = better; shopping is a **tier**, not a weight, so anything cookable now outranks anything needing a trip. Reasons are shown as chips, never a number. Completion hints ("Add rice + steamed veg") are deterministic sentences off the existing `mealBalance`, not composed meals. Zero new persisted state; displaying a pick consumes nothing. Rendered ABOVE the existing Ready-to-eat and What-should-I-cook cards, both unchanged. See DECISIONS D-059.
 - **"Ready to eat"** — Working · `getReadyFoodSuggestions()` / `renderReadyFoodCard()` · up to 3 stored cooked meals, ranked expiring-fridge → fridge → freezer, each with a one-tap **Use 1**. Rendered ABOVE the cook suggestions so the priority is ready food → easiest cook → everything else. Expired batches are excluded. See DECISIONS D-056.
 - **"What should I cook?"** — Working · `getCookSuggestions()` / `renderCookSuggestionCard()` · up to 3 deterministic options: ⚡ Easiest (lowest effort score), 🥬 Use soon (`getExpirySuggestions()`, shared with the existing attention card), 🍽️ Something different (least-recently cooked, from `cookHistory`). A category with no supporting data is OMITTED, never guessed. No model calls, no server. See DECISIONS D-055.
+- **Use-soon recipe suggestions (D-086)** come from matching available lots due today through
+  three days out via `getExpirySuggestions()`. Past-date items remain visible in Fridge and Attention.
 
 ## Cook (My Recipes)
 - **Recipe card grid** — Working · `renderRecipes()` · photo, nutrition, cost, shelf-life badges.
@@ -88,13 +90,17 @@
 - **Search & filter** — Working · name/instructions, category, prep-time, favorites-only.
 - **Recipe count** — Working · `#recipe-count` shows how many recipes match the active search/filter (updates live in `renderRecipes()`).
 - **Add/Edit recipe modal** — Working · `openEditRecipeModal()`; autocomplete from `INGREDIENT_DB`; USDA lookup; photo upload w/ compression.
-- **Cook suggestions strip** — Working · 3 tiers from pantry.
+- **Cook suggestions strip** — Working · 3 tiers from available pantry lots via
+  `getCookableRecipes()`. The D-086 ingredient rules distinguish Eggs from Eggplant.
 - **Getting Started card** — Working · 2-step onboarding, auto-dismiss.
 - **Paste recipe import** — Partial · `parseAndImportRecipe()`; heuristic, quality varies; shows confidence/warning.
 - **CSV import** — Working · file → preview → confirm; template download.
 - **JSON export/import** — Working · `exportData()` / `importData()`. Import **merges** by id (`unionById`) — existing items win on collision. `validateSnapshotData()` and `prepareSnapshotChange()` validate and stage detached records before mutation; rejected files do not change live data or deletion markers. Legacy partial exports remain supported. A failed safety backup aborts the operation; a failed primary local save rolls runtime data back. Grocery category, name, unit and source text is escaped on display, and grocery ids are JSON-encoded in handlers. Confirmation uses `showConfirmDialog()`. The JSON export format remains 1.6; see D-083. Release hardening (D-084) also escapes imported recipe, Storage Guide and Cooking Hacks text/attributes and their related Plan/Prep/Nutrition/Home handlers, including nested ingredient forms and CSV preview. Imported values remain unchanged in storage.
 
 ## Inventory (My Fridge)
+- **Stock health (D-087)** — `#stock-health` opens a read-only report grouped by food class.
+  It shows past printed dates, estimated safety checks, stale records, and consistency issues.
+  Freezer estimates describe quality. **Copy report** copies the visible findings as text.
 - **Cooked meals** — Working · `renderCookedMeals()` · location, days-remaining, expired highlight.
 - **Pantry grid** — Working · `renderPantry()` · grouped by storage; staple cycling; inline date/qty/storage edit; storage tips from `PANTRY_KNOWLEDGE`. Each card shows name, quantity/unit and the absolute date as three separate elements (`.pi-name` / `.pi-qty` / `.pi-date`) alongside the relative `.pantry-fresh-badge`. The date reads **Expires ‹date›** for a printed expiry the user entered and **Best by ‹date›** for one derived from bought-date + shelf life; both come from `pantryExpiryInfo()`, which reads `pantryDaysLeft()`'s own two branches so the date and the badge can never disagree. See DECISIONS D-066.
 - **Pantry search** — Working · `#pantry-search` filters the pantry by name in real time (`renderPantry()`); preserves storage grouping; encouraging "No matches" empty state; hidden when the pantry is empty. *(Job: "did I already buy X?")*
@@ -111,6 +117,9 @@
 
 ## Shop (Grocery)
 - **Auto grocery list** — Working · `renderGroceryList()` · aggregated from plan, scaled, grouped by category (A→Z, "Other" last), per-item cost, in-stock badges, check-off, recipe source labels.
+- **No plan? Fill the gaps** — Working · `#no-plan-grocery` opens a guide based on Kylie Sakaida’s *So Easy So Good*. The seven roles count available ingredients and unchecked shopping rows. Short roles offer up to four choices, ranked by nutrition rules, recipe versatility, and convenience. Tap one chip to add that ingredient to Shop.
+- **In stock (D-086)** — `pantryMatchesForShop()` uses available lots and ingredient matches
+  such as Jasmine Rice for Rice. `groceryItemChecked()` honors the shopper's manual check state.
 - Add custom item, Clear All, Copy to clipboard, Prices→Price Book, weekly cost summary.
 - **Grocery → Inventory on check** — Working · `toggleGroceryItem()` → `stockPurchasedGroceryItem()` · checking a row transfers it to inventory with **no further input**: category, storage, shelf life and purchase date are all inferred. Buying more of something you already have updates the existing record (`findMergeableStock()` → `canMergePurchaseInto()` → `applyPurchaseToStock()`) rather than creating a duplicate; a printed-expiry, already-expired, or different-unit record stays separate (D-069 — quantities are added, never converted). Buying a low staple sets `stockLevel: 'full'` and clears its auto shopping row. Unchecking undoes the transfer exactly, via the `stocked` receipt. Check-off now persists (it previously never called `saveData()`). See DECISIONS D-057.
 

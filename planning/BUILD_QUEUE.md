@@ -11,6 +11,36 @@
 
 ## Approved sprint
 
+### BQ-027 — FFS-0 Truthful availability (read path only)
+- source: PROP-035 · priority: P1 · approved: 2026-11-25 (owner, chat — "Proceed with PROP-035, PROP-036 and PROP-037 in dependency order")
+- build: TASK-080. Read paths only; stock writes deferred (D-086). Owner deploy hold → max landing state `approved`.
+- detail: planning/flexible-food-system-v1/IMPLEMENTATION_PLAN.md (FFS-0)
+
+### BQ-028 — FFS-1 Stock health: read-only, per food class, three signals
+- source: PROP-036 (revised by owner: no universal cutoff) · priority: P1 · approved: 2026-11-25 (owner, chat)
+- build: TASK-081. Never deletes or edits; backup before any future cleanup (D-087). Owner deploy hold.
+- detail: TASKS.md TASK-081; docs/DECISIONS.md D-087
+
+### BQ-029 — FFS-2 No-plan grocery "Fill the gaps"
+- source: PROP-037 · priority: P1 · approved: 2026-11-25 (owner, chat)
+- build: TASK-082. Preserve Kylie's framework; count what we have; flexible choices; no plan required; no unnecessary purchases; versatility-first ranking. Owner deploy hold.
+- detail: TASKS.md TASK-082
+
+### BQ-032 — PROP-041 Conversational food management (separate track, after FFS-V1)
+- source: PROP-041 · priority: P1 (Phase 1 safety first) · approved: 2026-11-26 (owner, chat — direction; plan approval pending)
+- build: HELD. Not converted to TASKS until the owner approves `planning/PROP-041-PLAN.md` and its 5 decisions. Phase 1 (safety visibility, duplicate-write protection, safe merges, undo) ships before Phases 2-3. High risk, solo, `approved` gate. Never blocks the FFS-V1 release.
+- detail: planning/PROP-041-PLAN.md
+
+### BQ-030 — FFS-3 Balanced Plate hints + Snack Pack (wave 2, prepared)
+- source: PROP-038 · priority: P2 · approved: 2026-11-25 (owner: "Prepare PROP-038 as the next wave")
+- build: TASK-083 drafted at `status: todo`; Claude releases it to Codex after the owner reviews wave 1.
+- detail: TASKS.md TASK-083
+
+### BQ-031 — FFS-4 Private cookbook recipes (source refs, original vs adaptation)
+- source: PROP-039 rev 2 · priority: P2 · approved: 2026-11-25 (owner, chat — "subject to implementation review after Wave 1")
+- build: TASK-084 prepared at `status: todo`; released after wave 1. High risk → held merge. Cookbook content stays private (import file outside repo).
+- detail: TASKS.md TASK-084
+
 ### BQ-017 — Planner tab overflows horizontally on mobile (+23px at 390px width)
 - source: PROP-029 · priority: P1 · approved: 2026-07-03 (chat)
 - build: Real, reproducible bug caught by `tests/mobile-layout.spec.js` after its TASK-004 fixture fix — Planner is the only tab (of 7) with nonzero horizontal overflow at a 390px viewport. Root cause not yet traced; likely a fixed-width element in the planner day-grid/table that doesn't shrink/wrap below a breakpoint. Start with a code trace of the planner tab markup/CSS before proposing a fix.

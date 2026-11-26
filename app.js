@@ -169,6 +169,95 @@ function pantryDaysLeft(p) {
   return daysLeftFrom(p.purchaseDate, shelf);
 }
 
+// FDA Refrigerator & Freezer Storage Chart (40°F / 4°C): https://www.fda.gov/media/74435/download
+// First matching rule wins. Use the conservative end for whole cuts and opened deli meats.
+const FRIDGE_SAFETY_LIMITS = [
+  { safetyClass: 'cooked-leftover', days: 4, match: /\b(?:cooked|leftovers?|adobo|curry|stews?(?![ -]+meat)|soups?)\b/i },
+  { safetyClass: 'cured-processed', days: 7, match: /\b(?:bacon|smoked links?|hot[ -]?dogs?)\b/i },
+  { safetyClass: 'cured-processed', days: 3, match: /\b(?:ham|luncheon(?: meat)?|lunch meat|deli meat|spam)\b/i },
+  { safetyClass: 'raw-sausage', days: 2, match: /\b(?:sausages?|longganisa|longanisa|chorizo)\b/i, exclude: /\bsmoked\b/i },
+  { safetyClass: 'ground', days: 2, match: /\b(?:ground|minced|giniling|hamburgers?|stew[ -]+meats?)\b/i },
+  { safetyClass: 'variety', days: 2, match: /\b(?:liver|kidney|heart|tongue|giblet|tripe|atay|isaw)s?\b/i },
+  { safetyClass: 'poultry', days: 2, match: /\b(?:chicken|turkey|duck|manok)s?\b/i },
+  { safetyClass: 'seafood', days: 2, match: /\b(?:fish|bangus|tilapia|salmon|tuna|galunggong|shrimp|prawn|hipon|squid|pusit|crab|mussel|clam|scallop|oyster|isda)s?\b/i },
+  { safetyClass: 'whole-cut', days: 3, match: /\b(?:beef|pork|lamb|veal|goat|steak|chop|roast|rib|brisket|sirloin|liempo|kasim)s?\b/i }
+];
+const COOKED_FRIDGE_LIMIT = FRIDGE_SAFETY_LIMITS[0].days;
+const FRIDGE_SAFETY_EXCLUSIONS = /\b(?:eggs?|itlog|tofu|tokwa|tempeh|beans?|lentils?|canned|tinned|dried|powder)\b/i;
+const THAWED_FOOD_DATE_HELP = 'Frozen until recently? Set its bought date to the day it went in the fridge.';
+
+function pantryFridgeSafety(p) {
+  // Fridge limits only: frozen food is quality-only, and counter food is shelf-stable
+  // (canned luncheon meat, instant soup). Condiments and dry goods never take this path.
+  if ((p.storage || inferStorage(p.name, p.category)) !== 'fridge') return null;
+  if (stockFoodClass(p) !== 'perishable') return null;
+  var name = (p.name || '').trim().toLowerCase();
+  if (FRIDGE_SAFETY_EXCLUSIONS.test(name)) return null;
+  var entry = stockIngredientEntry(name);
+  var names = [name, entry?.name || '', ...(entry?.aliases || [])];
+  if (names.some(value => FRIDGE_SAFETY_EXCLUSIONS.test(value))) return null;
+  var category = (p.category || entry?.category || '').toLowerCase();
+  // The lot's wording takes precedence over broad aliases (e.g. Hotdog lists "sausage").
+  var rule;
+  for (var value of names) {
+    rule = FRIDGE_SAFETY_LIMITS.find(candidate =>
+      (category === 'protein' || (candidate.safetyClass === 'cooked-leftover' &&
+        !['vegetable', 'fruit', 'dairy', 'pantry', 'grain'].includes(category))) &&
+      candidate.match.test(value) && !candidate.exclude?.test(name));
+    if (rule) break;
+  }
+  if (!rule) return null;
+  var limitDays = Math.min(rule.days, entry?.fridgeDays ?? rule.days);
+  var boughtDay = /^\d{4}-\d{2}-\d{2}$/.test(p.purchaseDate) ? stockCalendarDay(p.purchaseDate) : null;
+  var daysLeft = boughtDay == null ? null : boughtDay + limitDays - stockCalendarDay(todayISO());
+  return { daysLeft, limitDays, safetyClass: rule.safetyClass };
+}
+
+function pantryDateSignal(p) {
+  var printed = p.dateMode === 'expiry';
+  var bestBefore = printed && p.printedDateKind === 'best-before';
+  var daysLeft = pantryDaysLeft(p);
+  // A malformed printed date must never authorize a deletion.
+  if (printed && (!/^\d{4}-\d{2}-\d{2}$/.test(p.expiryDate) || stockCalendarDay(p.expiryDate) == null)) {
+    daysLeft = null;
+  }
+  var fridge = pantryFridgeSafety(p);
+  if (fridge && (fridge.daysLeft == null || fridge.daysLeft < 0)) {
+    var safety = fridge.daysLeft == null ? 'unknown-date' : 'past-limit';
+    if (printed && daysLeft < 0) daysLeft = Math.min(daysLeft, fridge.daysLeft ?? Infinity);
+    else daysLeft = fridge.daysLeft;
+    return { kind: 'expired', daysLeft, printed, bestBefore, safety,
+      limitDays: fridge.limitDays, safetyClass: fridge.safetyClass };
+  }
+  var kind = null;
+  if (daysLeft != null) {
+    if (daysLeft < 0) {
+      if (printed) kind = bestBefore ? 'check' : 'expired';
+      // Safety checks are for refrigerated perishables; counter produce past an
+      // estimate (onions, bananas) is a quality note on the Fridge card only.
+      else if (stockFoodClass(p) === 'perishable' &&
+               (p.storage || inferStorage(p.name, p.category)) !== 'counter') kind = 'check';
+    } else if (daysLeft <= FRESHNESS_WARN_DAYS) kind = 'use-soon';
+  }
+  var signal = { kind: kind, daysLeft: daysLeft, printed: printed, bestBefore: bestBefore };
+  if (fridge) {
+    signal.limitDays = fridge.limitDays;
+    signal.safetyClass = fridge.safetyClass;
+  }
+  return signal;
+}
+
+function pantryLotAvailable(p) {
+  if (p.stockLevel === 'empty') return false;
+  var signal = pantryDateSignal(p);
+  if (signal.safety) return false;
+  // A printed use-by can end the window sooner for the same fridge safety lot.
+  if (signal.kind === 'expired' && signal.safetyClass) return false;
+  if (isStaple(p)) return true;
+  if (Number.isFinite(p.quantity) && p.quantity <= 0) return false;
+  return signal.kind !== 'expired';
+}
+
 // The calendar date pantryDaysLeft() is actually counting down to, and whether
 // that date is the user's own (a printed expiry off the pack) or an estimate the
 // app derived from the bought date plus a shelf life.
@@ -189,6 +278,195 @@ function pantryExpiryInfo(p) {
   var m = String(d.getMonth() + 1).padStart(2, '0');
   var day = String(d.getDate()).padStart(2, '0');
   return { date: d.getFullYear() + '-' + m + '-' + day, printed: false, shelfLifeDays: Number(shelf) };
+}
+
+// Stock health (D-087). The first matching rule wins. Food class is separate
+// from the pantry staple flag, which controls how the app tracks quantity.
+const STOCK_CLASS_RULES = {
+  order: ['cooked-meal', 'frozen', 'fresh-herb', 'condiment', 'dry-goods', 'perishable', 'pantry-staple'],
+  herbs: /\b(?:herbs?|basil|parsley|cilantro|coriander leaf|mint|dill|chives|oregano|thyme|rosemary|sage|tarragon)\b/,
+  dried: /\b(?:dry|dried|ground|powder(?:ed)?|flakes?)\b/,
+  fresh: /\bfresh\b/,
+  condiment: /\b(?:sauces?|oils?|vinegars?|spices?|seasonings?|pastes?|dressings?|condiments?|ketchup|catsup|mayonnaise|mayo|mustard|pesto|salsa|salt|peppercorns?|(?:black|white) pepper|paprika|cumin|turmeric|cinnamon|nutmeg|cardamom|allspice|annatto|masala|bay leaves|garlic powder|onion powder|chili flakes|chili powder|curry powder|gochujang|bagoong|miso|tahini|vanilla extract)\b|^cloves?$/,
+  dryGoods: /\b(?:canned|tinned|rice|pasta|flours?|oats|oatmeal|quinoa|couscous|lentils|cornstarch)\b/,
+  rawCategories: ['protein', 'vegetable', 'fruit', 'dairy'],
+  shelfCategories: ['pantry', 'grain']
+};
+
+const STOCK_REVIEW_POLICY = {
+  perishable: { label: 'Perishable', reviewAfterDays: 7, safetyNote: 'Based on the shelf-life estimate.' },
+  frozen: {
+    label: 'Frozen', reviewAfterDays: 90,
+    safetyNote: 'Past the estimated freezer quality window — check it.'
+  },
+  'pantry-staple': { label: 'Pantry staples', reviewAfterDays: 180, safetyNote: 'Follow the printed date.' },
+  condiment: { label: 'Condiments', reviewAfterDays: 365, safetyNote: 'Follow the printed date.' },
+  'cooked-meal': {
+    label: 'Cooked meals',
+    fridge: { reviewAfterDays: 4, safetyAfterDays: 4, safetyNote: 'Typical fridge window is 3–4 days.' },
+    freezer: {
+      reviewAfterDays: 90, qualityAfterDays: 90,
+      safetyNote: 'Past the typical freezer quality window of about 2–3 months — check it.'
+    }
+  }
+};
+
+function stockIngredientEntry(name) {
+  return INGREDIENT_DB.find(i => i.name.toLowerCase() === name) ||
+    INGREDIENT_DB.find(i => (i.aliases || []).some(alias => alias.toLowerCase() === name));
+}
+
+function stockFoodClass(record) {
+  const rules = STOCK_CLASS_RULES;
+  const name = (record.name || '').trim().toLowerCase();
+  const entry = stockIngredientEntry(name);
+  const dbName = (entry?.name || '').toLowerCase();
+  const category = (record.category || entry?.category || '').toLowerCase();
+  const herb = rules.herbs.test(name) || rules.herbs.test(dbName);
+  const freshHerb = herb && !rules.dried.test(name) &&
+    (rules.fresh.test(name) || record.storage === 'fridge' || category === 'vegetable');
+  const matches = {
+    'cooked-meal': 'cookedDate' in record || 'portionsRemaining' in record || 'fridgeLife' in record,
+    frozen: record.storage === 'freezer',
+    'fresh-herb': freshHerb,
+    condiment: rules.condiment.test(name.replace(/\bin oil\b/g, '')) || rules.condiment.test(dbName) || herb,
+    'dry-goods': rules.dryGoods.test(name) || rules.dryGoods.test(dbName),
+    perishable: rules.rawCategories.includes(category) ||
+      (!rules.shelfCategories.includes(category) && record.storage !== 'counter' && record.staple !== true),
+    'pantry-staple': true
+  };
+  const match = rules.order.find(key => matches[key]);
+  if (match === 'fresh-herb') return 'perishable';
+  if (match === 'dry-goods') return 'pantry-staple';
+  return match;
+}
+
+// Compare calendar days without daylight-saving rounding. Stored timestamps
+// use the same local calendar as todayISO(); date-only values keep their day.
+function stockCalendarDay(value) {
+  if (typeof value !== 'string' || !value) return null;
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  if (dateOnly && date.toISOString().slice(0, 10) !== value) return null;
+  const dayMs = 86400000;
+  return (dateOnly ? date.getTime() : Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) / dayMs;
+}
+
+function stockUnitKey(value) {
+  const unit = (value || '').trim().toLowerCase();
+  const normalized = normalizeUnit(unit);
+  // The bulk-add parser defaults unfamiliar units to pieces. Keep the original
+  // unit for this comparison so a jar and a bag still produce a finding.
+  return normalized !== 'pieces' || /^(?:pcs?|pieces?)\.?$/.test(unit) ? normalized : unit;
+}
+
+function stockHealthReport(state, todayISO) {
+  const today = stockCalendarDay(todayISO);
+  const pantry = (state.pantry || []).filter(Boolean);
+  const cookedMeals = (state.cookedMeals || []).filter(Boolean);
+
+  function reportRow(record, foodClass, consistency) {
+    const cooked = foodClass === 'cooked-meal';
+    const name = record.name || 'Unnamed item';
+    const storage = record.storage || (cooked ? 'fridge' : inferStorage(name, record.category));
+    const classPolicy = STOCK_REVIEW_POLICY[foodClass];
+    const policy = cooked ? classPolicy[storage === 'freezer' ? 'freezer' : 'fridge'] : classPolicy;
+    const originDay = stockCalendarDay(cooked ? record.cookedDate : record.purchaseDate);
+    const updatedDay = stockCalendarDay(record.updatedAt) ?? originDay;
+    const printedDate = !cooked && record.dateMode === 'expiry' ? record.expiryDate : null;
+    const printedDay = /^\d{4}-\d{2}-\d{2}$/.test(printedDate) ? stockCalendarDay(printedDate) : null;
+    const age = today != null && originDay != null ? today - originDay : null;
+    const updatedAge = today != null && updatedDay != null ? today - updatedDay : null;
+    const entry = !cooked && stockIngredientEntry(name.toLowerCase().trim());
+    let safetyAfterDays = policy.safetyAfterDays;
+    let qualityAfterDays = policy.qualityAfterDays;
+    if (foodClass === 'perishable') {
+      // A fresh herb may share a name with a dried entry in the database.
+      const driedHerb = entry && STOCK_CLASS_RULES.herbs.test(entry.name.toLowerCase()) && entry.category === 'Pantry';
+      safetyAfterDays = record.shelfLifeDays ?? (driedHerb ? categoryShelfLife('Vegetable') :
+        ingredientShelfLife(entry?.name || name, record.category || entry?.category));
+    } else if (foodClass === 'frozen') {
+      qualityAfterDays = entry?.freezerDays;
+    }
+
+    const pastPrintedDate = printedDay != null && today != null && printedDay < today;
+    const pastBestBefore = pastPrintedDate && record.printedDateKind === 'best-before';
+    const expiration = pastPrintedDate && !pastBestBefore
+      ? 'Past printed date (' + printedDate + ')' : null;
+    const safety = age != null && safetyAfterDays != null && age > safetyAfterDays
+      ? 'Past typical safe window — check it' : null;
+    const dataStale = updatedAge != null && updatedAge > policy.reviewAfterDays
+      ? 'Not updated in ' + updatedAge + ' days — still accurate?' : null;
+    const quality = pastBestBefore ? BEST_BEFORE_CHECK_LABEL :
+      age != null && qualityAfterDays != null && age > qualityAfterDays ? policy.safetyNote : null;
+    const note = safety || (expiration && (foodClass === 'pantry-staple' || foodClass === 'condiment'))
+      ? policy.safetyNote : null;
+    return { foodClass, name, storage, expiration, safety, dataStale, consistency, quality, note };
+  }
+
+  const units = pantry.map(p => stockUnitKey(p.unit));
+  const rows = pantry.map((p, i) => {
+    const consistency = [];
+    const staple = isStaple(p);
+    if (p.quantity < 0) consistency.push('Negative quantity.');
+    else if (p.quantity === 0 && ['full', 'ok'].includes(p.stockLevel)) {
+      consistency.push('Stock marked ' + p.stockLevel + ' with zero quantity.');
+    } else if (p.quantity === 0 && p.stockLevel !== 'empty') consistency.push('Zero quantity, still listed as non-empty.');
+    else if (!staple && p.quantity == null && units[i]) consistency.push('Unit recorded with no quantity.');
+    if (staple && p.stockLevel === 'empty') consistency.push('Empty staple — check whether it needs restocking.');
+
+    // Compare each pair once. Different recorded units get the more specific
+    // message. Multiple earlier matches only add each finding once per row.
+    let duplicate = null;
+    let mixedUnits = null;
+    for (let j = 0; j < i; j++) {
+      if (!ingredientNamesMatch(p.name, pantry[j].name)) continue;
+      if (units[i] && units[j] && units[i] !== units[j]) mixedUnits ??= pantry[j].name;
+      else duplicate ??= pantry[j].name;
+    }
+    if (duplicate) consistency.push('Possible duplicate of ' + duplicate + '.');
+    if (mixedUnits) consistency.push('Different units from matching lot ' + mixedUnits + '.');
+    return reportRow(p, stockFoodClass(p), consistency);
+  });
+
+  return rows.concat(cookedMeals.map(meal => reportRow(meal, 'cooked-meal',
+    portionCountOrNull(meal.portionsRemaining, 0) === 0 ? ['Still listed as ready food with no portions remaining.'] : [])));
+}
+
+function renderStockHealth() {
+  const details = document.getElementById('stock-health');
+  if (!details?.open) return;
+  const report = stockHealthReport(AppState, todayISO());
+  const counts = [
+    [report.filter(row => row.expiration).length, 'past printed date'],
+    [report.filter(row => row.safety).length, 'safety estimate'],
+    [report.filter(row => row.dataStale).length, 'stale record'],
+    [report.reduce((total, row) => total + row.consistency.length, 0), 'consistency issue']
+  ];
+  const summary = '<ul class="stock-health-counts">' + counts.map(([count, label]) =>
+    '<li>' + count + ' ' + label + (count === 1 ? '' : 's') + '</li>').join('') + '</ul>';
+  const groups = Object.entries(STOCK_REVIEW_POLICY).map(([foodClass, policy]) => {
+    const rows = report.filter(row => row.foodClass === foodClass).map(row => {
+      const findings = [row.expiration, row.safety, row.dataStale, ...row.consistency, row.quality].filter(Boolean);
+      if (!findings.length) return '';
+      const storage = row.storage.charAt(0).toUpperCase() + row.storage.slice(1);
+      return '<li><strong>' + escapeHtml(row.name) + '</strong> · ' + escapeHtml(storage) +
+        '<ul>' + findings.map(text => '<li>' + escapeHtml(text) + '</li>').join('') + '</ul>' +
+        (row.note ? '<p class="stock-health-note">' + escapeHtml(row.note) + '</p>' : '') + '</li>';
+    }).join('');
+    return rows ? '<div class="stock-health-group"><h3>' + policy.label + '</h3><ul>' + rows + '</ul></div>' : '';
+  }).join('');
+  document.getElementById('stock-health-report').innerHTML = summary + (groups || '<p>No stock records to review.</p>');
+  document.getElementById('stock-health-copy-status').textContent = '';
+}
+
+function copyStockHealthReport() {
+  const report = document.getElementById('stock-health-report');
+  const status = document.getElementById('stock-health-copy-status');
+  copyTextToClipboard('Stock health\n' + report.innerText.replace(/\n{2,}/g, '\n'),
+    () => { status.textContent = 'Report copied.'; },
+    () => { status.textContent = 'Could not copy. You can select and copy the report text.'; });
 }
 
 // "Aug 10" within the current year, "Aug 10, 2026" outside it. Parsed at LOCAL
@@ -323,6 +601,22 @@ function freshnessStatus(daysLeft) {
   if (daysLeft === 0) return { cls: 'fresh-warn', icon: '<span class="fresh-dot"></span>', label: 'Use today!' };
   if (daysLeft <= FRESHNESS_WARN_DAYS) return { cls: 'fresh-warn', icon: '<span class="fresh-dot"></span>', label: daysLeft + 'd left' };
   return { cls: 'fresh-ok', icon: '<span class="fresh-dot"></span>', label: daysLeft + 'd left' };
+}
+
+const BEST_BEFORE_CHECK_LABEL = 'Best before passed — check it';
+const FREEZER_CHECK_LABEL = 'Freezer quality window passed — check it';
+
+function pantryCheckLabel(signal) {
+  return signal.bestBefore ? BEST_BEFORE_CHECK_LABEL : 'Estimated window passed — check it';
+}
+
+function pantrySafetyLabel(signal) {
+  if (signal.safety === 'unknown-date') return 'No bought date - add it before use';
+  return 'Past safe fridge time - do not use (' + signal.safetyClass + ', ' + signal.limitDays + '-day limit)';
+}
+
+function checkFreshnessStatus(label) {
+  return { cls: 'fresh-check', icon: '<span class="fresh-dot"></span>', label: label };
 }
 
 // Local Storage Management
@@ -1705,6 +1999,71 @@ function mealBalanceParts(recipe) {
   if (mb.vegetables) parts.push('Veg');
   if (mb.carb) parts.push('Carb');
   return parts;
+}
+
+function canSuggestBalancedPlate(recipe) {
+  return recipe && recipe.category !== 'Sauce & Side' && recipe.category !== 'Snack';
+}
+
+const BALANCED_PLATE_FLAVOR_BASE = /\b(?:garlic|onions?|shallots?|ginger|scallions?|leeks?|chill?(?:is?|ies|es)|jalape[nñ]os?|siling|lemongrass|cilantro|parsley|basil|dill|mint|chives?|lemons?|limes?|calamansi)\b/i;
+
+function balancedPlateAdditions(recipe, state) {
+  if (!canSuggestBalancedPlate(recipe)) return [];
+  const balance = normalizeMealBalance(recipe.mealBalance);
+  // Older recipes and recipes with no boxes checked normalize to all false.
+  if (!Object.values(balance).some(Boolean)) return [];
+  const roles = { vegetables: ['veggies', 'fruits'], protein: ['proteins'], carb: ['starches'] };
+  const parts = Object.keys(roles).filter(part => !balance[part]);
+  if (!parts.length) return [];
+
+  const recipes = state.recipes || [];
+  // Staples normally bypass the quantity and printed expiry checks for suggestions.
+  const pantry = (state.pantry || []).filter(p => p?.name && pantryLotAvailable(p) &&
+    !(Number.isFinite(p.quantity) && p.quantity <= 0) && !lotNeedsCheck(p) &&
+    (p.dateMode !== 'expiry' || pantryDateSignal(p).kind !== 'expired'));
+  const optionLimit = 2;
+
+  return parts.map(part => {
+    const candidates = pantry.filter(({ name }) => roles[part].includes(noPlanRole(name)) &&
+      (part !== 'vegetables' || !BALANCED_PLATE_FLAVOR_BASE.test(name)))
+      .map(({ name }) => ({
+        name,
+        // ingredientNamesMatch is symmetric, so generic lines like Rice count for Jasmine Rice.
+        recipeCount: recipes.filter(r => (r.baseIngredients || r.ingredients || [])
+          .some(ingredient => ingredientNamesMatch(ingredient.name, name))).length,
+        versatility: ingredientVersatility(name, recipes)
+      }))
+      .sort((a, b) => b.recipeCount - a.recipeCount || b.versatility - a.versatility || a.name.localeCompare(b.name));
+    const options = [];
+    for (const { name } of candidates) {
+      if (!options.some(option => ingredientNamesMatch(option, name))) options.push(name);
+      if (options.length === optionLimit) break;
+    }
+
+    // Quick sides from the recipe book can fill slots if the stock can support them.
+    for (const side of recipes) {
+      if (options.length === optionLimit) break;
+      if (side.category === 'Main Dish' || side.category === 'Breakfast') continue;
+      if (!side.name || !normalizeMealBalance(side.mealBalance)[part]) continue;
+      const effort = normalizeEffort(side.effort);
+      if (effort !== 'assembly' && effort !== 'very-low' && !recipeHasEquipment(side, ['no-cook'])) continue;
+      if (options.some(option => ingredientNamesMatch(option, side.name))) continue;
+
+      const ingredients = side.baseIngredients || side.ingredients || [];
+      const available = ingredients.every(ingredient => ingredientLineRole(ingredient) !== 'required' ||
+        ingredientAlternatives(ingredient.name).some(name => WATER_INGREDIENT_LINE.test(name) ||
+          pantry.some(p => ingredientNamesMatch(name, p.name))));
+      if (available) options.push(side.name);
+    }
+    return { part, options };
+  }).filter(addition => addition.options.length);
+}
+
+function balancedPlateHint(recipe, state) {
+  const [addition] = balancedPlateAdditions(recipe, state);
+  if (!addition) return '';
+  const labels = { vegetables: 'a veg', protein: 'a protein', carb: 'a carb' };
+  return 'Optional: add ' + labels[addition.part] + ' — ' + addition.options.join(' or ');
 }
 
 // ── Variety, from the cook history we already keep ───────────────────────────
@@ -4075,8 +4434,8 @@ function pasteDayInto(day) {
   AppState.dayToCopy = null;
   renderWeeklyPlanner();
   updateWeeklyStats();
-  saveData();
   generateGroceryList();
+  saveData();
   showSuccessMessage('Meals pasted to ' + day + '!');
 }
 
@@ -4184,11 +4543,11 @@ function updateServingSize(recipeId, newServings) {
   if (!recipe || newServings < 1) return;
 
   recipe.currentServings = newServings;
-  saveData();
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
   generateGroceryList();
+  saveData();
 }
 
 function resetServingSize(recipeId) {
@@ -4196,11 +4555,11 @@ function resetServingSize(recipeId) {
   if (!recipe) return;
 
   recipe.currentServings = recipe.baseServings;
-  saveData();
   renderRecipes();
   renderRecipeSelectionGrid();
   updateWeeklyStats();
   generateGroceryList();
+  saveData();
 }
 
 function openEditRecipeModal(recipeId) {
@@ -4244,7 +4603,7 @@ function openRecipeModal(recipeId, mode) {
   document.getElementById('nutrition-fat').value      = np.fat      || '';
   document.getElementById('storage-notes').value = recipe.storageNotes;
   document.getElementById('instructions').value = recipe.instructions;
-  renderRecipeMetaFields(recipe);
+  renderRecipeMetaFields(recipe, mode);
   
   // Handle existing photo
   if (recipe.photo) {
@@ -4635,19 +4994,23 @@ function renderCookSuggestions() {
   if (cookable.length === 0) { el.innerHTML = ''; return; }
 
   var csTiers = [
-    { key: 0, label: 'Can cook now', tierCls: 'cs-tier--ready', badgeCls: 'cs-badge--full', badgeText: 'All ingredients ✓' },
-    { key: 1, label: 'Missing 1 ingredient', tierCls: 'cs-tier--one', badgeCls: 'cs-badge--one', badgeText: 'Missing 1' },
-    { key: 2, label: 'Missing 2 ingredients', tierCls: 'cs-tier--two', badgeCls: 'cs-badge--two', badgeText: 'Missing 2' }
+    { key: 'ready', missing: 0, label: 'Can cook now', tierCls: 'cs-tier--ready', badgeCls: 'cs-badge--full', badgeText: 'All ingredients ✓' },
+    { key: 'check', missing: 0, label: 'Check first', tierCls: 'cs-tier--check', badgeCls: 'cs-badge--one', badgeText: '' },
+    { key: 'swap', missing: 0, label: 'Cook with a swap', tierCls: 'cs-tier--swap', badgeCls: 'cs-badge--swap', badgeText: 'Swap' },
+    { key: 'buy', missing: 1, label: 'Missing 1 ingredient', tierCls: 'cs-tier--one', badgeCls: 'cs-badge--one', badgeText: 'Missing 1' },
+    { key: 'buy', missing: 2, label: 'Missing 2 ingredients', tierCls: 'cs-tier--two', badgeCls: 'cs-badge--two', badgeText: 'Missing 2' }
   ];
 
   var sections = csTiers.map(function(tier) {
-    var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 4);
+    var items = cookable.filter(function(s) { return s.tier === tier.key && s.missing === tier.missing; }).slice(0, 4);
     if (!items.length) return '';
     var cards = items.map(function(s) {
+      var badge = tier.check ? '' : tier.badgeText;
+      if (s.needsCheck?.length) badge += (badge ? ' · ' : '') + cookCheckNote(s.needsCheck);
       return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
         escJAttr(s.recipe.name) + '\';renderRecipes()">' +
         '<span class="cs-name">' + escapeHtml(s.recipe.name) + '</span>' +
-        '<span class="cs-badge ' + tier.badgeCls + '">' + tier.badgeText + '</span>' +
+        '<span class="cs-badge ' + tier.badgeCls + '">' + escapeHtml(badge) + '</span>' +
         '</button>';
     }).join('');
     return '<div class="cs-tier ' + tier.tierCls + '">' +
@@ -4678,7 +5041,7 @@ function metaCheckboxes(containerId, options, selected, iconed) {
   }).join('');
 }
 
-function renderRecipeMetaFields(recipe) {
+function renderRecipeMetaFields(recipe, mode) {
   var r = recipe || {};
   var equipEl = document.getElementById('recipe-equipment-chips');
   if (equipEl) equipEl.innerHTML = metaCheckboxes('recipe-equipment-chips', RECIPE_EQUIPMENT, r.equipment, true);
@@ -4708,6 +5071,14 @@ function renderRecipeMetaFields(recipe) {
       el.checked = pair[1];
       if (el.parentNode) el.parentNode.classList.toggle('is-on', pair[1]);
     });
+
+  var hint = mode === 'details' ? balancedPlateHint(recipe, AppState) : '';
+  for (const id of ['recipe-name', 'balance-protein']) {
+    const group = document.getElementById(id)?.closest('.form-group');
+    if (!group) continue;
+    group.querySelector('.balanced-plate-hint')?.remove();
+    if (hint) group.insertAdjacentHTML('beforeend', '<div class="balanced-plate-hint">' + escapeHtml(hint) + '</div>');
+  }
 }
 
 function readCheckedValues(containerId) {
@@ -5020,14 +5391,15 @@ function renderRecipeQuickFilters() {
 
 // ── Home: up to three deterministic "what should I cook?" options ────────────
 
-// Recipes that use a pantry item expiring within 3 days. Lifted verbatim out of
-// renderDashboard() so the dashboard's own "Use before they expire" block and the
-// suggestion ranker below share one implementation instead of drifting apart.
+// Recipes that use an available pantry item expiring today or within 3 days.
+// Shared by Home's attention and recipe suggestions.
 function getExpirySuggestions(limit) {
   var nearExpiryNames = [];
   (AppState.pantry || []).forEach(function(p) {
-    var dl = pantryDaysLeft(p);
-    if (dl != null && dl <= 3) nearExpiryNames.push(p.name.toLowerCase());
+    var signal = pantryDateSignal(p);
+    if (signal.daysLeft != null && signal.daysLeft >= 0 && signal.daysLeft <= 3 && pantryLotAvailable(p)) {
+      nearExpiryNames.push(p.name);
+    }
   });
   if (!nearExpiryNames.length) return [];
 
@@ -5035,8 +5407,7 @@ function getExpirySuggestions(limit) {
   (AppState.recipes || []).forEach(function(r) {
     if (!r.baseIngredients) return;
     var match = r.baseIngredients.find(function(ing) {
-      var n = ing.name.toLowerCase();
-      return nearExpiryNames.some(function(en) { return n.includes(en) || en.includes(n); });
+      return nearExpiryNames.some(function(name) { return ingredientNamesMatch(ing.name, name); });
     });
     if (match) out.push({ recipe: r, ingredient: match.name });
   });
@@ -5065,6 +5436,7 @@ function getCookSuggestions() {
 
   var cookable = getCookableRecipes(); // pantry-aware; empty when the pantry has nothing to say
   var missingById = {};
+  var checkById = cookCheckNotesByRecipe(cookable);
   cookable.forEach(function(c) { missingById[String(c.recipe.id)] = c.missing; });
 
   // Prefer recipes we can nearly cook; fall back to the whole book when the
@@ -5076,7 +5448,7 @@ function getCookSuggestions() {
   function take(key, icon, label, recipe, why) {
     if (!recipe || used[String(recipe.id)]) return;
     used[String(recipe.id)] = true;
-    out.push({ key: key, icon: icon, label: label, recipe: recipe, why: why });
+    out.push({ key: key, icon: icon, label: label, recipe: recipe, why: checkById.get(String(recipe.id)) || why });
   }
 
   // Claim order is NOT display order. "Use soon" picks first because food about
@@ -5240,8 +5612,8 @@ function eatCookCandidates() {
   if (!recipes.length) return [];
 
   var cookable = getCookableRecipes();
-  var missingById = {};
-  cookable.forEach(function(c) { missingById[String(c.recipe.id)] = c.missing; });
+  var availabilityById = new Map(cookable.map(function(c) { return [String(c.recipe.id), c]; }));
+  var checkById = cookCheckNotesByRecipe(cookable);
 
   // Which recipes use something that needs using up. Same scan the dashboard's
   // "Use before they expire" block runs — one expiry rule, not two.
@@ -5259,7 +5631,7 @@ function eatCookCandidates() {
 
   return pool.map(function(r) {
     var id = String(r.id);
-    var missing = pantryInformed ? (missingById[id] || 0) : 0;
+    var availability = availabilityById.get(id);
     // Weights follow the priority order this wave was briefed with: expiry
     // pressure first, then balance, effort, hands-on time, cleanup, appliance,
     // and variety last as a tie-breaker. Each is small enough that no single
@@ -5277,7 +5649,10 @@ function eatCookCandidates() {
     Object.keys(parts).forEach(function(k) { score += parts[k]; });
     return {
       recipe: r,
-      missing: missing,
+      missing: availability?.missing ?? 0,
+      tier: availability?.tier,
+      swaps: availability?.swaps ?? [],
+      checkNote: checkById.get(id),
       pantryInformed: pantryInformed,
       expiringIngredient: expiringBy[id] || '',
       parts: parts,
@@ -5362,7 +5737,11 @@ function buildRecipeEatPick(key, cand) {
   var reasons = [];
 
   // Most-specific reason first — the card shows at most four.
+  if (cand.checkNote) reasons.push(cand.checkNote);
   if (cand.expiringIngredient) reasons.push('Uses ' + cand.expiringIngredient);
+  if (cand.tier === 'swap') {
+    reasons.push('Swap: use ' + cand.swaps.map(function(swap) { return swap.use; }).join(', '));
+  }
   if (key === 'different') {
     var days = daysSinceCooked(r.id);
     reasons.push(days == null ? "Haven't cooked this yet" : 'Not for ' + days + ' days');
@@ -5374,7 +5753,7 @@ function buildRecipeEatPick(key, cand) {
   var mb = normalizeMealBalance(r.mealBalance);
   if (mb.protein && mb.vegetables && mb.carb) reasons.push('Balanced');
   if (recipeHasTag(r, 'minimal-cleanup')) reasons.push('Minimal cleanup');
-  if (cand.pantryInformed && cand.missing === 0) reasons.push('Have everything');
+  if (cand.tier === 'ready') reasons.push('Have everything');
   else if (cand.missing > 0) reasons.push('Missing ' + cand.missing);
   if (recipeHasTag(r, 'batch-friendly')) reasons.push('Batch-friendly');
 
@@ -5484,9 +5863,8 @@ function renderReadyFoodCard() {
     return '<div class="dash-ready-row">' +
       '<button class="dash-ready-item" onclick="goToFreshnessTab()">' +
         '<span class="dash-ready-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + '</span>' +
-        '<span class="dash-ready-meta">' + escapeHtml(readyFoodMetaLine(m)) +
-          (hint ? ' · <span class="dash-ready-hint">' + escapeHtml(hint) + '</span>' : '') +
-        '</span>' +
+        '<span class="dash-ready-meta">' + escapeHtml(readyFoodMetaLine(m)) + '</span>' +
+        (hint ? '<span class="dash-ready-hint balanced-plate-hint">' + escapeHtml(hint) + '</span>' : '') +
       '</button>' + action +
       '</div>';
   }).join('');
@@ -5930,8 +6308,8 @@ function removeRecipeFromSlot(day, meal) {
   
   renderWeeklyPlanner();
   updateWeeklyStats();
-  saveData(); // TASK-064: this clear must persist, or a reload resurrects the removed recipe
   generateGroceryList();
+  saveData();
   showSuccessMessage('Recipe removed!');
 }
 
@@ -5951,8 +6329,8 @@ function clearDay(day) {
       AppState.weeklyPlan[day] = { breakfast: null, lunch: null, dinner: null, snacks: [] };
       renderWeeklyPlanner();
       updateWeeklyStats();
-      saveData(); // TASK-064: this clear must persist, or a reload resurrects the cleared day
       generateGroceryList();
+      saveData();
       showSuccessMessage(`${day} cleared!`);
     }
   );
@@ -6125,8 +6503,8 @@ function selectRecipeForPlanning(recipeId) {
   document.getElementById('recipe-selection-modal').classList.add('hidden');
   renderWeeklyPlanner();
   updateWeeklyStats();
-  saveData();
   generateGroceryList();
+  saveData();
 
   const where = days.length === 1 ? days[0]
     : (days.length === 7 ? 'every day' : days.length + ' days');
@@ -6153,8 +6531,8 @@ function clearWeeklyPlan() {
       });
       renderWeeklyPlanner();
       updateWeeklyStats();
-      saveData(); // TASK-064: this clear must persist, or a reload resurrects the old weekly plan
       generateGroceryList();
+      saveData();
     }
   );
 }
@@ -6195,35 +6573,85 @@ function updateWeeklyStats() {
   document.getElementById('planned-meals').textContent = plannedMeals;
 }
 
-// Returns recipes grouped by how many ingredients are missing from the pantry.
-// Tiers: missing 0 (can cook now), missing 1, missing 2. Requires ≥2 ingredients
-// and at least 1 pantry match so noise recipes don't appear.
+// A required line needs a check only when every available lot that satisfies it
+// is a "check" lot (D-088) the user has not confirmed today.
+function lotNeedsCheck(p) {
+  return !isKeptToday(p) && pantryDateSignal(p).kind === 'check';
+}
+
+function cookCheckNote(names) {
+  return 'check ' + names.join(', ') + ' first';
+}
+
+function cookCheckNotesByRecipe(cookable) {
+  var notes = new Map();
+  cookable.forEach(function(c) {
+    if (c.needsCheck?.length) notes.set(String(c.recipe.id), cookCheckNote(c.needsCheck));
+  });
+  return notes;
+}
+
+// Cook Now counts required lines. A swap can cover a gap without counting as a match.
 function getCookableRecipes() {
   if (!AppState.pantry.length || !AppState.recipes.length) return [];
-  var pantryNames = AppState.pantry.map(function(p) { return p.name.toLowerCase().trim(); });
-
-  function pantryHas(ingName) {
-    var n = ingName.toLowerCase().trim();
-    return pantryNames.some(function(pn) { return n.includes(pn) || pn.includes(n); });
-  }
+  var availablePantry = AppState.pantry.filter(pantryLotAvailable);
 
   var results = [];
   AppState.recipes.forEach(function(recipe) {
     var ings = recipe.baseIngredients || [];
     if (ings.length < 2) return;
+    var requiredTotal = 0;
     var matched = 0;
     var missingIngredients = [];
+    var swaps = [];
+    var optionalMissing = [];
+    var needsCheck = new Set();
     ings.forEach(function(ing) {
-      if (pantryHas(ing.name)) matched++;
+      var role = ingredientLineRole(ing);
+      if (role === 'water') return;
+
+      var alternatives = ingredientAlternatives(ing.name);
+      var haveLot = availablePantry.find(function(p) {
+        return alternatives.some(function(name) { return ingredientNamesMatch(name, p.name); });
+      });
+      var have = haveLot || alternatives.some(function(name) { return WATER_INGREDIENT_LINE.test(name); });
+      if (role !== 'required') {
+        if (!have) optionalMissing.push(ing.name);
+        return;
+      }
+
+      requiredTotal++;
+      if (have) {
+        matched++;
+        if (haveLot) {
+          var lots = availablePantry.filter(function(p) {
+            return alternatives.some(function(name) { return ingredientNamesMatch(name, p.name); });
+          });
+          if (lots.every(lotNeedsCheck)) lots.forEach(function(p) { needsCheck.add(p.name); });
+        }
+        return;
+      }
+
+      var swapLot = availablePantry.find(function(p) {
+        return alternatives.some(function(name) { return ingredientSwapMatch(name, p.name); });
+      });
+      if (swapLot) swaps.push({ need: ing.name, use: swapLot.name });
       else missingIngredients.push(ing.name);
     });
-    var missing = ings.length - matched;
-    if (missing <= 2 && matched >= 1) {
-      results.push({ recipe: recipe, matched: matched, total: ings.length, missing: missing, missingIngredients: missingIngredients });
+    var missing = missingIngredients.length;
+    if (requiredTotal >= 2 && missing <= 2 && matched >= 1) {
+      results.push({
+        recipe: recipe, matched: matched, total: ings.length, missing: missing,
+        missingIngredients: missingIngredients, requiredTotal: requiredTotal,
+        swaps: swaps, optionalMissing: optionalMissing, needsCheck: Array.from(needsCheck),
+        tier: missing > 0 ? 'buy' : needsCheck.size > 0 ? 'check' : swaps.length > 0 ? 'swap' : 'ready'
+      });
     }
   });
 
-  return results.sort(function(a, b) { return a.missing - b.missing || b.matched - a.matched; });
+  return results.sort(function(a, b) {
+    return a.missing - b.missing || a.swaps.length - b.swaps.length || b.matched - a.matched;
+  });
 }
 
 function renderHomeFavorites() {
@@ -6277,6 +6705,8 @@ function renderDashboard() {
   // ── Expiry-based recipe suggestions (≤3 days) ─────────────────
   // Same scan as before, now shared with getCookSuggestions() (see getExpirySuggestions).
   var expirySuggestions = getExpirySuggestions(3);
+  var cookable = getCookableRecipes();
+  var checkById = cookCheckNotesByRecipe(cookable);
 
   // ══════════════════════════════════════════════════════════════
   // LEVEL 1 — What needs attention?
@@ -6285,32 +6715,45 @@ function renderDashboard() {
   var attention = collectAttentionItems();
   var level1Card = '';
   var hasExpired = attention.expired.length > 0;
+  var hasCheck = attention.check.length > 0;
   var hasUseSoon = attention.useSoon.length > 0;
   var hasLow = lowStaples.length > 0;
   var hasSuggestions = expirySuggestions.length > 0;
-  if (hasExpired || hasUseSoon || hasLow || hasSuggestions) {
+  if (hasExpired || hasCheck || hasUseSoon || hasLow || hasSuggestions) {
 
-    // EXPIRED — the only destructive bucket, and the only one with per-row
-    // actions. Keep is one tap and invents no date; Remove is one tap.
+    function attentionActionRow(e, check, label) {
+      var args = '\'' + e.kind + '\', \'' + escJAttr(String(e.id)) + '\'';
+      var state = check ? 'check' : 'expired';
+      return '<div class="dash-attn-row dash-attn-row--' + state + '">' +
+        '<span class="dash-attn-name">' + escapeHtml(e.name) + '</span>' +
+        '<span class="dash-expiry-tag dash-expiry-tag--' + state + (e.safety ? ' dash-expiry-tag--safety' : '') + '">' + escapeHtml(label) + '</span>' +
+        '<button class="dash-inline-btn dash-keep-btn" onclick="keepAttentionItem(' + args + ')">' + (check ? 'Still good' : 'Keep') + '</button>' +
+        '<button class="dash-inline-btn dash-remove-btn" onclick="removeAttentionItem(' + args + ')">' + (check ? 'Toss' : 'Remove') + '</button>' +
+        '</div>';
+    }
+
     var expiredSection = '';
     if (hasExpired) {
+      var bulkCount = attention.expired.filter(e => !e.safety).length;
       var expiredRows = attention.expired.slice(0, 4).map(function(e) {
         var days = Math.abs(e.daysLeft);
         var when = days === 1 ? 'Expired yesterday' : 'Expired ' + days + 'd ago';
-        var args = '\'' + e.kind + '\', \'' + escJAttr(String(e.id)) + '\'';
-        return '<div class="dash-attn-row dash-attn-row--expired">' +
-          '<span class="dash-attn-name">' + escapeHtml(e.name) + '</span>' +
-          '<span class="dash-expiry-tag dash-expiry-tag--expired">' + when + '</span>' +
-          '<button class="dash-inline-btn dash-keep-btn" onclick="keepAttentionItem(' + args + ')">Keep</button>' +
-          '<button class="dash-inline-btn dash-remove-btn" onclick="removeAttentionItem(' + args + ')">Remove</button>' +
-          '</div>';
+        return attentionActionRow(e, false, e.safety ? pantrySafetyLabel(e) : when);
       }).join('') + (attention.expired.length > 4
         ? '<div class="dash-expiry-more">+ ' + (attention.expired.length - 4) + ' more</div>' : '');
       expiredSection = '<div class="dash-l1-block">' +
         '<div class="dash-l1-sublabel">' + icon('triangle-alert') + ' Expired</div>' +
         expiredRows +
-        '<button class="dash-inline-btn dash-l1-cta dash-remove-all-btn" onclick="removeAllExpired()">' +
-          'Remove expired (' + attention.expired.length + ')</button>' +
+        (bulkCount ? '<button class="dash-inline-btn dash-l1-cta dash-remove-all-btn" onclick="removeAllExpired()">' +
+          'Remove expired (' + bulkCount + ')</button>' : '') +
+        '</div>';
+    }
+
+    var checkSection = '';
+    if (hasCheck) {
+      checkSection = '<div class="dash-l1-block' + (hasExpired ? ' dash-l1-block--sep' : '') + '">' +
+        '<div class="dash-l1-sublabel">' + icon('triangle-alert') + ' Check</div>' +
+        attention.check.map(function(e) { return attentionActionRow(e, true, e.checkLabel); }).join('') +
         '</div>';
     }
 
@@ -6325,14 +6768,14 @@ function renderDashboard() {
           '</div>';
       }).join('') + (attention.useSoon.length > 4
         ? '<div class="dash-expiry-more">+ ' + (attention.useSoon.length - 4) + ' more</div>' : '');
-      useSoonItemSection = '<div class="dash-l1-block' + (hasExpired ? ' dash-l1-block--sep' : '') + '">' +
+      useSoonItemSection = '<div class="dash-l1-block' + (hasExpired || hasCheck ? ' dash-l1-block--sep' : '') + '">' +
         '<div class="dash-l1-sublabel">' + icon('hourglass') + ' Use soon</div>' +
         soonRows +
         '<button class="dash-inline-btn dash-l1-cta" onclick="showTab(\'fridge\')">View in Fridge →</button>' +
         '</div>';
     }
-    var expirySection = expiredSection + useSoonItemSection;
-    var hasExpiring = hasExpired || hasUseSoon;
+    var expirySection = expiredSection + checkSection + useSoonItemSection;
+    var hasExpiring = hasExpired || hasCheck || hasUseSoon;
 
     var lowSection = '';
     if (hasLow) {
@@ -6353,13 +6796,14 @@ function renderDashboard() {
         .concat(todayPlan.snacks || []).map(String);
       var sugRows = expirySuggestions.map(function(s) {
         var sid = String(s.recipe.id);
+        var reason = checkById.get(sid) || 'uses ' + s.ingredient;
         var alreadyPlanned = todayIds.indexOf(sid) >= 0;
         var btn = alreadyPlanned
           ? '<span class="dash-planned-badge">Planned ✓</span>'
           : '<button class="dash-inline-btn" onclick="planRecipeForToday(\'' + escJAttr(sid) + '\')">Plan it</button>';
         return '<div class="dash-attn-row">' +
           '<span class="dash-attn-name">' + escapeHtml(s.recipe.name) + '</span>' +
-          '<span class="dash-expiry-tag" style="color:var(--color-text-secondary)">uses ' + escapeHtml(s.ingredient) + '</span>' +
+          '<span class="dash-expiry-tag' + (checkById.has(sid) ? ' dash-expiry-tag--check' : '') + '">' + escapeHtml(reason) + '</span>' +
           btn +
           '</div>';
       }).join('');
@@ -6374,6 +6818,7 @@ function renderDashboard() {
     // on render. Manually opened/closed state still survives re-render.
     var attnSummaryParts = [];
     if (hasExpired) attnSummaryParts.push(attention.expired.length + ' expired');
+    if (hasCheck) attnSummaryParts.push(attention.check.length + ' to check');
     if (hasUseSoon) attnSummaryParts.push(attention.useSoon.length + ' use soon');
     if (hasLow) attnSummaryParts.push(lowStaples.length + ' running low');
     if (hasSuggestions) attnSummaryParts.push(expirySuggestions.length + ' meal idea' + (expirySuggestions.length === 1 ? '' : 's'));
@@ -6392,7 +6837,6 @@ function renderDashboard() {
   // LEVEL 2 — What can I do?
   // Always shown. Cook this | Buy this in a split layout.
   // ══════════════════════════════════════════════════════════════
-  var cookable = getCookableRecipes();
   var cookPane;
   if (totalPantryItems === 0) {
     cookPane = '<div class="dash-l2-empty">Add items to <button class="dash-inline-btn" onclick="showTab(\'fridge\')">Fridge</button> to see what you can make.</div>';
@@ -6400,18 +6844,40 @@ function renderDashboard() {
     cookPane = '<div class="dash-l2-empty">No recipes match your inventory yet. <button class="dash-inline-btn" onclick="showTab(\'recipes\')">Browse Recipes →</button></div>';
   } else {
     var cookTiers = [
-      { key: 0, label: 'Can cook now', cls: 'dash-cook-tier--ready' },
+      { key: 'ready', label: 'Can cook now', cls: 'dash-cook-tier--ready' },
+      { key: 'check', label: 'Check first', cls: 'dash-cook-tier--check' },
+      { key: 'swap', label: 'Cook with a swap', cls: 'dash-cook-tier--swap' },
       { key: 1, label: 'Missing 1 ingredient', cls: 'dash-cook-tier--one' },
       { key: 2, label: 'Missing 2 ingredients', cls: 'dash-cook-tier--two' }
     ];
     cookPane = cookTiers.map(function(tier) {
-      var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 3);
+      // Older callers/stubs may omit tier and needsCheck; derive them from missing.
+      var items = cookable.filter(function(s) {
+        var sTier = s.tier || (s.missing > 0 ? 'buy' : 'ready');
+        return sTier === tier.key || (sTier === 'buy' && s.missing === tier.key);
+      }).slice(0, 3);
       if (!items.length) return '';
       var rows = items.map(function(s) {
         var sid = String(s.recipe.id);
-        var meta = tier.key === 0
-          ? '<span class="dash-cook-full">All ingredients ✓</span>'
-          : '<span class="dash-cook-meta">Missing ' + s.missing + '</span>';
+        var meta = '';
+        var note = '';
+        if (tier.key === 'ready') {
+          meta = '<span class="dash-cook-full">All ingredients ✓</span>';
+          if ((s.optionalMissing || []).length) {
+            var names = s.optionalMissing.slice(0, 2).map(function(name) {
+              return ingredientNameSegments(name)[0].replace(SERVING_INGREDIENT_NOTE, '').trim() || name;
+            });
+            note = '+ optional: ' + names.join(', ');
+          }
+        } else if (tier.key === 'check') {
+          meta = '<span class="dash-cook-meta dash-cook-meta--check">' + escapeHtml(cookCheckNote(s.needsCheck)) + '</span>';
+        } else if (tier.key === 'swap') {
+          note = s.swaps.map(function(swap) { return 'use ' + swap.use + ' for ' + swap.need; }).join(' · ');
+        } else {
+          var checkNames = s.needsCheck || [];
+          var text = 'Missing ' + s.missing + (checkNames.length ? ' · ' + cookCheckNote(checkNames) : '');
+          meta = '<span class="dash-cook-meta' + (checkNames.length ? ' dash-cook-meta--check' : '') + '">' + escapeHtml(text) + '</span>';
+        }
         var buyBtn = '';
         if (tier.key === 1 && s.missingIngredients && s.missingIngredients.length === 1) {
           buyBtn = '<button class="dash-inline-btn dash-buy-it-btn" onclick="event.stopPropagation();buyMissingIngredient(\'' + escJAttr(s.missingIngredients[0]) + '\')">Buy ' + escapeHtml(s.missingIngredients[0]) + '</button>';
@@ -6419,7 +6885,9 @@ function renderDashboard() {
         return '<div class="dash-cook-row">' +
           '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJAttr(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
-          '</button>' + buyBtn + '</div>';
+          '</button>' +
+          (note ? '<div class="dash-cook-meta dash-cook-note">' + escapeHtml(note) + '</div>' : '') +
+          buyBtn + '</div>';
       }).join('');
       return '<div class="dash-cook-tier ' + tier.cls + '">' +
         '<div class="dash-cook-tier-label">' + tier.label + '</div>' + rows + '</div>';
@@ -6567,19 +7035,19 @@ function renderMealPrepFlowCard() {
     '</div>';
 }
 
-function buyMissingIngredient(ingName) {
-  var already = (AppState.groceryList || []).some(function(g) {
-    return g.name.toLowerCase() === ingName.toLowerCase();
-  });
+function buyMissingIngredient(ingName, category) {
+  var need = { name: ingName, quantity: null };
+  var already = AppState.groceryList.some(g => !g.checked && groceryRowsEquivalent(g, need) &&
+    groceryUnitsCompatible(groceryRowAmount(g), need));
   if (already) { showSuccessMessage(ingName + ' is already on your grocery list.'); return; }
   var db = INGREDIENT_DB.find(function(i) { return i.name.toLowerCase() === ingName.toLowerCase(); });
   AppState.groceryList.push({
     id: Date.now() + Math.random(),
     name: ingName,
-    category: db ? db.category : 'Pantry',
+    category: db ? db.category : category || 'Pantry',
     quantity: null,
     unit: db ? db.unit : '',
-    sources: [],
+    sources: category ? [] : ['Cook Now'],
     checked: false,
     custom: true
   });
@@ -6620,17 +7088,249 @@ function planRecipeForToday(recipeId) {
     plan[slot] = id;
   }
 
-  saveData();
   generateGroceryList();
+  saveData();
   renderWeeklyPlanner();
   renderDashboard();
   showSuccessMessage('Added to ' + slotLabel[slot] + '!');
 }
 window.planRecipeForToday = planRecipeForToday;
 
+// So Easy So Good's no-plan framework, with generic foods for each role.
+const NO_PLAN_TEMPLATE = {
+  proteins: {
+    label: 'Proteins', target: 4, category: 'Protein',
+    candidates: ['Chicken Breast', 'Eggs', 'Tuna (Canned)', 'Tofu (Tokwa)', 'Greek Yogurt',
+      'Cottage Cheese', 'Canned Black Beans', 'Red Lentils', 'Edamame', 'Chicken Thigh',
+      'Sardines (Canned)', 'Salmon', 'Ground Beef', 'Shrimp', 'Quail Eggs'],
+    keywords: /\b(eggs?|chicken|turkey|beef|pork|fish|salmon|tuna|shrimp|tofu|tokwa|tempeh|seitan|beans?|lentils?|chickpeas?|edamame|monggo|munggo)\b/,
+    plant: /\b(tofu|tokwa|tempeh|seitan|beans?|lentils?|chickpeas?|edamame|monggo|munggo|mung dal)\b/,
+    lowPrep: /\b(canned|eggs?|yoghurts?|yogurts?|cottage cheese|tofu|tokwa|rotisserie|tuna in (oil|water)|tuna flakes|cooked|precooked)\b/,
+    convenience: /\b(canned|yoghurt|yogurt|cottage cheese|rotisserie|precooked)\b/,
+    rules: [
+      { attribute: 'lowPrep', minimum: 1, met: 'low-prep', missing: 'low-prep' },
+      { attribute: 'plant', minimum: 1, met: 'plant-based', missing: 'plant-based' }
+    ]
+  },
+  veggies: {
+    label: 'Veggies', target: 4, category: 'Vegetable',
+    candidates: ['Baby Carrots', 'Spring Mix', 'Mini Peppers', 'Frozen Green Beans',
+      'Frozen Broccoli', 'Spinach', 'Cucumber', 'Red Bell Pepper', 'Tomato (Kamatis)',
+      'Cabbage (Repolyo)', 'Cauliflower', 'Frozen Mixed Vegetables'],
+    keywords: /\b(spring mix|green beans?|snap peas?|snow peas?|vegetables|beets?|kale|zucchini|asparagus|brussels sprouts)\b/,
+    convenience: /\b(frozen|precut|baby carrots|spring mix|mini peppers)\b/,
+    guidance: 'Mix colors. Fresh, frozen or precut work.'
+  },
+  starches: {
+    label: 'Starches', target: 3, category: 'Grain',
+    candidates: ['Whole-Grain Bread', 'Microwave Quinoa', 'Frozen White Rice', 'Brown Rice',
+      'Rolled Oats', 'Whole-Wheat Pasta', 'Barley', 'Pasta', 'Sweet Potato (Kamote)', 'Pandesal'],
+    keywords: /\b(rice|quinoa|oats?|barley|bread|pasta|noodles?|tortillas?|potatoes|potato|couscous|buckwheat|bulgur)\b/,
+    wholeGrain: /\b(whole[ -](grain|wheat)|brown (\w+ )?rice|wild rice|quinoa|oats?|barley|bulgur|buckwheat|farro)\b/,
+    convenience: /\b(microwave|frozen|precooked|pouch|bread|pandesal)\b/,
+    rules: [{ attribute: 'wholeGrain', minimum: 2, met: '2 whole grains', missing: 'whole grain' }]
+  },
+  fruits: {
+    label: 'Fruits', target: 3, category: 'Fruit',
+    candidates: ['Banana (Saging)', 'Apple', 'Frozen Blueberries', 'Mixed Berries', 'Mango (Mangga)',
+      'Pineapple (Pinya)', 'Papaya', 'Grapes', 'Orange'],
+    keywords: /\b(blueberr(?:y|ies)|strawberr(?:y|ies)|raspberr(?:y|ies)|blackberr(?:y|ies)|grapes?|oranges?|pears?|peach(?:es)?|cherr(?:y|ies))\b/,
+    convenience: /\b(frozen|precut)\b/,
+    guidance: 'Fresh or frozen.'
+  },
+  snacks: {
+    label: 'Snacks', target: 3, category: 'Pantry',
+    candidates: ['Pretzels', 'Roasted Chickpeas', 'Dark Chocolate', 'Granola', 'Cheese',
+      'Popcorn', 'Crackers', 'Almonds'],
+    keywords: /\b(pretzels?|roasted chickpeas?|chocolate|granola|cheese|popcorn|crackers?|nuts?|almonds?|walnuts?|pistachios?|trail mix)\b/,
+    convenience: /\b(pretzels?|roasted|chocolate|granola|crackers?|trail mix)\b/
+  },
+  flavors: {
+    label: 'Flavor enhancers', target: 3, category: 'Pantry',
+    candidates: ['Balsamic Vinaigrette', 'Honey Mustard', 'Hummus', 'Soy Sauce (Toyo)',
+      'Gochujang', 'Chili Sauce', 'Vinegar (Suka)', 'Lemon', 'Lime', 'Ketchup'],
+    keywords: /\b(vinaigrette|dressing|mustard|hummus|sauces?|vinegar|gochujang|miso|sriracha|ketchup|mayonnaise|tahini|seasoning|spices?|dried herbs|salt|black pepper|white pepper|garlic powder|onion powder|peppercorns?|lemons?|limes?|calamansi)\b/,
+    convenience: /\b(vinaigrette|dressing|mustard|hummus|sauces?|gochujang|sriracha|ketchup)\b/
+  },
+  beverages: {
+    label: 'Beverages', target: 1, maxTarget: 2, category: 'Pantry',
+    candidates: ['Herbal Tea', 'Sparkling Water', 'Milk (Gatas)', 'Unsweetened Tea', 'Water'],
+    keywords: /\b(tea|coffee|water|milk|juice|soda|kombucha|seltzer|lemonade)$/,
+    convenience: /\b(water|milk|bottled|ready-to-drink)\b/,
+    guidance: 'Choose drinks with little or no added sugar.'
+  }
+};
+
+function noPlanRole(name) {
+  const term = (name || '').trim().toLowerCase().split(',')[0].trim();
+  const words = ingredientMatchWords(term);
+  const entry = stockIngredientEntry(term) || stockIngredientEntry(words.join(' ')) ||
+    stockIngredientEntry(words[words.length - 1]);
+  const canonical = entry?.name.toLowerCase() || term;
+  // Give these forms precedence over the role of the underlying ingredient.
+  if (/\b(cottage cheese|yoghurts?|yogurts?)\b/.test(term)) return 'proteins';
+  if (/\b(coconut milk|condensed milk|evaporated milk)\b/.test(term + ' ' + canonical)) return 'flavors';
+  if (entry?.category === 'Protein') return 'proteins';
+  if (NO_PLAN_TEMPLATE.beverages.keywords.test(term) || canonical === 'milk (gatas)') return 'beverages';
+  if (NO_PLAN_TEMPLATE.flavors.keywords.test(term)) return 'flavors';
+  if (NO_PLAN_TEMPLATE.snacks.keywords.test(term) || canonical === 'cheese') return 'snacks';
+  if (NO_PLAN_TEMPLATE.veggies.keywords.test(term)) return 'veggies';
+  if (/\b(mung beans?|red lentils?)\b/.test(canonical)) return 'proteins';
+  if (NO_PLAN_TEMPLATE.starches.keywords.test(term)) return 'starches';
+  const roles = Object.keys(NO_PLAN_TEMPLATE);
+  // Pantry is a Shop fallback shared by several roles. Those roles use their food keywords.
+  return roles.find(role => entry && entry.category !== 'Pantry' && NO_PLAN_TEMPLATE[role].category === entry.category) ||
+    roles.find(role => NO_PLAN_TEMPLATE[role].keywords.test(term)) || null;
+}
+
+// Quick uses include assembly/no-cook recipes and staple ingredients used in quick meals.
+const NO_PLAN_QUICK_INGREDIENTS = /\b(silken tofu|tofu|tokwa|canned|greek yogurt|cottage cheese|rotisserie chicken|shredded chicken|frozen mixed vegetables|tortillas?|naan|wraps?|lemon|lime)\b/i;
+
+function ingredientVersatility(name, recipes = AppState.recipes) {
+  const candidateWords = ingredientMatchWords(name);
+  const candidateName = candidateWords.join(' ');
+  const methods = new Set();
+  let recipeCount = 0;
+  let quick = NO_PLAN_QUICK_INGREDIENTS.test(name);
+  for (const recipe of recipes) {
+    const usesIngredient = (recipe.baseIngredients || recipe.ingredients || []).some(ingredient => {
+      if (!ingredientNamesMatch(ingredient.name, name)) return false;
+      const words = ingredientMatchWords(ingredient.name);
+      // A generic recipe ingredient can use a substitute, but does not establish
+      // usage of a named variety (e.g. Eggs for Quail Eggs). Direct aliases do.
+      const generic = words.length < candidateWords.length &&
+        words[words.length - 1] === candidateWords[candidateWords.length - 1];
+      return !generic || INGREDIENT_AVAILABILITY_ALIASES.get(candidateName)?.has(words.join(' '));
+    });
+    if (!usesIngredient) continue;
+    recipeCount++;
+    const equipment = normalizeSlugList(recipe.equipment, EQUIPMENT_BY_ID);
+    equipment.forEach(method => methods.add(method));
+    if (normalizeEffort(recipe.effort) === 'assembly' || equipment.includes('no-cook')) quick = true;
+  }
+  return recipeCount + methods.size + Number(quick);
+}
+
+function uniqueNoPlanNames(names) {
+  // Keep named varieties ahead of generic labels such as Rice so the broadest
+  // match does not collapse otherwise distinct varieties into one.
+  const ordered = names.map(name => ({ name, specificity: ingredientMatchWords(name).length }))
+    .sort((a, b) => b.specificity - a.specificity);
+  const distinct = [];
+  for (const { name } of ordered) {
+    if (!distinct.some(other => ingredientNamesMatch(name, other))) distinct.push(name);
+  }
+  return distinct;
+}
+
+function noPlanGaps(state) {
+  const available = (state.pantry || []).filter(pantryLotAvailable).map(lot => lot.name);
+  const grocery = state.groceryList || [];
+  const matchesAvailable = name => available.some(other => ingredientNamesMatch(name, other));
+  const unchecked = grocery.filter(row => !row.checked).map(row => row.name);
+  const checked = grocery.filter(row => row.checked).map(row => row.name);
+  const covered = [...available, ...unchecked];
+  const isNearTwin = (name, other) => ingredientNamesMatch(name, other) || ingredientSwapMatch(name, other);
+  const toBuy = unchecked.filter(name => !matchesAvailable(name));
+  const availableRoles = available.map(name => ({ name, role: noPlanRole(name) }));
+  const groceryRoles = toBuy.map(name => ({ name, role: noPlanRole(name) }));
+  return Object.fromEntries(Object.entries(NO_PLAN_TEMPLATE).map(([role, template]) => {
+    const haveNames = availableRoles.filter(item => item.role === role).map(item => item.name);
+    const onListNames = groceryRoles.filter(item => item.role === role).map(item => item.name);
+    const have = uniqueNoPlanNames(haveNames).length;
+    const onList = uniqueNoPlanNames(onListNames).length;
+    const target = template.target;
+    const short = Math.max(0, target - have - onList);
+    const rules = (template.rules || []).map(rule => ({
+      ...rule,
+      remaining: Math.max(0, rule.minimum - uniqueNoPlanNames([...haveNames, ...onListNames]
+        .filter(name => template[rule.attribute].test(name.toLowerCase()))).length)
+    }));
+    const unmet = rules.filter(rule => rule.remaining > 0);
+    const ranked = (short || unmet.length) ? template.candidates
+      .filter(name => !covered.some(other => isNearTwin(name, other)) &&
+        !checked.some(other => ingredientNamesMatch(name, other)))
+      .map(name => ({
+        name,
+        unmetRules: unmet.filter(rule => template[rule.attribute].test(name.toLowerCase())).length,
+        versatility: ingredientVersatility(name, state.recipes || []),
+        convenience: Number(template.convenience.test(name.toLowerCase()))
+      }))
+      .filter(option => short || option.unmetRules)
+      .sort((a, b) => b.unmetRules - a.unmetRules || b.versatility - a.versatility || b.convenience - a.convenience) : [];
+    const options = [];
+    for (const { name } of ranked) {
+      if (!options.some(other => isNearTwin(name, other))) options.push(name);
+    }
+    return [role, { have, onList, target, short, rules, options }];
+  }));
+}
+
+const NO_PLAN_CHIP_LIMIT = 4;
+const NO_PLAN_RULE_CHIP_LIMIT = 2;
+let noPlanIdeasOffset = 0;
+
+function rotateNoPlanIdeas() {
+  noPlanIdeasOffset += NO_PLAN_CHIP_LIMIT;
+  renderNoPlanGrocery();
+}
+
+function renderNoPlanGrocery() {
+  const card = document.getElementById('no-plan-grocery');
+  if (!card?.open || card.classList.contains('hidden')) return;
+  const gaps = noPlanGaps(AppState);
+  const roles = card.querySelector('.no-plan-roles');
+  const restoreFocus = roles.contains(document.activeElement);
+  let hasDifferentIdeas = false;
+  roles.innerHTML = Object.entries(NO_PLAN_TEMPLATE).map(([role, template]) => {
+    const { have, onList, target, short, rules, options } = gaps[role];
+    const goal = template.maxTarget ? target + '–' + template.maxTarget : target;
+    const status = rules.map(rule => rule.remaining ? 'needs ' + rule.missing : '✓ ' + rule.met);
+    if (template.guidance) status.push(template.guidance);
+    const chipLimit = short ? NO_PLAN_CHIP_LIMIT : NO_PLAN_RULE_CHIP_LIMIT;
+    const canRotate = options.length > chipLimit && NO_PLAN_CHIP_LIMIT % options.length !== 0;
+    hasDifferentIdeas ||= canRotate;
+    const start = canRotate ? noPlanIdeasOffset % options.length : 0;
+    const rotated = options.slice(start).concat(options.slice(0, start));
+    const category = escapeHtml(JSON.stringify(template.category));
+    const chips = rotated.slice(0, chipLimit).map(name =>
+      `<button type="button" class="btn btn--outline btn--sm"
+        onclick="buyMissingIngredient(${escapeHtml(JSON.stringify(name))}, ${category})">${escapeHtml(name)}</button>`);
+    return `<li><strong>${template.label} ${have + onList}/${goal}${short ? '' : ' ✓'}</strong>${status.length ? ' · ' + status.join(' · ') : ''}
+      ${chips.length ? '<div class="no-plan-chips">' + chips.join('') + '</div>' : ''}</li>`;
+  }).join('');
+  card.querySelector('.no-plan-different-ideas').classList.toggle('hidden', !hasDifferentIdeas);
+  if (restoreFocus) card.querySelector('summary').focus({ preventScroll: true });
+}
+
 // Grocery list functions
+function groceryRowsEquivalent(a, b) {
+  return ingredientNamesMatch(a.name, b.name) || ingredientNamesMatch(b.name, a.name);
+}
+
+function groceryUnitsCompatible(a, b) {
+  return a.quantity == null || b.quantity == null || stockUnitKey(a.unit) === stockUnitKey(b.unit);
+}
+
+function groceryRowAmount(item) {
+  const need = item.plannedNeed;
+  if (!need || need.quantity == null) return item;
+  if (item.quantity == null) return need;
+  if (!groceryUnitsCompatible(item, need)) return item;
+  return { quantity: Number(item.quantity) + Number(need.quantity), unit: item.unit };
+}
+
+function groceryQuantityText(item) {
+  const { quantity, unit } = groceryRowAmount(item);
+  return quantity ? [formatQuantity(quantity), unit].filter(Boolean).join(' ') : '';
+}
+
+function plannedGroceryKey(item) {
+  return JSON.stringify([item.category || 'Other', item.name, stockUnitKey(item.unit)]);
+}
+
 function generateGroceryList() {
-  const ingredients = {};
+  const ingredients = new Map();
   
   // Collect all ingredients from planned meals
   Object.keys(AppState.weeklyPlan).forEach(day => {
@@ -6653,40 +7353,28 @@ function generateGroceryList() {
     addRecipeIngredients(batch.recipeId, ingredients, batch.servings);
   });
 
-  // A rebuild must not un-buy what the user already ticked (a batch +/- regenerates
-  // this list). Carry the user's state over by the SAME identity rows are built with
-  // above: exact category + exact name. Never fuzzy, never by position — "Rice" and
-  // "Rice Vinegar" stay separate. A row whose ingredient left the plan is not kept.
-  const rowKey = (category, name) => String(category) + '\u0000' + String(name);
-  const previous = {};
-  AppState.groceryList.forEach(item => {
-    if (!item.custom) previous[rowKey(item.category, item.name)] = item;
+  const previous = new Map();
+  const custom = AppState.groceryList.filter(item => {
+    if (!item.custom) previous.set(plannedGroceryKey(item), item);
+    else delete item.plannedNeed;
+    return item.custom;
   });
-
-  // Convert to grocery list format. Keep manually-added custom items — only the
-  // meal-plan-generated items are rebuilt from the weekly plan.
-  AppState.groceryList = AppState.groceryList.filter(item => item.custom);
-  Object.keys(ingredients).forEach(category => {
-    Object.keys(ingredients[category]).forEach(name => {
-      const item = ingredients[category][name];
-      const row = {
-        id: Date.now() + Math.random(),
-        category,
-        name,
-        quantity: item.quantity,
-        unit: item.unit,
-        sources: item.sources || [],
-        checked: false
-      };
-      const prev = previous[rowKey(category, name)];
-      if (prev) {
-        row.checked = !!prev.checked;
-        if (prev.userSet) row.userSet = true;
-        if (prev.stocked) row.stocked = prev.stocked; // keeps "uncheck" able to undo the purchase
-      }
-      AppState.groceryList.push(row);
-    });
-  });
+  const planned = [];
+  for (const [key, need] of ingredients) {
+    const prev = previous.get(key);
+    const row = custom.find(item => !item.checked && groceryRowsEquivalent(item, need) &&
+      groceryUnitsCompatible(groceryRowAmount(item), need));
+    if (row) {
+      const existing = row.plannedNeed;
+      const quantity = existing?.quantity == null ? need.quantity : existing.quantity + (need.quantity ?? 0);
+      const unit = existing?.quantity == null ? need.unit : existing.unit;
+      row.plannedNeed = { quantity, unit, sources: [...(existing?.sources || []), ...need.sources] };
+    } else {
+      // Carry purchase receipts with the same exact category, name and unit.
+      planned.push({ ...prev, ...need, id: prev?.id ?? Date.now() + Math.random(), checked: !!prev?.checked });
+    }
+  }
+  AppState.groceryList = [...custom, ...planned];
   
   renderGroceryList();
 }
@@ -6697,24 +7385,14 @@ function addRecipeIngredients(recipeId, ingredients, servings) {
 
   const recipeIngredients = recipe.baseIngredients || recipe.ingredients;
   recipeIngredients.forEach(ingredient => {
-    const category = ingredient.category;
-    const name = ingredient.name;
-    const scaledQty = servings ? batchScaledQuantity(recipe, ingredient, servings) : calculateScaledQuantity(recipe, ingredient);
-    
-    if (!ingredients[category]) {
-      ingredients[category] = {};
-    }
-    
-    if (!ingredients[category][name]) {
-      ingredients[category][name] = {
-        quantity: 0,
-        unit: ingredient.unit,
-        sources: []
-      };
-    }
-    
-    ingredients[category][name].quantity += scaledQty;
-    ingredients[category][name].sources.push(`${recipe.name} (${servings || recipe.currentServings} servings)`);
+    if (!ingredient.name) return;
+    const need = { category: ingredient.category || 'Other', name: ingredient.name, unit: ingredient.unit || '' };
+    const key = plannedGroceryKey(need);
+    if (!ingredients.has(key)) ingredients.set(key, { ...need, quantity: null, sources: [] });
+    const item = ingredients.get(key);
+    const quantity = servings ? batchScaledQuantity(recipe, ingredient, servings) : calculateScaledQuantity(recipe, ingredient);
+    if (Number.isFinite(quantity)) item.quantity = (item.quantity ?? 0) + quantity;
+    item.sources.push(`${recipe.name} (${servings || recipe.currentServings} servings)`);
   });
 }
 
@@ -6737,6 +7415,7 @@ function summarizeSources(sources) {
 }
 
 function renderGroceryList() {
+  renderNoPlanGrocery();
   const groceryListEl = document.getElementById('grocery-list');
 
   // The summary (meal count + cost) reflects the weekly plan, so hide it when
@@ -6767,7 +7446,7 @@ function renderGroceryList() {
 
   // ── Stock summary bar: show what's already at home ─────────────
   const totalItems = AppState.groceryList.length;
-  const inStockItems = AppState.groceryList.filter(item => !item.fromStaple && !item.userSet && isInPantry(item.name)).length;
+  const inStockItems = AppState.groceryList.filter(groceryItemInPantry).length;
   const needToBuyCount = totalItems - inStockItems;
   const stockBar = inStockItems > 0
     ? `<div class="grocery-stock-bar">
@@ -6802,22 +7481,30 @@ function renderGroceryList() {
         // in-stock check hide them; the whole point is that you need to rebuy.
         // Once the user has tapped the row it is theirs; only an untouched row still
         // claims "In stock" from the kitchen.
-        const inPantry = (item.fromStaple || item.userSet) ? false : isInPantry(item.name);
+        const inPantry = groceryItemInPantry(item);
         const isChecked = groceryItemChecked(item);
         const itemId = escapeHtml(JSON.stringify(item.id));
+        const amount = groceryRowAmount(item);
+        const quantity = groceryQuantityText(item);
+        const sources = Array.isArray(item.plannedNeed?.sources)
+          ? [...(item.sources?.length ? item.sources : ['Added by you']), ...item.plannedNeed.sources]
+          : item.sources || [];
+        const conflicts = AppState.groceryList.filter(other => other !== item && groceryRowsEquivalent(item, other) &&
+          !groceryUnitsCompatible(amount, groceryRowAmount(other)));
+        const showSources = item.plannedNeed || item.fromStaple;
+        const detailsClass = showSources || conflicts.length ? ' grocery-item-info--details' : '';
         return `
         <div class="grocery-item ${isChecked ? 'checked' : ''} ${inPantry ? 'in-pantry' : ''}" role="button" tabindex="0" aria-pressed="${isChecked}" aria-label="${escapeHtml(item.name)}" onclick="toggleGroceryItem(${itemId})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleGroceryItem(${itemId})}">
           <input type="checkbox" class="grocery-checkbox" tabindex="-1" aria-hidden="true"
                  ${isChecked ? 'checked' : ''}>
-          <div class="grocery-item-info">
+          <div class="grocery-item-info${detailsClass}">
             <div class="grocery-item-name">
-              ${item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : ''}${escapeHtml(item.name)}
+              ${quantity ? escapeHtml(quantity) + ' ' : ''}${escapeHtml(item.name)}
               ${inPantry ? '<span class="pantry-badge">' + icon('house') + ' In stock</span><button type="button" class="grocery-not-have-btn" onclick="event.stopPropagation();openNotInKitchenDialog(' + itemId + ')" aria-label="' + escapeHtml(item.name) + ' is not actually in my kitchen">Not anymore?</button>' : ''}
               ${item.suggested ? `<span class="grocery-suggested-badge" title="${escapeHtml(item.suggestedReason || 'suggested')}">Suggested</span><button class="grocery-dismiss-btn" title="Don't suggest this again" onclick="event.stopPropagation();dismissSuggestedGroceryItem(${itemId})" aria-label="Dismiss suggestion for ${escapeHtml(item.name)}">×</button>` : ''}
             </div>
-            ${item.sources && item.sources.length > 0 ? `
-              <div class="grocery-item-source">From: ${escapeHtml(summarizeSources(item.sources))}</div>
-            ` : ''}
+            ${sources.length ? `<div class="grocery-item-source${showSources ? ' grocery-item-source--detail' : ''}">From: ${escapeHtml(summarizeSources(sources))}</div>` : ''}
+            ${conflicts.map(other => `<div class="grocery-item-source grocery-item-source--conflict">Also on your list as ${escapeHtml(other.name)} (${escapeHtml(groceryQuantityText(other))}) - check the amount</div>`).join('')}
             ${priceHtml}
           </div>
         </div>
@@ -6839,7 +7526,10 @@ function toggleGroceryItem(itemId) {
   item.userSet = true;   // the user's tap now outranks the "already at home" auto-tick
 
   if (item.checked) {
-    if (!item.stocked) item.stocked = stockPurchasedGroceryItem(item);
+    if (!item.stocked) {
+      const { quantity, unit } = groceryRowAmount(item);
+      item.stocked = stockPurchasedGroceryItem({ ...item, quantity, unit });
+    }
   } else if (item.stocked) {
     unstockPurchasedGroceryItem(item.stocked);
     delete item.stocked;
@@ -6861,6 +7551,7 @@ function dismissSuggestedGroceryItem(itemId) {
   });
   if (pantryItem) { pantryItem.suggestDismissed = true; stampUpdated(pantryItem); }
   AppState.groceryList = AppState.groceryList.filter(function(g) { return g.id !== itemId; });
+  if (item.plannedNeed) generateGroceryList();
   saveData();
   renderGroceryList();
 }
@@ -6978,10 +7669,12 @@ function clearGroceryList() {
 function switchShopTab(subTab) {
   var listEl = document.getElementById('grocery-list');
   var priceEl = document.getElementById('grocery-price-panel');
+  var noPlanCard = document.getElementById('no-plan-grocery');
   var summaryEl = document.getElementById('weekly-cost-summary');
   var listBtn = document.getElementById('shop-subtab-list');
   var pricesBtn = document.getElementById('shop-subtab-prices');
   if (!listEl || !priceEl) return;
+  noPlanCard?.classList.toggle('hidden', subTab === 'prices');
 
   if (subTab === 'prices') {
     listEl.classList.add('hidden');
@@ -6994,6 +7687,7 @@ function switchShopTab(subTab) {
     priceEl.classList.add('hidden');
     if (summaryEl) summaryEl.classList.remove('hidden');
     listEl.classList.remove('hidden');
+    if (noPlanCard?.open && !listBtn?.classList.contains('active')) renderNoPlanGrocery();
     if (pricesBtn) pricesBtn.classList.remove('active');
     if (listBtn) listBtn.classList.add('active');
   }
@@ -7043,7 +7737,8 @@ function renderGroceryPricePanel() {
       html += '<div class="gpl-row" style="grid-template-columns:' + colTemplate + '">';
       html += '<div class="gpl-col-name">';
       html += '<div class="gpl-item-name">' + escapeHtml(item.name) + '</div>';
-      if (item.quantity) html += '<div class="gpl-item-qty">' + formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + '</div>';
+      var quantity = groceryQuantityText(item);
+      if (quantity) html += '<div class="gpl-item-qty">' + escapeHtml(quantity) + '</div>';
       html += '</div>';
       myStores.forEach(function(s) {
         var p = storePrices[s] || '';
@@ -7081,15 +7776,26 @@ function confirmCustomGroceryItem() {
   const unit = document.getElementById('custom-item-unit').value.trim() || 'pcs';
   const category = document.getElementById('custom-item-category').value;
 
-  AppState.groceryList.push({
-    id: Date.now() + Math.random(),
-    category,
-    name,
-    quantity,
-    unit,
-    checked: false,
-    custom: true   // manually added — must survive grocery-list regeneration
-  });
+  const manual = { category, name, quantity, unit, checked: false, custom: true };
+  const match = AppState.groceryList.find(item => !item.checked && groceryRowsEquivalent(item, manual) &&
+    groceryUnitsCompatible(groceryRowAmount(item), manual));
+  if (!match) AppState.groceryList.push({ ...manual, id: Date.now() + Math.random() });
+  else {
+    if (!match.custom) {
+      match.plannedNeed = { quantity: match.quantity, unit: match.unit, sources: match.sources || [] };
+      match.custom = true;
+      match.sources = ['Added by you'];
+      match.quantity = null;
+    } else if (match.fromStaple) {
+      delete match.fromStaple;
+      delete match.suggested;
+      delete match.suggestedReason;
+      match.sources = ['Added by you'];
+    }
+    if (match.quantity == null) match.unit = unit;
+    match.quantity = Number(match.quantity ?? 0) + quantity;
+    showSuccessMessage(name + ' merged with the item already on your grocery list.');
+  }
 
   saveData();
   closeCustomItemModal();
@@ -7414,14 +8120,16 @@ function unitConvertFactor(itemUnit, priceUnit) {
 // Estimated cost of a grocery line, or 0 when it can't be priced reliably
 // (unknown ingredient, no quantity, or incompatible units).
 function groceryItemCost(item) {
-  if (!item || !item.quantity) return 0;
+  if (!item) return 0;
+  const { quantity, unit } = groceryRowAmount(item);
+  if (!quantity) return 0;
   const ing = findIngredientPrice(item.name);
   if (!ing || !ing.pricePerUnit) return 0;
-  const itemUnit = String(item.unit || ing.unit || '').toLowerCase();
+  const itemUnit = String(unit || ing.unit || '').toLowerCase();
   const priceUnit = String(ing.unit || '').toLowerCase();
   const factor = unitConvertFactor(itemUnit, priceUnit);
   if (factor == null) return 0;
-  return ing.pricePerUnit * item.quantity * factor;
+  return ing.pricePerUnit * quantity * factor;
 }
 
 function getUnitConversion(fromUnit, toUnit) {
@@ -7575,6 +8283,134 @@ function normalizeIngredientName(name) {
     .replace(/\b(bone-in|boneless|fresh|dried|sliced|diced|chopped|minced|small|medium|large|thumb-sized|instant|whole|raw|cooked)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+const SERVING_INGREDIENT_NOTE = /\b(?:for (?:serving|garnish|drizzling|squeezing|coating|dipping)|to serve)\b/i;
+const WATER_INGREDIENT_LINE = /^\s*(?:(?:hot|cold|ice)\s+)?water(?:\s*,\s*plus more\b.*)?\s*$/i;
+const QUANTITY_INGREDIENT_NOTE = /(?:\s*,\s*|\s+)or\s+(?:more(?:\s+(?:to taste|if needed))?|as needed|to taste)\s*$|,\s*plus\s+more\b.*$/i;
+
+function ingredientLineRole(ing) {
+  var name = ing.name || '';
+  if (ing.optional === true || /\(optional\)|,\s*optional\b/i.test(name)) return 'optional';
+  if (SERVING_INGREDIENT_NOTE.test(name) ||
+      (/\bday of serving\b/i.test(name) && /\bgarnish\b/i.test(name))) return 'serving';
+  if (WATER_INGREDIENT_LINE.test(name)) return 'water';
+  return 'required';
+}
+
+function ingredientNameSegments(name) {
+  // Prep notes follow the first comma, except a leading run of descriptors
+  // ("Boneless, skinless chicken thighs") which belongs to the name itself.
+  var segments = (name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+packed\s+in\s.*$/i, '')
+    .replace(/\bshort-\s*,\s*medium-\s*,\s*(?:or\s+)?long-grain\s+(?=(?:white\s+)?rice\b)/gi, '')
+    .split(',').map(function(segment) { return segment.trim(); });
+  var descriptor = /^(?:(?:boneless|skinless|fresh|dried|canned|frozen|raw|cooked|large|medium|small|whole|low-sodium|reduced-sodium)(?:\s+|$))+$/i;
+  while (segments.length > 1 && descriptor.test(segments[0])) segments.shift();
+  return segments;
+}
+
+function ingredientAlternatives(name) {
+  var cleanName = name && name.replace(QUANTITY_INGREDIENT_NOTE, '');
+  var segments = ingredientNameSegments(cleanName);
+  // A comma list ends at the segment containing "or". Prep wording after a
+  // comma, such as "chopped or torn", does not start an ingredient list.
+  var prepNote = /^(?:(?:finely|roughly|thinly|coarsely|freshly)\s+)*(?:chopped|torn|sliced|diced|minced|grated|peeled|crushed|drained|rinsed|divided|cooked|optional|plus|for|to serve)\b/i;
+  var lastChoice = segments.findIndex(function(segment) { return /\bor\s+/i.test(segment); });
+  if (lastChoice < 0 || segments.slice(1, lastChoice + 1).some(function(segment) { return prepNote.test(segment); })) {
+    return [cleanName === name ? name : normalizeIngredientName(segments[0])];
+  }
+
+  var candidates = segments.slice(0, lastChoice + 1).join(', ').toLowerCase()
+    .split(/\s*,\s*(?:or\s+)?|\s+or\s+/)
+    .map(function(candidate) { return candidate.replace(/^(?:(?:boneless|skinless|bone-in)\s+)+/, '').trim(); })
+    .filter(Boolean);
+
+  // Comma lists supply full names. In a pair, a bare word can share a
+  // trailing ingredient ("sunflower oil") or a leading one ("chicken thighs").
+  if (candidates.length === 2 && !candidates.some(function(candidate) { return WATER_INGREDIENT_LINE.test(candidate); })) {
+    var first = candidates[0].split(/\s+/);
+    var second = candidates[1].split(/\s+/);
+    if (first.length === 1 && second.length > 1) candidates[0] += ' ' + second[second.length - 1];
+    if (first.length > 1 && second.length === 1) candidates[1] = first[0] + ' ' + candidates[1];
+  }
+  return candidates;
+}
+
+// These modifiers can turn a shared head noun into a different ingredient.
+const INGREDIENT_IDENTITY_MODIFIERS = new Set([
+  'evaporated', 'condensed', 'coconut', 'almond', 'oat', 'soy', 'powdered',
+  'cream', 'peanut', 'sour', 'sweetened', 'glutinous', 'malagkit', 'sticky',
+  'sushi', 'sesame', 'toasted'
+]);
+
+function hasIngredientIdentityModifier(words, sharedWords = []) {
+  var head = words[words.length - 1];
+  return words.slice(0, -1).some(function(word) {
+    return INGREDIENT_IDENTITY_MODIFIERS.has(word) && !sharedWords.includes(word) &&
+      (word !== 'soy' || head === 'milk' || head === 'sauce');
+  });
+}
+
+function ingredientMatchWords(name) {
+  var baseName = ingredientNameSegments(name)[0];
+  if (/\brice$/i.test(baseName)) {
+    baseName = baseName.replace(/\b(?:white|steamed|cooked|plain|leftover|day-old|(?:short|medium|long)-grain)\b/gi, '');
+  }
+  // The shared normalizer already handles the other prep and size descriptors.
+  var normalized = normalizeIngredientName(baseName).replace(
+    /^(?:(?:canned|frozen|grated|peeled|skinless|low-sodium|reduced-sodium|of)(?:\s+|$))+/, ''
+  );
+  var words = (normalized.match(/[\p{L}\p{N}]+/gu) || []).map(function(word) {
+    if (word === 'leaves') return 'leaf';
+    if (word.length <= 3) return word;
+    return word.replace(/(potato|tomato|ch|sh|ss|x|zz)es$/, '$1')
+      .replace(/([^sui])s$/, '$1');
+  });
+  var unit = /^(?:clove|head|bunch|sprig|stalk|piece|slice|fillet|leaf|can|package|pack|bag|jar|bottle|floret)$/;
+  while (words.length > 1 && unit.test(words[words.length - 1])) words.pop();
+  return words;
+}
+
+function ingredientNamesMatch(a, b) {
+  var aWords = ingredientMatchWords(a);
+  var bWords = ingredientMatchWords(b);
+  if (!aWords.length || !bWords.length) return false;
+  var aName = aWords.join(' ');
+  var bName = bWords.join(' ');
+  if (aName === bName) return true;
+
+  var shorter = aWords.length < bWords.length ? aWords : bWords;
+  var longer = shorter === aWords ? bWords : aWords;
+  if (shorter.length < longer.length &&
+      shorter[shorter.length - 1] === longer[longer.length - 1] &&
+      shorter.every(function(word) { return longer.includes(word); }) &&
+      !hasIngredientIdentityModifier(longer, shorter)) return true;
+
+  return (INGREDIENT_AVAILABILITY_ALIASES.get(aName)?.has(bName) ||
+          INGREDIENT_AVAILABILITY_ALIASES.get(bName)?.has(aName)) === true;
+}
+
+const NO_SWAP_INGREDIENT_HEADS = new Set([
+  'powder', 'sauce', 'paste', 'seasoning', 'flake', 'seed', 'extract',
+  'vinegar', 'spice', 'salt', 'sugar', 'dressing'
+]);
+
+function ingredientSwapMatch(recipeName, lotName) {
+  var recipeWords = ingredientMatchWords(recipeName);
+  var lotWords = ingredientMatchWords(lotName);
+  var head = recipeWords[recipeWords.length - 1];
+  if (recipeWords.length < 2 || lotWords.length < 2 || head !== lotWords[lotWords.length - 1]) return false;
+  if (hasIngredientIdentityModifier(recipeWords) || hasIngredientIdentityModifier(lotWords)) return false;
+  if (NO_SWAP_INGREDIENT_HEADS.has(head) ||
+      (head === 'pepper' && !(recipeWords.includes('bell') && lotWords.includes('bell')))) return false;
+
+  // Stock Health treats oils as condiments. Canola and olive oil can still substitute for one another.
+  var cookingOilPair = head === 'oil' && [recipeWords, lotWords].every(function(words) {
+    return ['canola oil', 'olive oil'].includes(words.join(' '));
+  });
+  if (!cookingOilPair && (stockFoodClass({ name: recipeName }) === 'condiment' ||
+      stockFoodClass({ name: lotName }) === 'condiment')) return false;
+  return !ingredientNamesMatch(recipeName, lotName);
 }
 
 function findIngredientNutrition(name) {
@@ -9900,11 +10736,11 @@ function printGroceryList() {
 
   const rows = Object.keys(categories).map(cat =>
     '<h3>' + escapeHtml(cat) + '</h3>' +
-    categories[cat].map(item =>
-      '<div class="gp-item"><span class="gp-box"></span><span>' +
-      (item.quantity ? formatQuantity(item.quantity) + ' ' + escapeHtml(item.unit) + ' ' : '') +
-      '<strong>' + escapeHtml(item.name) + '</strong></span></div>'
-    ).join('')
+    categories[cat].map(item => {
+      const amount = groceryQuantityText(item);
+      return '<div class="gp-item"><span class="gp-box"></span><span>' +
+        (amount ? escapeHtml(amount) + ' ' : '') + '<strong>' + escapeHtml(item.name) + '</strong></span></div>';
+    }).join('')
   ).join('');
 
   // Print the MAIN window (reliable on mobile — iframe/popup printing is flaky on
@@ -9941,7 +10777,7 @@ function copyGroceryList() {
   Object.keys(categories).forEach(cat => {
     lines.push(cat.toUpperCase());
     categories[cat].forEach(item => {
-      lines.push(`• ${formatQuantity(item.quantity)} ${item.unit} ${item.name}`);
+      lines.push(`• ${[groceryQuantityText(item), item.name].filter(Boolean).join(' ')}`);
     });
     lines.push('');
   });
@@ -10127,8 +10963,8 @@ function defaultBatchServings(recipe) {
 }
 
 function afterPlannedBatchesChange() {
-  saveData();
   generateGroceryList();
+  saveData();
   renderPlannedBatches();
   renderDashboard();
 }
@@ -10773,10 +11609,10 @@ function loadWeekTemplate() {
       }
 
       Object.assign(AppState.weeklyPlan, filledWeek);
-      saveData();
       renderWeeklyPlanner();
       updateWeeklyStats();
       generateGroceryList();
+      saveData();
       showSuccessMessage(`Filled ${filled} empty slot${filled !== 1 ? 's' : ''} from your saved week.`);
     }
   );
@@ -11881,17 +12717,9 @@ function parseIngredientLine(line) {
 
 // â”€â”€ Pantry Tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// The kitchen records that make the Shop list say "In stock" for `name`. Same loose
-// two-way name match the Shop list has always used; a staple the user marked EMPTY is
-// not stock — it is the very thing they need to buy.
+// The available kitchen records behind a Shop row's "In stock" label.
 function pantryMatchesForShop(name) {
-  const n = (name || '').toLowerCase();
-  if (!n) return [];
-  return AppState.pantry.filter(p => {
-    const pn = (p.name || '').toLowerCase();
-    if (!pn || !(n.includes(pn) || pn.includes(n))) return false;
-    return !(isStaple(p) && p.stockLevel === 'empty');
-  });
+  return AppState.pantry.filter(p => ingredientNamesMatch(name, p.name) && pantryLotAvailable(p));
 }
 
 function isInPantry(name) {
@@ -11941,14 +12769,11 @@ function renderPantryBulkActions() {
     '<button class="btn btn--ghost btn--sm" onclick="exitPantrySelectMode()">Cancel</button>';
 }
 
-// Definitively-expired pantry items. Uses pantryDaysLeft() — the SAME source of
-// truth the badges and banners use — so "Clear expired" can never disagree with
-// what the user sees. The old version only looked at item.expiryDate, which most
-// items never have (they track bought-date + shelf life), so it matched nothing.
+// Only a passed printed use-by date qualifies for pantry bulk removal.
 function getExpiredPantryItems() {
   return (AppState.pantry || []).filter(function(item) {
-    var dl = pantryDaysLeft(item);
-    return dl != null && dl < 0 && !isKeptToday(item);
+    var signal = pantryDateSignal(item);
+    return signal.kind === 'expired' && !signal.safety && !isKeptToday(item);
   });
 }
 
@@ -12002,6 +12827,10 @@ function moveSelectedPantryItems() {
 function deleteSelectedPantryItems() {
   var ids = Array.from(pantrySelectedIds);
   if (ids.length === 0) return;
+  if (AppState.pantry.some(p => pantrySelectedIds.has(String(p.id)) && pantryDateSignal(p).safety)) {
+    showErrorMessage('Use Remove on each item with a fridge safety warning.');
+    return;
+  }
   var selected = {};
   ids.forEach(function(id) { selected[String(id)] = true; });
   var when = new Date().toISOString();
@@ -12017,23 +12846,19 @@ function deleteSelectedPantryItems() {
 }
 
 function clearExpiredPantryItems() {
-  var expired = getExpiredPantryItems();
+  var expired = getExpiredPantryItems().map(function(p) { return attentionEntry('pantry', p); });
   if (expired.length === 0) return;
 
-  showConfirmDialog(
-    'Clear expired items?',
-    'Remove ' + expired.length + ' expired item(s) from your pantry?',
-    'Remove',
-    'Cancel',
+  confirmExpiredRemoval('Clear expired items?', expired,
     function() {
-      var expiredIds = {};
+      var expiredIds = new Set();
       var when = new Date().toISOString();
       expired.forEach(function(item) {
-        expiredIds[String(item.id)] = true;
+        expiredIds.add(String(item.id));
         writeTombstone('pantry', item.id, when);
       });
       AppState.pantry = AppState.pantry.filter(function(item) {
-        return !expiredIds[String(item.id)];
+        return !expiredIds.has(String(item.id));
       });
       pantrySelectMode = false;
       pantrySelectedIds.clear();
@@ -12051,6 +12876,7 @@ function renderPantry() {
   const list = document.getElementById('pantry-list');
   const count = document.getElementById('pantry-count');
   if (!list) return;
+  renderStockHealth();
 
   const n = AppState.pantry.length;
   count.textContent = n > 0 ? '(' + n + ' item' + (n !== 1 ? 's' : '') + ')' : '';
@@ -12074,19 +12900,19 @@ function renderPantry() {
   }
   if (searchWrap) searchWrap.classList.remove('hidden');
 
-  // Summary banner: expired / expiring soon (freshness) + running-low staples (stock)
-  var expiredCount = 0, expiringCount = 0, lowCount = 0;
+  var expiredCount = 0, checkCount = 0, expiringCount = 0, lowCount = 0;
   AppState.pantry.forEach(function(p) {
     if (isStaple(p) && p.stockLevel === 'low') lowCount++;
-    var dl = pantryDaysLeft(p);
-    if (dl == null) return;
-    if (dl < 0) expiredCount++;
-    else if (dl <= FRESHNESS_WARN_DAYS) expiringCount++;
+    var kind = pantryDateSignal(p).kind;
+    if (kind === 'expired' && !isKeptToday(p)) expiredCount++;
+    else if (kind === 'check' && !isKeptToday(p)) checkCount++;
+    else if (kind === 'use-soon') expiringCount++;
   });
   var banner = '';
-  if (expiredCount || expiringCount || lowCount) {
+  if (expiredCount || checkCount || expiringCount || lowCount) {
     var parts = [];
     if (expiredCount) parts.push('<span class="fresh-dot fdot-red"></span> ' + expiredCount + ' expired');
+    if (checkCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + checkCount + ' to check');
     if (expiringCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + expiringCount + ' expiring soon');
     if (lowCount) parts.push('<span class="fresh-dot fdot-amber"></span> ' + lowCount + ' running low');
     banner = '<div class="pantry-fresh-summary ' + (expiredCount ? 'fresh-expired' : 'fresh-warn') + '">' +
@@ -12097,7 +12923,11 @@ function renderPantry() {
 
   // Build a compact row + collapsible edit panel per item.
   function buildPantryItem(p) {
-    var fs = freshnessStatus(pantryDaysLeft(p));
+    var signal = pantryDateSignal(p);
+    var fs = freshnessStatus(signal.daysLeft);
+    if (signal.safety) fs = { cls: 'fresh-expired fresh-safety', icon: '<span class="fresh-dot"></span>', label: pantrySafetyLabel(signal) };
+    else if (signal.kind === 'check') fs = checkFreshnessStatus(pantryCheckLabel(signal));
+    else if (signal.daysLeft < 0 && !signal.printed) fs = checkFreshnessStatus('Estimated window passed');
     var staple = isStaple(p);
     var k = lookupPantryKnowledge(p.name); // only show guide for recognized items
     var safeId = String(p.id).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -12127,9 +12957,9 @@ function renderPantry() {
     var exp = pantryExpiryInfo(p);
     var dateChip = '';
     if (exp) {
-      var dateLabel = (exp.printed ? 'Expires ' : 'Best by ') + formatShortDate(exp.date);
+      var dateLabel = (signal.bestBefore ? 'Best before ' : exp.printed ? 'Expires ' : 'Best by ') + formatShortDate(exp.date);
       var dateTitle = exp.printed
-        ? 'Printed expiry date you entered'
+        ? (signal.bestBefore ? 'Printed best-before date you entered' : 'Printed expiry date you entered')
         : 'Estimated: bought ' + formatShortDate(p.purchaseDate) + ' + ' + exp.shelfLifeDays + '-day shelf life';
       dateChip = '<span class="pi-date' + (exp.printed ? ' pi-date--printed' : '') +
                  '" title="' + escapeHtml(dateTitle) + '">' + escapeHtml(dateLabel) + '</span>';
@@ -12144,6 +12974,8 @@ function renderPantry() {
         'onclick="event.stopPropagation();togglePantrySelected(\'' + p.id + '\')" aria-label="Select ' + escapeHtml(p.name) + '">'
       : '';
     var rowClick = pantrySelectMode ? 'togglePantrySelected(\'' + p.id + '\')' : 'togglePantryExpand(\'' + safeId + '\')';
+    var removeClick = signal.safety ? 'removeAttentionItem(\'pantry\',\'' + escJAttr(p.id) + '\')'
+      : 'removeFromPantry(\'' + p.id + '\')';
 
     var stockEdit = !staple
       ? '<div class="pi-field"><span class="pi-field-label">Qty</span>' +
@@ -12175,15 +13007,19 @@ function renderPantry() {
         stockEdit +
         '<div class="pi-field"><span class="pi-field-label">Where</span>' +
           '<select class="pt-where" onchange="setPantryStorage(\'' + p.id + '\', this.value)">' + whereOpts + '</select></div>' +
-        '<div class="pi-field"><span class="pi-field-label">Date</span>' +
+        '<div class="pi-field pi-field--date"><span class="pi-field-label">Date</span>' +
           '<input class="pt-date" type="date" value="' + dateVal + '" onchange="updatePantryDate(\'' + p.id + '\', this.value)">' +
-          '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')">' + (expiryMode ? 'expires' : 'bought') + '</button></div>' +
+          '<button class="pt-datemode" onclick="togglePantryDateMode(\'' + p.id + '\')">' + (signal.bestBefore ? 'printed' : expiryMode ? 'expires' : 'bought') + '</button>' +
+          (expiryMode ? '<select class="pt-date-kind" aria-label="Printed date type" onchange="updatePantryPrintedDateKind(\'' + escJAttr(p.id) + '\', this.value)">' +
+            '<option value="use-by">Use by / expiry</option><option value="best-before"' + (signal.bestBefore ? ' selected' : '') + '>Best before</option></select>' : '') +
+          '</div>' +
+        (signal.safety ? '<div class="pt-unit">' + THAWED_FOOD_DATE_HELP + '</div>' : '') +
         '<label class="pi-field pi-staple-label"><span class="pi-field-label">Staple</span>' +
           '<input type="checkbox" ' + (staple ? 'checked' : '') + ' onchange="togglePantryStaple(\'' + p.id + '\', this.checked)">' +
           '<span class="pt-unit">not deducted when cooking</span></label>' +
         guideHtml +
         '<div class="pi-footer">' +
-          '<button class="btn btn--outline btn--sm pi-remove-btn" onclick="removeFromPantry(\'' + p.id + '\')">Remove</button>' +
+          '<button class="btn btn--outline btn--sm pi-remove-btn" onclick="' + removeClick + '">Remove</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -12245,32 +13081,57 @@ function togglePantryStaple(id, checked) {
   renderGroceryList();
 }
 
-// Keep the grocery list in sync with a staple's level: a "low" staple shows up
-// as a shopping item; raising it back to OK/Full removes that auto entry.
+function shouldRestockStaple(p) {
+  return isStaple(p) && (p.stockLevel === 'low' || p.stockLevel === 'empty') && !p.suggestDismissed;
+}
+
+// Keep an existing restock row stable until the staple or the shopping list changes.
 function syncStapleToGrocery(p) {
-  AppState.groceryList = AppState.groceryList.filter(function(it) {
-    return !(it.fromStaple && it.name.toLowerCase() === p.name.toLowerCase());
-  });
-  if (isStaple(p) && p.stockLevel === 'low') {
-    if (!p.suggestDismissed) {
+  var rows = AppState.groceryList;
+  var name = p.name.toLowerCase();
+  var ownsRestock = row => row.fromStaple && row.name.toLowerCase() === name;
+  var inList = rows.some(row => !row.checked && !ownsRestock(row) && groceryRowsEquivalent(row, p));
+  // Duplicate lots of one staple share a row. A later Full lot cannot remove it.
+  var restockLots = AppState.pantry.filter(lot => lot !== p && lot.name.toLowerCase() === name && shouldRestockStaple(lot));
+  if (shouldRestockStaple(p)) restockLots.push(p);
+  var shouldBeInList = restockLots.length > 0;
+  var existing = shouldBeInList && !inList ? rows.find(row => !row.checked && ownsRestock(row)) : null;
+  var obsolete = rows.filter(row => ownsRestock(row) && row !== existing);
+  var changed = obsolete.length > 0;
+  if (changed) AppState.groceryList = rows.filter(row => !obsolete.includes(row));
+
+  if (shouldBeInList && !inList) {
+    var empty = restockLots.some(lot => lot.stockLevel === 'empty');
+    var source = empty ? 'Out' : 'Running low';
+    var reason = empty ? 'out of stock' : 'low stock';
+    if (!existing) {
       AppState.groceryList.push({
         id: Date.now() + Math.random(),
         name: p.name,
         category: p.category || 'Pantry',
         quantity: null,
         unit: p.unit || '',
-        sources: ['Running low'],
+        sources: [source],
         checked: false,
         custom: true,
         fromStaple: true,
         suggested: true,
-        suggestedReason: 'low stock'
+        suggestedReason: reason
       });
+      changed = true;
+    } else if (existing.sources?.[0] !== source || existing.suggestedReason !== reason) {
+      existing.sources = [source];
+      existing.suggestedReason = reason;
+      changed = true;
     }
-  } else if (p.stockLevel !== 'empty') {
-    // Restocked (full/ok): clear dismiss so next dip suggests again
-    delete p.suggestDismissed;
   }
+  if (p.suggestDismissed && p.stockLevel !== 'empty' && (!isStaple(p) || p.stockLevel !== 'low')) {
+    // A restock clears dismissal so the next dip can suggest the staple again.
+    delete p.suggestDismissed;
+    changed = true;
+  }
+  if (obsolete.some(row => row.plannedNeed)) generateGroceryList();
+  return changed;
 }
 
 // ── Grocery → Inventory ──────────────────────────────────────────────
@@ -12434,7 +13295,13 @@ function unstockPurchasedGroceryItem(receipt) {
 // authoritative; an untouched one still auto-ticks when it's already at home.
 function groceryItemChecked(item) {
   if (item.userSet) return !!item.checked;
-  return !!item.checked || (!item.fromStaple && isInPantry(item.name));
+  return !!item.checked || groceryItemInPantry(item);
+}
+
+function groceryItemInPantry(item) {
+  if (item.fromStaple || item.userSet) return false;
+  if (!item.custom) return isInPantry(item.name);
+  return pantryMatchesForShop(item.name).some(p => !shouldRestockStaple(p));
 }
 
 // Scan all pantry items and keep the grocery list in sync with low-stock state.
@@ -12443,14 +13310,12 @@ function groceryItemChecked(item) {
 function checkAndReplenishLowStock() {
   var changed = false;
   AppState.pantry.forEach(function(p) {
-    var db = INGREDIENT_DB.find(function(i) { return i.name === p.name; });
     if (isStaple(p)) {
-      var inList = AppState.groceryList.some(function(g) {
-        return g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase();
-      });
-      var shouldBeInList = p.stockLevel === 'low' || p.stockLevel === 'empty';
-      if (inList !== shouldBeInList) { syncStapleToGrocery(p); changed = true; }
-    } else if (db && db.minStockQty != null && p.quantity != null) {
+      if (syncStapleToGrocery(p)) changed = true;
+      return;
+    }
+    var db = INGREDIENT_DB.find(function(i) { return i.name === p.name; });
+    if (db && db.minStockQty != null && p.quantity != null) {
       var alreadyInList = AppState.groceryList.some(function(g) {
         return g.fromStaple && g.name.toLowerCase() === p.name.toLowerCase();
       });
@@ -12506,6 +13371,16 @@ function updatePantryDate(id, value) {
     p.purchaseDate = value || null;
     if (p.shelfLifeDays == null) p.shelfLifeDays = categoryShelfLife(p.category);
   }
+  stampUpdated(p);
+  saveData();
+  renderPantryKeepOpen();
+  refreshFreshnessAlerts();
+}
+
+function updatePantryPrintedDateKind(id, value) {
+  var p = AppState.pantry.find(function(x) { return String(x.id) === String(id); });
+  if (!p || p.dateMode !== 'expiry' || (value !== 'use-by' && value !== 'best-before')) return;
+  p.printedDateKind = value;
   stampUpdated(p);
   saveData();
   renderPantryKeepOpen();
@@ -13740,15 +14615,16 @@ function getReadyFoodSuggestions(limit) {
   return limit ? meals.slice(0, limit) : meals;
 }
 
-// Reuses the recipe's existing mealBalance (D-055) when the batch came from one.
-// Purely a nudge — no composition logic, no new model. Returns '' when the
-// recipe has no balance data or the batch was added manually.
+// Use the same optional additions as the recipe details, with the existing
+// generic side hint as a fallback for a protein batch.
 function readyFoodBalanceHint(meal) {
   if (!meal || meal.recipeId == null) return '';
   var recipe = (AppState.recipes || []).find(function(r) {
     return String(r.id) === String(meal.recipeId);
   });
-  if (!recipe) return '';
+  if (!canSuggestBalancedPlate(recipe)) return '';
+  var hint = balancedPlateHint(recipe, AppState);
+  if (hint) return hint;
   var mb = normalizeMealBalance(recipe.mealBalance);
   if (!mb.protein) return ''; // only worth suggesting sides for a protein batch
   var missing = [];
@@ -13773,8 +14649,8 @@ function readyFoodMetaLine(meal) {
 }
 
 function cookedShelfLife(m) {
-  var days = m.storage === 'freezer' ? m.freezerLife : m.fridgeLife;
-  return days == null ? null : days;
+  if (m.storage === 'freezer') return m.freezerLife ?? null;
+  return Math.min(m.fridgeLife ?? COOKED_FRIDGE_LIMIT, COOKED_FRIDGE_LIMIT);
 }
 
 function setCookedStorage(id, storage) {
@@ -13897,6 +14773,7 @@ window.verifyInventoryChecked = verifyInventoryChecked;
 function renderCookedMeals() {
   var list = document.getElementById('cooked-meals-list');
   if (!list) return;
+  renderStockHealth();
   var section = document.getElementById('cooked-meals-section');
   var meals = AppState.cookedMeals || [];
 
@@ -13908,9 +14785,8 @@ function renderCookedMeals() {
   if (section) section.classList.remove('hidden');
 
   function buildCookedCard(m) {
-    var shelfLife = cookedShelfLife(m);
-    var dl = shelfLife == null ? null : daysLeftFrom(m.cookedDate, shelfLife);
-    var fs = shelfLife == null ? { cls: 'fresh-unknown', label: '', icon: '' } : freshnessStatus(dl);
+    var signal = cookedDateSignal(m);
+    var fs = signal.kind === 'check' ? checkFreshnessStatus(FREEZER_CHECK_LABEL) : freshnessStatus(signal.daysLeft);
     var sourceLabel = m.source === 'takeout' ? 'Takeout' : (m.source === 'leftovers' ? 'Leftovers' : '');
     var h = '<div class="cooked-card ' + fs.cls + '">';
     h += '<div class="cooked-card-main">';
@@ -13974,11 +14850,14 @@ function renderCookedMeals() {
 // does not invent one: the Inventory tab still shows the item as expired.
 function isKeptToday(rec) { return !!rec && rec.keptOn === todayISO(); }
 
-// Days left for either record type, or null when it isn't tracked.
-function attentionDaysLeft(kind, rec) {
-  return kind === 'cooked'
-    ? daysLeftFrom(rec.cookedDate, cookedShelfLife(rec))
-    : pantryDaysLeft(rec);
+function cookedDateSignal(meal) {
+  var daysLeft = daysLeftFrom(meal.cookedDate, cookedShelfLife(meal));
+  var kind = null;
+  if (daysLeft != null) {
+    if (daysLeft < 0) kind = meal.storage === 'freezer' ? 'check' : 'expired';
+    else if (daysLeft <= FRESHNESS_WARN_DAYS) kind = 'use-soon';
+  }
+  return { kind: kind, daysLeft: daysLeft };
 }
 
 function findAttentionRecord(kind, id) {
@@ -13986,28 +14865,36 @@ function findAttentionRecord(kind, id) {
   return list.find(function(r) { return String(r.id) === String(id); }) || null;
 }
 
-// The three actionable buckets. Nothing else belongs here — this list exists to
-// be emptied, so anything that isn't an action is noise.
+function attentionEntry(kind, record) {
+  return { kind: kind, id: record.id, name: record.name,
+    date: kind === 'cooked' ? record.cookedDate : record.expiryDate };
+}
+
 function collectAttentionItems() {
-  var expired = [], useSoon = [];
+  var buckets = { expired: [], check: [], 'use-soon': [] };
   function scan(kind, list) {
     (list || []).forEach(function(rec) {
-      var dl = attentionDaysLeft(kind, rec);
-      if (dl == null) return;
-      var entry = { kind: kind, id: rec.id, name: rec.name, daysLeft: dl };
-      if (dl < 0) { if (!isKeptToday(rec)) expired.push(entry); }
-      else if (dl <= FRESHNESS_WARN_DAYS) useSoon.push(entry);
+      var signal = kind === 'cooked' ? cookedDateSignal(rec) : pantryDateSignal(rec);
+      if (!signal.kind || (signal.kind !== 'use-soon' && isKeptToday(rec))) return;
+      var entry = attentionEntry(kind, rec);
+      entry.daysLeft = signal.daysLeft;
+      if (signal.safety) {
+        entry.safety = signal.safety;
+        entry.limitDays = signal.limitDays;
+        entry.safetyClass = signal.safetyClass;
+      }
+      if (signal.kind === 'check') entry.checkLabel = kind === 'cooked' ? FREEZER_CHECK_LABEL : pantryCheckLabel(signal);
+      buckets[signal.kind].push(entry);
     });
   }
   scan('pantry', AppState.pantry);
   scan('cooked', AppState.cookedMeals);
   var byDays = function(a, b) { return a.daysLeft - b.daysLeft; };
-  expired.sort(byDays);
-  useSoon.sort(byDays);
+  Object.values(buckets).forEach(function(items) { items.sort(byDays); });
   var low = (AppState.pantry || []).filter(function(p) {
     return isStaple(p) && p.stockLevel === 'low';
   });
-  return { expired: expired, useSoon: useSoon, low: low };
+  return { expired: buckets.expired, check: buckets.check, useSoon: buckets['use-soon'], low: low };
 }
 
 // Keep: "I looked, it's fine." Costs one tap and no date entry.
@@ -14023,8 +14910,7 @@ function keepAttentionItem(kind, id) {
   refreshFreshnessAlerts();
 }
 
-// Remove one expired record. One tap, no confirmation: it's a single item the
-// user is looking at, and the row states plainly that it has expired.
+// Remove one named row using the existing explicit deletion path.
 function removeAttentionItem(kind, id) {
   var rec = findAttentionRecord(kind, id);
   if (!rec) return;
@@ -14045,33 +14931,52 @@ function removeAttentionItem(kind, id) {
   showSuccessMessage('Removed "' + rec.name + '"');
 }
 
-// Bulk cleanup. Only touches records collectAttentionItems() classified as
-// EXPIRED — days-left strictly negative, by the same pantryDaysLeft() /
-// cookedShelfLife() rules the badges use. "Use soon" is never in this set, and
-// neither is anything kept today. Every id gets an explicit tombstone before it
-// is dropped, so the MASS_DELETE_GUARD diff in recordLocalDeletions() (which
-// ignores >5 simultaneous disappearances as a suspected load race) can't swallow
-// the delete and let another device resurrect the food.
+function confirmExpiredRemoval(title, expired, onConfirm) {
+  function stillBulkExpired(e) {
+    if (e.safety) return false;
+    var records = e.kind === 'cooked' ? AppState.cookedMeals : AppState.pantry;
+    var matches = (records || []).filter(rec => String(rec.id) === String(e.id));
+    if (matches.length !== 1) return false;
+    var rec = matches[0];
+    var current = attentionEntry(e.kind, rec);
+    var signal = e.kind === 'cooked' ? cookedDateSignal(rec) : pantryDateSignal(rec);
+    return current.name === e.name && current.date === e.date && signal.kind === 'expired' && !signal.safety && !isKeptToday(rec);
+  }
+  if (!expired.length || !expired.every(stillBulkExpired)) return;
+  var list = expired.map(function(e) {
+    return '<li><strong>' + escapeHtml(e.name) + '</strong> — ' +
+      (e.kind === 'cooked' ? 'cooked ' : '') + escapeHtml(e.date) + '</li>';
+  }).join('');
+  showConfirmDialog(title,
+    '<ul class="confirm-expired-list" tabindex="0" aria-label="Records to remove">' + list + '</ul>' +
+      '<p>Estimated dates and best-before items are not included.</p>',
+    'Remove ' + expired.length, 'Cancel', function() {
+      // The realtime listener can replace inventory while the dialog is open.
+      if (!expired.every(stillBulkExpired)) {
+        showErrorMessage('The expired list changed. Review it again before removing food.');
+        return;
+      }
+      if (createBackup('Remove expired food')) onConfirm();
+    });
+}
+
+// Write one explicit tombstone per confirmed id before dropping the records so
+// the MASS_DELETE_GUARD cannot suppress a legitimate bulk removal.
 function removeAllExpired() {
-  var expired = collectAttentionItems().expired;
+  var expired = collectAttentionItems().expired.filter(e => !e.safety);
   if (expired.length === 0) return;
 
-  showConfirmDialog(
-    'Remove expired food?',
-    '<p>Remove ' + expired.length + ' expired item' + (expired.length !== 1 ? 's' : '') +
-      ' from your inventory?</p><p class="confirm-note">Items you marked <b>Keep</b> and anything still marked <b>use soon</b> are left alone.</p>',
-    'Remove ' + expired.length,
-    'Cancel',
+  confirmExpiredRemoval('Remove expired food?', expired,
     function() {
       var when = new Date().toISOString();
-      var doomed = { pantry: {}, cookedMeals: {} };
+      var doomed = { pantry: new Set(), cookedMeals: new Set() };
       expired.forEach(function(e) {
         var collection = e.kind === 'cooked' ? 'cookedMeals' : 'pantry';
-        doomed[collection][String(e.id)] = true;
+        doomed[collection].add(String(e.id));
         writeTombstone(collection, e.id, when);
       });
-      AppState.pantry = (AppState.pantry || []).filter(function(x) { return !doomed.pantry[String(x.id)]; });
-      AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return !doomed.cookedMeals[String(x.id)]; });
+      AppState.pantry = (AppState.pantry || []).filter(function(x) { return !doomed.pantry.has(String(x.id)); });
+      AppState.cookedMeals = (AppState.cookedMeals || []).filter(function(x) { return !doomed.cookedMeals.has(String(x.id)); });
       pantrySelectMode = false;
       pantrySelectedIds.clear();
       snapshotIdBaseline();
@@ -14090,25 +14995,17 @@ function removeAllExpired() {
 
 // Counts of items needing attention across pantry + cooked meals.
 function getFreshnessAlerts() {
-  var pantry = { expired: 0, expiring: 0 };
-  AppState.pantry.forEach(function(p) {
-    var dl = pantryDaysLeft(p);
-    if (dl == null) return;
-    if (dl < 0) { if (!isKeptToday(p)) pantry.expired++; }
-    else if (dl <= FRESHNESS_WARN_DAYS) pantry.expiring++;
-  });
-  var cooked = { expired: 0, expiring: 0 };
-  (AppState.cookedMeals || []).forEach(function(m) {
-    var dl = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
-    if (dl == null) return;
-    if (dl < 0) { if (!isKeptToday(m)) cooked.expired++; }
-    else if (dl <= FRESHNESS_WARN_DAYS) cooked.expiring++;
-  });
+  var attention = collectAttentionItems();
+  function count(kind) {
+    function ofKind(entry) { return entry.kind === kind; }
+    return { expired: attention.expired.filter(ofKind).length, expiring: attention.useSoon.filter(ofKind).length };
+  }
   return {
-    pantry: pantry,
-    cooked: cooked,
-    expired: pantry.expired + cooked.expired,
-    expiring: pantry.expiring + cooked.expiring
+    pantry: count('pantry'),
+    cooked: count('cooked'),
+    expired: attention.expired.length,
+    expiring: attention.useSoon.length,
+    check: attention.check.length
   };
 }
 
@@ -14119,12 +15016,13 @@ function renderFreshnessBanner() {
   var el = document.getElementById('freshness-alert-banner');
   if (!el) return;
   var a = getFreshnessAlerts();
-  if (_freshnessBannerDismissed || (a.expired + a.expiring) === 0) {
+  if (_freshnessBannerDismissed || (a.expired + a.expiring + a.check) === 0) {
     el.classList.add('hidden');
     return;
   }
   var parts = [];
   if (a.expired) parts.push('<span class="fresh-dot fdot-red"></span> ' + a.expired + ' expired');
+  if (a.check) parts.push('<span class="fresh-dot fdot-amber"></span> ' + a.check + ' to check');
   if (a.expiring) parts.push('<span class="fresh-dot fdot-amber"></span> ' + a.expiring + ' expiring soon');
   el.className = 'freshness-banner ' + (a.expired ? 'fresh-expired' : 'fresh-warn');
   el.innerHTML =
@@ -14159,7 +15057,7 @@ function viewFreshnessDetails() {
 // Small count badge on the My Fridge tab.
 function updateFreshnessBadges() {
   var a = getFreshnessAlerts();
-  var count = a.expired + a.expiring;
+  var count = a.expired + a.expiring + a.check;
   var btn = document.querySelector('.tab-btn[data-tab="fridge"]');
   if (!btn) return;
   var badge = btn.querySelector('.tab-badge');
@@ -14185,9 +15083,7 @@ function refreshFreshnessAlerts() {
 // open, and when the app is brought back to the foreground. Nothing here fires
 // while the app is closed. See DECISIONS D-058.
 //
-// Everything below CONSUMES collectAttentionItems() / pantryDaysLeft() /
-// cookedShelfLife(). It never recomputes an expiry boundary of its own — the
-// Kitchen Truth model (D-057) stays the single source of freshness.
+// Notifications consume the Expired and Use soon buckets from collectAttentionItems().
 //
 // State lives in its own device-local localStorage key, NOT in AppState: this is
 // per-device notification bookkeeping, and syncing it would mean one device's
@@ -14358,7 +15254,7 @@ function updateAppAttentionBadge() {
   try {
     if (!navigator.setAppBadge) return;
     var a = getFreshnessAlerts();
-    var count = a.expired + a.expiring;
+    var count = a.expired + a.expiring + a.check;
     if (count > 0) navigator.setAppBadge(count).catch(function() {});
     else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function() {});
   } catch (e) { /* unsupported or blocked — the in-app badge still shows it */ }
@@ -14452,6 +15348,7 @@ function addToPantry(forceAdd) {
   var qtyEl = document.getElementById('pantry-qty');
   var unitEl = document.getElementById('pantry-unit');
   var expiryEl = document.getElementById('pantry-expiry');
+  var dateKindEl = document.getElementById('pantry-printed-date-kind');
   var qtyRaw = qtyEl ? qtyEl.value.trim() : '';
   var qty = parseFloat(qtyRaw);
   if (qtyRaw === '' || isNaN(qty) || qty <= 0) qty = null;
@@ -14471,13 +15368,15 @@ function addToPantry(forceAdd) {
     unit: unit || (dbEntry ? dbEntry.unit : ''),
     staple: dbEntry ? !!dbEntry.isStaple : undefined,
     expiryDate: expiry || null,
-    dateMode: expiry ? 'expiry' : undefined
+    dateMode: expiry ? 'expiry' : undefined,
+    ...(expiry && dateKindEl?.value === 'best-before' ? { printedDateKind: 'best-before' } : {})
   });
 
   input.value = '';
   if (qtyEl) qtyEl.value = '';
   if (unitEl) unitEl.value = '';
   if (expiryEl) expiryEl.value = '';
+  if (dateKindEl) dateKindEl.value = '';
   input.focus();
 
   saveData();
@@ -16140,6 +17039,17 @@ const INGREDIENT_DB = [
   { name: 'Gochujang', unit: 'g', category: 'Pantry', price: '₱250/500g', store: 'Supermarket / Korean Store', storage: 'fridge', shelfLifeDays: 365, aliases: ['gochujang', 'Korean chili paste', 'Korean red pepper paste', 'gochuchang'], fridgeDays: 365, freezerDays: null, trackExpiry: true, priceValue: 250, minStockQty: null },
   { name: 'Mung Beans', unit: 'g', category: 'Grain', price: '₱80/500g', store: 'Palengke / Supermarket', storage: 'counter', shelfLifeDays: 365, aliases: ['mung beans', 'monggo', 'green mung beans', 'munggo', 'mung dal'], fridgeDays: null, freezerDays: null, trackExpiry: false, priceValue: 80, minStockQty: 200 },
 ];
+
+// Index direct aliases once for the availability checks that run on each render.
+const INGREDIENT_AVAILABILITY_ALIASES = new Map();
+INGREDIENT_DB.forEach(function(entry) {
+  var name = ingredientMatchWords(entry.name).join(' ');
+  var aliases = INGREDIENT_AVAILABILITY_ALIASES.get(name) || new Set();
+  (entry.aliases || []).forEach(function(alias) {
+    aliases.add(ingredientMatchWords(alias).join(' '));
+  });
+  INGREDIENT_AVAILABILITY_ALIASES.set(name, aliases);
+});
 
 function filterIngredients(query) {
   var q = query.toLowerCase();

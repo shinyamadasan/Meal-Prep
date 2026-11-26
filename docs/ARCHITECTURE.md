@@ -26,7 +26,7 @@ Desktop is unchanged.
 |---|---|---|
 | Home / Dashboard | `#dashboard` | `renderDashboard()` → `renderMealPrepFlowCard()` first; the "what to cook/eat" cards sit in the collapsed `#dash-ideas` |
 | Plan / Weekly Planner | `#planner` | `renderWeeklyPlanner()` (ends with `renderPlannedBatches()`); the "By day" scheduler is a collapsed `<details>`; `renderBatchPickerResults()` fills the "+ Add meals" picker modal |
-| Shop / Grocery | `#grocery` | `renderGroceryList()` |
+| Shop / Grocery | `#grocery` | `renderGroceryList()` → `renderNoPlanGrocery()` for the open `#no-plan-grocery` card |
 | Prep | `#prep` | `renderPrepTab()` |
 | Fridge (was "Inventory") | `#fridge` | `renderPantry()`, `renderCookedMeals()`, `renderPreparedFlavors()` (mirrors the Flavor Library's prepared-stock cards — D-075) |
 | Recipes (was "Cook") | `#recipes` | `renderRecipes()` |
@@ -85,8 +85,53 @@ Recipe photos are compressed (max 1000px JPEG ~0.7) and stored in a Firestore **
 Legacy inline photos are auto-migrated on load. In-memory `recipePhotoCache` attaches them at render.
 
 ## The "cook now" engine
-Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngredients` in 3 tiers
-(can cook / missing 1 / missing 2). Missing-1 cards expose `buyMissingIngredient()`.
+`getCookableRecipes()` matches available pantry lots against the required lines in a recipe's
+`baseIngredients`. A required line is covered when any of its alternatives matches, including
+water as an alternative. Missing optional and serving lines appear in `optionalMissing`.
+Water-only lines are skipped. Recipes need at least two required lines, at least one match,
+and up to two missing required lines. Home and Recipes show Can cook now, Cook with a swap, and
+Missing 1 or 2 ingredients. The eat picker names the pantry ingredient to use when a recipe needs
+a swap. A same-head variety swap covers a required line separately from exact availability.
+Swaps exclude condiments, spices, and identity-changing varieties. Canola and olive oil can swap
+with each other. Home cards missing one ingredient expose `buyMissingIngredient()`.
+
+`getCookableRecipes()`, `getExpirySuggestions()`, and `pantryMatchesForShop()` share
+`ingredientNamesMatch()` and `pantryLotAvailable()` (D-086). Matching uses normalized names,
+whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. A subset match
+rejects added identity modifiers such as evaporated in evaporated milk. Generic descriptors
+such as white, steamed, and short-grain are ignored for names headed by rice. Empty lots are
+unavailable. Non-empty staples count as available. For non-staples, a finite quantity of zero or
+less or a valid printed use-by date (`dateMode: 'expiry'`) before today makes the lot unavailable.
+Lots past an estimated shelf-life window or a printed best-before date still count as available.
+`getExpirySuggestions()` limits its source lots to today through three days out. The cooking
+write path uses its own `findPantryMatch()` rules under D-086.
+
+## No-plan grocery
+
+`noPlanGaps(state)` applies `NO_PLAN_TEMPLATE` and `noPlanRole()` to available pantry names
+and unchecked grocery rows. It counts matching names once per role and excludes all existing
+grocery rows and available lots from the options using D-086. Options that fill an unmet
+rule come first, followed by `ingredientVersatility()` and convenience. Recipe versatility
+counts recipe usage, distinct equipment, and quick uses. A named variety gets recipe credit
+for its own use and direct aliases.
+
+`renderNoPlanGrocery()` derives results for the open Shop List card independently of the plan.
+Rendering is read-only. A chip calls `buyMissingIngredient()` for a single custom grocery row.
+
+## Fridge stock health (D-087)
+
+`renderStockHealth()` fills the open `#stock-health` panel from
+`stockHealthReport(AppState, todayISO())`. `STOCK_CLASS_RULES` classifies raw lots with storage,
+ingredient names, direct database aliases, and categories. Cooked batches come from
+`AppState.cookedMeals`. `STOCK_REVIEW_POLICY` sets the record-age checks at 7 days for perishables,
+90 for frozen stock, 180 for pantry staples, 365 for condiments, and 4 fridge / 90 freezer for
+cooked meals. Record age uses `updatedAt` with purchase or cook date as the fallback.
+
+Printed dates, age-based safety estimates, and record staleness are independent. Freezer quality
+guidance uses the ingredient's existing freezer estimate or the cooked batch policy. The
+consistency check reuses `pantryLotAvailable()` for empty staples, `ingredientNamesMatch()` for
+matching lots, and `portionCountOrNull()` for depleted cooked batches. The renderer and clipboard
+action read from the report without persisting inventory data.
 
 ## Cook → inventory loop
 `markRecipeCooked()`:
@@ -193,7 +238,7 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
 5. A purchase lands in `AppState.pantry` (raw ingredients) ONLY. It never creates a `cookedMeals`
    record — that happens only through prep (see "Meal-prep flow" below). D-076.
 6. **Correcting a stale "In stock"** — `pantryMatchesForShop()` names the kitchen records behind a
-   row's claim (the same loose match `isInPantry()` always used, minus staples marked `empty`). The
+   row's claim using D-086 availability and ingredient matching rules. The
    row's **Not anymore?** button opens `openNotInKitchenDialog()`, which lists each matched record;
    `correctKitchenStock()` acts on the ONE record tapped: a staple is set `stockLevel: 'empty'`,
    anything else is removed with an explicit `writeTombstone('pantry', …)`. Any grocery row whose
@@ -222,10 +267,12 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
   Times use `statedMinutes()`, NOT `recipePrepMinutes()` (which returns 0 for "missing").
 
 ## Attention loop
-`collectAttentionItems()` is the single classifier behind Home's "What needs attention?" card. It
-scans `AppState.pantry` (via `pantryDaysLeft()`) and `AppState.cookedMeals` (via `cookedShelfLife()`)
-in one pass and returns `{ expired, useSoon, low }`. The two record types keep separate shapes — this
-unifies the attention experience, not the data model.
+`collectAttentionItems()` scans pantry lots via `pantryDateSignal()` and cooked batches via
+`cookedDateSignal()`. It returns `{ expired, check, useSoon, low }` for Home. Expired covers a
+passed printed use-by date or a cooked batch past its fridge window. Check covers a passed
+perishable estimate, a passed printed best-before date, or a cooked batch past its freezer
+quality window. Aged frozen pantry lots, pantry staples and condiments keep their estimate
+context in Fridge and Stock Health. Record staleness belongs to Stock Health (D-087).
 
 `#dash-attention` is compact by default, unconditionally (D-079) — an expired item no longer forces
 it open. It opens only through an explicit action: the card's own `.dash-attn-review-btn` ("Review",
@@ -235,15 +282,17 @@ entry point and the target of the global banner's own View action via `viewFresh
 Ready-to-eat and What-should-we-eat cards' row buttons still use to jump straight to the Fridge tab
 for a specific item, an unrelated call site `viewFreshnessDetails()` must not disturb.
 
-Actions: `keepAttentionItem()` writes `keptOn = todayISO()` (suppresses the record from attention
-surfaces for the day; alters no dates), `removeAttentionItem()` removes one, `removeAllExpired()`
-removes the whole `expired` bucket. Both removal paths write EXPLICIT tombstones into
-`AppState.deletions` — into the record's OWN collection bucket via `writeTombstone(collection, id)`,
-`'cookedMeals'` or `'pantry'` depending on the record (D-071) — and call `snapshotIdBaseline()`
-before dropping records, because `recordLocalDeletions()` deliberately ignores more than
-`MASS_DELETE_GUARD` simultaneous disappearances **in aggregate across all collections**. Writing
-explicitly is what keeps a legitimate bulk removal from being swallowed by that guard.
-`getExpiredPantryItems()` and `getFreshnessAlerts()` honour `keptOn` too.
+Keep and Still good call `keepAttentionItem()` to record `keptOn = todayISO()`. Home and the
+freshness alerts suppress the flagged record for that day. Cook Now displays a check note
+when every available lot matching a recipe line needs checking. Choosing Still good lets that
+lot satisfy the line without the check note for the rest of the day.
+
+Remove and Toss call `removeAttentionItem()` for one named record. `removeAllExpired()` and
+`clearExpiredPantryItems()` list every eligible record and date before asking for confirmation.
+Confirmation revalidates the named records and takes a local backup before deletion. These
+actions write explicit tombstones to each record's collection (D-071), remove the confirmed
+records, then call `snapshotIdBaseline()` and `saveData()`. The explicit tombstones preserve
+legitimate bulk removals across the aggregate `MASS_DELETE_GUARD`.
 
 ### Deletion identity and the mass-delete guard (D-071)
 

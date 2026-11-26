@@ -474,6 +474,179 @@
 
 ---
 
+<!-- Flexible Food System V1 — owner brief 2026-11-25. Full analysis: planning/flexible-food-system-v1/.
+     All six are deliberately "Decision: Clarify" so D-042 cannot auto-promote them: the brief says
+     "Do not implement or deploy changes until the proposal is reviewed and approved." -->
+
+### PROP-035 — FFS-0 Truthful availability (read path): stop counting empty/expired/substring matches as "have"
+- **▶ Decision: Clarify — recommend Approve (wave 1).** Every Cook Now, grocery and plate suggestion depends on it (audit F1/F2).
+- **▶ Risk: Low at idea time; build as Medium.** Read-side only (`isInPantry`, `findPantryMatch`, `pantryMatchesForShop`, `groceryItemChecked`, `getExpirySuggestions`). No record writes, no `saveData()` change.
+- **type:** bug · **source captures:** owner brief FFS-V1; audit-evidence/2026-11-06 F1, F2
+- **goal alignment:** supports — North-star #1 accurate core loop; prerequisite for the FFS-V1 objective
+- **expected user value:** High — recommendations stop suggesting food we don't really have
+- **evidence:** reproducible audit cases (0 g / expired → "In stock"; Rice satisfies Rice Vinegar; expired raw food suggested)
+- **effort:** M · **dependencies:** none · **confidence:** high · **ambiguity:** whether `null` quantity counts as "have" (proposed: yes, unchanged)
+- **why now vs later:** now — the audit ranks it first
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat) → BQ-027 / TASK-080
+
+---
+
+### PROP-036 — FFS-1 Read-only "Stock health" report for outdated and inconsistent inventory
+- **▶ Decision: Clarify — recommend Approve (wave 1).** Fulfils "investigate outdated inventory records and inconsistent quantities without deleting or modifying them" against live data.
+- **▶ Risk: Low** — render-only; no edit or delete controls; test asserts `AppState` is unchanged.
+- **type:** feature · **source captures:** owner brief FFS-V1; CAPABILITY_AUDIT §3 (I-1…I-8)
+- **goal alignment:** supports — North-star #2 trustworthy data
+- **expected user value:** Medium–High — shows which records are stale without any manual audit
+- **evidence:** code-path analysis I-1…I-8; production data not yet inspected
+- **effort:** S · **dependencies:** none (better after PROP-035) · **confidence:** high · **ambiguity:** stale threshold (proposed: 60 days)
+- **why now vs later:** now — the owner asked for this investigation
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat; revised: per-class staleness, three separate signals, never delete) → BQ-028 / TASK-081
+
+---
+
+### PROP-037 — FFS-2 No-plan grocery "Fill the gaps" (Kylie's 4/4/3/3/3/3/1–2 template vs current stock)
+- **▶ Decision: Clarify — recommend Approve (wave 1).** This is the cookbook's signature framework, and the app has no grocery path for a week without a plan.
+- **▶ Risk: Low** — additive Shop card; adds grocery items only through the existing add path when tapped.
+- **type:** feature · **source captures:** owner brief FFS-V1 capability 4; KNOWLEDGE_BASE F5
+- **goal alignment:** supports — FFS-V1 objective (eat well without a plan); North-star #1
+- **expected user value:** High — a short, inventory-aware list instead of none
+- **evidence:** book pp ~58–59; `INGREDIENT_DB.category` already maps 4 of the 7 roles
+- **effort:** M · **dependencies:** PROP-035 · **confidence:** high · **ambiguity:** keyword map for snack, flavor and drink roles
+- **why now vs later:** now — core of the brief
+- **AI-recommended priority:** **P1**
+- **status:** approved 2026-11-25 (owner, chat; + flexible choices, avoid unnecessary purchases, versatility-first) → BQ-029 / TASK-082
+
+---
+
+### PROP-038 — FFS-3 Balanced Plate completion hints and Snack Pack pairs on Home suggestions
+- **▶ Decision: Clarify — recommend Approve (wave 2).**
+- **▶ Risk: Low** — pure functions and one hint line per card; suggests only items in stock.
+- **type:** feature · **source captures:** owner brief FFS-V1 capabilities 3 and 5; KNOWLEDGE_BASE F2, F6
+- **goal alignment:** supports — FFS-V1 nutrition goal without extra tracking
+- **expected user value:** Medium–High
+- **evidence:** `mealBalance` exists but is unused by suggestion surfaces
+- **effort:** S–M · **dependencies:** PROP-035 · **confidence:** med · **ambiguity:** inferring plate roles for recipes without `mealBalance`
+- **why now vs later:** after wave 1, so hints use truthful stock
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-11-25 as next wave (owner, chat) → BQ-030 / TASK-083 prepared at status todo
+
+---
+
+### PROP-039 — FFS-4 Recipe source and adaptation fields + private-safe "So Easy So Good" reference pack
+- **▶ Decision: Clarify — REVISED 2026-11-25 per owner:** full selected recipes (ingredients, verified quantities, instructions, page ref, original/adapted status) usable inside the private household app; copyrighted text kept out of the public repo and public app bundle. Content enters only through the owner's signed-in account via the existing import path, from a private file kept outside the repo. See IMPLEMENTATION_PLAN.md FFS-4 rev 2.
+- **▶ Risk: High** — adds fields to the Firestore-synced Recipe shape → D-032 red zone; merge held (`approved`).
+- **type:** feature · **source captures:** owner brief FFS-V1 capability 7 and the "preserve originals, distinguish adaptations" constraint
+- **goal alignment:** supports — FFS-V1 recipe knowledge
+- **expected user value:** Medium
+- **evidence:** no `source` field today; public repo makes verbatim recipe text unsuitable
+- **effort:** M · **dependencies:** none · **confidence:** med · **ambiguity:** pack content scope; DATA_MODEL and D-0NN needed
+- **why now vs later:** wave 2 or 3, after the owner decides on copyright scope
+- **AI-recommended priority:** **P2**
+- **status:** approved 2026-11-25 (owner, chat; rev 2, subject to implementation review after wave 1; + categories, page-image-verified quantities, curated start) → BQ-031 / TASK-084
+
+---
+
+### PROP-040 — FFS-5 Ingredient versatility score and hands-off tie-break in Cook Now
+- **▶ Decision: Clarify — recommend Approve (wave 2).**
+- **▶ Risk: Low** — derived and never stored; ordering only.
+- **type:** feature · **source captures:** owner brief FFS-V1 capabilities 6 and 8; KNOWLEDGE_BASE §4, F9
+- **goal alignment:** supports — versatility, simplicity, convenience
+- **expected user value:** Medium
+- **evidence:** no versatility ranking today; equipment already implies supervision level
+- **effort:** S · **dependencies:** PROP-037 · **confidence:** high · **ambiguity:** none
+- **why now vs later:** after PROP-037, which it orders
+- **AI-recommended priority:** **P3**
+- **status:** pending (owner review)
+
+### PROP-041 — Conversational household operations: Meal Prep MCP audit and gap proposal
+- **▶ Decision: Approve (direction, 2026-11-26) — phased plan in `planning/PROP-041-PLAN.md`; implementation awaits owner approval.**
+- **▶ Risk: High** — any new tool writes Firestore through the bridge (D-032 red zone: sync, tombstones,
+  auth). Not part of the current release; read-only audit only.
+- **type:** feature · **source captures:** owner request 2026-11-26 ("AI-assisted household management")
+- **goal alignment:** supports — minimum decisions and minimum manual app interaction (north star:
+  simplicity; data safety preserved)
+- **expected user value:** High once onboarding is done; most daily inventory edits could move to chat
+- **evidence:** audit of `workers/conversational-bridge/src/mcp.js` and `src/operations/*` at `ffs-v1-refine`
+  (9 tools, one owner OAuth subject, revision-checked single-document writes)
+- **effort:** M–L (depends on gaps chosen) · **dependencies:** FFS-V1 release; household onboarding
+- **confidence:** high (code read) · **ambiguity:** which operations matter most day to day
+- **why now vs later:** later — the release and its deployment hold come first
+- **AI-recommended priority:** **P1** after release
+- **status:** approved (direction only) — separate track, does not block FFS-V1
+
+**Current tools.** Read: `get_inventory`, `get_ready_food`. Write: `record_ready_food`,
+`consume_ready_food`, `mark_out_of_stock`, `mark_in_stock`, `set_inventory_quantity`,
+`consume_stock`, `add_stock`. Every write: OAuth write scope for ONE configured owner subject,
+`expectedRevision` compare plus Firestore `updateTime` precondition, one guarded write, explicit
+tombstone on removal, ingredient ids only from `get_inventory` (no fuzzy matching), ambiguous
+staple rows refused.
+
+**Coverage of the requested operations.**
+
+| Operation | Today | Gap |
+| --- | --- | --- |
+| Register a newly purchased ingredient | Missing | `add_stock` only grows an existing row; no create tool |
+| Add quantity to existing inventory | Supported (`add_stock`) | Merges into the old lot and keeps its old bought date (see C2) |
+| Record ingredient consumption | Supported (`consume_stock`) | Same unit or g/kg, ml/L only; no "we cooked recipe X" deduction |
+| Staples Full / OK / Low / Empty | Partial: Full (`mark_in_stock`), Empty (`mark_out_of_stock`) | No OK or Low, so "running low" cannot reach Shop from chat |
+| Remove / discard safely | Supported for one row (`mark_out_of_stock` -> staple Empty, non-staple removed + tombstone) | No safety backup before a chat removal; no "discard because expired" reason |
+| Prepared ingredients (frozen garlic, portioned proteins) | Partial: existing rows can be counted/consumed | Cannot create them, set Freezer, or set pack units |
+| Storage location and dates | Missing | No tool sets storage, bought date or printed date (needed for thaw and "no bought date") |
+| Cooked meals and servings | Supported (`record_ready_food`, `consume_ready_food`) | No freezer/fridge move; see C3 on freshness |
+| Grocery list items | Missing | No read or write of `groceryList` |
+| Recommend meals from actual inventory | Missing (chat can only guess) | No recipes read; inventory read lacks dates, category and safety state (C1) |
+| Several updates in one request | Partial: sequential calls, each using the revision the previous call returned | No atomic batch; a mid-sequence failure leaves a partial result |
+
+**Compatibility with the FFS-V1 changes (TASK-086..090).**
+- C1 (gap, safety): `get_inventory` returns no `purchaseDate`, `expiryDate`, `dateMode`,
+  `printedDateKind`, category or safety state, and `get_ready_food` no freshness. A chat model can
+  call raw chicken the app marks "Past safe fridge time - do not use" available, or offer a 6-day
+  leftover. Nothing is written wrongly, but chat recommendations can contradict the app's safety rules.
+- C2 (behaviour): `add_stock` keeps the existing lot's `purchaseDate`. Under TASK-090 the app's fridge
+  clock then treats new raw protein as old (conservative, it hides fresh food early). Its own freshness
+  guard uses category defaults (protein 3 d), not the FDA classes (poultry 2 d, ham 3 d), and a lot
+  with no bought date is accepted, so new stock can merge into a lot the app already blocks.
+- C3 (description drift): `record_ready_food` without `source` stores `fridgeLife: null` "to keep
+  freshness unknown". Since TASK-090 the app caps fridge leftovers at 4 days, including null, so such
+  a meal shows Expired after 4 days and is included (named) in "Remove expired". The tool description
+  is now inaccurate; behaviour is safe (no automatic deletion).
+- C4 (improved): `mark_out_of_stock` on a staple now puts an "Out" row on Shop the next time the app
+  opens Shop (TASK-090 B3); before, Empty never reached Shop.
+- C5 (unchanged): staple classification differs from the app when a row has no explicit flag (the
+  bridge cannot see INGREDIENT_DB); it refuses with `ambiguous` instead of guessing. Kept.
+- Ledger contract (13/13) and the worker tests are unaffected by TASK-090 (no `workers/` change).
+
+**Safeguards to keep in every proposal below.** `expectedRevision` + `updateTime` precondition; one
+guarded write per call; explicit tombstones; no fuzzy ids; ambiguous refusal; no bulk delete from
+chat; single-owner OAuth subject (household members act through the owner's connection; per-person
+access is a separate decision).
+
+**Proposed increments (each its own task, High risk, `approved`-gated; none in this release).**
+1. **Read truth first (smallest, highest value):** extend `get_inventory` / `get_ready_food` with
+   dates, storage, category and the app's own availability/safety verdict, so chat never recommends
+   unsafe food. Read-only.
+2. **Duplicate-write protection for deltas:** an optional client `requestId` stored briefly per
+   document so a retried `add_stock` / `consume_stock` / `consume_ready_food` is applied once.
+3. **Register and edit rows:** `add_pantry_item` (name, qty, unit, storage, bought date, staple flag)
+   and `update_pantry_item` (storage, bought date, printed date + kind); `add_stock` gains "new lot"
+   mode so a purchase keeps its own date.
+4. **Staple levels:** `set_stock_level` (full/ok/low/empty) replacing the two-level tools' gap.
+5. **Shop list:** `get_shopping_list`, `add_shopping_item`, `check_shopping_item` using the app's
+   own consolidation rules (TASK-090 B2), so chat and app never double-list.
+6. **Meal recommendation:** `get_cook_options` returning the app's Cook-now tiers, and
+   `record_cooked_recipe` that deducts like the app's Cooked button.
+7. **Multi-update requests:** `apply_inventory_changes` taking a short list of the above operations
+   under one `expectedRevision`, all-or-nothing in one guarded write.
+8. Update the `record_ready_food` description for C3 (docs-only fix; can ride with increment 1).
+
+**Owner decisions needed:** which increments, in what order; whether chat may create records
+(increment 3) or only edit existing ones; whether household members other than the owner get
+their own connection; whether chat removals should take a local-style safety backup first.
+
+---
+
 ## Proposal contract
 *(the structured shape triage produces — keep this shape so downstream stages stay swappable)*
 ```

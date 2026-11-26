@@ -4,6 +4,360 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-090 (FFS-V1 release blockers B1/B2/B3) — APPROVED (held) — Claude, 2026-11-26
+Branch `task-090-ffs-release-blockers` (Codex `e9ccdb1`, `9ca5ede`; review fix `9601807`), merged
+into `ffs-v1-refine` (`5bd770b`). Independent verification on a separate checkout:
+- B1 PASS after the review fix. Raw chicken/ground/liver/longganisa/fish past their FDA-chart fridge
+  limit -> Expired "Past safe fridge time - do not use", unavailable, not restored by Keep or
+  "Still good" (staples included); missing bought date -> unusable until a date is entered; frozen
+  lots, eggs, tofu, canned goods unchanged; safety lots excluded from every bulk set and from
+  multi-select delete (per-row Remove only, existing backup/tombstone path). Clock = purchaseDate,
+  never updatedAt. Cooked fridge meals capped at 4 days.
+- Review fix (Claude, small): the first build flagged shelf-stable and non-raw items — Curry Paste
+  (even with no date), instant/canned soups and Spam/luncheon meat on the counter, canned "Tuna" on
+  the counter, curry leaves. `pantryFridgeSafety()` now applies only to lots stored in the fridge
+  (explicit or inferred) whose food class is perishable, and the cooked-leftover rule skips
+  vegetable/fruit/dairy/pantry/grain categories. Regression test added.
+- B2 PASS. Cook Now "Bay Leaves" + planned Chicken Adobo -> one row (1.5 pcs, both sources), stable
+  across 3 regenerations; rice vinegar never absorbs Jasmine Rice; incompatible units stay separate
+  with an "Also on your list" note; planned rows no longer sum different units.
+- B3 PASS. Empty staple -> one "Out" row; second `checkAndReplenishLowStock()` false; Shop opened
+  twice -> 0 `saveData()` calls.
+- Note: `saveData()` now runs after `generateGroceryList()` in plan-edit handlers (so `plannedNeed`
+  persists); every call site still saves, and the `cloudReady` guard is untouched.
+Evidence: full local suite 905/905; `npm run test:ledger-contract` 13/13; `node --check app.js`;
+`git diff --check` clean; private probe `probe090.js`.
+Gate: **approved (held)** — touches safety logic and synced grocery rows (red zone, D-032), and the
+owner's merge/deploy hold for household acceptance applies.
+
+---
+## Final verification round (owner request) — Claude, 2026-11-26 — 3 release blockers
+Build: `ffs-v1-refine` (offline preview). Probe: private `preview/verify-final.js`, results in
+`verify-final.json`. No code changed in this round.
+1. Prepared ingredients: PASS. Frozen minced garlic, frozen ginger, chopped onions, portioned
+   chicken/turkey and frozen vegetables satisfy everyday recipe lines; frozen lots never flagged;
+   a prepped item marked staple + Low restocks through the existing path; Fill the gaps does not
+   re-suggest them.
+2. TASK-088: backward compatibility PASS (legacy printed dates = use-by; no field written by
+   reading; old snapshots validate). Backup PASS (taken before bulk removal; restore preparation
+   revives every removed record and clears their tombstones; restore needs sign-in as before).
+   Safe deletion PASS (bulk = exactly the named printed/cooked set; Cancel removes nothing; one
+   tombstone per id). **BLOCKER B1**: raw fridge meat/poultry/fish past its safe window can be
+   made available by "Still good".
+3. Shopping modes: Fill the gaps never suggests listed items; restock vs planned does not double
+   buy. **BLOCKER B2**: planned rows duplicate manual / Fill the gaps / Cook Now rows.
+   **BLOCKER B3**: an Empty staple never reaches the Shop list (and causes a save on every Shop open).
+4. Cooking modes: PASS. No-cook, Lowest effort and Batch-friendly are first-row Recipes chips; Home
+   (Ready to eat, Cook this) works with no plan; nothing requires a plan or prep.
+Fix scope prepared as TASK-090 (`todo`, awaiting owner approval). Non-blocking items -> ROADMAP.
+
+---
+## Review TASK-083 (lite) — APPROVED (held) after rework — Claude, 2026-11-26
+candidate: `18da165` (base `ddf4c71`). All three must-fix items resolved: flavor-base produce
+excluded from veg fillers (`BALANCED_PLATE_FLAVOR_BASE`); fillers ranked by generic-aware recipe
+count, then versatility (`ingredientVersatility` unchanged); hint shown under the recipe name in
+details mode and not in edit mode. Preview household now reads "add a veg — Carrot or Red Bell
+Pepper" (Adobo, Sinangag) and "add a carb — Jasmine Rice or Pasta" (Sinigang, Tinola).
+QA on merged `ffs-v1-refine`: full local 894/894 · ledger contract 13/13 · `node --check` ·
+`git diff --check`. gate: `approved` (owner deploy hold).
+
+---
+## Review TASK-083 (lite) — REWORK after integrated preview walkthrough — Claude, 2026-11-26
+The unit-level approval above stands for structure and safety (render-only, optional, no score),
+but the preview household (40 built-in + 20 cookbook recipes, 42 lots) shows the suggestions are
+not yet useful. Status back to `codex`.
+must-fix:
+1. **Aromatics are offered as "a veg".** Sinangag / Chicken Adobo / Arroz Caldo get "Optional: add
+   a veg — Garlic or Onion" while Broccoli, Spinach, Carrot, Red Bell Pepper, Zucchini and Frozen
+   Mixed Vegetables are in stock. Exclude flavor-base produce from veg fillers with one const:
+   garlic, onion (incl. red/white/spring), shallot, ginger, scallion / green onion, leek, chili /
+   jalapeño / siling, lemongrass, fresh herbs (cilantro, parsley, basil, dill, mint, chives),
+   lemon, lime, calamansi.
+2. **Wrong carb ranking.** Pork Sinigang / Chicken Tinola get "add a carb — Flour Tortillas or
+   Pasta" with Jasmine Rice in stock. `ingredientVersatility` deliberately ignores generic recipe
+   lines ("Rice") for a named variety ("Jasmine Rice"), so the most-used starch ranks last. For
+   plate fillers rank by how many recipes have an ingredient line that `ingredientNamesMatch`es
+   the lot in EITHER direction (generic lines count), then by `ingredientVersatility`, then name.
+   Do not change `ingredientVersatility` itself (Fill the gaps depends on it).
+3. **Hard to see.** In the recipe details view the line sits inside the balance group near the
+   bottom of a long form. Also render it directly under the recipe name at the top of the details
+   view (one line, muted, same text); keep it out of edit mode.
+tests (synthetic): (a) stock Garlic, Onion, Broccoli → veg filler is Broccoli, never Garlic/Onion;
+(b) stock Jasmine Rice, Flour Tortillas, Pasta with 3 recipes using "Rice" and 1 using "Pasta" →
+carb filler starts with Jasmine Rice; (c) details view shows the line near the name; edit mode
+does not. Full suite + ledger contract + node --check + git diff --check.
+
+---
+## Review TASK-083 (lite) — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidates: `10c6cfa` (first Codex run; ended on API error before handoff, committed unchanged by
+Claude) + `a7b8623` (Codex finish: reviewer fix + evidence). Base `5c3e6bf`.
+Good: `balancedPlateAdditions` reads only existing `mealBalance`; fillers are available, non-
+check, non-expired lots by `noPlanRole`, ranked by versatility, de-duplicated; at most one line
+"Optional: add a veg — A or B"; nothing shown when stock cannot fill it; Sauce & Side / Snack /
+no-balance recipes get no line; Ready to eat reuses it with the old generic hint as fallback;
+the details modal shows it only in details mode. Render-only, no persisted state, no score.
+reviewer fix (applied by Codex in `a7b8623`): side-recipe fallback excludes Main Dish and
+Breakfast so a plate addition is never another meal.
+QA on the integrated head (`ffs-v1-refine` + 083): full local 891/891 · ledger contract 13/13 ·
+`node --check app.js` · `git diff --check`.
+gate: `approved` (owner deploy hold). Snack Pack remains deferred.
+
+---
+## Review TASK-089 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `4beecb7` (base `5c3e6bf`). The Codex run ended on an API error after it had
+committed and recorded its evidence; Claude pushed the commit unchanged.
+Good: role categories (Shop fallback only, DB category wins); rule-only chips (≤ 2) when the
+count is met but a rule is not; near-twins filtered with the TASK-087 matchers against stock and
+unchecked list rows, and de-duplicated within chips; "↻ Different ideas" uses an in-memory offset
+(no persisted state), shown only when a role has more candidates than chips.
+must-fix (fixed by Claude in the integration commit, trivial): the implementation lowered the
+starch rule from Kylie's ≥ 2 whole-grain starches (KNOWLEDGE_BASE, IMPLEMENTATION_PLAN) to 1.
+The owner asked to preserve Kylie's framework, so it is back to `minimum: 2` ("2 whole grains").
+The rule-chip test now starts with one whole grain in stock.
+QA on the merged head (`ffs-v1-refine` + the fix): full local 883/883 · ledger contract 13/13 ·
+`node --check app.js` · `git diff --check`.
+gate: `approved` (owner deploy hold).
+
+---
+## Integration ffs-v1-refine (TASK-087 + TASK-088) — Claude, 2026-11-26
+Merged `5e23e0f` (TASK-087) then `02c2962` (TASK-088) into `ffs-v1-refine`. Conflicts in
+getCookableRecipes / Home + Recipes-tab tiers / eat picker resolved into ONE tier field:
+`buy` (missing ≥ 1) → `check` (every lot satisfying a required line needs a D-088 check) →
+`swap` → `ready`. `needsCheck` now follows TASK-087 alternatives (any alternative lot that is
+fresh clears the check). Home tier renderer derives tier from `missing` when a caller omits it
+(release-hardening stub). Claude fix per TASK-088 spec ("fridge raw / fresh"): counter produce
+past an estimate (onions, bananas) is not a safety check. New tests/ffs-refine-integration.spec.js
+(2 tests); TASK-087 result-shape test gains `needsCheck: []`.
+QA on the merged head: full local 878/878 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check`.
+
+---
+## Review TASK-088 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `02c2962` (base `bd4ce22`). independent QA (clean detached checkout in
+qa080): full local 864/864 · ledger contract 13/13 · `node --check app.js`.
+Probed in the offline preview household: bulk set = Ketchup + Chicken Breast only (printed
+dates); confirm lists both by name + date and states estimates/best-before are excluded;
+frozen chicken / canned tuna appear nowhere; Spinach in Check with Still good / Toss; a local
+safety backup (`createBackup`) is taken before any bulk removal; the confirm re-validates the list
+against live state before deleting. Tombstone / snapshotIdBaseline / saveData sequence unchanged.
+`printedDateKind` written only by the user (pantry add + inline edit), absent by default.
+follow-ups (not blocking): counter produce classed as check (fixed in integration, see above);
+"Cabbage" with quantity 0 still shows under Use soon (pre-existing; Stock Health flags it).
+gate: `approved` — red zone (deletion paths, new synced optional field). Held for the owner.
+
+---
+## Review TASK-087 — APPROVED (held) — Claude independent review + QA, 2026-11-26 (rework 1)
+candidate reviewed: `5e23e0f`. All four must-fix items resolved: swap guard (condiment class +
+no-swap heads + bell-pepper rule; canola/olive exception), identity modifiers extended, quantity
+notes stripped before splitting, Recipes tab + eat picker use `tier`, inline style moved to CSS.
+independent QA: full local 868/868 · ledger contract 13/13 · `node --check app.js`.
+follow-up (not blocking, honest failure mode): "X or Y Z" where X is a standalone noun
+("Kale or swiss chard") distributes Z onto X ("kale chard"), so a Kale lot does not satisfy it;
+the line shows as missing, never as a false match. Revisit only if it shows up in real recipes.
+gate: `approved` (owner deploy hold; read-path logic only).
+
+---
+## Review TASK-087 — REWORK — Claude independent review, 2026-11-26
+candidate reviewed: `18642b7` (base `bd4ce22`). Tests claimed 863/863 + ledger 13/13; matching
+logic probed in the offline preview household (20 cookbook + 40 built-in recipes).
+What is good: line roles, alternatives for the spec examples, identity-modifier guard, rice family
+rule, Home tiers, additive result shape. Keep all of that.
+
+must-fix:
+1. **Swaps are far too loose.** `ingredientSwapMatch` only checks a shared head noun, so it
+   returns true for: Black pepper ~ Red Bell Pepper, Cayenne pepper ~ Red Bell Pepper, Garlic
+   powder ~ Chili powder, Oyster sauce ~ Chili garlic sauce, Glutinous Rice (Malagkit) ~ Jasmine
+   Rice (Champorado shows "use Jasmine Rice"). A swap must be something a cook would actually
+   accept. Binding fix:
+   a. No swap when either name is a condiment/spice: `stockFoodClass({ name })` is 'condiment',
+      OR the head noun is one of: pepper (unless BOTH names contain "bell"), powder, sauce, paste,
+      seasoning, flakes, seeds, extract, vinegar, spice, salt, sugar, dressing.
+   b. Add to `INGREDIENT_IDENTITY_MODIFIERS`: glutinous, malagkit, sticky, sushi, sesame,
+      toasted. (Verify "Sesame Oil" still matches "toasted sesame oil" via the shared word, and a
+      generic "Oil" line is no longer satisfied by "Sesame Oil".)
+   c. Keep as swaps: Brown rice ~ Jasmine Rice; Cheddar cheese ~ Parmesan cheese; Red onion ~
+      White onion; Green bell pepper ~ Red Bell Pepper; Canola oil ~ Olive oil.
+   Add every pair above as a test row (true and false lists).
+2. **"or more to taste" is parsed as an alternative.** "Sriracha, or more to taste" yields
+   [sriracha taste, more to taste], so Onigiri lists Sriracha as missing although a Sriracha
+   staple is in stock. Strip trailing notes before splitting: ", or more to taste", "or more
+   if needed", "or as needed", "or more", "or to taste", ", plus more ...". Test rows: "Sriracha,
+   or more to taste" -> [sriracha]; "Garlic powder, or more to taste" -> [garlic powder]; "Fresh
+   lemon juice, or more to taste" -> [lemon juice] (do not add a new juice rule).
+3. **Two consumers call a swap result "ready".** `renderCookSuggestions` (Recipes tab) filters
+   tier 0 by `missing === 0`, so swap recipes show "Can cook now · All ingredients ✓"; the eat
+   picker reason (`cand.missing === 0` -> "Have everything") does the same. Use `tier`: the
+   Recipes tab gets the same "Cook with a swap" tier (badge "Swap"), and the picker says "Have
+   everything" only for tier ready and "Swap: use X" for tier swap.
+4. Nit (fix while there): the swap/optional note uses an inline `style=` attribute; move it to
+   a class in style.css (no new `:root`).
+
+re-verify: focused spec + new rows red on `18642b7` where behavior changes, then green; full
+local suite, `npm run test:ledger-contract`, `node --check app.js`, `git diff --check`; refresh
+feature-evidence/task-087/ screenshots.
+gate: `approved` (owner deploy hold) once fixed.
+
+---
+## Review TASK-086 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `07aa5d14d67ad91af555d34d32bba62565bde491` (base `3d0a5c2` = TASK-082 approved head + plan).
+independent QA: new availability/no-plan rows fail on base app.js, 17/17 focused on candidate ·
+full local 856/856 · `npm run test:ledger-contract` 13/13 · `node --check app.js` · `git diff --check`.
+Note: Codex built in the shared `qa080` worktree; QA re-ran there from a clean detached checkout
+of the pushed SHA (tracked tree clean, regenerated evidence PNGs restored).
+
+### Verification
+- `pantryLotAvailable` change is the only app.js edit: non-staple lots become unavailable only for
+  qty ≤ 0, empty stockLevel, or a valid printed date before today. Estimated windows no longer
+  gate availability (D-086 addendum). Same calendar comparison as Stock Health (`stockCalendarDay`).
+- Display untouched: `pantryDaysLeft`, `pantryExpiryInfo`, Fridge badges, Home Attention, Stock
+  Health "safety estimate", use-soon window. Write paths untouched. Zero legacy expectations changed.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold. Not merged to `main`.
+
+---
+## Review TASK-082 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `89e2fdecec935292df70591bd0cd84c69bf88dd3` (base `f875953` = TASK-081 approved head).
+independent QA (Claude, separate clean worktree): focused `tests/ffs-no-plan-grocery.spec.js`
+fails on base app code, 7/7 on candidate · full local 852/852 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Probe results (synthetic household, page.evaluate)
+- Roles: eggs/chicken/tofu/tuna/beans/bangus → proteins; rice/oats/bread/sweet potato/noodles →
+  starches; kangkong, sitaw, pechay, malunggay → veggies; soy sauce, calamansi, coconut milk →
+  flavors; milk, coffee → beverages; cheddar → snacks; Greek yogurt → protein (spec design 2).
+- Counting: expired spinach and 0-qty carrot do not count; unchecked grocery rows count as
+  `onList`; checked rows are never re-suggested. Plant rule met by tofu on the list; starches
+  1/3 → whole grains rank first. Beverages met at 1 (target 1–2) → ✓, no chips.
+- Pure: input state byte-identical after `noPlanGaps`; adds go only through `buyMissingIngredient`.
+- Content: framework counts + generic food names + credit line only; no book prose (design 1).
+
+### Follow-ups (not blocking)
+1. 31 of the candidates are not `INGREDIENT_DB` items, so `buyMissingIngredient` files them
+   under "Pantry" on the Shop list (e.g. Frozen Broccoli, Spring Mix). The role already knows
+   its category; pass it through as an optional fallback. Polish item for after the TASK-085 preview.
+2. Option ranking can suggest a near-twin of what is on hand (Chicken Thigh when Chicken Breast
+   is available). Consider a small variety bonus later.
+3. "Water" as a purchase chip is low value; chips are tall at 390px (card is long when opened,
+   collapsed by default).
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold — not `done`, not
+merged to `main`. Wave 1 (TASK-080/081/082) is complete and held on this stacked branch.
+
+---
+## Review TASK-081 — APPROVED (held) — Claude independent review + QA, 2026-11-25
+candidate reviewed: `14d1046a3bed0e8c219bcf7dc530d78c442a0810` (base `99c4925` = TASK-080 approved head + ffs-v1).
+independent QA (Claude, separate clean worktree, own `npm ci`):
+focused `tests/ffs-stock-health.spec.js` 5/5 · full local 845/845 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Probe results (synthetic records, page.evaluate)
+- Classes: fresh basil / basil(Vegetable) / parsley(fridge) → perishable; dried basil, oregano,
+  soy sauce, rice vinegar, olive oil, black pepper, cloves → condiment; rice, canned tuna,
+  peanut butter, bread, honey → pantry staple; chicken(freezer) → frozen; garlic, bell pepper,
+  butter, eggs → perishable. Matches D-087.
+- Three signals stay separate: Milk 15 days → safety + data-stale, no expiration; Ketchup past
+  printed date → expiration + "Follow the printed date", no safety claim; frozen chicken 208 days
+  → stale only (270-day DB freezer window); freezer soup 147 days → quality note.
+- Consistency: zero-qty "full", empty staple, 0-portion cooked meal, duplicate vs mixed units —
+  same unit → "Possible duplicate", different units → the more specific mixed-unit finding
+  (Codex's flagged precedence question: correct).
+- Read-only: the input records and `AppState` are byte-identical after the report; no
+  `saveData()`; no deletions. Empty state and junk dates/quantities do not throw.
+- 390px evidence screenshot readable; collapsed by default.
+
+### Nits (not blocking → follow-up candidates)
+1. `stockFoodClass` treats any record carrying `fridgeLife`/`cookedDate`/`portionsRemaining` as a
+   cooked meal. No current pantry write path sets those fields, so this is fine today.
+2. An item named "Frozen …" with no `storage` value classifies as perishable. Records created in
+   the app get a storage value from `inferStorage`, so this only affects odd imported data.
+3. Frozen quality uses an exact-name/alias DB lookup, so a plural name ("Chicken thighs") gets no
+   quality window. It still gets the data-staleness signal.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold (2026-11-25) and
+red-zone-adjacent (inventory) — not `done`, not merged to `main`. Next: TASK-082 branches from this head.
+
+---
+## Review TASK-080 — APPROVED (held) — Claude independent review + QA, 2026-11-25
+candidate reviewed: `297c3725967bfcb5e34839bf0cbaea8fdf677aa1` (Codex rework) + reviewer fix commit on top.
+independent QA (Claude, separate clean worktree, own `npm ci`):
+focused 6/6 · full local `npm test` 840/840 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check` clean.
+
+### Rework items
+1. Prep-note matching — fixed by Codex (comma/parenthetical strip, descriptor and container words).
+2. Legacy expectation — fixed; "only the tapped record changes" assertion kept.
+
+### Reviewer fix (trivial, applied by Claude per CLAUDE.md delegation policy)
+Probing with real cookbook/pasted names found one remaining regression vs the old substring rule:
+`'Boneless, skinless chicken thighs'` → cut at the first comma to "boneless" → no match with
+"Chicken Thigh". Fix: skip leading comma segments made only of descriptors; also drop a
+"packed in …" clause ("Albacore tuna packed in water" ↔ "Tuna"). Both added as test rows.
+
+### Known limitation (pre-existing, not introduced here) → follow-up
+Compound product names whose head noun is a generic food still match it: "Coconut milk" ↔
+"Milk", "Peanut butter" ↔ "Butter". The old substring matcher had the same false positives.
+Candidate for a small exception list in a later task; not blocking.
+
+### Verification of constraints
+Write paths untouched (`findPantryMatch`, `deductIngredientsForRecipe`, `checkMissingIngredients`,
+`toGrams`, merges, staple replenish, workers/). No persisted-shape change. Expired items remain
+visible in Home Attention (separate expired scan). ChronaSense contract green.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold (2026-11-25) — not
+`done`, not merged to `main`. Next: TASK-081 branches from this head.
+
+---
+## Review TASK-080 — REWORK (Claude independent review, 2026-11-25)
+candidate: `da18016c27b65dbfe172589ebcb20d2b2955efe1` on `task-080-ffs-truthful-availability`
+builder evidence: focused 6/6 (1/6 on base), full local 839/840, ledger contract 13/13, syntax + diff checks pass.
+reviewer checks: read the app.js diff in full; probed `ingredientNamesMatch` with real-world
+ingredient strings by evaluating the branch's own functions; confirmed past-date items remain
+visible via the separate Attention "expired" scan (`dash-attn-row--expired`), so design item 5 holds.
+
+### What is right
+- `pantryLotAvailable` matches the D-086 rules; staples are unchanged except `empty`.
+- `getExpirySuggestions` lower bound and availability filter are correct; Attention still lists
+  expired lots via its own scan.
+- Deduction/write paths untouched (`findPantryMatch`, `deductIngredientsForRecipe`, workers/).
+- Alias index built once; no new persisted state.
+
+### Must fix
+1. **Matching regression on ingredient names that carry prep notes (blocking).** Real recipe
+   ingredient names include prep clauses and container words. On the candidate:
+   `ingredientNamesMatch('Garlic cloves, minced','Garlic')` → false;
+   `('Red bell pepper, thinly sliced','Bell Pepper')` → false;
+   `('Fresh ginger, peeled and grated','Ginger')` → false;
+   `('Canned black beans, drained and rinsed','Black Beans')` → false;
+   `('Dried red lentils, rinsed','Red Lentils')` → false;
+   `('Tomatoes','Cherry tomatoes, halved')` → false.
+   The old substring rule matched all of these, so Shop/cookable/use-soon would silently LOSE
+   correct matches for most pasted and cookbook recipes. Fix inside `ingredientMatchWords()`
+   (read-side only):
+   - drop everything from the first comma, and any parenthetical, before tokenizing
+     (keep `normalizeIngredientName` unchanged);
+   - drop leading form/prep descriptors: fresh, dried, canned, frozen, raw, cooked, chopped,
+     minced, diced, sliced, grated, peeled, large, medium, small, whole, boneless, skinless,
+     low-sodium, reduced-sodium, plus "of";
+   - drop trailing container/unit nouns when another word remains: clove, head, bunch, sprig,
+     stalk, piece, slice, fillet, leaf, can, package, pack, bag, jar, bottle, floret.
+   - Keep the head-noun rule, so Rice ≠ Rice Vinegar, Garlic ≠ Garlic Powder, Egg ≠ Eggplant,
+     Corn ≠ Cornstarch, Black Pepper ≠ Bell Pepper still hold.
+   Add every case above as positive rows in the table-driven test, keep all existing negatives,
+   and add: 'Reduced-sodium soy sauce' ↔ 'Soy Sauce' true; 'Garlic powder' ↔ 'Garlic cloves,
+   minced' false; 'Rice vinegar' ↔ 'Steamed rice, for serving' false.
+2. **Legacy test expectation (the blocked full-suite failure).** In
+   `tests/meal-prep-first.spec.js` "a loose match never deletes unrelated stock", update the
+   expectations to the corrected behavior: `matched` → `['buy_vin']`, `stillClaimsStock` → false.
+   Keep the core assertion unchanged: correcting the vinegar record leaves `buy_rice` intact
+   (`left` → `['buy_rice']`). Rename the comment so it describes the new truth.
+
+### Nice to have (non-blocking)
+- In CHANGELOG, note the behavior change for D-086 consequence ("may show fewer items available").
+
+**Disposition: REWORK → TASK-080 `status: codex`.** Gate after fix: `approved` (held) — owner deploy
+hold; never `done`, never merged to `main`.
+
+---
 ## Review TASK-038 — code review PASS; owner integration decision pending (2026-11-01)
 application candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527` (`bridge-CHAT-mealprep-task038-fill-empty-20261031-builder-1`); base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`.
 provenance: AI Dev OS produced candidate via one Claude Builder invocation and reported separate read-only Claude Reviewer PASS on the exact SHA; owner-relayed local validation was performed afterward in an isolated checkout. Reviewer was the same provider as Builder but a separate invocation. Codex cross-provider review NOT TESTED. The reviewer approval is NOT approval to merge/deploy.

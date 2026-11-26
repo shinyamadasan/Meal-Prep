@@ -1307,3 +1307,213 @@ deviations: Initial full run 833/834 exposed the obsolete Air-Fryer-is-unknown t
   updated only that expectation/comment, then reran affected and complete gates. Initial evidence
   retained. Inventory/shopping/sync/MCP implementations and historical evidence remain untouched.
 → status set to `review` in TASKS.md; independent verdict in REVIEW.md.
+
+## TASK-080 — implementation blocked at verification (branch: task-080-ffs-truthful-availability)
+changed:
+  - app.js (+54 / −19) · `ingredientNamesMatch()` uses normalized whole words and direct
+    `INGREDIENT_DB` aliases. `pantryLotAvailable()` checks stock level, quantity and freshness.
+    `pantryMatchesForShop()` uses both. `groceryItemChecked()` still honors `userSet`.
+  - tests/ffs-truthful-availability.spec.js (6 synthetic cases) · name and lot rules, Shop,
+    use-soon boundaries, Cook tiers, expired visibility and render-state equality.
+  - docs/ARCHITECTURE.md and docs/FEATURES.md · D-086 read paths and visible behavior.
+Home and Cook availability audit:
+  - `getCookableRecipes()` uses both helpers. `renderDashboard()` and `renderCookSuggestions()`
+    use its tiers. Home's low-staple buy rows use `isStaple()` and `stockLevel === 'low'`.
+  - `getExpirySuggestions()` uses both helpers and requires 0–3 days left via `pantryDaysLeft()`.
+    Home Attention's recipe suggestions use that scan.
+  - `getCookSuggestions()` uses the shared tiers and expiry suggestions, with effort and
+    cook-history ranking. Its recipe-library fallback supplies ideas when the tiers are empty.
+  - `getWhatShouldWeEatSuggestions()` uses `getReadyFoodSuggestions()` for cooked batches and
+    `eatCookCandidates()` for recipes. The latter uses the shared tiers and expiry suggestions.
+    It shows "Have everything" only for pantry-informed recipes in the zero-missing tier.
+  - `getReadyFoodSuggestions()` checks cooked batch names, tracked portions and cooked shelf
+    life. `getCompatibleFlavorsForCookedMeal()` compares cooked protein IDs to library pairings.
+  - `collectAttentionItems()` uses `attentionDaysLeft()`, `isKeptToday()`, and low staple levels.
+    Its notification helpers consume those buckets. `getFreshnessAlerts()` counts dates via
+    `pantryDaysLeft()` and `cookedShelfLife()`. Past-date lots remain visible in Attention and Fridge.
+  - `renderMealPrepFlowCard()` uses `groceryItemChecked()` for Shop and
+    `getReadyFoodSuggestions()` for Fridge.
+tests: focused 6 passed, 0 failed. Full local 839 passed, 1 failed. Ledger 13 passed, 0 failed.
+blockers: the legacy loose-stock assertion in tests/meal-prep-first.spec.js requires Rice to
+  count for Rice Vinegar. The task's file list excludes that spec.
+deviations: status set to `blocked` in TASKS.md because the full local suite must pass for review.
+
+## TASK-080 — Claude review rework (branch: task-080-ffs-truthful-availability)
+changed:
+  - `app.js` · `ingredientMatchWords()` strips prep clauses, leading descriptors, and trailing
+    units before availability matching. D-086 may show fewer items as available when the pantry
+    contains only a different ingredient with a similar name.
+  - `tests/ffs-truthful-availability.spec.js` · added the review's positive and negative pairs,
+    plus cases for a parenthetical comma, plural leaves, and a standalone unit word.
+  - `tests/meal-prep-first.spec.js` · only `buy_vin` matches Rice Vinegar. Correcting that record
+    preserves `buy_rice` and clears the Rice Vinegar stock claim.
+tests: focused 25/25, full local 840/840, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: the remote branch was already checked out in another worktree. The rework used a
+  local task branch from `6af568c` targeting the same remote branch.
+→ status set to `review` in TASKS.md
+
+## TASK-081 — done (branch: task-081-ffs-stock-health)
+changed:
+  - `app.js` (+188) · `stockFoodClass()` and `stockHealthReport()` derive food classes and
+    independent findings. `renderStockHealth()` and `copyStockHealthReport()` expose the report.
+  - `index.html` (+11) and `style.css` (+64) · collapsed `#stock-health` panel in Fridge.
+  - `tests/ffs-stock-health.spec.js` · five synthetic cases for classification, report signals,
+    consistency findings and read-only copy at two widths.
+  - `docs/FEATURES.md` and `docs/ARCHITECTURE.md` · D-087 behavior and stable anchors.
+  - `feature-evidence/task-081/` · opened panel at 1280px and 390px.
+tests: focused 5/5, full local 845/845, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
+
+## TASK-082 — implemented (branch: task-082-ffs-no-plan-grocery)
+changed:
+  - `app.js` · `NO_PLAN_TEMPLATE`, `noPlanRole()`, `noPlanGaps()`, and `ingredientVersatility()`
+    derive shopping options from available stock, unchecked rows, and recipe usage.
+  - `index.html` and `style.css` · collapsed `#no-plan-grocery` card in Shop List.
+    Each option adds one row through `buyMissingIngredient()`.
+  - `tests/ffs-no-plan-grocery.spec.js` · seven synthetic cases for stock, rule ordering,
+    versatility, one-tap add, plan-generated rows, and responsive rendering.
+  - `docs/FEATURES.md` and `docs/ARCHITECTURE.md` · feature and data-flow notes.
+  - `feature-evidence/task-082/` · expanded Shop card at 390px and 1280px.
+tests: focused 7/7, full local 852/852, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
+
+## TASK-086 — implemented (branch: task-086-ffs-estimated-dates)
+changed:
+  - `app.js` · `pantryLotAvailable()` filters on valid past printed dates after applying the
+    existing stock-level, staple, and quantity rules. Lots past an estimated date count as available.
+  - `tests/ffs-truthful-availability.spec.js` · synthetic frozen chicken, canned tuna, spinach
+    warnings and full-state equality, plus added printed-date cases.
+  - `tests/ffs-no-plan-grocery.spec.js` · frozen chicken counts toward the Shop protein target
+    and is omitted from Fill the gaps suggestions.
+  - `docs/ARCHITECTURE.md` · availability and estimated freshness rules.
+legacy expectation changes: none. The added February 31 case covers calendar validation because
+  JavaScript otherwise normalizes that impossible printed date to a day in March.
+tests: focused 22/22, full local 856/856 from both entry points, ledger contract 13/13.
+blockers: none.
+deviations: used the existing clean `qa080` checkout of the task branch.
+→ status set to `review` in TASKS.md
+
+## TASK-087 — implemented (branch: task-087-ffs-cook-now-matching)
+changed:
+  - `app.js` · `ingredientLineRole()` and `ingredientAlternatives()` classify recipe lines
+    and resolve alternatives. `ingredientNamesMatch()` handles identity modifiers and generic
+    rice descriptions. `ingredientSwapMatch()` identifies same-head variety swaps.
+  - `app.js` · `getCookableRecipes()` reports required gaps, optional gaps, and swaps.
+    The Home Cook this pane in `renderDashboard()` shows ready, swap, and buy tiers.
+  - `tests/ffs-cook-now-matching.spec.js` · seven synthetic Playwright cases.
+  - `docs/ARCHITECTURE.md` · updated the Cook Now matching and availability description.
+  - `feature-evidence/task-087/` · Home Cook this pane at 1280px and 390px.
+tests: seven expected failures on base, then seven passes. Both full local entry points
+  passed 863 tests. Ledger contract passed 13 tests. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
+
+## TASK-087 — rework complete (branch: task-087-ffs-cook-now-matching)
+changed:
+  - `app.js` · `ingredientAlternatives()` strips trailing quantity notes before parsing
+    choices. `ingredientSwapMatch()` excludes spices, condiments, and identity-changing
+    varieties. Canola and olive oil are the explicit exception to the condiment rule.
+  - `app.js` and `style.css` · `renderCookSuggestions()` shows a Swap badge, the eat picker
+    names the swap ingredient, and `.dash-cook-note` handles wrapping on Home.
+  - `docs/ARCHITECTURE.md` · updated the matching and tier descriptions.
+  - `tests/ffs-cook-now-matching.spec.js` · expanded the synthetic matching matrix and
+    covered quantity notes, Recipes tab badges, and the eat picker reasons.
+  - `tests/release-hardening.spec.js` · the Cook Now mock now supplies `tier: 'ready'`
+    so the existing literal search assertion exercises the tier-aware renderer.
+  - `feature-evidence/task-087/` · recaptured the 1280px and 390px Home pane. Both PNGs
+    matched the tracked screenshots byte for byte.
+tests: 8 expected failures on `18642b7`, then 12/12 focused, 868/868 full local, and
+  13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: focused tests used a temporary alternate port while the default port was occupied.
+
+## TASK-088 — implemented (branch: task-088-ffs-expiry-deletion-safety)
+changed:
+  - `app.js` and `style.css` · `pantryDateSignal()` and `cookedDateSignal()` feed Expired,
+    Check and Use soon. Cook recommendations show a check note until a matching lot can
+    be used. Home and Fridge bulk removal list and revalidate each record, take a backup,
+    and use the existing explicit tombstone and save sequence.
+  - `index.html` and `app.js` · Fridge add and edit controls capture `printedDateKind`.
+    The optional field follows the existing pantry record through local and cloud storage.
+  - `docs/DATA_MODEL.md` and `docs/ARCHITECTURE.md` · date kind, attention, and deletion behavior.
+  - `tests/ffs-expiry-deletion-safety.spec.js` · synthetic signal, cook, deletion, persistence,
+    and responsive coverage.
+  - `tests/ffs-truthful-availability.spec.js`, `tests/food-attention-notifications.spec.js`,
+    `tests/kitchen-truth.spec.js`, `tests/mobile-home-polish.spec.js`, and
+    `tests/tombstone-namespace.spec.js` · aligned existing fixtures with printed expiry and
+    estimate checks.
+  - `feature-evidence/task-088/` · six desktop and 390px screenshots.
+tests: focused 8/8, full local 864/864, ledger contract 13/13. Syntax and diff checks passed.
+blockers: none.
+deviations: the printed-date selector uses the existing inline Fridge add and edit controls.
+→ status set to `review` in TASKS.md
+
+## TASK-089 — implemented (branch: task-089-ffs-fill-gaps-polish)
+changed:
+  - `NO_PLAN_TEMPLATE` and `buyMissingIngredient()` supply a Shop category fallback for chips.
+    `noPlanRole()` keeps the shared Pantry category out of food-role classification.
+  - `noPlanGaps()` reuses the shared ingredient matchers to filter near-twins and ranks
+    candidates for unmet rules. One whole grain satisfies the starch rule.
+  - `#no-plan-grocery` keeps the card collapsed by default and offers Different ideas.
+    `renderNoPlanGrocery()` wraps the ranked suggestions with an in-memory offset.
+  - `tests/ffs-no-plan-grocery.spec.js` extends synthetic Shop coverage.
+  - `feature-evidence/task-089/` captures the open card at 1280px and 390px.
+tests: 13 focused passes, 883 full local passes per command, and 13 ledger contract passes.
+  Syntax and diff checks passed.
+blockers: none.
+deviations: none. The supporting change in `noPlanRole()` preserves existing role counts
+  when Pantry is used as a Shop fallback.
+
+## TASK-083 — implementation complete (branch: task-083-ffs-balanced-plate-lite)
+changed:
+  - `10c6cfa` added optional, stock-based hints through `balancedPlateAdditions()`,
+    `readyFoodBalanceHint()`, and `renderRecipeMetaFields()`, with single-line styling,
+    synthetic tests, and desktop and 390px screenshots.
+  - This handoff filters Main Dish and Breakfast recipes out of the quick-side fallback
+    and adds regression coverage for eligible Sauce & Side and Salad recipes.
+tests: 8 expected failures on `5c3e6bf`, then 8/8 focused, 886/886 in each full local
+  run, and 13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
+
+## TASK-083 — rework complete (branch: task-083-ffs-balanced-plate-rework)
+changed:
+  - `balancedPlateAdditions()` excludes aromatics, herbs, and citrus from veg fillers. It ranks
+    stock by matching recipe count, including generic lines, then versatility, then name.
+  - `renderRecipeMetaFields()` shows the muted, single-line hint directly below the recipe name
+    in Recipe Details as well as by the balance tags.
+  - `tests/ffs-balanced-plate.spec.js` adds three synthetic regressions and verifies both hint
+    placements at desktop and 390px. Recaptured all four PNGs in `feature-evidence/task-083/`.
+tests: 3 expected failures on `ddf4c71`. Final results were 11/11 focused, 894/894 full local,
+  and 13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
+
+## TASK-090 — implementation complete (branch: task-090-ffs-release-blockers)
+changed:
+  - `pantryDateSignal()` enforces food-specific fridge limits and requires a valid bought date.
+    `pantryLotAvailable()` blocks both safety signals even after Keep or when marked as a staple.
+    Fridge and Home show the reason, and bulk deletion excludes these lots.
+  - `cookedShelfLife()` caps fridge batches at four days and supplies the same default when the
+    shelf life is missing. Ready to eat, Attention and alerts use the shared calculation.
+  - `generateGroceryList()` consolidates compatible planned and custom needs through `plannedNeed`.
+    Shop shows each source and flags incompatible units. `toggleGroceryItem()` transfers the
+    displayed amount once through the existing purchase path.
+  - `syncStapleToGrocery()` restocks Low and Empty staples, reuses equivalent shopping rows,
+    and reports whether anything changed so repeat Shop opens avoid a save.
+tests: 11 new cases in `tests/ffs-release-blockers.spec.js`. The existing case in
+  `tests/food-attention-notifications.spec.js` now expects an expired alert for an old fridge
+  batch with no shelf life, reflecting the four-day default. The two recommendation tests
+  that exposed a within-limit ranking regression passed after the fix with their original assertions.
+blockers: none.
+deviations: The single full local run passed 903/905. After fixing its two failures,
+  all 83 tests in the affected suites passed, including both failures. Ledger passed 13/13.
+→ status set to `review` in TASKS.md

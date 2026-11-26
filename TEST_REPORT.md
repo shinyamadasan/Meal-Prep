@@ -1040,3 +1040,206 @@ self-review: SELF_REVIEW.md Code Health passes; would ship scoped candidate: yes
 untested: real iOS Safari/Android devices and production/live cloud or MCP checks. Existing
   Worker code was not changed; its separate Node suites were not rerun for this frontend-only task.
   Old clients require refresh to recognize air-fryer. No production writes, merge or deployment.
+
+## TASK-080 · 2026-11-25
+suite: `npm exec -- playwright test tests/ffs-truthful-availability.spec.js --project=local --workers=2 --reporter=list`
+result: 6 passed, 0 failed, 0 skipped, 0 flaky. Coverage not instrumented.
+red: focused spec on f230775 before app edits had 1 pass (expired visibility/render-state
+  compatibility) and 5 failures (missing helpers and reproduced Shop, expiry and Cook tier bugs).
+full: `npm test -- -- --config=<temporary offline config> --workers=4 --reporter=dot` ran the
+  complete local project. 839 passed, 1 failed, 0 skipped, 0 flaky. Includes all 9 unchanged
+  tests in tests/cook-depletion-tombstones.spec.js. The one failure is the pre-D-086 loose
+  match assertion in tests/meal-prep-first.spec.js, which expects Rice among the records for
+  Rice Vinegar. This conflicts with the new Shop acceptance criterion, and the legacy spec
+  falls outside the authorized file list.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2 --reporter=dot`
+  had 13 passed, 0 failed, 0 skipped, 0 flaky. Both broad runs blocked external browser connections.
+static: `node --check app.js`, `node --check tests/ffs-truthful-availability.spec.js` and
+  `git diff --check` passed. All 118 decision pointers passed. The docs checker reported 57
+  existing findings, down from 59 at f230775 because it now resolves both D-086 helpers.
+self-review: Code Health passes for the scoped implementation. QA traced the acceptance and
+  data-integrity checks through the affected renderers and confirmed the write paths, handlers
+  and styles were outside the diff. The full-suite gate blocks the ship decision and review handoff.
+untested: real iOS/Android devices and production or live cloud/MCP/bridge services. All fixtures
+  and ledger adapters used for verification were synthetic.
+
+## TASK-080 · 2026-11-25 · Claude review rework
+baseline: `6af568c`. With both specs updated and before the matcher fix, 24 passed and the
+  table-driven matcher test failed. The updated legacy assertion passed on the baseline.
+focused: local `tests/ffs-truthful-availability.spec.js` (6) and `tests/meal-prep-first.spec.js`
+  (19) · 25 passed.
+full: `npm test` (local project, four workers) · 840 passed.
+ledger: `npm run test:ledger-contract` (two workers) · 13 passed.
+results: 0 failed, 0 skipped, 0 flaky in final runs. Coverage was not instrumented. All three
+  runs used a temporary Playwright configuration that blocked off-origin Chromium traffic.
+static: `node --check app.js`, syntax checks on both changed specs, and `git diff --check`
+  passed. All 118 decision pointers passed. Synthetic probes covered all 21 leading words and
+  all 16 trailing units, including preservation of each unit as a standalone name.
+self-review and QA: Code Health passes and ship decision is yes. Diff inspection and the local
+  suites verify the read-side scope, the head-noun negatives, and stock correction by record ID.
+untested: production, live cloud/MCP/bridge services, and real devices.
+
+## TASK-081 · 2026-11-25
+focused: `npx playwright test tests/ffs-stock-health.spec.js --project=local --workers=2`.
+  Base `99c4925`: 0 passed, 5 failed because the report helpers and panel were absent.
+  Final: 5 passed. Both widths verified collapsed default, separate counts, clipboard text,
+  no horizontal overflow, unchanged `AppState` JSON, and zero `saveData()` calls.
+full: `npm test -- -- --config=<temporary offline config> --workers=4 --reporter=dot`.
+  Complete local project, 845 passed.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2 --reporter=dot`.
+  13 passed. Both broad runs blocked external browser connections. Final runs had zero failures,
+  skips, or flaky results. Coverage was not instrumented.
+static: `node --check app.js`, syntax check of the new spec, and `git diff --check` passed.
+  All 118 decision pointers passed. The docs consistency scan decreased from 57 to 55 existing
+  findings because both D-087 constants now resolve. It added zero findings.
+visual: `feature-evidence/task-081/stock-health-1280.png` and `stock-health-390.png` captured and
+  inspected with synthetic stock across all five classes.
+self-review: SELF_REVIEW.md Code Health passes, and the ship decision is yes for the scoped diff.
+QA: applicable AI checks pass. `#stock-health` handlers resolve, colors use existing tokens,
+  and the report's call chain performs no persistence, normalization, or ledger writes.
+untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
+
+## TASK-082 · 2026-11-25
+focused: `npx playwright test tests/ffs-no-plan-grocery.spec.js --project=local --workers=2`.
+  The first case failed on `f875953` because `#no-plan-grocery` was absent.
+  Final result: 7 passed, 0 failed.
+full: `npx playwright test --project=local --config=<temporary offline config> --workers=4`.
+  Complete local project behind `npm test`: 852 passed, 0 failed.
+ledger: `npm run test:ledger-contract -- --config=<temporary offline config> --workers=2`.
+  13 passed, 0 failed. The broad runs blocked off-origin browser connections.
+  Coverage was not instrumented.
+static: `node --check app.js`, syntax check of the new spec, and `git diff --check` passed.
+  Verified the existing availability, grocery-add, plan generation, stock deduction, and
+  Firestore write function bodies against the base branch.
+visual: `feature-evidence/task-082/fill-the-gaps-390.png` and `fill-the-gaps-1280.png`
+  show the expanded Shop card with synthetic records. Both widths passed overflow checks.
+self-review: SELF_REVIEW.md Code Health passes. The ship decision is yes for the scoped diff.
+QA: applicable AI checks pass. The disclosure and chip handlers resolve, the card render is
+  read-only, and the one-tap grocery row survives reload through the existing save path.
+untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
+
+## TASK-086 · 2026-11-26
+focused: `npx playwright test tests/ffs-truthful-availability.spec.js tests/ffs-no-plan-grocery.spec.js tests/ffs-stock-health.spec.js --project=local --workers=3`.
+  Base `3d0a5c2` with regression tests added gave 17 passed and 5 expected failures. Frozen
+  chicken was missing from the Cook ready tier and appeared as a Shop suggestion, Shop treated
+  canned tuna and spinach as unavailable, and the impossible printed date disqualified a lot.
+  After the fix, all 22 passed. The spinach case also verifies warnings on Home, in Fridge, and in
+  Stock Health and deep equality of `AppState` across the Home, Shop, and Fridge renders.
+full: `npx playwright test --project=local` and `npm test` each gave 856 passed, 0 failed.
+  Restored the regenerated `feature-evidence/task-079/home-1280.png` and `home-390.png`.
+ledger: `npm run test:ledger-contract` gave 13 passed, 0 failed.
+static: `node --check app.js`, syntax checks for both edited specs, and `git diff --check` passed.
+  Source comparison verified that `pantryLotAvailable()` was the only application-code change.
+self-review: Code Health and applicable AI QA checks passed for the scoped change.
+untested: production, real devices, and code coverage instrumentation.
+
+## TASK-087 · 2026-11-26
+focused: `tests/ffs-cook-now-matching.spec.js` had 7 expected failures on base `bd4ce22`.
+  All 7 passed in the final local suite, alongside all 9 TASK-080 availability cases.
+full: `npx playwright test --project=local` and `npm test` each passed 863 tests with zero
+  failures. Restored the regenerated TASK-079 screenshots.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, the new spec's syntax check, and `git diff --check` passed.
+  All 118 decision pointers passed. The write-path functions, availability filter, and existing
+  suggestion consumers were compared with the base.
+visual: `feature-evidence/task-087/cook-now-1280.png` and `cook-now-390.png` show the three
+  Home tiers with synthetic data. Both viewports passed overflow and deep state equality checks.
+self-review: Code Health and applicable AI QA checks passed for the scoped change.
+untested: production, real devices, and code coverage instrumentation.
+
+## TASK-087 rework · 2026-11-26
+focused: `tests/ffs-cook-now-matching.spec.js` gave 4 passes and 8 expected failures on
+  `18642b7`. All 12 passed with the fix, alongside all 9 TASK-080 availability cases.
+  Focused runs used a temporary local port because the default was occupied.
+full: `npx playwright test --project=local` and `npm test` each gave 868 passed, 0 failed.
+  The initial full run exposed a legacy Cook Now mock with no tier. The existing test
+  passed after the fixture supplied the current `tier: 'ready'` field.
+ledger: `npm run test:ledger-contract` gave 13 passed, 0 failed.
+static: `node --check app.js`, `git diff --check`, and all 118 decision pointers passed.
+  Source diff confirms the rework stays in matching and render code. The stock write
+  paths and Firestore guard were verified against the review commit.
+visual: recaptured and inspected `feature-evidence/task-087/cook-now-1280.png` and
+  `cook-now-390.png`. Both match the tracked files byte for byte. The notes, three
+  tiers, and overflow checks passed at desktop and 390px.
+self-review: Code Health and applicable AI QA checks passed.
+untested: production, real devices, and code coverage instrumentation.
+
+## TASK-088 · 2026-11-26
+focused: `tests/ffs-expiry-deletion-safety.spec.js` on `bd4ce22` failed all 8 cases as expected.
+  The base classified nine records as expired, showed a ready label for unchecked spinach,
+  omitted the named lists and date-type control, and removed a record that changed to
+  best-before while the confirmation was open. Final result was 8 passed, 0 failed.
+full: `npx playwright test --project=local` and `npm test` each passed 864, failed 0 on the
+  corrected source. The first direct run found two existing Cook Now stubs that omit the
+  new field. The renderers now accept an omitted `needsCheck`.
+ledger: `npm run test:ledger-contract` passed 13, failed 0.
+static: `node --check app.js` and `git diff --check` passed. Source comparison verified the
+  protected deletion, persistence, cooked-meal and Ready-to-eat functions against the base.
+visual: `feature-evidence/task-088/` includes Home Attention, the named confirmation, and
+  the date-type selector at desktop and 390px widths. Horizontal overflow checks passed.
+  Restored the unrelated regenerated `feature-evidence/task-079/` PNGs.
+self-review: Code Health and the applicable AI checks in `QA.md` passed.
+untested: live Firestore, real mobile devices, and code coverage instrumentation. Firestore
+  payload shape was verified with synthetic records.
+
+## TASK-089 · 2026-11-26
+focused: seven expected failures on base `5c3e6bf` across the first focused run and a
+  tightened near-twin fixture. All 13 cases in `tests/ffs-no-plan-grocery.spec.js`
+  passed after implementation. The tests cover categories, whole-grain suggestions,
+  near-twins, rotation, reload, and the responsive card.
+full: `npx playwright test --project=local` and `npm test` each passed 883 tests with
+  zero failures. Restored the two regenerated TASK-079 Home screenshots.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, the edited spec's syntax check, and `git diff --check`
+  passed. Source comparison confirmed the restock, planned grocery, and persistence paths.
+visual: inspected `feature-evidence/task-089/fill-the-gaps-1280.png` and
+  `fill-the-gaps-390.png`. Both viewports passed the horizontal overflow check.
+self-review: Code Health and the applicable AI QA checks passed.
+untested: production, real mobile devices, and coverage instrumentation.
+
+## TASK-083 · 2026-11-26
+focused: `tests/ffs-balanced-plate.spec.js` had 8 expected failures on `5c3e6bf`.
+  The new category case also failed on the earlier implementation at `10c6cfa`, which offered
+  a main dish and a breakfast. All 8 passed after the quick-side filter was added.
+full: `npx playwright test --project=local` and `npm test` each passed 886 tests with zero
+  failures. Playwright used port 47813. Restored the regenerated TASK-079 PNGs.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, syntax check of the focused spec, `git diff --check`, and the
+  delta secret scan passed. The feature only derives and renders suggestions.
+visual: Reviewed the four desktop and 390px PNGs in `feature-evidence/task-083/`, originally
+  committed in `10c6cfa` and reproduced byte for byte. Both surfaces passed the single-line,
+  overflow, and `AppState` deep equality checks.
+self-review: Code Health and applicable AI checks in `QA.md` passed.
+untested: production, real mobile devices, and code coverage instrumentation.
+
+## TASK-083 rework · 2026-11-26
+focused: The three new cases in `tests/ffs-balanced-plate.spec.js` failed on `ddf4c71` because
+  Ready to eat suggested Garlic, generic Rice usage gave Jasmine Rice no ranking credit, and the
+  hint was missing under the recipe name. All 11 focused cases passed with the fix.
+full: `npx playwright test --project=local` passed 894, failed 0. Playwright used port 47813.
+  Restored the two regenerated TASK-079 PNGs.
+ledger: `npm run test:ledger-contract` passed 13, failed 0.
+static: `node --check app.js`, the spec syntax check, and `git diff --check` passed. The app diff
+  confines ranking to `balancedPlateAdditions()` and leaves `ingredientVersatility()` and
+  `noPlanGaps()` intact.
+visual: Recaptured and inspected Ready to eat and Recipe Details at desktop and 390px in
+  `feature-evidence/task-083/`. The Ready to eat images match the tracked PNGs byte for byte.
+  Single-line, overflow, edit-mode visibility, and `AppState` deep equality checks passed.
+self-review: Code Health and applicable AI checks in `QA.md` passed.
+untested: production, real mobile devices, and code coverage instrumentation.
+
+## TASK-090 · 2026-11-26
+full local: `npx playwright test --project=local --reporter=dot` passed 903 and failed 2.
+  The failures were the shared expiry scan and competing urgency tests in
+  `tests/what-should-we-eat.spec.js`. Both exposed a ranking regression from using the hard
+  fridge limit for within-limit freshness guidance. Restored the existing guidance and kept
+  the safety block for past-limit and unknown-date lots.
+follow-up: The six affected specs passed 83/83 on the final implementation, including both
+  previous failures and all 11 new TASK-090 cases. The suites covered release blockers,
+  recommendations, expiry and bulk removal, refinement integration, availability, and alerts.
+ledger: `npm run test:ledger-contract` passed 13/13.
+static: `node --check app.js`, both changed spec syntax checks, and `git diff --check` passed.
+qa: Verified local and Firestore payloads carry `plannedNeed`, the 390px Shop conflict notes
+  are visible, and only one pantry tombstone is written for per-row safety removal. Restored
+  the generated TASK-079 PNGs. Code Health and applicable AI checks passed.
+untested: A second full local run, production, real mobile devices, and coverage instrumentation.

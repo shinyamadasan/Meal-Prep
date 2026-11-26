@@ -3560,3 +3560,96 @@ vocabulary cannot recognize the new slug until refreshed. Real-device checks rem
 Verify: app.js contains "function renderHomeFavorites()"
 Verify: app.js contains "{ id: 'air-fryer', label: 'Air Fryer', icon: '🍟' }"
 Verify: tests/home-favorites-air-fryer.spec.js contains "review Air Fryer respects favorites and category conjunction"
+
+## D-086 — Flexible Food System V1: availability truth is a read-path concern first
+Date: 2026-11-25 · Status: Accepted (owner approval of FFS-V1 wave 1); implementation TASK-080
+Context: Every FFS-V1 feature (Cook Now, no-plan grocery, Balanced Plate hints) answers "do we
+have it?". The 2026-11-06 audit (F1/F2) showed that answer is wrong: 0-qty, empty and expired lots
+count as stock, and raw substring matching lets "Rice" satisfy "Rice Vinegar".
+Decision: Introduce two pure helpers, `ingredientNamesMatch()` (normalized equality, whole-word
+token subset with a shared head noun, or an INGREDIENT_DB alias — never raw substring) and
+`pantryLotAvailable()` (empty / qty ≤ 0 / past-date non-staples are not available; null quantity
+stays "unknown = available"). Route display/suggestion read paths through them. Stock WRITE
+paths (`findPantryMatch` used by `deductIngredientsForRecipe`, quantity merge, staple replenish,
+the conversational-bridge worker) are deliberately untouched: they are red-zone and get their
+own solo High-risk task later (audit F3/F4/F9). No stored record is modified.
+Consequence: the app may show slightly FEWER items as available than before; that is the intended
+correction. Deduction and display can briefly disagree on fuzzy matches until the deferred write
+task aligns them — documented, accepted.
+Owner gate: all FFS-V1 tasks land at `approved` (held). Nothing merges to `main` or deploys
+without explicit owner approval (owner instruction 2026-11-25).
+
+Addendum (2026-11-26, TASK-086): "past-date" in `pantryLotAvailable()` means a PRINTED date only.
+Estimated windows (purchase date + shelf life, which ignore freezer/canned storage) are a food-
+safety "check it" signal per D-087 and never remove a lot from availability. Found in the TASK-085
+preview: frozen chicken and canned goods were reported missing, so Fill the gaps suggested
+rebuying them. Display of estimates (Fridge badges, Home Attention, Stock Health) is unchanged.
+
+Addendum 2 (2026-11-26, TASK-087, owner approval of finding A): Cook Now counts REQUIRED lines
+only. A line is optional / serving / water by its own wording ("(optional)", "for serving",
+"for garnish", plain water) and never blocks, but missing optional lines are still shown. Salt,
+pepper and spices stay required: no assumed pantry, so a missing essential is never hidden.
+"A or B" lines are satisfied by any alternative. A third tier, "Cook with a swap", covers lines
+met only by a same-head-noun variety ("Brown rice" ↔ "Jasmine Rice"); a swap never counts as
+"have". `ingredientNamesMatch` gains an identity-modifier guard (evaporated / condensed / coconut
+/ almond / oat / soy / peanut / sour …) so "Milk" no longer matches "Evaporated Milk", and a rice
+family rule so white / steamed / cooked / short-grain rice match any rice in stock.
+
+## D-087 — Inventory staleness is per food class and split into three independent signals
+Date: 2026-11-25 · Status: Accepted (owner decision); implementation TASK-081
+Context: The first FFS-V1 proposal suggested a universal 60-day "stale" cutoff. The owner rejected
+it: a 60-day-old jar of soy sauce and a 60-day-old bag of spinach are not the same problem, and
+"record is old", "food may be unsafe" and "printed date has passed" are different facts.
+Decision: Classify each record as perishable, frozen, pantry-staple, condiment or cooked-meal
+(`STOCK_CLASS_RULES`) and evaluate three signals separately, never merged into one verdict:
+(1) expiration — only an ACTUAL printed date in the past; (2) food safety — an ESTIMATE from age
+vs class guidance, worded as "check it", never "unsafe"; (3) data staleness — record confidence,
+days since update vs a per-class review interval (`STOCK_REVIEW_POLICY`). Consistency problems
+(0/negative/null quantities, mixed units, duplicates, empty staples) are reported separately.
+Rules: the report is read-only. Records are NEVER deleted or changed automatically. Any future
+cleanup requires (a) an explicit owner request, (b) a full backup preserved first (app JSON export
+or a bridge read snapshot stored outside the public repo), (c) its own reviewed task.
+Cooked meals are read, never written, by this feature (ChronaSense ledger contract).
+
+## D-088 — Expired, Check and Stale are separate; only Expired can be bulk-removed
+Date: 2026-11-26 · Status: Accepted (owner approval of finding B); implementation TASK-088
+Context: The TASK-085 preview showed Home Attention offering "Remove expired (9)" for frozen
+chicken and canned tuna whose only "expiry" was an estimate (purchase date + category shelf
+life). The confirm dialog did not name the records. Owner: never delete records solely because of
+estimated shelf life or staleness; food of uncertain safety needs confirmation before it is
+recommended; bulk deletion needs explicit confirmation naming the records; distinguish best-before
+from safety expiry where possible.
+Decision: One pure classifier, `pantryDateSignal()`, yields Expired (printed use-by/expiry past,
+or a cooked meal past its fridge safety window), Check (perishable estimate past, printed
+best-before past, frozen cooked meal past its quality window) or Use soon. Stale stays a Stock
+Health signal only (D-087). Only Expired records can be bulk-removed, and the confirmation lists
+every record by name. Check items get per-row "Still good" (existing keptOn, today only) or
+"Toss" (single explicit removal). A perishable in Check is flagged "check first" in Cook Now until
+the user says Still good. Frozen, pantry-staple and condiment estimates never reach Home at all.
+New optional pantry field `printedDateKind` ('use-by' | 'best-before'), user-set only; absent
+means use-by, so existing records behave exactly as before. No migration, no automatic writes.
+Rules: tombstone / snapshotIdBaseline / saveData sequences and the MASS_DELETE_GUARD are not
+changed. Red zone (D-032): lands `approved`, held for the owner.
+
+## D-089 — Fridge safety limits for animal protein cannot be overridden by "Still good"
+**Date:** 2026-11-26 · **Task:** TASK-090 (B1, B2, B3) · **Status:** accepted, held for owner acceptance
+
+**Context.** The final verification round found raw fridge meat, poultry and seafood past their
+window in the Check bucket, where one "Still good" tap (a look/smell judgement) made them
+cookable. The owner's rule: visual inspection or smell alone must not override an established
+food-safety limit.
+
+**Decision.** `FRIDGE_SAFETY_LIMITS` holds food-specific refrigerator limits taken from the FDA
+Refrigerator & Freezer Storage Chart / FoodSafety.gov cold storage chart, at the conservative end
+of each range: poultry, ground meat, raw sausage, variety meats and seafood 2 days; whole cuts
+3 days; cured/processed 3–7 days; cooked leftovers 4 days. A lot past its limit, or with no bought
+date, is Expired with a `safety` reason: unusable, not restored by Keep/Still good, and never in a
+bulk-removal set (per-row Remove only). The clock is `purchaseDate`, never `updatedAt`. There is no
+thaw date in the data, so a lot moved from the freezer counts from purchase (conservative) and the
+user is told to set the bought date to the day it went in the fridge. Eggs stay an estimate.
+Shop rows consolidate equivalent needs (same identity guards as matching) only when units are
+compatible; incompatible ones stay separate with a visible note. Empty staples restock like Low.
+
+**Why.** Lost safety is not reversible; a conservative false "do not use" costs one edit. Bulk
+deletion stays limited to printed and actual-cook dates (D-088) so no record is removed on an
+estimate.
