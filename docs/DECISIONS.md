@@ -3579,6 +3579,12 @@ task aligns them — documented, accepted.
 Owner gate: all FFS-V1 tasks land at `approved` (held). Nothing merges to `main` or deploys
 without explicit owner approval (owner instruction 2026-11-25).
 
+Addendum (2026-11-26, TASK-086): "past-date" in `pantryLotAvailable()` means a PRINTED date only.
+Estimated windows (purchase date + shelf life, which ignore freezer/canned storage) are a food-
+safety "check it" signal per D-087 and never remove a lot from availability. Found in the TASK-085
+preview: frozen chicken and canned goods were reported missing, so Fill the gaps suggested
+rebuying them. Display of estimates (Fridge badges, Home Attention, Stock Health) is unchanged.
+
 ## D-087 — Inventory staleness is per food class and split into three independent signals
 Date: 2026-11-25 · Status: Accepted (owner decision); implementation TASK-081
 Context: The first FFS-V1 proposal suggested a universal 60-day "stale" cutoff. The owner rejected

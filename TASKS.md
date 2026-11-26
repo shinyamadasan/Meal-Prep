@@ -6203,6 +6203,56 @@ private data (NOT part of this task's commits): the curated recipe import file i
   20 verified, 1 escalated (Garlicky Roasted Chickpeas: roast step on a missing page). File:
   Meal-Prep-private\cookbook\so-easy-so-good.private.json (outside the repo).
 
+### TASK-086 · FFS-V1 fix: estimated shelf-life dates never make a lot unavailable
+status: codex
+owner: codex
+risk: Medium (read-path logic in `pantryLotAvailable`; no write path, no persisted change).
+  Merge gate: `approved` (owner deploy hold).
+source: TASK-085 preview walkthrough finding (Claude, 2026-11-26) · D-086 addendum · D-087
+depends-on: TASK-080, TASK-081, TASK-082 (approved)
+branch: task-086-ffs-estimated-dates (from approved TASK-082 head `5b9221c`)
+problem (found in the integrated preview with a realistic household):
+  `pantryLotAvailable()` treats a lot as unavailable once `pantryDaysLeft()` < 0. For lots without
+  a printed date, that day count is an ESTIMATE (purchaseDate + `shelfLifeDays` or the category
+  fallback) and the estimate ignores storage. Results: chicken thigh in the FREEZER bought 40 days
+  ago is "not available"; "Canned tuna" (Protein fallback = 3 days) is "not available" after 3
+  days; onions on the counter vanish after 7 days. Fill the gaps then suggests rebuying food we
+  have, and Cook Now tiers list it as missing. This contradicts the owner rule "separate data
+  staleness from food safety and actual expiration" (D-087).
+objective:
+  Only an actual expiration (a printed date, `dateMode: 'expiry'`) can make a lot unavailable.
+  Estimated shelf-life windows stay a "check it" safety signal (Fridge badges, Home Attention,
+  Stock Health) but never remove a lot from availability.
+files:
+  - app.js (`pantryLotAvailable` only, plus any comment)
+  - tests/ffs-truthful-availability.spec.js and any other spec whose expectation relied on an
+    estimated date making a lot unavailable (list each one in CHANGELOG with the reason)
+  - tests/ffs-no-plan-grocery.spec.js (new regression rows)
+  - docs/ARCHITECTURE.md (availability note), CHANGELOG.md, TEST_REPORT.md, TASKS.md status only
+design (binding):
+  `pantryLotAvailable(p)`: empty stockLevel → false; staple → true; finite quantity ≤ 0 → false;
+  `dateMode === 'expiry'` with a valid printed date before today → false; everything else → true.
+  Do NOT change `pantryDaysLeft`, `pantryExpiryInfo`, Fridge cards, Home Attention, expiry badges,
+  use-soon suggestions (`getExpirySuggestions` keeps its today..+3 window), Stock Health, or any
+  write path (`findPantryMatch`, `deductIngredientsForRecipe`, `checkMissingIngredients`,
+  `toGrams`, workers/).
+acceptance:
+  - [ ] Freezer lot "Chicken Thigh" bought 40 days ago (no printed date) → available; Fill the gaps
+        does not suggest Chicken Thigh; Cook tiers do not list it as missing.
+  - [ ] "Canned tuna" (Protein, estimated 3-day shelf life) bought 30 days ago → available.
+  - [ ] Fridge "Spinach" past its estimated window → still available, AND still shown with its
+        estimate warning on the Fridge card / Home Attention and in Stock Health ("safety estimate").
+  - [ ] Printed date yesterday → unavailable (unchanged); printed today → available (unchanged);
+        0-qty / empty / staple rules unchanged.
+  - [ ] Rendering Home, Shop and Fridge leaves `AppState` deep-equal (unchanged guarantee).
+  - [ ] Focused specs fail on base where behavior changes, then pass; full `npm test`,
+        `npm run test:ledger-contract`, `node --check app.js`, `git diff --check` green.
+constraints:
+  - Synthetic test data only. No persisted-field change. Never merge or push `main`/`ffs-v1`.
+    Never deploy. Stop at `status: review`.
+verification:
+  - Tests first (red on base), then green. No screenshots needed (no visual change).
+
 ### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
 status: todo
 owner: claude (integration + preview harness; no production code)
