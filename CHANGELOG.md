@@ -1496,3 +1496,24 @@ tests: 3 expected failures on `ddf4c71`. Final results were 11/11 focused, 894/8
 blockers: none.
 deviations: none.
 → status set to `review` in TASKS.md
+
+## TASK-090 — implementation complete (branch: task-090-ffs-release-blockers)
+changed:
+  - `pantryDateSignal()` enforces food-specific fridge limits and requires a valid bought date.
+    `pantryLotAvailable()` blocks both safety signals even after Keep or when marked as a staple.
+    Fridge and Home show the reason, and bulk deletion excludes these lots.
+  - `cookedShelfLife()` caps fridge batches at four days and supplies the same default when the
+    shelf life is missing. Ready to eat, Attention and alerts use the shared calculation.
+  - `generateGroceryList()` consolidates compatible planned and custom needs through `plannedNeed`.
+    Shop shows each source and flags incompatible units. `toggleGroceryItem()` transfers the
+    displayed amount once through the existing purchase path.
+  - `syncStapleToGrocery()` restocks Low and Empty staples, reuses equivalent shopping rows,
+    and reports whether anything changed so repeat Shop opens avoid a save.
+tests: 11 new cases in `tests/ffs-release-blockers.spec.js`. The existing case in
+  `tests/food-attention-notifications.spec.js` now expects an expired alert for an old fridge
+  batch with no shelf life, reflecting the four-day default. The two recommendation tests
+  that exposed a within-limit ranking regression passed after the fix with their original assertions.
+blockers: none.
+deviations: The single full local run passed 903/905. After fixing its two failures,
+  all 83 tests in the affected suites passed, including both failures. Ledger passed 13/13.
+→ status set to `review` in TASKS.md
