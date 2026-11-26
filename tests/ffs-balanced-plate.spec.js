@@ -161,6 +161,22 @@ test('quick book recipes fill spare slots after stock, using ingredients availab
   await expect(ready.getByText('Optional: add a veg — Simple Slaw', { exact: true })).toBeVisible();
 });
 
+test('quick vegetable additions can be sides but cannot be main dishes or breakfasts', async ({ page }) => {
+  const candidates = [
+    ['Tofu Bowl', 'Main Dish'],
+    ['Tofu Breakfast Wrap', 'Breakfast'],
+    ['Tofu Slaw', 'Sauce & Side'],
+    ['Tofu Salad', 'Salad']
+  ].map(([name, category]) => ({
+    ...mealRecipe, id: name, name, category, effort: 'assembly', favorite: false,
+    mealBalance: { vegetables: true },
+    baseIngredients: [{ name: 'Tofu', baseQuantity: 1, unit: 'pcs' }]
+  }));
+  await seed(page, [lot('Tofu', { category: 'Protein' })], mealRecipe, candidates);
+  await expect(page.locator('.dash-card--ready .dash-ready-hint'))
+    .toHaveText('Optional: add a veg — Tofu Slaw or Tofu Salad');
+});
+
 test('a vegetable-only meal can get a named protein addition before a carb', async ({ page }) => {
   const ready = page.locator('.dash-card--ready');
   await seed(page, [rice, lot('Tofu', { category: 'Protein' })], { ...mealRecipe, mealBalance: { vegetables: true } });

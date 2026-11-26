@@ -1968,9 +1968,10 @@ function balancedPlateAdditions(recipe, state) {
       if (options.length === optionLimit) break;
     }
 
-    // Quick book recipes can fill the remaining slots if the stock can support them.
+    // Quick sides from the recipe book can fill slots if the stock can support them.
     for (const side of recipes) {
       if (options.length === optionLimit) break;
+      if (side.category === 'Main Dish' || side.category === 'Breakfast') continue;
       if (!side.name || !normalizeMealBalance(side.mealBalance)[part]) continue;
       const effort = normalizeEffort(side.effort);
       if (effort !== 'assembly' && effort !== 'very-low' && !recipeHasEquipment(side, ['no-cook'])) continue;

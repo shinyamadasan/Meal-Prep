@@ -1453,3 +1453,16 @@ tests: focused 8/8, full local 864/864, ledger contract 13/13. Syntax and diff c
 blockers: none.
 deviations: the printed-date selector uses the existing inline Fridge add and edit controls.
 → status set to `review` in TASKS.md
+
+## TASK-083 — implementation complete (branch: task-083-ffs-balanced-plate-lite)
+changed:
+  - `10c6cfa` added optional, stock-based hints through `balancedPlateAdditions()`,
+    `readyFoodBalanceHint()`, and `renderRecipeMetaFields()`, with single-line styling,
+    synthetic tests, and desktop and 390px screenshots.
+  - This handoff filters Main Dish and Breakfast recipes out of the quick-side fallback
+    and adds regression coverage for eligible Sauce & Side and Salad recipes.
+tests: 8 expected failures on `5c3e6bf`, then 8/8 focused, 886/886 in each full local
+  run, and 13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
+→ status set to `review` in TASKS.md
