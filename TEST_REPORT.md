@@ -1227,3 +1227,19 @@ visual: Recaptured and inspected Ready to eat and Recipe Details at desktop and 
   Single-line, overflow, edit-mode visibility, and `AppState` deep equality checks passed.
 self-review: Code Health and applicable AI checks in `QA.md` passed.
 untested: production, real mobile devices, and code coverage instrumentation.
+
+## TASK-090 · 2026-11-26
+full local: `npx playwright test --project=local --reporter=dot` passed 903 and failed 2.
+  The failures were the shared expiry scan and competing urgency tests in
+  `tests/what-should-we-eat.spec.js`. Both exposed a ranking regression from using the hard
+  fridge limit for within-limit freshness guidance. Restored the existing guidance and kept
+  the safety block for past-limit and unknown-date lots.
+follow-up: The six affected specs passed 83/83 on the final implementation, including both
+  previous failures and all 11 new TASK-090 cases. The suites covered release blockers,
+  recommendations, expiry and bulk removal, refinement integration, availability, and alerts.
+ledger: `npm run test:ledger-contract` passed 13/13.
+static: `node --check app.js`, both changed spec syntax checks, and `git diff --check` passed.
+qa: Verified local and Firestore payloads carry `plannedNeed`, the 390px Shop conflict notes
+  are visible, and only one pantry tombstone is written for per-row safety removal. Restored
+  the generated TASK-079 PNGs. Code Health and applicable AI checks passed.
+untested: A second full local run, production, real mobile devices, and coverage instrumentation.
