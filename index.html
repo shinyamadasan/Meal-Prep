@@ -310,9 +310,13 @@
                                     <input type="text" id="pantry-unit" class="form-control" placeholder="pcs, g, kg" autocomplete="off" aria-label="Unit">
                                 </label>
                                 <label class="pad-field pad-field--date">
-                                    <span class="pad-label">Expires</span>
-                                    <input type="date" id="pantry-expiry" class="form-control" autocomplete="off" aria-label="Expiry date">
+                                    <span class="pad-label">Printed date</span>
+                                    <input type="date" id="pantry-expiry" class="form-control" autocomplete="off" aria-label="Printed date">
                                 </label>
+                                <select id="pantry-printed-date-kind" class="form-control" aria-label="Printed date type">
+                                    <option value="">Use by / expiry</option>
+                                    <option value="best-before">Best before</option>
+                                </select>
                             </div>
                             <div id="pantry-search-wrap" class="pantry-search-wrap hidden">
                                 <input type="text" id="pantry-search" class="form-control" placeholder="Search your kitchen…" autocomplete="off" aria-label="Search pantry items">

@@ -296,7 +296,7 @@ test('explicit tombstone writers record their own collections', async ({ page })
     AppState.pantry = [{ id: 'unstock_1', name: 'Unstock', updatedAt: OLD }];
     unstockPurchasedGroceryItem({ mode: 'created', pantryId: 'unstock_1' });
 
-    AppState.pantry = [{ id: 'clear_exp', name: 'Expired Clear', purchaseDate: '2026-01-01', shelfLifeDays: 1, updatedAt: OLD }];
+    AppState.pantry = [{ id: 'clear_exp', name: 'Expired Clear', dateMode: 'expiry', expiryDate: '2000-01-01', updatedAt: OLD }];
     AppState.cookedMeals = [{ id: 'clear_exp', name: 'Same Id Cooked', cookedDate: '2026-08-01', fridgeLife: 30, storage: 'fridge', updatedAt: OLD }];
     clearExpiredPantryItems();
     document.querySelector('.confirm-ok-btn').click();
@@ -323,7 +323,7 @@ test('expired cleanup writers are collection-aware even with shared ids', async 
   await loadLocalApp(page);
   const result = await page.evaluate(() => {
     AppState.deletions = {};
-    AppState.pantry = [{ id: 'same', name: 'Expired Pantry', purchaseDate: '2026-01-01', shelfLifeDays: 1, updatedAt: OLD }];
+    AppState.pantry = [{ id: 'same', name: 'Expired Pantry', dateMode: 'expiry', expiryDate: '2000-01-01', updatedAt: OLD }];
     AppState.cookedMeals = [{ id: 'same', name: 'Expired Cooked', cookedDate: '2026-01-01', fridgeLife: 1, storage: 'fridge', updatedAt: OLD }];
     removeAllExpired();
     document.querySelector('.confirm-ok-btn').click();

@@ -386,16 +386,20 @@ DECISIONS D-074.
   dateMode?,          // 'expiry' -> count down to the printed expiryDate;
                       //   anything else (incl. absent) -> purchaseDate + shelfLifeDays.
                       //   pantryDaysLeft() and pantryExpiryInfo() both branch on this.
+  printedDateKind?,   // 'use-by' | 'best-before'. Applies in dateMode 'expiry'.
+                      //   Absent defaults to use-by. Only set by the printed date selector.
   storage?,           // 'fridge' | 'freezer' | 'counter' (inferred INGREDIENT_DB → PANTRY_KNOWLEDGE → category)
   staple?,            // boolean — staple cycles: none → staple → running low; staples not deducted on cook
   stockLevel?,        // 'full' | 'ok' | 'low' | 'empty' — for staples
   suggestDismissed?,  // boolean — user dismissed the auto-grocery suggestion; skip re-add until restocked
-  keptOn?,            // 'YYYY-MM-DD' — user tapped Keep on an expired item; suppresses it from the
-                      //   attention surfaces for that day only. Never alters dates. (D-057)
+  keptOn?,            // 'YYYY-MM-DD' — set by Keep or Still good. Suppresses Expired and Check
+                      //   attention for that calendar day. Date fields stay as entered. (D-088)
   updatedAt?,         // ISO — set by stampUpdated(); tombstone last-write-wins
 }
 ```
 `keptOn` also exists on **cooked meal** objects, with identical meaning.
+`printedDateKind` travels with the pantry record through localStorage, Firestore, backup and
+JSON import/export. Existing records retain their original shape on load.
 
 ### Merge rules for a purchase (D-057)
 `stockPurchasedGroceryItem()` folds a checked-off grocery item into an existing

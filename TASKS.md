@@ -6288,7 +6288,7 @@ acceptance:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-087 · FFS-V1 Cook Now ingredient matching: required vs optional, alternatives, swaps
-status: review
+status: approved
 owner: codex
 risk: Medium (read-path logic; no persisted change, no write path). Merge gate: `approved` (hold).
 source: owner approval 2026-11-26 "Approve finding A" + finding D (compound names) · D-086
@@ -6409,7 +6409,7 @@ verification:
     showing all three tiers into feature-evidence/task-087/.
 
 ### TASK-088 · FFS-V1 Food availability and deletion safety: expired vs check vs stale
-status: codex
+status: approved
 owner: codex
 risk: High (deletion paths, tombstones, a new optional synced pantry field; D-032 red zone).
   Solo build. Merge gate: `approved` (hold).

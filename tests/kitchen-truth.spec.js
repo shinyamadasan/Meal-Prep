@@ -347,7 +347,7 @@ test('Needs Attention separates expired from use-soon across pantry and cooked f
   const result = await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
     AppState.pantry = [
-      { id: 'p_exp', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
+      { id: 'p_exp', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' },
       { id: 'p_soon', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' },
       { id: 'p_fine', name: 'Fresh Carrot', category: 'Vegetable', purchaseDate: day(0), shelfLifeDays: 20, storage: 'fridge' },
       { id: 'p_low', name: 'Fish Sauce', category: 'Pantry', storage: 'counter', staple: true, stockLevel: 'low' }
@@ -379,7 +379,7 @@ test('Home renders the attention card with per-row Keep / Remove and a bulk acti
   await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
     AppState.pantry = [
-      { id: 'p_exp1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
+      { id: 'p_exp1', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' },
       { id: 'p_soon1', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
@@ -412,7 +412,7 @@ test('one tap removes a single expired item and tombstones it', async ({ page })
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'p_gone', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_gone', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
     showTab('dashboard');
@@ -440,13 +440,13 @@ test('bulk cleanup removes every expired record and nothing else', async ({ page
   const before = await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
     AppState.deletions = {};
-    // Eight expired items: deliberately more than MASS_DELETE_GUARD (5), to prove
+    // Seven expired items: deliberately more than MASS_DELETE_GUARD (5), to prove
     // the explicit tombstones are what carry the delete, not the vanish-diff.
     AppState.pantry = [];
     for (let i = 0; i < 6; i++) {
       AppState.pantry.push({
         id: 'p_exp_' + i, name: 'Expired ' + i, category: 'Vegetable',
-        purchaseDate: day(20), shelfLifeDays: 3, storage: 'fridge'
+        dateMode: 'expiry', expiryDate: day(17), storage: 'fridge'
       });
     }
     AppState.pantry.push({ id: 'p_soon', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' });
@@ -496,7 +496,7 @@ test('use-soon food is never removed in bulk, even at the boundary', async ({ pa
     AppState.pantry = [
       // Exactly 0 days left — "Use today", the closest thing to expired that isn't.
       { id: 'p_today', name: 'Today Tofu', category: 'Protein', purchaseDate: day(5), shelfLifeDays: 5, storage: 'fridge' },
-      { id: 'p_expired', name: 'Yesterday Tofu', category: 'Protein', purchaseDate: day(6), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_expired', name: 'Yesterday Tofu', category: 'Protein', dateMode: 'expiry', expiryDate: day(1), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
     const a = collectAttentionItems();
@@ -519,11 +519,13 @@ test('Keep quiets an expired item for the day without touching its dates', async
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'p_keep', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_keep', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5,
+        dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
     const beforeDate = AppState.pantry[0].purchaseDate;
     const beforeShelf = AppState.pantry[0].shelfLifeDays;
+    const beforeExpiry = AppState.pantry[0].expiryDate;
     const beforeDaysLeft = pantryDaysLeft(AppState.pantry[0]);
 
     keepAttentionItem('pantry', 'p_keep');
@@ -531,7 +533,7 @@ test('Keep quiets an expired item for the day without touching its dates', async
     const p = AppState.pantry[0];
     return {
       stillPresent: AppState.pantry.length === 1,
-      dateUnchanged: p.purchaseDate === beforeDate,
+      dateUnchanged: p.purchaseDate === beforeDate && p.expiryDate === beforeExpiry,
       shelfUnchanged: p.shelfLifeDays === beforeShelf,
       daysLeftUnchanged: pantryDaysLeft(p) === beforeDaysLeft,
       stillExpiredOnCard: pantryDaysLeft(p) < 0,
@@ -562,7 +564,7 @@ test('Keep is a one-day acknowledgement — the item is actionable again tomorro
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'p_keep', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_keep', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
     ];
     AppState.cookedMeals = normalizeCookedMeals([
       { id: 'cm_keep', name: 'Old Adobo', cookedDate: day(9), storage: 'fridge', fridgeLife: 4, freezerLife: 60 }
@@ -651,8 +653,8 @@ test('Keep can be tapped again the next day, and re-suppresses for that day only
     AppState.pantry = [
       // keptOn already carries YESTERDAY's date — the state a kept item is in
       // when the user opens the app the following morning.
-      { id: 'p_again', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9),
-        shelfLifeDays: 5, storage: 'fridge', keptOn: day(1) }
+      { id: 'p_again', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4),
+        storage: 'fridge', keptOn: day(1) }
     ];
     return {
       yesterday: day(1),
@@ -682,13 +684,11 @@ test('Keep can be tapped again the next day, and re-suppresses for that day only
   expect(after.persistedKeptOn).toBe(after.today); // and it survives a reload
 });
 
-test('the Inventory tab Clear-expired button now matches what the badges say', async ({ page }) => {
+test('the Inventory tab Clear-expired button stays hidden when only an estimate has passed', async ({ page }) => {
   await loadLocalApp(page);
 
   const result = await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
-    // A bought-date item with no printed expiryDate — the common case, which the
-    // old expiryDate-only scan could never see.
     AppState.pantry = [
       { id: 'p_bought', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
     ];
@@ -704,8 +704,8 @@ test('the Inventory tab Clear-expired button now matches what the badges say', a
   }, LOCAL_DAY_FN);
 
   expect(result.daysLeft).toBeLessThan(0);
-  expect(result.matched).toBe(1);
-  expect(result.buttonVisible).toBe(true);
+  expect(result.matched).toBe(0);
+  expect(result.buttonVisible).toBe(false);
 });
 
 // ── 6. Persistence / compatibility ──────────────────────────────────────────
@@ -767,6 +767,7 @@ test('old saved data without the new fields still loads and classifies', async (
       pantryLoaded: AppState.pantry.length,
       cookedLoaded: (AppState.cookedMeals || []).length,
       expired: a.expired.map((e) => e.name).sort(),
+      check: a.check.map((e) => e.name),
       keptDefaults: AppState.pantry.every((p) => p.keptOn === undefined),
       legacyGroceryChecked: groceryItemChecked(AppState.groceryList[0])
     };
@@ -774,7 +775,8 @@ test('old saved data without the new fields still loads and classifies', async (
 
   expect(result.pantryLoaded).toBe(1);
   expect(result.cookedLoaded).toBe(1);
-  expect(result.expired).toEqual(['Old Adobo', 'Old Broccoli']);
+  expect(result.expired).toEqual(['Old Adobo']);
+  expect(result.check).toEqual(['Old Broccoli']);
   expect(result.keptDefaults).toBe(true);
   expect(result.legacyGroceryChecked).toBe(true);  // legacy checked rows still read as checked
 });
@@ -888,8 +890,8 @@ test('mobile: expired cleanup is reachable and tappable on a phone viewport', as
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'p_m1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
-      { id: 'p_m2', name: 'Old Tofu', category: 'Protein', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_m1', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' },
+      { id: 'p_m2', name: 'Old Tofu', category: 'Protein', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
     showTab('dashboard');
@@ -941,7 +943,7 @@ test('the whole grocery → attention → cleanup loop runs with no console erro
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'p_e1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'p_e1', name: 'Old Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: day(4), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
     AppState.groceryList = [

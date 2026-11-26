@@ -101,11 +101,10 @@ whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. 
 rejects added identity modifiers such as evaporated in evaporated milk. Generic descriptors
 such as white, steamed, and short-grain are ignored for names headed by rice. Empty lots are
 unavailable. Non-empty staples count as available. For non-staples, a finite quantity of zero or
-less or a valid printed date (`dateMode: 'expiry'`) before today makes the lot unavailable.
-Estimated shelf-life windows continue to drive freshness warnings in Fridge, Home Attention,
-and Stock Health. Lots past those estimates still count as available. `getExpirySuggestions()`
-limits its source lots to today through three days out. The cooking write path uses its own
-`findPantryMatch()` rules under D-086.
+less or a valid printed use-by date (`dateMode: 'expiry'`) before today makes the lot unavailable.
+Lots past an estimated shelf-life window or a printed best-before date still count as available.
+`getExpirySuggestions()` limits its source lots to today through three days out. The cooking
+write path uses its own `findPantryMatch()` rules under D-086.
 
 ## No-plan grocery
 
@@ -268,10 +267,12 @@ scalar-field template (see the Save/load/sync pipeline section above) — delibe
   Times use `statedMinutes()`, NOT `recipePrepMinutes()` (which returns 0 for "missing").
 
 ## Attention loop
-`collectAttentionItems()` is the single classifier behind Home's "What needs attention?" card. It
-scans `AppState.pantry` (via `pantryDaysLeft()`) and `AppState.cookedMeals` (via `cookedShelfLife()`)
-in one pass and returns `{ expired, useSoon, low }`. The two record types keep separate shapes — this
-unifies the attention experience, not the data model.
+`collectAttentionItems()` scans pantry lots via `pantryDateSignal()` and cooked batches via
+`cookedDateSignal()`. It returns `{ expired, check, useSoon, low }` for Home. Expired covers a
+passed printed use-by date or a cooked batch past its fridge window. Check covers a passed
+perishable estimate, a passed printed best-before date, or a cooked batch past its freezer
+quality window. Aged frozen pantry lots, pantry staples and condiments keep their estimate
+context in Fridge and Stock Health. Record staleness belongs to Stock Health (D-087).
 
 `#dash-attention` is compact by default, unconditionally (D-079) — an expired item no longer forces
 it open. It opens only through an explicit action: the card's own `.dash-attn-review-btn` ("Review",
@@ -281,15 +282,17 @@ entry point and the target of the global banner's own View action via `viewFresh
 Ready-to-eat and What-should-we-eat cards' row buttons still use to jump straight to the Fridge tab
 for a specific item, an unrelated call site `viewFreshnessDetails()` must not disturb.
 
-Actions: `keepAttentionItem()` writes `keptOn = todayISO()` (suppresses the record from attention
-surfaces for the day; alters no dates), `removeAttentionItem()` removes one, `removeAllExpired()`
-removes the whole `expired` bucket. Both removal paths write EXPLICIT tombstones into
-`AppState.deletions` — into the record's OWN collection bucket via `writeTombstone(collection, id)`,
-`'cookedMeals'` or `'pantry'` depending on the record (D-071) — and call `snapshotIdBaseline()`
-before dropping records, because `recordLocalDeletions()` deliberately ignores more than
-`MASS_DELETE_GUARD` simultaneous disappearances **in aggregate across all collections**. Writing
-explicitly is what keeps a legitimate bulk removal from being swallowed by that guard.
-`getExpiredPantryItems()` and `getFreshnessAlerts()` honour `keptOn` too.
+Keep and Still good call `keepAttentionItem()` to record `keptOn = todayISO()`. Home and the
+freshness alerts suppress the flagged record for that day. Cook Now displays a check note
+when every available lot matching a recipe line needs checking. Choosing Still good lets that
+lot satisfy the line without the check note for the rest of the day.
+
+Remove and Toss call `removeAttentionItem()` for one named record. `removeAllExpired()` and
+`clearExpiredPantryItems()` list every eligible record and date before asking for confirmation.
+Confirmation revalidates the named records and takes a local backup before deletion. These
+actions write explicit tombstones to each record's collection (D-071), remove the confirmed
+records, then call `snapshotIdBaseline()` and `saveData()`. The explicit tombstones preserve
+legitimate bulk removals across the aggregate `MASS_DELETE_GUARD`.
 
 ### Deletion identity and the mass-delete guard (D-071)
 

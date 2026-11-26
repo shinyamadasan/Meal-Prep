@@ -124,8 +124,8 @@ test('Spinach past its estimate stays in stock and keeps its safety warnings on 
     return snapshot;
   }, { pantry, groceryList });
   await page.locator('#dash-attention .dash-attn-review-btn').click();
-  const attention = page.locator('#dash-attention .dash-attn-row--expired').filter({ hasText: 'Spinach' });
-  await expect(attention).toContainText('Expired 5d ago');
+  const attention = page.locator('#dash-attention .dash-attn-row--check').filter({ hasText: 'Spinach' });
+  await expect(attention).toContainText('Estimated window passed — check it');
 
   await page.locator('.tab-btn[data-tab="grocery"]').click();
   const spinach = page.locator('#grocery-list .grocery-item').filter({ hasText: 'Spinach' });
@@ -133,7 +133,7 @@ test('Spinach past its estimate stays in stock and keeps its safety warnings on 
 
   await page.locator('.tab-btn[data-tab="fridge"]').click();
   const fridgeRow = page.locator('#pantry-list .pi-row').filter({ hasText: 'Spinach' });
-  await expect(fridgeRow.locator('.pantry-fresh-badge')).toHaveText('Expired 5d ago');
+  await expect(fridgeRow.locator('.pantry-fresh-badge')).toHaveText('Estimated window passed — check it');
   await expect(fridgeRow.locator('.pi-date')).toHaveAttribute('title', /^Estimated: bought .* \+ 5-day shelf life$/);
   const health = page.locator('#stock-health');
   await health.locator('summary').click();

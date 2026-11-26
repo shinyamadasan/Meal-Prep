@@ -219,23 +219,24 @@ test('reports required availability, swaps and missing optional lines without co
   expect(result).toEqual({
     ready: {
       tier: 'ready', missing: 0, matched: 3, total: 8, requiredTotal: 3, missingIngredients: [],
-      swaps: [], optionalMissing: ['Mint, torn, for garnish', 'Lime, for squeezing', 'Sesame seeds (optional)']
+      swaps: [], optionalMissing: ['Mint, torn, for garnish', 'Lime, for squeezing', 'Sesame seeds (optional)'],
+      needsCheck: []
     },
     swap: {
       tier: 'swap', missing: 0, matched: 1, total: 2, requiredTotal: 2, missingIngredients: [],
-      swaps: [{ need: 'Brown rice', use: 'Jasmine Rice' }], optionalMissing: []
+      swaps: [{ need: 'Brown rice', use: 'Jasmine Rice' }], optionalMissing: [], needsCheck: []
     },
     spice: {
       tier: 'buy', missing: 1, matched: 1, total: 2, requiredTotal: 2, missingIngredients: ['Caraway'],
-      swaps: [], optionalMissing: []
+      swaps: [], optionalMissing: [], needsCheck: []
     },
     expired: {
       tier: 'buy', missing: 1, matched: 1, total: 2, requiredTotal: 2, missingIngredients: ['Paprika'],
-      swaps: [], optionalMissing: []
+      swaps: [], optionalMissing: [], needsCheck: []
     },
     two: {
       tier: 'buy', missing: 2, matched: 1, total: 3, requiredTotal: 3, missingIngredients: ['Leek', 'Fennel'],
-      swaps: [], optionalMissing: []
+      swaps: [], optionalMissing: [], needsCheck: []
     }
   });
 });

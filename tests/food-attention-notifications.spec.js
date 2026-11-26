@@ -121,7 +121,7 @@ test('turning alerts back off does not re-prompt and stops notifying', async ({ 
   await expect(page.locator('#settings-food-alerts-state')).toHaveText('Off');
 
   const fired = await runAttentionPass(page, (daysAgo) => {
-    AppState.pantry = [{ id: 1, name: 'Chicken Breast', category: 'Protein', purchaseDate: daysAgo(20), shelfLifeDays: 3 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken Breast', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(17) }];
     AppState.cookedMeals = [];
   });
   expect(fired).toHaveLength(0);
@@ -143,7 +143,7 @@ test('a denied permission leaves the app fully working', async ({ page }) => {
   // The rest of the app still renders and the attention machinery still works.
   const state = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Chicken Breast', category: 'Protein', purchaseDate: daysAgo(20), shelfLifeDays: 3 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken Breast', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(17) }];
     AppState.cookedMeals = [];
     closeSettingsModal();
     renderDashboard();
@@ -206,14 +206,14 @@ test('a browser with no Notification API at all does not break the app', async (
 
 // ── 3. Classification comes from Kitchen Truth, not a second system ─────────
 
-test('expired and use-soon come from the existing pantryDaysLeft boundaries', async ({ page }) => {
+test('printed dates use the existing expiry and use-soon day boundaries', async ({ page }) => {
   await loadLocalApp(page, { initialPermission: 'granted', alertPrefs: { enabled: true, announced: {} } });
 
   const result = await page.evaluate((dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
     // shelfLifeDays 3, bought N days ago → daysLeft = 3 - N.
     AppState.pantry = [
-      { id: 1, name: 'Expired Item', category: 'Protein', purchaseDate: daysAgo(5), shelfLifeDays: 3 },  // -2
+      { id: 1, name: 'Expired Item', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(2) }, // -2
       { id: 2, name: 'Today Item', category: 'Protein', purchaseDate: daysAgo(3), shelfLifeDays: 3 },    //  0
       { id: 3, name: 'Boundary Item', category: 'Protein', purchaseDate: daysAgo(1), shelfLifeDays: 3 }, // +2 == WARN
       { id: 4, name: 'Fresh Item', category: 'Protein', purchaseDate: daysAgo(0), shelfLifeDays: 3 }     // +3 > WARN
@@ -264,8 +264,8 @@ test('expired copy asks the user to review, never to eat', async ({ page }) => {
 
   const notes = await runAttentionPass(page, (daysAgo) => {
     AppState.pantry = [
-      { id: 1, name: 'Chicken Breast', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 3 },
-      { id: 2, name: 'Old Milk', category: 'Dairy', purchaseDate: daysAgo(20), shelfLifeDays: 5 }
+      { id: 1, name: 'Chicken Breast', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(7) },
+      { id: 2, name: 'Old Milk', category: 'Dairy', dateMode: 'expiry', expiryDate: daysAgo(15) }
     ];
     AppState.cookedMeals = [];
   });
@@ -283,8 +283,9 @@ test('a mixed kitchen only ever offers the use-soon items for using', async ({ p
 
   const notes = await runAttentionPass(page, (daysAgo) => {
     AppState.pantry = [
-      { id: 1, name: 'Rotten Fish', category: 'Protein', purchaseDate: daysAgo(30), shelfLifeDays: 2 },
-      { id: 2, name: 'Broccoli', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 } // +1
+      { id: 1, name: 'Rotten Fish', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(28) },
+      { id: 2, name: 'Broccoli', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 }, // +1
+      { id: 3, name: 'Spinach', category: 'Vegetable', purchaseDate: daysAgo(10), shelfLifeDays: 5 }
     ];
     AppState.cookedMeals = [];
   });
@@ -303,9 +304,9 @@ test('several attention items produce exactly one grouped notification', async (
 
   const notes = await runAttentionPass(page, (daysAgo) => {
     AppState.pantry = [
-      { id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 },
-      { id: 2, name: 'Pork', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 },
-      { id: 3, name: 'Fish', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 },
+      { id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) },
+      { id: 2, name: 'Pork', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) },
+      { id: 3, name: 'Fish', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) },
       { id: 4, name: 'Broccoli', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 },
       { id: 5, name: 'Carrots', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 }
     ];
@@ -341,7 +342,7 @@ test('unchanged food does not notify again on later opens', async ({ page }) => 
   const result = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
     AppState.pantry = [
-      { id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 },
+      { id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) },
       { id: 2, name: 'Broccoli', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 }
     ];
     AppState.cookedMeals = [];
@@ -365,7 +366,7 @@ test('unchanged food does not notify again on later opens', async ({ page }) => 
 
 test('the dedup ledger survives a reload', async ({ page }) => {
   const savedData = {
-    pantry: [{ id: 1, name: 'Chicken', category: 'Protein', purchaseDate: '2000-01-01', shelfLifeDays: 2 }],
+    pantry: [{ id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: '2000-01-01' }],
     cookedMeals: [], recipes: [], groceryList: []
   };
   await loadLocalApp(page, {
@@ -400,7 +401,7 @@ test('a newly use-soon item and a newly expired item each notify once', async ({
     AppState.cookedMeals = [];
 
     // Day 1: one item with 1 day left.
-    AppState.pantry = [{ id: 1, name: 'Broccoli', category: 'Vegetable', purchaseDate: daysAgo(4), shelfLifeDays: 5 }];
+    AppState.pantry = [{ id: 1, name: 'Broccoli', category: 'Vegetable', dateMode: 'expiry', expiryDate: daysAgo(-1) }];
     window.__notifications.length = 0;
     await maybeNotifyAttention();
     out.firstRun = window.__notifications.slice();
@@ -417,7 +418,7 @@ test('a newly use-soon item and a newly expired item each notify once', async ({
     out.newUseSoon = window.__notifications.slice();
 
     // Broccoli now crosses into expired — genuinely new news about known food.
-    AppState.pantry[0].purchaseDate = daysAgo(10);
+    AppState.pantry[0].expiryDate = daysAgo(5);
     window.__notifications.length = 0;
     await maybeNotifyAttention();
     out.crossedToExpired = window.__notifications.slice();
@@ -449,7 +450,7 @@ test('food removed and later re-added can notify again', async ({ page }) => {
 
   const result = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    const item = { id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 };
+    const item = { id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) };
     AppState.cookedMeals = [];
 
     AppState.pantry = [item];
@@ -479,7 +480,7 @@ test('food kept today is never announced', async ({ page }) => {
 
   const result = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Parmesan', category: 'Dairy', purchaseDate: daysAgo(30), shelfLifeDays: 5 }];
+    AppState.pantry = [{ id: 1, name: 'Parmesan', category: 'Dairy', dateMode: 'expiry', expiryDate: daysAgo(25) }];
     AppState.cookedMeals = [];
 
     // Keep it before it was ever announced.
@@ -508,7 +509,7 @@ test('tapping Keep after an alert stops the next alert', async ({ page }) => {
 
   const result = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Parmesan', category: 'Dairy', purchaseDate: daysAgo(30), shelfLifeDays: 5 }];
+    AppState.pantry = [{ id: 1, name: 'Parmesan', category: 'Dairy', dateMode: 'expiry', expiryDate: daysAgo(25) }];
     AppState.cookedMeals = [];
 
     window.__notifications.length = 0;
@@ -563,7 +564,7 @@ test('pantry and cooked food are grouped into a single notification', async ({ p
   await loadLocalApp(page, { initialPermission: 'granted', alertPrefs: { enabled: true, announced: {} } });
 
   const notes = await runAttentionPass(page, (daysAgo) => {
-    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) }];
     AppState.cookedMeals = [{ id: 'c1', name: 'Adobo', cookedDate: daysAgo(6), storage: 'fridge', fridgeLife: 4, freezerLife: 90 }];
   });
 
@@ -593,7 +594,7 @@ test('opening the app with newly expired food raises the alert', async ({ page }
     initialPermission: 'granted',
     alertPrefs: { enabled: true, announced: {} },
     savedData: {
-      pantry: [{ id: 1, name: 'Chicken Breast', category: 'Protein', purchaseDate: '2000-01-01', shelfLifeDays: 3 }],
+      pantry: [{ id: 1, name: 'Chicken Breast', category: 'Protein', dateMode: 'expiry', expiryDate: '2000-01-01' }],
       cookedMeals: [], recipes: [], groceryList: []
     }
   });
@@ -608,7 +609,7 @@ test('a notification lands the user on the Needs Attention card', async ({ page 
 
   const result = await page.evaluate((dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) }];
     AppState.cookedMeals = [];
     renderDashboard();
     showTab('grocery');
@@ -633,7 +634,7 @@ test('returning to the foreground runs an attention pass', async ({ page }) => {
 
   const notes = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) }];
     AppState.cookedMeals = [];
     window.__notifications.length = 0;
     document.dispatchEvent(new Event('visibilitychange'));
@@ -710,7 +711,7 @@ test('notification bookkeeping stays out of AppState and out of the synced paylo
 
   const result = await page.evaluate(async (dayFnSrc) => {
     const daysAgo = eval(dayFnSrc);
-    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', purchaseDate: daysAgo(10), shelfLifeDays: 2 }];
+    AppState.pantry = [{ id: 1, name: 'Chicken', category: 'Protein', dateMode: 'expiry', expiryDate: daysAgo(8) }];
     AppState.cookedMeals = [];
     await maybeNotifyAttention();
     saveToLocalStorage();

@@ -4,6 +4,44 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Integration ffs-v1-refine (TASK-087 + TASK-088) — Claude, 2026-11-26
+Merged `5e23e0f` (TASK-087) then `02c2962` (TASK-088) into `ffs-v1-refine`. Conflicts in
+getCookableRecipes / Home + Recipes-tab tiers / eat picker resolved into ONE tier field:
+`buy` (missing ≥ 1) → `check` (every lot satisfying a required line needs a D-088 check) →
+`swap` → `ready`. `needsCheck` now follows TASK-087 alternatives (any alternative lot that is
+fresh clears the check). Home tier renderer derives tier from `missing` when a caller omits it
+(release-hardening stub). Claude fix per TASK-088 spec ("fridge raw / fresh"): counter produce
+past an estimate (onions, bananas) is not a safety check. New tests/ffs-refine-integration.spec.js
+(2 tests); TASK-087 result-shape test gains `needsCheck: []`.
+QA on the merged head: full local 878/878 · `npm run test:ledger-contract` 13/13 ·
+`node --check app.js` · `git diff --check`.
+
+---
+## Review TASK-088 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `02c2962` (base `bd4ce22`). independent QA (clean detached checkout in
+qa080): full local 864/864 · ledger contract 13/13 · `node --check app.js`.
+Probed in the offline preview household: bulk set = Ketchup + Chicken Breast only (printed
+dates); confirm lists both by name + date and states estimates/best-before are excluded;
+frozen chicken / canned tuna appear nowhere; Spinach in Check with Still good / Toss; a local
+safety backup (`createBackup`) is taken before any bulk removal; the confirm re-validates the list
+against live state before deleting. Tombstone / snapshotIdBaseline / saveData sequence unchanged.
+`printedDateKind` written only by the user (pantry add + inline edit), absent by default.
+follow-ups (not blocking): counter produce classed as check (fixed in integration, see above);
+"Cabbage" with quantity 0 still shows under Use soon (pre-existing; Stock Health flags it).
+gate: `approved` — red zone (deletion paths, new synced optional field). Held for the owner.
+
+---
+## Review TASK-087 — APPROVED (held) — Claude independent review + QA, 2026-11-26 (rework 1)
+candidate reviewed: `5e23e0f`. All four must-fix items resolved: swap guard (condiment class +
+no-swap heads + bell-pepper rule; canola/olive exception), identity modifiers extended, quantity
+notes stripped before splitting, Recipes tab + eat picker use `tier`, inline style moved to CSS.
+independent QA: full local 868/868 · ledger contract 13/13 · `node --check app.js`.
+follow-up (not blocking, honest failure mode): "X or Y Z" where X is a standalone noun
+("Kale or swiss chard") distributes Z onto X ("kale chard"), so a Kale lot does not satisfy it;
+the line shows as missing, never as a false match. Revisit only if it shows up in real recipes.
+gate: `approved` (owner deploy hold; read-path logic only).
+
+---
 ## Review TASK-087 — REWORK — Claude independent review, 2026-11-26
 candidate reviewed: `18642b7` (base `bd4ce22`). Tests claimed 863/863 + ledger 13/13; matching
 logic probed in the offline preview household (20 cookbook + 40 built-in recipes).
