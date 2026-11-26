@@ -1469,4 +1469,16 @@ tests: 13 focused passes, 883 full local passes per command, and 13 ledger contr
 blockers: none.
 deviations: none. The supporting change in `noPlanRole()` preserves existing role counts
   when Pantry is used as a Shop fallback.
+
+## TASK-083 — implementation complete (branch: task-083-ffs-balanced-plate-lite)
+changed:
+  - `10c6cfa` added optional, stock-based hints through `balancedPlateAdditions()`,
+    `readyFoodBalanceHint()`, and `renderRecipeMetaFields()`, with single-line styling,
+    synthetic tests, and desktop and 390px screenshots.
+  - This handoff filters Main Dish and Breakfast recipes out of the quick-side fallback
+    and adds regression coverage for eligible Sauce & Side and Salad recipes.
+tests: 8 expected failures on `5c3e6bf`, then 8/8 focused, 886/886 in each full local
+  run, and 13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: none.
 → status set to `review` in TASKS.md

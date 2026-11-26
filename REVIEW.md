@@ -4,6 +4,21 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-083 (lite) — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidates: `10c6cfa` (first Codex run; ended on API error before handoff, committed unchanged by
+Claude) + `a7b8623` (Codex finish: reviewer fix + evidence). Base `5c3e6bf`.
+Good: `balancedPlateAdditions` reads only existing `mealBalance`; fillers are available, non-
+check, non-expired lots by `noPlanRole`, ranked by versatility, de-duplicated; at most one line
+"Optional: add a veg — A or B"; nothing shown when stock cannot fill it; Sauce & Side / Snack /
+no-balance recipes get no line; Ready to eat reuses it with the old generic hint as fallback;
+the details modal shows it only in details mode. Render-only, no persisted state, no score.
+reviewer fix (applied by Codex in `a7b8623`): side-recipe fallback excludes Main Dish and
+Breakfast so a plate addition is never another meal.
+QA on the integrated head (`ffs-v1-refine` + 083): full local 891/891 · ledger contract 13/13 ·
+`node --check app.js` · `git diff --check`.
+gate: `approved` (owner deploy hold). Snack Pack remains deferred.
+
+---
 ## Review TASK-089 — APPROVED (held) — Claude independent review + QA, 2026-11-26
 candidate reviewed: `4beecb7` (base `5c3e6bf`). The Codex run ended on an API error after it had
 committed and recorded its evidence; Claude pushed the commit unchanged.

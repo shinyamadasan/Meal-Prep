@@ -1196,3 +1196,18 @@ visual: inspected `feature-evidence/task-089/fill-the-gaps-1280.png` and
   `fill-the-gaps-390.png`. Both viewports passed the horizontal overflow check.
 self-review: Code Health and the applicable AI QA checks passed.
 untested: production, real mobile devices, and coverage instrumentation.
+
+## TASK-083 · 2026-11-26
+focused: `tests/ffs-balanced-plate.spec.js` had 8 expected failures on `5c3e6bf`.
+  The new category case also failed on the earlier implementation at `10c6cfa`, which offered
+  a main dish and a breakfast. All 8 passed after the quick-side filter was added.
+full: `npx playwright test --project=local` and `npm test` each passed 886 tests with zero
+  failures. Playwright used port 47813. Restored the regenerated TASK-079 PNGs.
+ledger: `npm run test:ledger-contract` passed 13 tests with zero failures.
+static: `node --check app.js`, syntax check of the focused spec, `git diff --check`, and the
+  delta secret scan passed. The feature only derives and renders suggestions.
+visual: Reviewed the four desktop and 390px PNGs in `feature-evidence/task-083/`, originally
+  committed in `10c6cfa` and reproduced byte for byte. Both surfaces passed the single-line,
+  overflow, and `AppState` deep equality checks.
+self-review: Code Health and applicable AI checks in `QA.md` passed.
+untested: production, real mobile devices, and code coverage instrumentation.
