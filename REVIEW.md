@@ -4,6 +4,23 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-086 — APPROVED (held) — Claude independent review + QA, 2026-11-26
+candidate reviewed: `07aa5d14d67ad91af555d34d32bba62565bde491` (base `3d0a5c2` = TASK-082 approved head + plan).
+independent QA: new availability/no-plan rows fail on base app.js, 17/17 focused on candidate ·
+full local 856/856 · `npm run test:ledger-contract` 13/13 · `node --check app.js` · `git diff --check`.
+Note: Codex built in the shared `qa080` worktree; QA re-ran there from a clean detached checkout
+of the pushed SHA (tracked tree clean, regenerated evidence PNGs restored).
+
+### Verification
+- `pantryLotAvailable` change is the only app.js edit: non-staple lots become unavailable only for
+  qty ≤ 0, empty stockLevel, or a valid printed date before today. Estimated windows no longer
+  gate availability (D-086 addendum). Same calendar comparison as Stock Health (`stockCalendarDay`).
+- Display untouched: `pantryDaysLeft`, `pantryExpiryInfo`, Fridge badges, Home Attention, Stock
+  Health "safety estimate", use-soon window. Write paths untouched. Zero legacy expectations changed.
+
+**Disposition: APPROVED → `status: approved` (held).** Gate: owner deploy hold. Not merged to `main`.
+
+---
 ## Review TASK-082 — APPROVED (held) — Claude independent review + QA, 2026-11-26
 candidate reviewed: `89e2fdecec935292df70591bd0cd84c69bf88dd3` (base `f875953` = TASK-081 approved head).
 independent QA (Claude, separate clean worktree): focused `tests/ffs-no-plan-grocery.spec.js`

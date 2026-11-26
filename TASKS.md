@@ -6204,7 +6204,7 @@ private data (NOT part of this task's commits): the curated recipe import file i
   Meal-Prep-private\cookbook\so-easy-so-good.private.json (outside the repo).
 
 ### TASK-086 · FFS-V1 fix: estimated shelf-life dates never make a lot unavailable
-status: review
+status: approved
 owner: codex
 risk: Medium (read-path logic in `pantryLotAvailable`; no write path, no persisted change).
   Merge gate: `approved` (owner deploy hold).
