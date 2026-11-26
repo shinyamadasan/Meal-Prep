@@ -174,7 +174,7 @@ book (print/PDF, private)
 - Each recipe is tagged with:
   - `equipment`, `effort`, `activeTime`, `tags` (batch-friendly, freezer-friendly, cook-fresh, minimal-cleanup)
   - `mealBalance`
-  
+
   This lets the same recipe surface in Meal Prep, Cook Now and Quick Eat.
 - Verification is a human step. A recipe gets `verifiedAt` only after the owner confirms its
   quantities against the printed page. Known OCR gaps (missing pp 179–80; Chicken Taco Salad Jars
