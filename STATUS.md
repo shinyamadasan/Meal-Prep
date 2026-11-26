@@ -27,7 +27,8 @@ no duplicate ids, missing names or invalid quantities. Food safety on real data:
 (TASK-088 moved them to **Check**), and `production-smoke-low-effort.spec.js` lacks `air-fryer`
 (TASK-079, shipped earlier). Live probe confirmed: past-limit fridge chicken and a passed printed
 expiry are flagged expired; frozen chicken and in-date eggs are not; estimated produce goes to Check.
-**Rollback:** `git revert -m 1 102059e && git push origin main` (Pages redeploys in ~1 min). Data is
+**Rollback:** `git revert --no-edit -m 1 -X ours 102059e && git push origin main` (`-X ours` keeps
+later doc entries; app files return exactly to `3c82258`, verified locally) (Pages redeploys in ~1 min). Data is
 unaffected; restore from the 2026-11-26 export only if data itself is wrong.
 **Next:** refresh the 4 stale production smoke specs (ROADMAP Known Issues). PROP-041 remains a
 separate, held track.
