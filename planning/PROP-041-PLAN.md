@@ -1,6 +1,6 @@
 # PROP-041 — Conversational Food Management: smallest implementation plan
 
-Status: **plan awaiting owner approval** · track: separate from the FFS-V1 release (does not block it)
+Status: **plan approved in direction; owner decisions recorded 2026-11-26; implementation awaits explicit go-ahead after V1** · track: separate from the FFS-V1 release (does not block it)
 Owner direction approved 2026-11-26 (chat). Nothing here is built or deployed without approval.
 Source audit: `planning/PROPOSALS.md` PROP-041.
 
@@ -51,9 +51,13 @@ in ChatGPT. Phase 1 changes no user-visible app behaviour.
 | P3-4 Cook a recipe | `record_cooked_recipe(recipeId, multiplier, portions)`: deducts like the app's **Cooked** button, in one write. |
 | P3-5 Two household members | Allow-list of two OAuth subjects mapped to the one household document; per-person tokens and revocation; actor recorded per request (P1-3). |
 
-## Owner decisions before Phase 1 starts
-1. Household time zone for "today" (e.g. Asia/Manila).
-2. How long request records are kept (proposal: 30 days), and whether undo is allowed for that whole window.
-3. Phase 2: may chat create new records, or only edit existing ones?
-4. What counts as "bulk" (proposal: more than one removal in one request).
-5. Phase 3: does the second household member get their own sign-in now, or does the owner connection stay shared until P3-5?
+## Owner decisions (2026-11-26) and Claude's challenges
+| # | Owner decision | Challenge / refinement (adopted unless the owner objects) |
+| --- | --- | --- |
+| 1 | Time zone Asia/Manila | Agreed. One Worker setting (`HOUSEHOLD_TIME_ZONE`), not per person. It replaces the bridge's current UTC ±1-day skew guard, which becomes unnecessary. |
+| 2 | Duplicate-write records kept 30 days | Agreed, and simpler: the duplicate-write record and the undo snapshot are the **same** record (P1-3), so one 30-day retention covers both. Expiry through a Firestore TTL policy on an `expireAt` field (one-time setting, no code); fallback: prune expired records inside each write. |
+| 3 | Undo / recovery 30 days | Agreed, with one safety limit: undo restores only while the affected records are unchanged since that request (or, for a removed record, still absent with its id unused). A 3-week-old undo over later edits is refused, not forced. |
+| 4 | AI may create and edit records on explicit instruction | Agreed. Defaults are stated back in every reply ("bought today, stored in Freezer"). A missing storage location is inferred the same way the app does. A missing date on raw meat is never invented: it defaults to today only when the user said "bought today" or "just bought"; otherwise chat asks. |
+| 5 | Individual removals recoverable | Covered by P1-3 + P1-5. Stronger than the app's single-slot local backup. |
+| 6 | Removing 2+ distinct records needs confirmation; consumption and grocery logging are not bulk | Agreed, with two clarifications. (a) Consumption that empties a non-staple removes it; that stays routine (no confirmation) but is undoable. (b) A confirmation rule per request can be sidestepped by many one-item requests, so tool descriptions require chat to group removals into one `apply_changes` call, and every removal is undoable regardless. A time-window counter was considered and rejected as more complex than undo. |
+| 7 | Both members individually authorized in Phase 3 | Agreed: an allow-list of two Cloudflare Access identities mapped to the one household document (`TARGET_UID`), each with their own token and revocable alone; the request record names who acted. **Scope note:** this covers chat access only. If the second member should also sign in to the *app* with their own account, that needs Firestore rules and app sharing changes; that's a separate decision, not part of PROP-041. |
