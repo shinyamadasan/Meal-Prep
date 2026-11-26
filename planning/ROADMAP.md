@@ -131,6 +131,9 @@ Bugs, gaps, and dead code. Fixing one = delete it here (note it in the git commi
   - "Kale or swiss chard" order sensitivity (TASK-087 follow-up).
   - Cabbage at quantity 0 still shows under Use soon.
   - Cookbook ingredient names reach the Shop list verbatim (TASK-084, deferred).
+  - TASK-090 follow-ups: no thaw date is recorded (moved-from-freezer raw protein counts from
+    purchase; user corrects the bought date); smoked fish uses the 2-day seafood limit (chart:
+    14 d); eggs stay an estimate (chart 3-5 weeks); tocino/tapa are not on the chart (estimate only).
   - The "Keep" label on Expired rows reads like an override, though it only hides the row for
     today. Consider "Not now".
 

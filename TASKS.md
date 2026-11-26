@@ -6628,7 +6628,7 @@ verification:
   - Screenshots desktop + 390px (Ready-to-eat + recipe modal) into feature-evidence/task-083/.
 
 ### TASK-090 · FFS-V1 release blockers from the final verification round
-status: review
+status: approved
 owner: codex
 risk: High (TASK-088 safety logic, Shop list generation, staple sync, synced grocery rows).
   Solo build, never chained. Merge gate: `approved` (owner deploy hold).

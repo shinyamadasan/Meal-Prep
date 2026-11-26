@@ -4,6 +4,33 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-090 (FFS-V1 release blockers B1/B2/B3) — APPROVED (held) — Claude, 2026-11-26
+Branch `task-090-ffs-release-blockers` (Codex `e9ccdb1`, `9ca5ede`; review fix `9601807`), merged
+into `ffs-v1-refine` (`5bd770b`). Independent verification on a separate checkout:
+- B1 PASS after the review fix. Raw chicken/ground/liver/longganisa/fish past their FDA-chart fridge
+  limit -> Expired "Past safe fridge time - do not use", unavailable, not restored by Keep or
+  "Still good" (staples included); missing bought date -> unusable until a date is entered; frozen
+  lots, eggs, tofu, canned goods unchanged; safety lots excluded from every bulk set and from
+  multi-select delete (per-row Remove only, existing backup/tombstone path). Clock = purchaseDate,
+  never updatedAt. Cooked fridge meals capped at 4 days.
+- Review fix (Claude, small): the first build flagged shelf-stable and non-raw items — Curry Paste
+  (even with no date), instant/canned soups and Spam/luncheon meat on the counter, canned "Tuna" on
+  the counter, curry leaves. `pantryFridgeSafety()` now applies only to lots stored in the fridge
+  (explicit or inferred) whose food class is perishable, and the cooked-leftover rule skips
+  vegetable/fruit/dairy/pantry/grain categories. Regression test added.
+- B2 PASS. Cook Now "Bay Leaves" + planned Chicken Adobo -> one row (1.5 pcs, both sources), stable
+  across 3 regenerations; rice vinegar never absorbs Jasmine Rice; incompatible units stay separate
+  with an "Also on your list" note; planned rows no longer sum different units.
+- B3 PASS. Empty staple -> one "Out" row; second `checkAndReplenishLowStock()` false; Shop opened
+  twice -> 0 `saveData()` calls.
+- Note: `saveData()` now runs after `generateGroceryList()` in plan-edit handlers (so `plannedNeed`
+  persists); every call site still saves, and the `cloudReady` guard is untouched.
+Evidence: full local suite 905/905; `npm run test:ledger-contract` 13/13; `node --check app.js`;
+`git diff --check` clean; private probe `probe090.js`.
+Gate: **approved (held)** — touches safety logic and synced grocery rows (red zone, D-032), and the
+owner's merge/deploy hold for household acceptance applies.
+
+---
 ## Final verification round (owner request) — Claude, 2026-11-26 — 3 release blockers
 Build: `ffs-v1-refine` (offline preview). Probe: private `preview/verify-final.js`, results in
 `verify-final.json`. No code changed in this round.
