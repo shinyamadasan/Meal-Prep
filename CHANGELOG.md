@@ -1381,3 +1381,19 @@ tests: focused 7/7, full local 852/852, ledger contract 13/13. Syntax and diff c
 blockers: none.
 deviations: none.
 → status set to `review` in TASKS.md
+
+## TASK-086 — implemented (branch: task-086-ffs-estimated-dates)
+changed:
+  - `app.js` · `pantryLotAvailable()` filters on valid past printed dates after applying the
+    existing stock-level, staple, and quantity rules. Lots past an estimated date count as available.
+  - `tests/ffs-truthful-availability.spec.js` · synthetic frozen chicken, canned tuna, spinach
+    warnings and full-state equality, plus added printed-date cases.
+  - `tests/ffs-no-plan-grocery.spec.js` · frozen chicken counts toward the Shop protein target
+    and is omitted from Fill the gaps suggestions.
+  - `docs/ARCHITECTURE.md` · availability and estimated freshness rules.
+legacy expectation changes: none. The added February 31 case covers calendar validation because
+  JavaScript otherwise normalizes that impossible printed date to a day in March.
+tests: focused 22/22, full local 856/856 from both entry points, ledger contract 13/13.
+blockers: none.
+deviations: used the existing clean `qa080` checkout of the task branch.
+→ status set to `review` in TASKS.md

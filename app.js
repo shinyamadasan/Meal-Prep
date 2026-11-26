@@ -173,8 +173,10 @@ function pantryLotAvailable(p) {
   if (p.stockLevel === 'empty') return false;
   if (isStaple(p)) return true;
   if (Number.isFinite(p.quantity) && p.quantity <= 0) return false;
-  var daysLeft = pantryDaysLeft(p);
-  return daysLeft == null || daysLeft >= 0;
+  // Shelf-life estimates drive freshness warnings only.
+  if (p.dateMode !== 'expiry') return true;
+  var printedDay = /^\d{4}-\d{2}-\d{2}$/.test(p.expiryDate) ? stockCalendarDay(p.expiryDate) : null;
+  return printedDay == null || printedDay >= stockCalendarDay(todayISO());
 }
 
 // The calendar date pantryDaysLeft() is actually counting down to, and whether

@@ -1117,3 +1117,18 @@ self-review: SELF_REVIEW.md Code Health passes. The ship decision is yes for the
 QA: applicable AI checks pass. The disclosure and chip handlers resolve, the card render is
   read-only, and the one-tap grocery row survives reload through the existing save path.
 untested: real iOS Safari and Android Chrome devices, production, and live cloud/MCP/bridge services.
+
+## TASK-086 · 2026-11-26
+focused: `npx playwright test tests/ffs-truthful-availability.spec.js tests/ffs-no-plan-grocery.spec.js tests/ffs-stock-health.spec.js --project=local --workers=3`.
+  Base `3d0a5c2` with regression tests added gave 17 passed and 5 expected failures. Frozen
+  chicken was missing from the Cook ready tier and appeared as a Shop suggestion, Shop treated
+  canned tuna and spinach as unavailable, and the impossible printed date disqualified a lot.
+  After the fix, all 22 passed. The spinach case also verifies warnings on Home, in Fridge, and in
+  Stock Health and deep equality of `AppState` across the Home, Shop, and Fridge renders.
+full: `npx playwright test --project=local` and `npm test` each gave 856 passed, 0 failed.
+  Restored the regenerated `feature-evidence/task-079/home-1280.png` and `home-390.png`.
+ledger: `npm run test:ledger-contract` gave 13 passed, 0 failed.
+static: `node --check app.js`, syntax checks for both edited specs, and `git diff --check` passed.
+  Source comparison verified that `pantryLotAvailable()` was the only application-code change.
+self-review: Code Health and applicable AI QA checks passed for the scoped change.
+untested: production, real devices, and code coverage instrumentation.

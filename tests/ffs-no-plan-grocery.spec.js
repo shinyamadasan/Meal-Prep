@@ -86,6 +86,20 @@ test('Shop puts rule-filling options ahead of versatile ingredients in short rol
   expect(scores).toEqual([8, 0]);
 });
 
+test('Fill the gaps counts a frozen chicken thigh past its estimate and leaves it off the suggestions', async ({ page }) => {
+  const card = await shop(page, {
+    pantry: [
+      lot('Chicken Thigh', { category: 'Protein', storage: 'freezer', purchaseDate: '2026-10-16', shelfLifeDays: 2 }),
+      lot('Canned Black Beans', { category: 'Protein' })
+    ],
+    recipes: [recipe('thigh', 'Chicken Thigh', ['oven'])]
+  });
+  await card.locator('summary').click();
+  const proteins = role(card, 'Proteins');
+  await expect.soft(proteins).toContainText('Proteins 2/4');
+  await expect(proteins.getByRole('button', { name: 'Chicken Thigh', exact: true })).toHaveCount(0);
+});
+
 test('Shop classifies stock aliases, grocery forms and dairy by their food role', async ({ page }) => {
   const card = await shop(page, {
     pantry: [

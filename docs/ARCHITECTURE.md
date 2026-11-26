@@ -91,9 +91,11 @@ Dashboard and Cook tab match `AppState.pantry` against each recipe's `baseIngred
 `getCookableRecipes()`, `getExpirySuggestions()`, and `pantryMatchesForShop()` share
 `ingredientNamesMatch()` and `pantryLotAvailable()` (D-086). Matching uses normalized names,
 whole-word subsets with the same final word, or direct `INGREDIENT_DB` aliases. Empty lots are
-unavailable. Non-staples also require a positive or unknown quantity and a current or unknown
-expiry. `getExpirySuggestions()` limits its source lots to today through three days out.
-Fridge and Attention continue to show past-date items. The cooking write path uses its own
+unavailable. Non-empty staples count as available. For non-staples, a finite quantity of zero or
+less or a valid printed date (`dateMode: 'expiry'`) before today makes the lot unavailable.
+Estimated shelf-life windows continue to drive freshness warnings in Fridge, Home Attention,
+and Stock Health. Lots past those estimates still count as available. `getExpirySuggestions()`
+limits its source lots to today through three days out. The cooking write path uses its own
 `findPantryMatch()` rules under D-086.
 
 ## No-plan grocery

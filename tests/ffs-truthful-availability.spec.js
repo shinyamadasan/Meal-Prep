@@ -72,12 +72,75 @@ test('availability handles empty, depleted, expired, untracked and staple lots',
     [lot('Carrot', { stockLevel: 'empty' }), false],
     [lot('Carrot', yesterday), false],
     [lot('Carrot', { ...today, quantity: null }), true],
+    [lot('Carrot', inThreeDays), true],
+    [lot('Carrot', printedDate('')), true],
+    [lot('Carrot', printedDate('2026-02-31')), true],
     [lot('Carrot', { quantity: null }), true],
     [lot('Soy Sauce', { ...yesterday, quantity: 0, staple: true, stockLevel: 'low' }), true],
     [lot('Soy Sauce', { staple: true, stockLevel: 'empty' }), false]
   ];
   const available = await page.evaluate(lots => lots.map(pantryLotAvailable), cases.map(([p]) => p));
   expect(available).toEqual(cases.map(([, expected]) => expected));
+});
+
+test('Home and Cook put a recipe using a 40-day-old frozen chicken thigh in the ready tier', async ({ page }) => {
+  const pantry = [
+    lot('Chicken Thigh', { category: 'Protein', storage: 'freezer', purchaseDate: '2026-10-16', shelfLifeDays: 2 }),
+    lot('Carrot')
+  ];
+  const recipes = [recipe('chicken', 'Chicken thigh and carrot', ['Chicken Thigh', 'Carrot'])];
+  await page.evaluate(state => {
+    Object.assign(AppState, state);
+    showTab('dashboard');
+    renderCookSuggestions();
+  }, { pantry, recipes });
+
+  await expect(page.locator('.dash-cook-tier--ready .dash-cook-name')).toHaveText('Chicken thigh and carrot');
+  await expect(page.locator('.cs-tier--ready .cs-name')).toHaveText('Chicken thigh and carrot');
+});
+
+test('Shop counts 30-day-old canned tuna as in stock', async ({ page }) => {
+  const pantry = [
+    lot('Canned tuna', { category: 'Protein', storage: 'counter', purchaseDate: '2026-10-26' })
+  ];
+  const groceryList = [{ id: 1, name: 'Canned tuna', category: 'Protein', checked: false }];
+  await page.evaluate(state => Object.assign(AppState, state), { pantry, groceryList });
+  await page.locator('.tab-btn[data-tab="grocery"]').click();
+
+  const tuna = page.locator('#grocery-list .grocery-item').filter({ hasText: 'Canned tuna' });
+  await expect(tuna).toHaveAttribute('aria-pressed', 'true');
+  await expect(tuna.locator('.pantry-badge')).toBeVisible();
+});
+
+test('Spinach past its estimate stays in stock and keeps its safety warnings on read-only renders', async ({ page }) => {
+  const pantry = [
+    lot('Spinach', { storage: 'fridge', purchaseDate: '2026-11-15', shelfLifeDays: 5 })
+  ];
+  const groceryList = [{ id: 1, name: 'Spinach', category: 'Vegetable', checked: false }];
+  const before = await page.evaluate(state => {
+    Object.assign(AppState, state);
+    const snapshot = structuredClone(AppState);
+    showTab('dashboard');
+    return snapshot;
+  }, { pantry, groceryList });
+  await page.locator('#dash-attention .dash-attn-review-btn').click();
+  const attention = page.locator('#dash-attention .dash-attn-row--expired').filter({ hasText: 'Spinach' });
+  await expect(attention).toContainText('Expired 5d ago');
+
+  await page.locator('.tab-btn[data-tab="grocery"]').click();
+  const spinach = page.locator('#grocery-list .grocery-item').filter({ hasText: 'Spinach' });
+  await expect.soft(spinach).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('.tab-btn[data-tab="fridge"]').click();
+  const fridgeRow = page.locator('#pantry-list .pi-row').filter({ hasText: 'Spinach' });
+  await expect(fridgeRow.locator('.pantry-fresh-badge')).toHaveText('Expired 5d ago');
+  await expect(fridgeRow.locator('.pi-date')).toHaveAttribute('title', /^Estimated: bought .* \+ 5-day shelf life$/);
+  const health = page.locator('#stock-health');
+  await health.locator('summary').click();
+  await expect(health.getByText('1 safety estimate', { exact: true })).toBeVisible();
+  await expect(health.locator('.stock-health-group li').filter({ has: page.getByText('Spinach', { exact: true }) }))
+    .toContainText('Past typical safe window');
+  expect(await page.evaluate(() => structuredClone(AppState))).toEqual(before);
 });
 
 test('Shop auto-ticks available matching lots and honors manual check states', async ({ page }) => {
