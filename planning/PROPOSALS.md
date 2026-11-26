@@ -561,7 +561,7 @@
 - **status:** pending (owner review)
 
 ### PROP-041 — Conversational household operations: Meal Prep MCP audit and gap proposal
-- **▶ Decision: Clarify — audit done; owner picks which gaps to close, after the FFS-V1 release.**
+- **▶ Decision: Approve (direction, 2026-11-26) — phased plan in `planning/PROP-041-PLAN.md`; implementation awaits owner approval.**
 - **▶ Risk: High** — any new tool writes Firestore through the bridge (D-032 red zone: sync, tombstones,
   auth). Not part of the current release; read-only audit only.
 - **type:** feature · **source captures:** owner request 2026-11-26 ("AI-assisted household management")
@@ -574,7 +574,7 @@
 - **confidence:** high (code read) · **ambiguity:** which operations matter most day to day
 - **why now vs later:** later — the release and its deployment hold come first
 - **AI-recommended priority:** **P1** after release
-- **status:** pending (owner review)
+- **status:** approved (direction only) — separate track, does not block FFS-V1
 
 **Current tools.** Read: `get_inventory`, `get_ready_food`. Write: `record_ready_food`,
 `consume_ready_food`, `mark_out_of_stock`, `mark_in_stock`, `set_inventory_quantity`,

@@ -26,6 +26,11 @@
 - build: TASK-082. Preserve Kylie's framework; count what we have; flexible choices; no plan required; no unnecessary purchases; versatility-first ranking. Owner deploy hold.
 - detail: TASKS.md TASK-082
 
+### BQ-032 — PROP-041 Conversational food management (separate track, after FFS-V1)
+- source: PROP-041 · priority: P1 (Phase 1 safety first) · approved: 2026-11-26 (owner, chat — direction; plan approval pending)
+- build: HELD. Not converted to TASKS until the owner approves `planning/PROP-041-PLAN.md` and its 5 decisions. Phase 1 (safety visibility, duplicate-write protection, safe merges, undo) ships before Phases 2-3. High risk, solo, `approved` gate. Never blocks the FFS-V1 release.
+- detail: planning/PROP-041-PLAN.md
+
 ### BQ-030 — FFS-3 Balanced Plate hints + Snack Pack (wave 2, prepared)
 - source: PROP-038 · priority: P2 · approved: 2026-11-25 (owner: "Prepare PROP-038 as the next wave")
 - build: TASK-083 drafted at `status: todo`; Claude releases it to Codex after the owner reviews wave 1.

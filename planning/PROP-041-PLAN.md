@@ -1,0 +1,59 @@
+# PROP-041 — Conversational Food Management: smallest implementation plan
+
+Status: **plan awaiting owner approval** · track: separate from the FFS-V1 release (does not block it)
+Owner direction approved 2026-11-26 (chat). Nothing here is built or deployed without approval.
+Source audit: `planning/PROPOSALS.md` PROP-041.
+
+## Principles (binding for every task)
+- **Reuse, don't re-derive.** The bridge must give the same safety and matching answers as the app.
+  Pure logic moves to `shared/` as classic scripts on `globalThis` (the `shared/readyFoodContract.js`
+  pattern already loaded by both the app and the Worker). No framework, no build step, no new service.
+- **Keep every existing guard.** `expectedRevision` + Firestore `updateTime` precondition, one guarded
+  write per request, explicit tombstones, ids only from reads (no fuzzy ids), `ambiguous` refusal,
+  single-owner OAuth until Phase 3 changes it deliberately.
+- **Chat recommends only food the app calls usable.** Unknown safety information = not usable.
+- **Routine explicit requests: one call. Ambiguous: clarify. Bulk destructive: preview + confirm +
+  recoverable.**
+- All tasks are High risk (D-032 red zone): solo build, independent review, `approved` (held) merge,
+  Worker deploy only on owner approval. The app side (`shared/` extraction) ships only after V1.
+
+## Phase 1 — Safety and reliability (safety-critical; do first, ship together)
+
+| Task | What | Why it is safety-critical |
+| --- | --- | --- |
+| P1-1 Shared safety core | Move `INGREDIENT_DB` data and the pure safety functions (`FRIDGE_SAFETY_LIMITS`, `pantryFridgeSafety`, `pantryDateSignal`, `pantryLotAvailable`, `cookedShelfLife`, `cookedDateSignal`, `stockFoodClass` and their inputs) into `shared/` unchanged. App loads them by `<script>`; Worker imports them. Functions take `today` as an argument. Parity test: same cases, same verdicts, browser and Node. | One source of truth for "safe to eat"; no second rule set to drift. |
+| P1-2 Truthful reads | `get_inventory` / `get_ready_food` add `purchaseDate`, `expiryDate`, `printedDateKind`, `category`, `storage`, and `safety: {status, reason, label, daysLeft, usable}` from P1-1. Household calendar day from a configured household time zone (owner decision). Descriptions: "never suggest `usable:false`; unknown = not usable". Fix the `record_ready_food` freshness wording (audit C3). | Closes audit C1: chat can no longer call unsafe or unknown food available. |
+| P1-3 No duplicate writes | Every write tool takes a required `requestId`. One atomic Firestore `commit`: the guarded user-document update plus a create-only `users/{uid}/mcpRequests/{requestId}` record (precondition: must not exist). A replay returns the stored result and changes nothing. The record holds actor, tool, revision before/after, and a snapshot of any record removed. A subcollection, because the app saves the user document with a full overwrite. | Retries after timeouts can no longer double-add or double-consume. |
+| P1-4 Safe merges | `add_stock` uses P1-1: refuse merging into a lot that is not `usable` or is unknown, and refuse merging raw fridge protein bought on a different day ("record as a new lot"). Remove the bridge's own category-default freshness check. | Closes audit C2: new food never inherits an older or unsafe lot's clock. |
+| P1-5 Recovery | `undo_request(requestId)`: restores the snapshot from P1-3 under a revision check, refusing if the affected records changed since; clears their tombstones the same way the app's restore does (D-083). | Chat removals become recoverable, like app removals. |
+
+Exit gate: worker suites, ledger contract, full app suite, parity test, and a live read-only check
+in ChatGPT. Phase 1 changes no user-visible app behaviour.
+
+## Phase 2 — Everyday inventory (convenience; built on Phase 1 guards)
+
+| Task | What | Safety notes |
+| --- | --- | --- |
+| P2-1 Register items | `add_pantry_item`: name, quantity, unit, storage, bought date (default: household today), staple flag and level, printed date and kind. Covers prepared ingredients (e.g. *Frozen Minced Garlic*, storage freezer). If an active same-name lot with the same date and storage exists, return `ambiguous` with both choices. | Create-only; idempotent via P1-3. |
+| P2-2 Edit items | `update_pantry_item`: storage, bought date, printed date and kind. Moving raw protein freezer→fridge returns the thaw reminder; an explicit `thawedToday` sets the bought date. | Safety verdict recomputed in the result. |
+| P2-3 Staple levels | `set_stock_level`: full / ok / low / empty. Existing `mark_in_stock` / `mark_out_of_stock` stay as compatible aliases. | Low/Empty reach Shop via the app's TASK-090 sync. |
+| P2-4 Conversions without double-counting | `convert_stock`: consume raw lot(s) and create the prepared lot in one write. `record_ready_food` gains an optional explicit `consume` list (ids + amounts) applied in the same write. | One write = no window where both raw and prepared are counted. |
+| P2-5 Ready food | Move a leftover between fridge and freezer (existing `consume_ready_food` unchanged). | Fridge clock follows the app's rules. |
+| P2-6 Multi-operation requests | `apply_changes`: up to 10 operations from P2-1..5 and the existing deltas, one `requestId`, one `expectedRevision`, all-or-nothing. Any removal of more than one record requires `dryRun` first, then a confirmation token matching that preview. | Bulk destructive changes: preview, confirmation, snapshot (P1-5 undo). |
+
+## Phase 3 — Food assistance (convenience; reuses app logic)
+
+| Task | What |
+| --- | --- |
+| P3-1 Shared matching | Move ingredient matching, Cook-now tiers, effort/quick filters, Balanced Plate, Fill the gaps and Shop consolidation (TASK-090 B2) into `shared/`, with parity tests. |
+| P3-2 Recommendations | `get_cook_options(mode: instant / quick / meal-prep)` and `get_fill_the_gaps`: the app's own answers, using usable food only. No separate engine. |
+| P3-3 Shop list | `get_shopping_list`, `add_shopping_items`, `check_off_items` (adds to the Fridge the way the app does), `remove_shopping_item`; app consolidation rules. |
+| P3-4 Cook a recipe | `record_cooked_recipe(recipeId, multiplier, portions)`: deducts like the app's **Cooked** button, in one write. |
+| P3-5 Two household members | Allow-list of two OAuth subjects mapped to the one household document; per-person tokens and revocation; actor recorded per request (P1-3). |
+
+## Owner decisions before Phase 1 starts
+1. Household time zone for "today" (e.g. Asia/Manila).
+2. How long request records are kept (proposal: 30 days), and whether undo is allowed for that whole window.
+3. Phase 2: may chat create new records, or only edit existing ones?
+4. What counts as "bulk" (proposal: more than one removal in one request).
+5. Phase 3: does the second household member get their own sign-in now, or does the owner connection stay shared until P3-5?
