@@ -5856,6 +5856,7 @@ select.form-control {
   color: var(--fresh-color, var(--color-text-secondary));
 }
 .pantry-fresh-badge.fresh-check { white-space: normal; }
+.pantry-fresh-badge.fresh-safety { white-space: normal; max-width: 12rem; }
 
 /* Staple Low/OK/Full level selector (pantry table) */
 .pt-level { font-weight: 600; }
@@ -6112,6 +6113,8 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .grocery-item-name { font-size: 0.875rem; margin-bottom: 0; flex: 1; }
   .ingredient-price { flex-shrink: 0; font-size: 0.8rem; }
   .grocery-item-source { display: none; }
+  .grocery-item-info--details { flex-wrap: wrap; }
+  .grocery-item-source--detail, .grocery-item-source--conflict { display: block; flex-basis: 100%; order: 1; }
 }
 
 /* Grocery print: a print-only area that replaces the page when printing.
@@ -6554,6 +6557,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   color: #b91c1c;
   background: rgba(220, 38, 38, 0.12);
 }
+.dash-expiry-tag--safety { white-space: normal; flex-shrink: 1; }
 .dash-expiry-tag--check {
   color: var(--color-warning);
   background: var(--color-warning-light);
@@ -6594,6 +6598,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   .dash-attn-row--check .dash-attn-name { grid-column: 1 / -1; white-space: normal; }
   .dash-attn-row--check .dash-expiry-tag { justify-self: start; }
   .pantry-fresh-badge.fresh-check { max-width: 9rem; }
+  .pantry-fresh-badge.fresh-safety { max-width: 9rem; }
   .pi-row:has(.fresh-check) .pi-name { white-space: normal; overflow-wrap: anywhere; }
   .dash-keep-btn, .dash-remove-btn { min-height: 34px; padding: 0.35rem 0.7rem; }
 }

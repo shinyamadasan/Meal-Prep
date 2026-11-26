@@ -575,7 +575,7 @@ test('pantry and cooked food are grouped into a single notification', async ({ p
   expect(ledger).toEqual({ 'pantry:1': 'expired', 'cooked:c1': 'expired' });
 });
 
-test('a cooked meal with no shelf life is never announced', async ({ page }) => {
+test('a fridge meal with no shelf life uses the four-day default for alerts', async ({ page }) => {
   await loadLocalApp(page, { initialPermission: 'granted', alertPrefs: { enabled: true, announced: {} } });
 
   const notes = await runAttentionPass(page, (daysAgo) => {
@@ -584,7 +584,8 @@ test('a cooked meal with no shelf life is never announced', async ({ page }) => 
       { id: 'c9', name: 'Mystery Leftovers', cookedDate: daysAgo(30), storage: 'fridge', fridgeLife: null, freezerLife: null }
     ];
   });
-  expect(notes).toHaveLength(0);
+  expect(notes).toHaveLength(1);
+  expect(notes[0].title).toBe('Mystery Leftovers expired');
 });
 
 // ── 10. Open / resume triggers and the route back to Needs Attention ────────
