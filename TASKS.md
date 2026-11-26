@@ -6571,7 +6571,7 @@ verification:
   - Screenshots desktop + 390px into feature-evidence/task-089/.
 
 ### TASK-083 · FFS-3 Balanced Plate — lightweight, optional suggestions (owner-approved lite)
-status: approved
+status: codex
 owner: codex
 risk: Medium (render-only logic; no persisted state). Merge gate: `approved` (owner deploy hold).
 source: BQ-030 · PROP-038 · owner approval 2026-11-26 "Approve a lightweight version of TASK-083…

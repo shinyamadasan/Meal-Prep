@@ -4,6 +4,32 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-083 (lite) — REWORK after integrated preview walkthrough — Claude, 2026-11-26
+The unit-level approval above stands for structure and safety (render-only, optional, no score),
+but the preview household (40 built-in + 20 cookbook recipes, 42 lots) shows the suggestions are
+not yet useful. Status back to `codex`.
+must-fix:
+1. **Aromatics are offered as "a veg".** Sinangag / Chicken Adobo / Arroz Caldo get "Optional: add
+   a veg — Garlic or Onion" while Broccoli, Spinach, Carrot, Red Bell Pepper, Zucchini and Frozen
+   Mixed Vegetables are in stock. Exclude flavor-base produce from veg fillers with one const:
+   garlic, onion (incl. red/white/spring), shallot, ginger, scallion / green onion, leek, chili /
+   jalapeño / siling, lemongrass, fresh herbs (cilantro, parsley, basil, dill, mint, chives),
+   lemon, lime, calamansi.
+2. **Wrong carb ranking.** Pork Sinigang / Chicken Tinola get "add a carb — Flour Tortillas or
+   Pasta" with Jasmine Rice in stock. `ingredientVersatility` deliberately ignores generic recipe
+   lines ("Rice") for a named variety ("Jasmine Rice"), so the most-used starch ranks last. For
+   plate fillers rank by how many recipes have an ingredient line that `ingredientNamesMatch`es
+   the lot in EITHER direction (generic lines count), then by `ingredientVersatility`, then name.
+   Do not change `ingredientVersatility` itself (Fill the gaps depends on it).
+3. **Hard to see.** In the recipe details view the line sits inside the balance group near the
+   bottom of a long form. Also render it directly under the recipe name at the top of the details
+   view (one line, muted, same text); keep it out of edit mode.
+tests (synthetic): (a) stock Garlic, Onion, Broccoli → veg filler is Broccoli, never Garlic/Onion;
+(b) stock Jasmine Rice, Flour Tortillas, Pasta with 3 recipes using "Rice" and 1 using "Pasta" →
+carb filler starts with Jasmine Rice; (c) details view shows the line near the name; edit mode
+does not. Full suite + ledger contract + node --check + git diff --check.
+
+---
 ## Review TASK-083 (lite) — APPROVED (held) — Claude independent review + QA, 2026-11-26
 candidates: `10c6cfa` (first Codex run; ended on API error before handoff, committed unchanged by
 Claude) + `a7b8623` (Codex finish: reviewer fix + evidence). Base `5c3e6bf`.
