@@ -1938,6 +1938,61 @@ function mealBalanceParts(recipe) {
   return parts;
 }
 
+function canSuggestBalancedPlate(recipe) {
+  return recipe && recipe.category !== 'Sauce & Side' && recipe.category !== 'Snack';
+}
+
+function balancedPlateAdditions(recipe, state) {
+  if (!canSuggestBalancedPlate(recipe)) return [];
+  const balance = normalizeMealBalance(recipe.mealBalance);
+  // Older recipes and recipes with no boxes checked normalize to all false.
+  if (!Object.values(balance).some(Boolean)) return [];
+  const roles = { vegetables: ['veggies', 'fruits'], protein: ['proteins'], carb: ['starches'] };
+  const parts = Object.keys(roles).filter(part => !balance[part]);
+  if (!parts.length) return [];
+
+  const recipes = state.recipes || [];
+  // Staples normally bypass the quantity and printed expiry checks for suggestions.
+  const pantry = (state.pantry || []).filter(p => p?.name && pantryLotAvailable(p) &&
+    !(Number.isFinite(p.quantity) && p.quantity <= 0) && !lotNeedsCheck(p) &&
+    (p.dateMode !== 'expiry' || pantryDateSignal(p).kind !== 'expired'));
+  const optionLimit = 2;
+
+  return parts.map(part => {
+    const candidates = pantry.filter(p => roles[part].includes(noPlanRole(p.name)))
+      .map(p => ({ name: p.name, score: ingredientVersatility(p.name, recipes) }))
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    const options = [];
+    for (const { name } of candidates) {
+      if (!options.some(option => ingredientNamesMatch(option, name))) options.push(name);
+      if (options.length === optionLimit) break;
+    }
+
+    // Quick book recipes can fill the remaining slots if the stock can support them.
+    for (const side of recipes) {
+      if (options.length === optionLimit) break;
+      if (!side.name || !normalizeMealBalance(side.mealBalance)[part]) continue;
+      const effort = normalizeEffort(side.effort);
+      if (effort !== 'assembly' && effort !== 'very-low' && !recipeHasEquipment(side, ['no-cook'])) continue;
+      if (options.some(option => ingredientNamesMatch(option, side.name))) continue;
+
+      const ingredients = side.baseIngredients || side.ingredients || [];
+      const available = ingredients.every(ingredient => ingredientLineRole(ingredient) !== 'required' ||
+        ingredientAlternatives(ingredient.name).some(name => WATER_INGREDIENT_LINE.test(name) ||
+          pantry.some(p => ingredientNamesMatch(name, p.name))));
+      if (available) options.push(side.name);
+    }
+    return { part, options };
+  }).filter(addition => addition.options.length);
+}
+
+function balancedPlateHint(recipe, state) {
+  const [addition] = balancedPlateAdditions(recipe, state);
+  if (!addition) return '';
+  const labels = { vegetables: 'a veg', protein: 'a protein', carb: 'a carb' };
+  return 'Optional: add ' + labels[addition.part] + ' — ' + addition.options.join(' or ');
+}
+
 // ── Variety, from the cook history we already keep ───────────────────────────
 
 // Days since this recipe was last cooked, or null if it never has been.
@@ -4475,7 +4530,7 @@ function openRecipeModal(recipeId, mode) {
   document.getElementById('nutrition-fat').value      = np.fat      || '';
   document.getElementById('storage-notes').value = recipe.storageNotes;
   document.getElementById('instructions').value = recipe.instructions;
-  renderRecipeMetaFields(recipe);
+  renderRecipeMetaFields(recipe, mode);
   
   // Handle existing photo
   if (recipe.photo) {
@@ -4913,7 +4968,7 @@ function metaCheckboxes(containerId, options, selected, iconed) {
   }).join('');
 }
 
-function renderRecipeMetaFields(recipe) {
+function renderRecipeMetaFields(recipe, mode) {
   var r = recipe || {};
   var equipEl = document.getElementById('recipe-equipment-chips');
   if (equipEl) equipEl.innerHTML = metaCheckboxes('recipe-equipment-chips', RECIPE_EQUIPMENT, r.equipment, true);
@@ -4943,6 +4998,13 @@ function renderRecipeMetaFields(recipe) {
       el.checked = pair[1];
       if (el.parentNode) el.parentNode.classList.toggle('is-on', pair[1]);
     });
+
+  var balanceGroup = document.getElementById('balance-protein')?.closest('.form-group');
+  balanceGroup?.querySelector('.balanced-plate-hint')?.remove();
+  var hint = mode === 'details' ? balancedPlateHint(recipe, AppState) : '';
+  if (hint && balanceGroup) {
+    balanceGroup.insertAdjacentHTML('beforeend', '<div class="balanced-plate-hint">' + escapeHtml(hint) + '</div>');
+  }
 }
 
 function readCheckedValues(containerId) {
@@ -5727,9 +5789,8 @@ function renderReadyFoodCard() {
     return '<div class="dash-ready-row">' +
       '<button class="dash-ready-item" onclick="goToFreshnessTab()">' +
         '<span class="dash-ready-name">' + icon('utensils') + ' ' + escapeHtml(m.name) + '</span>' +
-        '<span class="dash-ready-meta">' + escapeHtml(readyFoodMetaLine(m)) +
-          (hint ? ' · <span class="dash-ready-hint">' + escapeHtml(hint) + '</span>' : '') +
-        '</span>' +
+        '<span class="dash-ready-meta">' + escapeHtml(readyFoodMetaLine(m)) + '</span>' +
+        (hint ? '<span class="dash-ready-hint balanced-plate-hint">' + escapeHtml(hint) + '</span>' : '') +
       '</button>' + action +
       '</div>';
   }).join('');
@@ -14388,15 +14449,16 @@ function getReadyFoodSuggestions(limit) {
   return limit ? meals.slice(0, limit) : meals;
 }
 
-// Reuses the recipe's existing mealBalance (D-055) when the batch came from one.
-// Purely a nudge — no composition logic, no new model. Returns '' when the
-// recipe has no balance data or the batch was added manually.
+// Use the same optional additions as the recipe details, with the existing
+// generic side hint as a fallback for a protein batch.
 function readyFoodBalanceHint(meal) {
   if (!meal || meal.recipeId == null) return '';
   var recipe = (AppState.recipes || []).find(function(r) {
     return String(r.id) === String(meal.recipeId);
   });
-  if (!recipe) return '';
+  if (!canSuggestBalancedPlate(recipe)) return '';
+  var hint = balancedPlateHint(recipe, AppState);
+  if (hint) return hint;
   var mb = normalizeMealBalance(recipe.mealBalance);
   if (!mb.protein) return ''; // only worth suggesting sides for a protein batch
   var missing = [];
