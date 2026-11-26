@@ -6614,6 +6614,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
 .dash-cook-item:hover .dash-cook-name { color: var(--color-primary); }
 .dash-cook-name { font-size: 0.88rem; font-weight: 500; color: var(--color-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cook-meta { font-size: 0.7rem; color: var(--color-text-secondary); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.dash-cook-note { white-space: normal; overflow-wrap: anywhere; }
 .dash-cook-full { font-size: 0.7rem; color: var(--color-primary); font-weight: 650; white-space: nowrap; flex-shrink: 0; }
 .dash-cook-tier { margin-top: 0.5rem; }
 .dash-cook-tier:first-child { margin-top: 0; }
@@ -6724,6 +6725,7 @@ button.pt-level.pt-level--low { color: var(--color-error); border-color: var(--c
   background: rgba(var(--color-teal-500-rgb, 45, 157, 120), 0.12);
   color: var(--color-primary);
 }
+.cs-badge--swap { color: var(--color-text); }
 .cs-badge--one {
   background: rgba(180, 83, 9, 0.1);
   color: #b45309;

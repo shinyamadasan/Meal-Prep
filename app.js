@@ -4831,13 +4831,14 @@ function renderCookSuggestions() {
   if (cookable.length === 0) { el.innerHTML = ''; return; }
 
   var csTiers = [
-    { key: 0, label: 'Can cook now', tierCls: 'cs-tier--ready', badgeCls: 'cs-badge--full', badgeText: 'All ingredients ✓' },
-    { key: 1, label: 'Missing 1 ingredient', tierCls: 'cs-tier--one', badgeCls: 'cs-badge--one', badgeText: 'Missing 1' },
-    { key: 2, label: 'Missing 2 ingredients', tierCls: 'cs-tier--two', badgeCls: 'cs-badge--two', badgeText: 'Missing 2' }
+    { key: 'ready', missing: 0, label: 'Can cook now', tierCls: 'cs-tier--ready', badgeCls: 'cs-badge--full', badgeText: 'All ingredients ✓' },
+    { key: 'swap', missing: 0, label: 'Cook with a swap', tierCls: 'cs-tier--swap', badgeCls: 'cs-badge--swap', badgeText: 'Swap' },
+    { key: 'buy', missing: 1, label: 'Missing 1 ingredient', tierCls: 'cs-tier--one', badgeCls: 'cs-badge--one', badgeText: 'Missing 1' },
+    { key: 'buy', missing: 2, label: 'Missing 2 ingredients', tierCls: 'cs-tier--two', badgeCls: 'cs-badge--two', badgeText: 'Missing 2' }
   ];
 
   var sections = csTiers.map(function(tier) {
-    var items = cookable.filter(function(s) { return s.missing === tier.key; }).slice(0, 4);
+    var items = cookable.filter(function(s) { return s.tier === tier.key && s.missing === tier.missing; }).slice(0, 4);
     if (!items.length) return '';
     var cards = items.map(function(s) {
       return '<button class="cs-card" onclick="document.getElementById(\'recipe-search\').value=\'' +
@@ -5434,8 +5435,7 @@ function eatCookCandidates() {
   if (!recipes.length) return [];
 
   var cookable = getCookableRecipes();
-  var missingById = {};
-  cookable.forEach(function(c) { missingById[String(c.recipe.id)] = c.missing; });
+  var availabilityById = new Map(cookable.map(function(c) { return [String(c.recipe.id), c]; }));
 
   // Which recipes use something that needs using up. Same scan the dashboard's
   // "Use before they expire" block runs — one expiry rule, not two.
@@ -5453,7 +5453,7 @@ function eatCookCandidates() {
 
   return pool.map(function(r) {
     var id = String(r.id);
-    var missing = pantryInformed ? (missingById[id] || 0) : 0;
+    var availability = availabilityById.get(id);
     // Weights follow the priority order this wave was briefed with: expiry
     // pressure first, then balance, effort, hands-on time, cleanup, appliance,
     // and variety last as a tie-breaker. Each is small enough that no single
@@ -5471,7 +5471,9 @@ function eatCookCandidates() {
     Object.keys(parts).forEach(function(k) { score += parts[k]; });
     return {
       recipe: r,
-      missing: missing,
+      missing: availability?.missing ?? 0,
+      tier: availability?.tier,
+      swaps: availability?.swaps ?? [],
       pantryInformed: pantryInformed,
       expiringIngredient: expiringBy[id] || '',
       parts: parts,
@@ -5557,6 +5559,9 @@ function buildRecipeEatPick(key, cand) {
 
   // Most-specific reason first — the card shows at most four.
   if (cand.expiringIngredient) reasons.push('Uses ' + cand.expiringIngredient);
+  if (cand.tier === 'swap') {
+    reasons.push('Swap: use ' + cand.swaps.map(function(swap) { return swap.use; }).join(', '));
+  }
   if (key === 'different') {
     var days = daysSinceCooked(r.id);
     reasons.push(days == null ? "Haven't cooked this yet" : 'Not for ' + days + ' days');
@@ -5568,7 +5573,7 @@ function buildRecipeEatPick(key, cand) {
   var mb = normalizeMealBalance(r.mealBalance);
   if (mb.protein && mb.vegetables && mb.carb) reasons.push('Balanced');
   if (recipeHasTag(r, 'minimal-cleanup')) reasons.push('Minimal cleanup');
-  if (cand.pantryInformed && cand.missing === 0) reasons.push('Have everything');
+  if (cand.tier === 'ready') reasons.push('Have everything');
   else if (cand.missing > 0) reasons.push('Missing ' + cand.missing);
   if (recipeHasTag(r, 'batch-friendly')) reasons.push('Batch-friendly');
 
@@ -6652,7 +6657,7 @@ function renderDashboard() {
           '<button class="dash-cook-item" onclick="openRecipeFromHome(\'' + escJAttr(sid) + '\')">' +
             '<span class="dash-cook-name">' + escapeHtml(s.recipe.name) + '</span>' + meta +
           '</button>' +
-          (note ? '<div class="dash-cook-meta" style="white-space: normal; overflow-wrap: anywhere">' + escapeHtml(note) + '</div>' : '') +
+          (note ? '<div class="dash-cook-meta dash-cook-note">' + escapeHtml(note) + '</div>' : '') +
           buyBtn + '</div>';
       }).join('');
       return '<div class="dash-cook-tier ' + tier.cls + '">' +
@@ -7999,6 +8004,7 @@ function normalizeIngredientName(name) {
 
 const SERVING_INGREDIENT_NOTE = /\b(?:for (?:serving|garnish|drizzling|squeezing|coating|dipping)|to serve)\b/i;
 const WATER_INGREDIENT_LINE = /^\s*(?:(?:hot|cold|ice)\s+)?water(?:\s*,\s*plus more\b.*)?\s*$/i;
+const QUANTITY_INGREDIENT_NOTE = /(?:\s*,\s*|\s+)or\s+(?:more(?:\s+(?:to taste|if needed))?|as needed|to taste)\s*$|,\s*plus\s+more\b.*$/i;
 
 function ingredientLineRole(ing) {
   var name = ing.name || '';
@@ -8021,13 +8027,14 @@ function ingredientNameSegments(name) {
 }
 
 function ingredientAlternatives(name) {
-  var segments = ingredientNameSegments(name);
+  var cleanName = name && name.replace(QUANTITY_INGREDIENT_NOTE, '');
+  var segments = ingredientNameSegments(cleanName);
   // A comma list ends at the segment containing "or". Prep wording after a
   // comma, such as "chopped or torn", does not start an ingredient list.
   var prepNote = /^(?:(?:finely|roughly|thinly|coarsely|freshly)\s+)*(?:chopped|torn|sliced|diced|minced|grated|peeled|crushed|drained|rinsed|divided|cooked|optional|plus|for|to serve)\b/i;
   var lastChoice = segments.findIndex(function(segment) { return /\bor\s+/i.test(segment); });
   if (lastChoice < 0 || segments.slice(1, lastChoice + 1).some(function(segment) { return prepNote.test(segment); })) {
-    return [name];
+    return [cleanName === name ? name : normalizeIngredientName(segments[0])];
   }
 
   var candidates = segments.slice(0, lastChoice + 1).join(', ').toLowerCase()
@@ -8049,7 +8056,8 @@ function ingredientAlternatives(name) {
 // These modifiers can turn a shared head noun into a different ingredient.
 const INGREDIENT_IDENTITY_MODIFIERS = new Set([
   'evaporated', 'condensed', 'coconut', 'almond', 'oat', 'soy', 'powdered',
-  'cream', 'peanut', 'sour', 'sweetened'
+  'cream', 'peanut', 'sour', 'sweetened', 'glutinous', 'malagkit', 'sticky',
+  'sushi', 'sesame', 'toasted'
 ]);
 
 function hasIngredientIdentityModifier(words, sharedWords = []) {
@@ -8099,13 +8107,27 @@ function ingredientNamesMatch(a, b) {
           INGREDIENT_AVAILABILITY_ALIASES.get(bName)?.has(aName)) === true;
 }
 
+const NO_SWAP_INGREDIENT_HEADS = new Set([
+  'powder', 'sauce', 'paste', 'seasoning', 'flake', 'seed', 'extract',
+  'vinegar', 'spice', 'salt', 'sugar', 'dressing'
+]);
+
 function ingredientSwapMatch(recipeName, lotName) {
   var recipeWords = ingredientMatchWords(recipeName);
   var lotWords = ingredientMatchWords(lotName);
-  return recipeWords.length > 1 && lotWords.length > 1 &&
-    recipeWords[recipeWords.length - 1] === lotWords[lotWords.length - 1] &&
-    !hasIngredientIdentityModifier(recipeWords) && !hasIngredientIdentityModifier(lotWords) &&
-    !ingredientNamesMatch(recipeName, lotName);
+  var head = recipeWords[recipeWords.length - 1];
+  if (recipeWords.length < 2 || lotWords.length < 2 || head !== lotWords[lotWords.length - 1]) return false;
+  if (hasIngredientIdentityModifier(recipeWords) || hasIngredientIdentityModifier(lotWords)) return false;
+  if (NO_SWAP_INGREDIENT_HEADS.has(head) ||
+      (head === 'pepper' && !(recipeWords.includes('bell') && lotWords.includes('bell')))) return false;
+
+  // Stock Health treats oils as condiments. Canola and olive oil can still substitute for one another.
+  var cookingOilPair = head === 'oil' && [recipeWords, lotWords].every(function(words) {
+    return ['canola oil', 'olive oil'].includes(words.join(' '));
+  });
+  if (!cookingOilPair && (stockFoodClass({ name: recipeName }) === 'condiment' ||
+      stockFoodClass({ name: lotName }) === 'condiment')) return false;
+  return !ingredientNamesMatch(recipeName, lotName);
 }
 
 function findIngredientNutrition(name) {

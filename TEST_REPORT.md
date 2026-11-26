@@ -1146,3 +1146,20 @@ visual: `feature-evidence/task-087/cook-now-1280.png` and `cook-now-390.png` sho
   Home tiers with synthetic data. Both viewports passed overflow and deep state equality checks.
 self-review: Code Health and applicable AI QA checks passed for the scoped change.
 untested: production, real devices, and code coverage instrumentation.
+
+## TASK-087 rework · 2026-11-26
+focused: `tests/ffs-cook-now-matching.spec.js` gave 4 passes and 8 expected failures on
+  `18642b7`. All 12 passed with the fix, alongside all 9 TASK-080 availability cases.
+  Focused runs used a temporary local port because the default was occupied.
+full: `npx playwright test --project=local` and `npm test` each gave 868 passed, 0 failed.
+  The initial full run exposed a legacy Cook Now mock with no tier. The existing test
+  passed after the fixture supplied the current `tier: 'ready'` field.
+ledger: `npm run test:ledger-contract` gave 13 passed, 0 failed.
+static: `node --check app.js`, `git diff --check`, and all 118 decision pointers passed.
+  Source diff confirms the rework stays in matching and render code. The stock write
+  paths and Firestore guard were verified against the review commit.
+visual: recaptured and inspected `feature-evidence/task-087/cook-now-1280.png` and
+  `cook-now-390.png`. Both match the tracked files byte for byte. The notes, three
+  tiers, and overflow checks passed at desktop and 390px.
+self-review: Code Health and applicable AI QA checks passed.
+untested: production, real devices, and code coverage instrumentation.

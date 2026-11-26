@@ -89,9 +89,11 @@ Legacy inline photos are auto-migrated on load. In-memory `recipePhotoCache` att
 `baseIngredients`. A required line is covered when any of its alternatives matches, including
 water as an alternative. Missing optional and serving lines appear in `optionalMissing`.
 Water-only lines are skipped. Recipes need at least two required lines, at least one match,
-and up to two missing required lines. Home shows Can cook now, Cook with a swap, and Missing 1 or 2
-ingredients. A same-head variety swap covers a required line separately from exact availability.
-Missing-1 cards expose `buyMissingIngredient()`.
+and up to two missing required lines. Home and Recipes show Can cook now, Cook with a swap, and
+Missing 1 or 2 ingredients. The eat picker names the pantry ingredient to use when a recipe needs
+a swap. A same-head variety swap covers a required line separately from exact availability.
+Swaps exclude condiments, spices, and identity-changing varieties. Canola and olive oil can swap
+with each other. Home cards missing one ingredient expose `buyMissingIngredient()`.
 
 `getCookableRecipes()`, `getExpirySuggestions()`, and `pantryMatchesForShop()` share
 `ingredientNamesMatch()` and `pantryLotAvailable()` (D-086). Matching uses normalized names,

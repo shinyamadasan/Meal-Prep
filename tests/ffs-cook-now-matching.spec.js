@@ -100,6 +100,37 @@ test('resolves shared nouns, comma lists and full-name alternatives before prep 
   expect(result).toEqual([{ tier: 'ready', matched: 3 }]);
 });
 
+test('strips trailing quantity notes before splitting ingredient alternatives', async ({ page }) => {
+  const cases = [
+    ['Sriracha, or more to taste', ['sriracha']],
+    ['Garlic powder, or more to taste', ['garlic powder']],
+    ['Fresh lemon juice, or more to taste', ['lemon juice']],
+    ['Paprika or more if needed', ['paprika']],
+    ['Ground cumin or as needed', ['ground cumin']],
+    ['Caraway, or more', ['caraway']],
+    ['Cinnamon or to taste', ['cinnamon']],
+    ['Chives, plus more for topping', ['chives']],
+    ['Canola or avocado oil, or more if needed', ['canola oil', 'avocado oil']]
+  ];
+  const alternatives = await page.evaluate(cases => cases.map(([name]) => ingredientAlternatives(name)), cases);
+  for (const [index, [name, expected]] of cases.entries()) {
+    expect.soft(alternatives[index], name).toEqual(expected);
+  }
+});
+
+test('stocked ingredients with quantity notes count as have in Cook Now', async ({ page }) => {
+  const result = await page.evaluate(state => {
+    Object.assign(AppState, state);
+    return getCookableRecipes().map(({ tier, matched }) => ({ tier, matched }));
+  }, {
+    pantry: [lot('Carrot'), lot('Sriracha', { staple: true }), lot('Garlic powder'), lot('Lemon juice')],
+    recipes: [recipe('quantity-notes', 'Pepper and Lemon Carrots', [
+      'Carrot', 'Sriracha, or more to taste', 'Garlic powder, or more to taste', 'Fresh lemon juice, or more to taste'
+    ])]
+  });
+  expect(result).toEqual([{ tier: 'ready', matched: 4 }]);
+});
+
 test('matches generic rice descriptors and direct aliases while protecting ingredient identity', async ({ page }) => {
   const cases = [
     ['White rice', 'Jasmine Rice', true],
@@ -134,11 +165,38 @@ test('matches generic rice descriptors and direct aliases while protecting ingre
   expect(matches).toEqual(cases.map(([, , expected]) => [expected, expected]));
 });
 
+test('matches toasted sesame oil with its alias and keeps sesame oil distinct from generic oil', async ({ page }) => {
+  const cases = [
+    ['Sesame Oil', 'toasted sesame oil', true],
+    ['Oil', 'Sesame Oil', false]
+  ];
+  const matches = await page.evaluate(cases => cases.map(([a, b]) =>
+    [ingredientNamesMatch(a, b), ingredientNamesMatch(b, a)]), cases);
+  for (const [index, [a, b, expected]] of cases.entries()) {
+    expect.soft(matches[index], `${a} / ${b}`).toEqual([expected, expected]);
+  }
+});
+
 test('allows same-head variety swaps and rejects matches, different heads and identity modifiers', async ({ page }) => {
   const cases = [
     ['Brown rice', 'Jasmine Rice', true],
     ['Wild rice', 'Jasmine Rice', true],
     ['Cheddar cheese', 'Parmesan cheese', true],
+    ['Red onion', 'White onion', true],
+    ['Green bell pepper', 'Red Bell Pepper', true],
+    ['Canola oil', 'Olive oil', true],
+    ['Black pepper', 'Red Bell Pepper', false],
+    ['Cayenne pepper', 'Red Bell Pepper', false],
+    ['Garlic powder', 'Chili powder', false],
+    ['Oyster sauce', 'Chili garlic sauce', false],
+    ['Glutinous Rice (Malagkit)', 'Jasmine Rice', false],
+    ['Malagkit rice', 'Jasmine Rice', false],
+    ['Sticky rice', 'Jasmine Rice', false],
+    ['Sushi rice', 'Jasmine Rice', false],
+    ['Sesame Oil', 'Canola oil', false],
+    ['Toasted walnut oil', 'Olive oil', false],
+    ['Chili oil', 'Olive oil', false],
+    ['Ground cumin', 'Smoked cumin', false],
     ['Red onion', 'Onion', false],
     ['Rice vinegar', 'Jasmine Rice', false],
     ['Evaporated milk', 'Milk', false],
@@ -148,7 +206,9 @@ test('allows same-head variety swaps and rejects matches, different heads and id
   ];
   const swaps = await page.evaluate(cases => cases.map(([a, b]) =>
     [ingredientSwapMatch(a, b), ingredientSwapMatch(b, a)]), cases);
-  expect(swaps).toEqual(cases.map(([, , expected]) => [expected, expected]));
+  for (const [index, [a, b, expected]] of cases.entries()) {
+    expect.soft(swaps[index], `${a} / ${b}`).toEqual([expected, expected]);
+  }
 });
 
 test('reports required availability, swaps and missing optional lines without counting expired stock', async ({ page }) => {
@@ -180,6 +240,49 @@ test('reports required availability, swaps and missing optional lines without co
   });
 });
 
+test('Recipes tab badges ready, swap and buy recipes in their own tiers', async ({ page }) => {
+  await page.evaluate(state => {
+    Object.assign(AppState, state);
+    renderRecipes();
+  }, { pantry, recipes });
+  await page.locator('.tab-btn[data-tab="recipes"]').click();
+  const suggestions = page.locator('#cook-suggestions');
+  await expect(suggestions.locator('.cs-tier-label')).toHaveText([
+    'Can cook now', 'Cook with a swap', 'Missing 1 ingredient', 'Missing 2 ingredients'
+  ]);
+  const tiers = [
+    ['Can cook now', 'Golden Carrot Skillet', 'All ingredients ✓'],
+    ['Cook with a swap', 'Carrot and Brown Rice', 'Swap'],
+    ['Missing 1 ingredient', 'Caraway Carrots', 'Missing 1'],
+    ['Missing 2 ingredients', 'Leek and Fennel Rice', 'Missing 2']
+  ];
+  for (const [label, name, badge] of tiers) {
+    const tier = suggestions.locator('.cs-tier').filter({ has: page.getByText(label, { exact: true }) });
+    await expect(tier.getByRole('button', { name: `${name} ${badge}`, exact: true })).toBeVisible();
+  }
+});
+
+test('eat picker tells cooks what to swap, buy or use from stock', async ({ page }) => {
+  const picker = page.locator('.dash-card--eat');
+  const cases = [
+    ['ready', pantry, 'Have everything'],
+    ['swap', pantry, 'Swap: use Jasmine Rice'],
+    ['spice', pantry, 'Missing 1'],
+    ['ready', [], null]
+  ];
+  for (const [id, stock, reason] of cases) {
+    const selectedRecipe = recipes.find(r => r.id === id);
+    await page.evaluate(({ stock, selectedRecipe }) => {
+      Object.assign(AppState, { pantry: stock, recipes: [selectedRecipe] });
+      renderDashboard();
+    }, { stock, selectedRecipe });
+    await expect(picker.locator('.wse-name')).toHaveText(selectedRecipe.name);
+    const stockReasons = picker.locator('.wse-chip').filter({ hasText: /^(Have everything|Swap:|Missing)/ });
+    if (reason) await expect.soft(stockReasons, id).toHaveText(reason);
+    else await expect.soft(stockReasons, 'empty pantry').toHaveCount(0);
+  }
+});
+
 for (const width of [1280, 390]) {
   test(`Home shows ready, swap and buy tiers at ${width}px and rendering preserves state`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -200,8 +303,12 @@ for (const width of [1280, 390]) {
     const ready = cook.locator('.dash-cook-tier--ready');
     await expect(ready).toContainText('Golden Carrot Skillet');
     await expect(ready).toContainText('All ingredients ✓');
-    await expect(ready.getByText('+ optional: Mint, Lime', { exact: true })).toBeVisible();
-    await expect(cook.getByText('use Jasmine Rice for Brown rice', { exact: true })).toBeVisible();
+    const optionalNote = ready.getByText('+ optional: Mint, Lime', { exact: true });
+    const swapNote = cook.getByText('use Jasmine Rice for Brown rice', { exact: true });
+    for (const note of [optionalNote, swapNote]) {
+      await expect(note).toBeVisible();
+      expect.soft(await note.getAttribute('style')).toBeNull();
+    }
     await expect(cook.getByRole('button', { name: 'Buy Caraway' })).toBeVisible();
     await expect(page.locator('.dash-card--eat .wse-name').first()).toBeVisible();
     expect(await cook.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);

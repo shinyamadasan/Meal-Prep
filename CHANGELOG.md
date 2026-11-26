@@ -1413,3 +1413,23 @@ tests: seven expected failures on base, then seven passes. Both full local entry
 blockers: none.
 deviations: none.
 → status set to `review` in TASKS.md
+
+## TASK-087 — rework complete (branch: task-087-ffs-cook-now-matching)
+changed:
+  - `app.js` · `ingredientAlternatives()` strips trailing quantity notes before parsing
+    choices. `ingredientSwapMatch()` excludes spices, condiments, and identity-changing
+    varieties. Canola and olive oil are the explicit exception to the condiment rule.
+  - `app.js` and `style.css` · `renderCookSuggestions()` shows a Swap badge, the eat picker
+    names the swap ingredient, and `.dash-cook-note` handles wrapping on Home.
+  - `docs/ARCHITECTURE.md` · updated the matching and tier descriptions.
+  - `tests/ffs-cook-now-matching.spec.js` · expanded the synthetic matching matrix and
+    covered quantity notes, Recipes tab badges, and the eat picker reasons.
+  - `tests/release-hardening.spec.js` · the Cook Now mock now supplies `tier: 'ready'`
+    so the existing literal search assertion exercises the tier-aware renderer.
+  - `feature-evidence/task-087/` · recaptured the 1280px and 390px Home pane. Both PNGs
+    matched the tracked screenshots byte for byte.
+tests: 8 expected failures on `18642b7`, then 12/12 focused, 868/868 full local, and
+  13/13 ledger contract. Syntax and diff checks passed.
+blockers: none.
+deviations: focused tests used a temporary alternate port while the default port was occupied.
+→ status set to `review` in TASKS.md
