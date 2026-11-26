@@ -560,6 +560,91 @@
 - **AI-recommended priority:** **P3**
 - **status:** pending (owner review)
 
+### PROP-041 — Conversational household operations: Meal Prep MCP audit and gap proposal
+- **▶ Decision: Clarify — audit done; owner picks which gaps to close, after the FFS-V1 release.**
+- **▶ Risk: High** — any new tool writes Firestore through the bridge (D-032 red zone: sync, tombstones,
+  auth). Not part of the current release; read-only audit only.
+- **type:** feature · **source captures:** owner request 2026-11-26 ("AI-assisted household management")
+- **goal alignment:** supports — minimum decisions and minimum manual app interaction (north star:
+  simplicity; data safety preserved)
+- **expected user value:** High once onboarding is done; most daily inventory edits could move to chat
+- **evidence:** audit of `workers/conversational-bridge/src/mcp.js` and `src/operations/*` at `ffs-v1-refine`
+  (9 tools, one owner OAuth subject, revision-checked single-document writes)
+- **effort:** M–L (depends on gaps chosen) · **dependencies:** FFS-V1 release; household onboarding
+- **confidence:** high (code read) · **ambiguity:** which operations matter most day to day
+- **why now vs later:** later — the release and its deployment hold come first
+- **AI-recommended priority:** **P1** after release
+- **status:** pending (owner review)
+
+**Current tools.** Read: `get_inventory`, `get_ready_food`. Write: `record_ready_food`,
+`consume_ready_food`, `mark_out_of_stock`, `mark_in_stock`, `set_inventory_quantity`,
+`consume_stock`, `add_stock`. Every write: OAuth write scope for ONE configured owner subject,
+`expectedRevision` compare plus Firestore `updateTime` precondition, one guarded write, explicit
+tombstone on removal, ingredient ids only from `get_inventory` (no fuzzy matching), ambiguous
+staple rows refused.
+
+**Coverage of the requested operations.**
+
+| Operation | Today | Gap |
+| --- | --- | --- |
+| Register a newly purchased ingredient | Missing | `add_stock` only grows an existing row; no create tool |
+| Add quantity to existing inventory | Supported (`add_stock`) | Merges into the old lot and keeps its old bought date (see C2) |
+| Record ingredient consumption | Supported (`consume_stock`) | Same unit or g/kg, ml/L only; no "we cooked recipe X" deduction |
+| Staples Full / OK / Low / Empty | Partial: Full (`mark_in_stock`), Empty (`mark_out_of_stock`) | No OK or Low, so "running low" cannot reach Shop from chat |
+| Remove / discard safely | Supported for one row (`mark_out_of_stock` -> staple Empty, non-staple removed + tombstone) | No safety backup before a chat removal; no "discard because expired" reason |
+| Prepared ingredients (frozen garlic, portioned proteins) | Partial: existing rows can be counted/consumed | Cannot create them, set Freezer, or set pack units |
+| Storage location and dates | Missing | No tool sets storage, bought date or printed date (needed for thaw and "no bought date") |
+| Cooked meals and servings | Supported (`record_ready_food`, `consume_ready_food`) | No freezer/fridge move; see C3 on freshness |
+| Grocery list items | Missing | No read or write of `groceryList` |
+| Recommend meals from actual inventory | Missing (chat can only guess) | No recipes read; inventory read lacks dates, category and safety state (C1) |
+| Several updates in one request | Partial: sequential calls, each using the revision the previous call returned | No atomic batch; a mid-sequence failure leaves a partial result |
+
+**Compatibility with the FFS-V1 changes (TASK-086..090).**
+- C1 (gap, safety): `get_inventory` returns no `purchaseDate`, `expiryDate`, `dateMode`,
+  `printedDateKind`, category or safety state, and `get_ready_food` no freshness. A chat model can
+  call raw chicken the app marks "Past safe fridge time - do not use" available, or offer a 6-day
+  leftover. Nothing is written wrongly, but chat recommendations can contradict the app's safety rules.
+- C2 (behaviour): `add_stock` keeps the existing lot's `purchaseDate`. Under TASK-090 the app's fridge
+  clock then treats new raw protein as old (conservative, it hides fresh food early). Its own freshness
+  guard uses category defaults (protein 3 d), not the FDA classes (poultry 2 d, ham 3 d), and a lot
+  with no bought date is accepted, so new stock can merge into a lot the app already blocks.
+- C3 (description drift): `record_ready_food` without `source` stores `fridgeLife: null` "to keep
+  freshness unknown". Since TASK-090 the app caps fridge leftovers at 4 days, including null, so such
+  a meal shows Expired after 4 days and is included (named) in "Remove expired". The tool description
+  is now inaccurate; behaviour is safe (no automatic deletion).
+- C4 (improved): `mark_out_of_stock` on a staple now puts an "Out" row on Shop the next time the app
+  opens Shop (TASK-090 B3); before, Empty never reached Shop.
+- C5 (unchanged): staple classification differs from the app when a row has no explicit flag (the
+  bridge cannot see INGREDIENT_DB); it refuses with `ambiguous` instead of guessing. Kept.
+- Ledger contract (13/13) and the worker tests are unaffected by TASK-090 (no `workers/` change).
+
+**Safeguards to keep in every proposal below.** `expectedRevision` + `updateTime` precondition; one
+guarded write per call; explicit tombstones; no fuzzy ids; ambiguous refusal; no bulk delete from
+chat; single-owner OAuth subject (household members act through the owner's connection; per-person
+access is a separate decision).
+
+**Proposed increments (each its own task, High risk, `approved`-gated; none in this release).**
+1. **Read truth first (smallest, highest value):** extend `get_inventory` / `get_ready_food` with
+   dates, storage, category and the app's own availability/safety verdict, so chat never recommends
+   unsafe food. Read-only.
+2. **Duplicate-write protection for deltas:** an optional client `requestId` stored briefly per
+   document so a retried `add_stock` / `consume_stock` / `consume_ready_food` is applied once.
+3. **Register and edit rows:** `add_pantry_item` (name, qty, unit, storage, bought date, staple flag)
+   and `update_pantry_item` (storage, bought date, printed date + kind); `add_stock` gains "new lot"
+   mode so a purchase keeps its own date.
+4. **Staple levels:** `set_stock_level` (full/ok/low/empty) replacing the two-level tools' gap.
+5. **Shop list:** `get_shopping_list`, `add_shopping_item`, `check_shopping_item` using the app's
+   own consolidation rules (TASK-090 B2), so chat and app never double-list.
+6. **Meal recommendation:** `get_cook_options` returning the app's Cook-now tiers, and
+   `record_cooked_recipe` that deducts like the app's Cooked button.
+7. **Multi-update requests:** `apply_inventory_changes` taking a short list of the above operations
+   under one `expectedRevision`, all-or-nothing in one guarded write.
+8. Update the `record_ready_food` description for C3 (docs-only fix; can ride with increment 1).
+
+**Owner decisions needed:** which increments, in what order; whether chat may create records
+(increment 3) or only edit existing ones; whether household members other than the owner get
+their own connection; whether chat removals should take a local-style safety backup first.
+
 ---
 
 ## Proposal contract
