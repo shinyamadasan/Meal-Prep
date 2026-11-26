@@ -3585,6 +3585,16 @@ safety "check it" signal per D-087 and never remove a lot from availability. Fou
 preview: frozen chicken and canned goods were reported missing, so Fill the gaps suggested
 rebuying them. Display of estimates (Fridge badges, Home Attention, Stock Health) is unchanged.
 
+Addendum 2 (2026-11-26, TASK-087, owner approval of finding A): Cook Now counts REQUIRED lines
+only. A line is optional / serving / water by its own wording ("(optional)", "for serving",
+"for garnish", plain water) and never blocks, but missing optional lines are still shown. Salt,
+pepper and spices stay required: no assumed pantry, so a missing essential is never hidden.
+"A or B" lines are satisfied by any alternative. A third tier, "Cook with a swap", covers lines
+met only by a same-head-noun variety ("Brown rice" ↔ "Jasmine Rice"); a swap never counts as
+"have". `ingredientNamesMatch` gains an identity-modifier guard (evaporated / condensed / coconut
+/ almond / oat / soy / peanut / sour …) so "Milk" no longer matches "Evaporated Milk", and a rice
+family rule so white / steamed / cooked / short-grain rice match any rice in stock.
+
 ## D-087 — Inventory staleness is per food class and split into three independent signals
 Date: 2026-11-25 · Status: Accepted (owner decision); implementation TASK-081
 Context: The first FFS-V1 proposal suggested a universal 60-day "stale" cutoff. The owner rejected
@@ -3600,3 +3610,23 @@ Rules: the report is read-only. Records are NEVER deleted or changed automatical
 cleanup requires (a) an explicit owner request, (b) a full backup preserved first (app JSON export
 or a bridge read snapshot stored outside the public repo), (c) its own reviewed task.
 Cooked meals are read, never written, by this feature (ChronaSense ledger contract).
+
+## D-088 — Expired, Check and Stale are separate; only Expired can be bulk-removed
+Date: 2026-11-26 · Status: Accepted (owner approval of finding B); implementation TASK-088
+Context: The TASK-085 preview showed Home Attention offering "Remove expired (9)" for frozen
+chicken and canned tuna whose only "expiry" was an estimate (purchase date + category shelf
+life). The confirm dialog did not name the records. Owner: never delete records solely because of
+estimated shelf life or staleness; food of uncertain safety needs confirmation before it is
+recommended; bulk deletion needs explicit confirmation naming the records; distinguish best-before
+from safety expiry where possible.
+Decision: One pure classifier, `pantryDateSignal()`, yields Expired (printed use-by/expiry past,
+or a cooked meal past its fridge safety window), Check (perishable estimate past, printed
+best-before past, frozen cooked meal past its quality window) or Use soon. Stale stays a Stock
+Health signal only (D-087). Only Expired records can be bulk-removed, and the confirmation lists
+every record by name. Check items get per-row "Still good" (existing keptOn, today only) or
+"Toss" (single explicit removal). A perishable in Check is flagged "check first" in Cook Now until
+the user says Still good. Frozen, pantry-staple and condiment estimates never reach Home at all.
+New optional pantry field `printedDateKind` ('use-by' | 'best-before'), user-set only; absent
+means use-by, so existing records behave exactly as before. No migration, no automatic writes.
+Rules: tombstone / snapshotIdBaseline / saveData sequences and the MASS_DELETE_GUARD are not
+changed. Red zone (D-032): lands `approved`, held for the owner.

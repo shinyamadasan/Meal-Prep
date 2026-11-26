@@ -6129,32 +6129,11 @@ verification:
   - Tests first (fail on base), then green. Screenshots desktop + 390px into
     feature-evidence/task-082/. Full suite + ledger contract; SELF_REVIEW + QA notes.
 
-### TASK-083 · FFS-3 Balanced Plate hints + Snack Pack pairs (WAVE 2 — prepared, NOT released)
+### TASK-084 · FFS-4 Private cookbook recipes: source, original vs adaptation (DEFERRED by owner 2026-11-26)
 status: todo
-owner: claude (release to codex only after the owner reviews wave 1)
-risk: Low. Merge gate: `approved` (owner deploy hold) unless the owner lifts it.
-source: BQ-030 · PROP-038 · KNOWLEDGE_BASE F2 (Balanced Plate), F6 (Snack Pack)
-depends-on: TASK-080, TASK-082 (`noPlanRole`, `ingredientVersatility`)
-objective:
-  On existing Home suggestion cards, add one quiet "make it a plate" hint built only from food we
-  actually have, and offer up to 3 Snack Pack pairs from stock. "Add, not subtract": no scores,
-  no warnings, no tracking.
-design (draft, finalize at release):
-  - Pure `plateGaps(recipeOrReadyItem)` → missing of {produce, protein, carb, fat}; use
-    `mealBalance` when present, else infer from ingredient roles (`noPlanRole`).
-  - One line per card in "What should we eat?" and "Ready to eat": "Make it a plate: add frozen
-    broccoli" — the suggestion must be an available lot (`pantryLotAvailable`), ranked by
-    versatility; omit the line when nothing in stock fills the gap.
-  - Snack Pack row (Quick Eat area of Home): up to 3 pairs from stock covering ≥ 2 of
-    {fiber-carb, protein, healthy fat}.
-  - No persisted state; render-only; no new tab; collapsed/inline only.
-acceptance (draft):
-  - plate hint appears only with an in-stock filler; never suggests an unavailable item;
-    snack pairs always span ≥ 2 groups; render leaves AppState deep-equal; 390px clean;
-    npm test + ledger contract green.
-
-### TASK-084 · FFS-4 Private cookbook recipes: source, original vs adaptation (WAVE 2 — prepared, NOT released)
-status: todo
+deferred (owner, 2026-11-26): "Defer TASK-084 and full cookbook integration." The 21-recipe pack stays
+  private; source references use existing fields (`source`, `highlights`, `adaptationNotes` where the
+  import keeps them). Garlicky Roasted Chickpeas dropped from the initial pack (incomplete source).
 owner: claude (release to codex after wave 1 review; owner approved PROP-039 rev 2 on 2026-11-25,
   "subject to implementation review after Wave 1")
 risk: High (adds optional fields to the Firestore-synced Recipe shape; D-032 red zone).
@@ -6282,6 +6261,366 @@ acceptance:
   - No Firebase network request is possible from the preview (verified in a browser run).
   - Each of the five scenarios is walked through once by Claude in a browser with screenshots.
   - Nothing is merged to `main`; nothing deployed; no production data touched.
+
+<!-- ═══════════════════════════════════════════════════════
+     FFS-V1 · Final refinement (owner approval 2026-11-26: findings A, B, C; TASK-083 lite;
+     grocery-mode review; TASK-084 deferred; drop Garlicky Roasted Chickpeas)
+     Risk: High (TASK-088 touches deletion/tombstone paths) · Execution: Solo, one task per run
+     Build order: TASK-087 and TASK-088 are independent (different functions) and may be built in
+     separate worktrees; TASK-089 and TASK-083 build on the reviewed TASK-087 head.
+     Branching: integration branch `ffs-v1-refine` (= `ffs-v1-preview` + this plan). Each task
+     branches from `ffs-v1-refine` (or the head named under the task) and is merged back into
+     `ffs-v1-refine` by Claude after review. NEVER `main`.
+     DEPLOY GATE (owner): "Maintain the production deployment hold." Max landing state `approved`.
+     Decisions: D-086 addendum 2 (matching) and D-088 (expiry signals) are written by Claude in
+     the plan commit; Codex does not edit docs/DECISIONS.md in this group.
+     Owner objective: maximum food flexibility with minimum decision-making and management.
+     Shopping modes (restock / no-plan / planned) are all optional; none becomes mandatory.
+     Review of existing capability (Claude, 2026-11-26) — what is NOT being built:
+       - Restock essentials already exists: any pantry item can be marked a staple (user-
+         configurable, persistent); a staple at Low/Empty auto-adds a "Running low" row to the
+         Shop list (`checkAndReplenishLowStock`, `syncStapleToGrocery`); non-staples use
+         `INGREDIENT_DB.minStockQty`. No new essentials model.
+       - Planned grocery already exists (`generateGroceryList` from the week plan + batches).
+       - The three cooking modes already exist as Recipes quick filters (🥗 No-cook / ⚡ Lowest
+         effort / 🍱 Batch-friendly) plus Home "Ready to eat" leftovers. No new mode UI.
+       - Ready-to-eat already hides leftovers past their safety window (`getReadyFoodSuggestions`).
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-087 · FFS-V1 Cook Now ingredient matching: required vs optional, alternatives, swaps
+status: codex
+owner: codex
+risk: Medium (read-path logic; no persisted change, no write path). Merge gate: `approved` (hold).
+source: owner approval 2026-11-26 "Approve finding A" + finding D (compound names) · D-086
+depends-on: TASK-080/081/082/086 (approved, all in `ffs-v1-preview`)
+branch: task-087-ffs-cook-now-matching (from `ffs-v1-refine`)
+problem (TASK-085 preview, realistic household + 21 cookbook recipes):
+  - Every ingredient line is required, so "Steamed rice, for serving", "Fresh cilantro, chopped,
+    for garnish", "(optional)" lines and water push most recipes to "missing 3+".
+  - "Canola or avocado oil", "Boneless, skinless chicken breasts or thighs", "Spaghetti,
+    bucatini, penne rigate, or rigatoni" only match if a lot contains the whole phrase.
+  - "White rice" / "Cooked short-grain white rice" do not match "Jasmine Rice".
+  - `ingredientNamesMatch` lets a generic name match an identity-changing compound:
+    "Milk" ↔ "Evaporated Milk", "Milk" ↔ "Coconut milk" (shorter-subset + shared head noun).
+objective:
+  Cook Now tells the truth in three tiers: genuinely cookable now; cookable with a swap you
+  already have; needs buying. Optional, garnish and serving lines never block, but are shown;
+  missing essential lines are never hidden.
+files:
+  - app.js: new pure `ingredientLineRole(ing)`, `ingredientAlternatives(name)`,
+    `ingredientSwapMatch(a, b)`; `ingredientMatchWords` / `ingredientNamesMatch` (identity-
+    modifier guard and the rice family rule only); `getCookableRecipes`; the Home cook pane in
+    `renderDashboard` (tier labels/meta only). Every other caller of `getCookableRecipes`
+    (`getCookSuggestions`, the Cook-tab / "what should we eat" consumers) must keep working with
+    the result shape (add fields, never rename/remove `missing`, `matched`, `total`,
+    `missingIngredients`).
+  - tests/ffs-cook-now-matching.spec.js (new), plus any existing spec whose expectation changes
+    (name each in CHANGELOG with the reason)
+  - docs/ARCHITECTURE.md (availability/matching note), CHANGELOG.md, TEST_REPORT.md, TASKS.md status only
+design (binding):
+  1. `ingredientLineRole(ing)` → 'required' | 'optional' | 'serving' | 'water'.
+     - `ing.optional === true` (explicit flag, if a recipe ever has it) → 'optional'.
+     - name contains "(optional)" or ", optional" → 'optional'.
+     - "for serving", "for garnish", "to serve", "for drizzling", "for squeezing", "for coating",
+       "for dipping", "day of serving" + garnish wording → 'serving'.
+     - the whole line is water ("Water", "Hot water", "Cold water", "Ice water", "Water, plus
+       more") → 'water'. "Veggie broth or water" is NOT water-only; it is required with
+       alternatives (water satisfies it).
+     - Everything else, including salt, pepper and spices, is 'required'. No assumed pantry.
+  2. `ingredientAlternatives(name)` → array of candidate names. Strip notes after the first
+     comma that is not part of a leading descriptor run (reuse the `ingredientMatchWords`
+     segment logic), drop parentheticals, then split on " or " and list commas:
+     "Canola or avocado oil" → [canola oil, avocado oil]; "Vegetable or chicken broth" →
+     [vegetable broth, chicken broth]; "Boneless, skinless chicken breasts or thighs" →
+     [chicken breasts, chicken thighs]; "Soft or silken tofu" → [soft tofu, silken tofu];
+     "Spaghetti, bucatini, penne rigate, or rigatoni" → [spaghetti, bucatini, penne rigate,
+     rigatoni]; "Greek yogurt or sour cream" → [greek yogurt, sour cream]; "Veggie broth or
+     water" → [veggie broth, water]. Shared-noun rule: when one side is a single word and the
+     other side has ≥ 2 words, distribute the other side's head noun (suffix: "canola" +
+     "oil") or leading noun (prefix: "chicken" + "thighs"). A line with no "or" → [name].
+     A line satisfied by any alternative counts as matched; "water" as an alternative is always
+     satisfied.
+  3. Identity-modifier guard in `ingredientNamesMatch`: the shorter-subset rule must NOT match
+     when the longer name's extra words include an identity-changing modifier:
+     evaporated, condensed, coconut, almond, oat, soy (as a milk/sauce qualifier, i.e. "soy
+     milk"), powdered, cream (as in "cream cheese" is already a different head; keep it so),
+     peanut (peanut butter vs butter), sour (sour cream vs cream), sweetened, vinegar-bearing
+     heads stay separate as today. Keep the list as one const near `ingredientMatchWords`
+     with a comment. INGREDIENT_DB aliases still win (an alias pair always matches).
+  4. Rice family rule: for head noun "rice", the descriptors white, steamed, cooked, plain,
+     leftover, day-old, short-grain, medium-grain, long-grain (and "short-, medium-, or
+     long-grain") are ignored when matching, so "White rice", "Steamed rice", "Cooked
+     short-grain white rice", "Rice (short-, medium-, or long-grain)" all match "Jasmine Rice".
+     "Brown rice", "wild rice", "rice vinegar", "rice noodles", "rice flour" do NOT match
+     "Jasmine Rice" (vinegar/noodles/flour are different heads; brown/wild are swaps — see 5).
+  5. `ingredientSwapMatch(recipeName, lotName)`: same final head noun, both names have ≥ 1
+     qualifier, no identity-modifier on either side, and `ingredientNamesMatch` is false.
+     Examples that ARE swaps: "Brown rice" ↔ "Jasmine Rice"; "Cheddar cheese" ↔ "Parmesan
+     cheese"; "Red onion" ↔ "Onion"? NO — that is already a subset match (have). Examples that
+     are NOT swaps: "Rice vinegar" ↔ "Jasmine Rice" (different head); "Evaporated milk" ↔
+     "Milk"; "Coconut milk" ↔ "Milk". Swaps are only for Cook Now tiering, never for "have".
+  6. `getCookableRecipes()` per recipe, required lines only (water lines skipped, optional and
+     serving lines reported separately): each required line is `have` (any alternative matches
+     an available lot via `ingredientNamesMatch`), `swap` (no have, but an alternative swap-
+     matches an available lot; record `{ need, use }`), or `missing`.
+     Result adds: `requiredTotal`, `swaps: [{ need, use }]`, `optionalMissing: [names]`,
+     `tier: 'ready' | 'swap' | 'buy'` (ready = 0 missing, 0 swaps; swap = 0 missing, ≥ 1 swap;
+     buy = 1–2 missing). Keep `missing` = number of missing REQUIRED lines and
+     `missingIngredients` = their names (existing consumers). Keep the existing inclusion rule
+     shape: include when missing ≤ 2 and at least one required line is have.
+     Recipes with fewer than 2 required lines are skipped as today.
+  7. Home "Cook this" pane tiers: "Can cook now" (tier ready, meta "All ingredients ✓", plus
+     "· no garnish" style is NOT needed — show "+ optional: cilantro" only when optionalMissing
+     is non-empty, max 2 names); "Cook with a swap" (meta "use Jasmine Rice for Brown rice");
+     "Missing 1 ingredient" / "Missing 2 ingredients" (unchanged, Buy button unchanged). Three
+     rows per tier max, as today.
+acceptance:
+  - [ ] Line roles: "Steamed rice, for serving" → serving; "Fresh cilantro, chopped, for
+        garnish" → serving; "Chili oil (optional)" → optional; "Hot water, plus more if
+        needed" → water; "Kosher salt" → required; "Veggie broth or water" → required and
+        satisfied with no broth in stock.
+  - [ ] Alternatives: each example in design 2 produces exactly the listed names (order free).
+  - [ ] Have/matching: "White rice", "Steamed rice", "Cooked short-grain white rice",
+        "Rice (short-, medium-, or long-grain)" ↔ "Jasmine Rice" true; "Canola or avocado oil"
+        satisfied by "Canola Oil"; "Boneless, skinless chicken breasts or thighs" satisfied by
+        "Chicken Thigh".
+  - [ ] Never match: "Rice vinegar" ↔ "Jasmine Rice"; "Rice" ↔ "Rice Vinegar"; "Milk" ↔
+        "Evaporated Milk"; "Milk" ↔ "Coconut milk"; "Butter" ↔ "Peanut Butter"; "Cream" ↔
+        "Sour Cream"; "Brown rice" ↔ "Jasmine Rice" is NOT a have (it is a swap).
+  - [ ] Existing TASK-080 matching cases still pass unchanged (tests/ffs-truthful-availability).
+  - [ ] Tiering with a synthetic pantry: a recipe whose only gaps are garnish/serving/optional
+        lines is tier ready and lists them as optionalMissing; a recipe needing "Brown rice"
+        with only Jasmine Rice is tier swap with `{ need: 'Brown rice', use: 'Jasmine Rice' }`;
+        a recipe missing one required spice is tier buy with missing 1 — the spice is never
+        hidden; an expired-printed-date lot is still missing (D-086).
+  - [ ] Home cook pane renders the swap tier and the optional note at 390px without overflow;
+        `getCookSuggestions` and the other consumers still render.
+  - [ ] Rendering Home leaves `AppState` deep-equal.
+  - [ ] Focused specs fail on base where behavior changes, then pass; full `npm test`,
+        `npm run test:ledger-contract`, `node --check app.js`, `git diff --check` green.
+constraints:
+  - No persisted-field change, no recipe data change, no write path (`findPantryMatch`,
+    `deductIngredientsForRecipe`, `checkMissingIngredients`, workers/) touched.
+  - Synthetic test data only; no cookbook text in tests (use invented ingredient lines of the
+    same shapes). Never merge or push `main`/`ffs-v1`/`ffs-v1-refine`. Never deploy. Stop at
+    `status: review`.
+verification:
+  - Tests first (red on base), then green. Screenshots desktop + 390px of the Home cook pane
+    showing all three tiers into feature-evidence/task-087/.
+
+### TASK-088 · FFS-V1 Food availability and deletion safety: expired vs check vs stale
+status: codex
+owner: codex
+risk: High (deletion paths, tombstones, a new optional synced pantry field; D-032 red zone).
+  Solo build. Merge gate: `approved` (hold).
+source: owner approval 2026-11-26 "Approve finding B" · D-086 addendum · D-087
+depends-on: TASK-086 (approved)
+branch: task-088-ffs-expiry-deletion-safety (from `ffs-v1-refine`)
+problem:
+  Home Attention "Expired" and **Remove expired (N)** (`collectAttentionItems`,
+  `removeAllExpired`) and Fridge **Clear expired** (`getExpiredPantryItems`,
+  `clearExpiredPantryItems`) use `pantryDaysLeft() < 0`, which for purchase-mode lots is an
+  ESTIMATE. In the preview, frozen chicken and canned tuna (estimate only) were offered for bulk
+  deletion, and the confirm dialog does not name the records. Owner rule: never delete records
+  solely because of estimated shelf life or staleness.
+objective:
+  Three separate signals, never merged: (1) Expired = a printed use-by/expiry date has passed
+  (or a cooked meal is past its fridge safety window); (2) Check = an estimate has passed or a
+  printed best-before date has passed — quality/safety unknown, the user decides; (3) Stale =
+  record not updated (Stock Health only, unchanged). Only (1) can ever be bulk-removed, and only
+  after a confirmation that lists every record by name. Perishable food in "Check" needs a
+  one-tap confirmation before it is recommended for eating.
+files:
+  - app.js: new pure `pantryDateSignal(p)` → { kind: 'expired' | 'check' | 'use-soon' | null,
+    daysLeft, printed, bestBefore }; `collectAttentionItems` (adds a `check` bucket);
+    `renderDashboard` Home Attention block; `removeAllExpired`; `getExpiredPantryItems` /
+    `clearExpiredPantryItems` / `renderPantryClearExpiredButton`; `pantryLotAvailable`
+    (best-before rule only); Fridge card badge text for check items; the add/edit pantry modal
+    date section (one optional select); `getCookableRecipes` ONLY to attach `needsCheck` names
+    (coordinate: TASK-087 edits the same function — keep this to one added field computed from
+    the lots that satisfied a line; Claude resolves the merge).
+  - index.html (the select in the pantry modal), style.css (check tag; no new `:root`)
+  - tests/ffs-expiry-deletion-safety.spec.js (new) + affected specs (name each in CHANGELOG)
+  - docs/DATA_MODEL.md (new optional field), docs/ARCHITECTURE.md, CHANGELOG.md, TEST_REPORT.md, TASKS.md status only
+design (binding):
+  1. Optional pantry field `printedDateKind`: 'use-by' | 'best-before' | absent. Only meaningful
+     when `dateMode === 'expiry'`. Absent = treat as use-by (today's behavior). Set only by the
+     user via a select ("Use by / expiry" default, "Best before") next to the printed-date input
+     in the add/edit pantry modal. Never written by any automatic path; never back-filled.
+  2. `pantryDateSignal(p)`:
+     - printed date (dateMode 'expiry') past and kind ≠ best-before → 'expired'.
+     - printed best-before past → 'check' (wording: "Best before passed — check it").
+     - purchase-mode estimate past → 'check' ONLY for food class perishable (fridge raw / fresh,
+       via `stockFoodClass`); frozen, pantry-staple and condiment classes → null on Home/Cook
+       (their estimate is a quality note that stays in Stock Health and on the Fridge card as
+       today). Wording: "Estimated window passed — check it".
+     - within FRESHNESS_WARN_DAYS → 'use-soon' (unchanged behavior).
+     - Kept-today (`keptOn === todayISO()`) suppresses 'check' and 'expired' from Home as today.
+  3. Cooked meals: past fridge safety window → 'expired' (unchanged); freezer past quality
+     window → 'check' (not expired, never bulk-removable).
+  4. Home Attention: "Expired" bucket = signal 'expired' only (per-row Keep/Remove unchanged).
+     New "Check" bucket (estimate/best-before): per-row **Still good** (= existing
+     `keepAttentionItem`, sets keptOn today) and **Toss** (= existing single
+     `removeAttentionItem`, explicit user choice on one named row). No bulk action on Check.
+     Summary chip text includes "N to check".
+  5. Bulk removal (`removeAllExpired`, `clearExpiredPantryItems`): input = signal 'expired' only.
+     The confirm dialog lists every record by name with its printed date (or "cooked <date>")
+     — escaped, scrollable when long — and states "Estimated dates and best-before items are
+     not included." Button "Remove N". Each removal keeps the existing explicit tombstone +
+     `snapshotIdBaseline()` + `saveData()` sequence exactly (MASS_DELETE_GUARD contract). The
+     Fridge "Clear expired" button is hidden when there are no 'expired' records.
+  6. `pantryLotAvailable`: printed best-before past → available (quality, not safety); every
+     other rule unchanged (use-by/absent past → unavailable).
+  7. Recommendation confirmation: a lot with signal 'check' (perishable estimate or best-before)
+     that is not kept today is "needs check". `getCookableRecipes` adds `needsCheck: [lot names]`
+     for lines satisfied only by such lots; Home cook rows then show "check Spinach first"
+     instead of "All ingredients ✓" and are never labelled ready without it. Ready-to-eat stays
+     as is (already hides past-window leftovers). `getExpirySuggestions` ("use before it
+     expires") must not suggest recipes for 'expired' lots (already true) and must label
+     'check' lots "check first" if it surfaces them.
+  8. No automatic deletion, no automatic date change, no automatic field write anywhere.
+acceptance:
+  - [ ] Frozen chicken (purchase 40 days, freezer) and canned tuna (purchase 30 days): not in
+        Expired, not in Check, not in any bulk removal set; still available.
+  - [ ] Fridge spinach past its estimate: in Check with Still good / Toss; not in any bulk set;
+        Cook Now rows using it say "check Spinach first"; after Still good, the note disappears
+        for today and nothing else changed except `keptOn`/`updatedAt` on that record.
+  - [ ] Printed use-by yesterday → Expired, unavailable, included in bulk removal; printed
+        best-before yesterday → Check, available, excluded from bulk removal; lot without
+        `printedDateKind` and printed date yesterday → Expired (backward compatible).
+  - [ ] Bulk confirm dialog names every record that will be removed (test asserts the exact
+        list) and Cancel removes nothing; Confirm removes exactly that list, writes one
+        tombstone per id, and no other record changes (deep-equal on the remainder).
+  - [ ] Fridge Clear expired: same rules and same named confirmation.
+  - [ ] Cooked meal past fridge window → Expired; frozen soup past quality window → Check only.
+  - [ ] The pantry modal select round-trips `printedDateKind` through save, reload, Firestore
+        payload shape (field present only when set), import/export; old records without it load
+        unchanged; no migration writes.
+  - [ ] Rendering Home, Fridge and Shop leaves `AppState` deep-equal.
+  - [ ] Focused specs fail on base where behavior changes, then pass; full `npm test`,
+        `npm run test:ledger-contract`, `node --check app.js`, `git diff --check` green.
+constraints:
+  - Do not change `writeTombstone`, `snapshotIdBaseline`, `recordLocalDeletions`, the
+    MASS_DELETE_GUARD, `saveData`, `saveToFirestore`, the `cloudReady` guard, cooked-meal write
+    paths, or workers/ (ChronaSense ledger contract). Synthetic data only.
+  - Never merge or push `main`/`ffs-v1`/`ffs-v1-refine`. Never deploy. Stop at `status: review`.
+verification:
+  - Tests first (red on base), then green. Screenshots desktop + 390px: Home Attention with
+    Expired + Check, the named bulk-confirm dialog, the pantry modal select →
+    feature-evidence/task-088/.
+
+### TASK-089 · FFS-V1 Fill the gaps polish: categories, whole grain, near-twins, variety
+status: codex
+owner: codex
+risk: Medium (render + suggestion logic; grocery rows use the existing shape). Gate: `approved`.
+source: owner approval 2026-11-26 "Approve finding C" + "Refine the grocery system" (B: rotate
+  for variety, fewer choices) · TASK-082 review follow-ups
+depends-on: TASK-087 (identity-modifier guard and `ingredientSwapMatch` are reused)
+branch: task-089-ffs-fill-gaps-polish (from the reviewed TASK-087 head)
+problem:
+  - 31 template candidates are not in INGREDIENT_DB, so `buyMissingIngredient` files them under
+    "Pantry" (e.g. Frozen Blueberries, Pretzels, Herbal Tea).
+  - "Starches 4/3 ✓ · needs whole grain" shows no chips: options are only computed when the
+    count is short, not when a rule is unmet.
+  - Near-twins: it can suggest "Mixed Berries" when "Frozen Blueberries" is on the list, or a
+    second cheese when one is in stock.
+  - The same top 4 chips every time; no way to ask for something different.
+objective:
+  Fill the gaps stays one collapsed card with ≤ 4 chips per short role, files every item in the
+  right Shop category, shows whole-grain chips when that rule is unmet, never suggests a near-
+  twin of what you have or listed, and offers one "Different ideas" control for variety.
+files:
+  - app.js: `NO_PLAN_TEMPLATE` (add `category` per role), `noPlanGaps`, `renderNoPlanGrocery`,
+    `buyMissingIngredient` (category fallback only); index.html only if the card needs the button
+    host; style.css (chip wrap, no new `:root`)
+  - tests/ffs-no-plan-grocery.spec.js (extend), CHANGELOG.md, TEST_REPORT.md, TASKS.md status
+design (binding):
+  1. Category: each role carries a Shop category (proteins → Protein, veggies → Vegetable,
+     fruits → Fruit, starches → Grain, snacks → Snacks if that Shop category exists else
+     Pantry, flavors → Pantry, beverages → Beverages if it exists else Pantry — Codex checks the
+     category list the Shop renders and uses existing names only). `buyMissingIngredient(name,
+     category?)` uses INGREDIENT_DB first, then the passed role category, then 'Pantry'. Chips
+     pass their role category. Other callers unchanged.
+  2. Rules: compute options when `short > 0` OR any rule has `remaining > 0`; when only a rule is
+     unmet, show only candidates that satisfy that rule (e.g. whole-grain starches), ≤ 2 chips.
+  3. Near-twins: exclude a candidate when it `ingredientNamesMatch`es OR `ingredientSwapMatch`es
+     any available lot or any unchecked list row (e.g. "Parmesan Cheese" vs "Cheddar Cheese" is a
+     swap; "Cheese" vs "Cheddar Cheese" is a have). Also de-duplicate within the chips.
+  4. Variety: a single small "↻ Different ideas" button in the card. It advances an in-memory
+     offset (module variable, not persisted, resets on reload) that rotates each role's ranked
+     candidate list by 4 so the next 4 show; the ranking itself (rules, versatility, convenience)
+     is unchanged. Default (offset 0) shows the best 4, so the card never needs a decision.
+  5. No new persisted state. Restock (staples) and planned grocery are untouched.
+acceptance:
+  - [ ] Tapping "Frozen Blueberries" files it under Fruit; "Pretzels" under the snacks role's
+        category; DB items keep their DB category.
+  - [ ] Starches at/above target with no whole grain: shows ≤ 2 whole-grain chips; adding one
+        removes the "needs whole grain" note.
+  - [ ] With "Cheddar Cheese" in stock, neither "Cheese" nor another "… Cheese" is offered; with
+        "Greek Yogurt" on the list, no other "… Yogurt" is offered; Evaporated Milk in stock does
+        NOT count as Milk (Milk can still be suggested under beverages).
+  - [ ] "Different ideas" shows a different set of chips for a role with > 4 candidates and
+        wraps around; reload returns to the default set; AppState unchanged by the button.
+  - [ ] Card stays collapsed by default; ≤ 4 chips per role; 390px clean.
+  - [ ] Focused specs red on base where behavior changes, then green; full `npm test`,
+        `npm run test:ledger-contract`, `node --check app.js`, `git diff --check` green.
+constraints:
+  - Synthetic data only. Never merge or push `main`/`ffs-v1`/`ffs-v1-refine`. Never deploy.
+    Stop at `status: review`.
+verification:
+  - Screenshots desktop + 390px into feature-evidence/task-089/.
+
+### TASK-083 · FFS-3 Balanced Plate — lightweight, optional suggestions (owner-approved lite)
+status: codex
+owner: codex
+risk: Medium (render-only logic; no persisted state). Merge gate: `approved` (owner deploy hold).
+source: BQ-030 · PROP-038 · owner approval 2026-11-26 "Approve a lightweight version of TASK-083…
+  Defer the dedicated Snack Pack feature."
+depends-on: TASK-087 (matching), TASK-082 (`noPlanRole`, `ingredientVersatility`)
+branch: task-083-ffs-balanced-plate-lite (from the reviewed TASK-087 head; Claude merges with 089)
+scope change vs the prepared draft: Snack Pack DEFERRED. No new Home card. Reuse the two places
+  that already show balance: the Ready-to-eat hint (`readyFoodBalanceHint`, today generic "add
+  veg + rice") and the recipe details modal's balance tags (`mealBalanceParts`).
+objective:
+  When a meal is missing a Protein, Veg or Carb part per its existing `mealBalance`, show ONE
+  optional line naming something we already have that fills it: "Optional: add a veg — Broccoli
+  or Spinach". Nothing to tick, nothing tracked, never blocks cooking/eating/planning.
+files:
+  - app.js: new pure `balancedPlateAdditions(recipe, state)` → [{ part: 'vegetables' | 'protein'
+    | 'carb', options: [≤ 2 names] }]; `readyFoodBalanceHint` (use it); the recipe details
+    modal render (one line under the balance tags); style.css (muted one-line style, no new
+    `:root`)
+  - tests/ffs-balanced-plate.spec.js (new), CHANGELOG.md, TEST_REPORT.md, TASKS.md status only
+design (binding):
+  - Parts come only from `normalizeMealBalance(recipe.mealBalance)`. A recipe with no balance
+    data, or all three parts true, gets no line. No inference, no scores, no nutrient numbers.
+  - Fillers: available lots (`pantryLotAvailable`, and not a TASK-088 "needs check" lot if that
+    helper exists on the branch) whose `noPlanRole` is veggies / fruits (for vegetables), proteins
+    (for protein) or starches (for carb); plus quick recipes already in the book whose own
+    mealBalance supplies that part and are effort assembly/very-low or tagged no-cook (e.g. a
+    side salad) — max 2 names total per part, available lots first, ranked by
+    `ingredientVersatility`, de-duplicated with `ingredientNamesMatch`.
+  - Show at most one line per meal, for the first missing part in the order vegetables →
+    protein → carb. If nothing in stock fills it, show nothing (no buy prompt).
+  - Ready-to-eat: replace the generic "add veg + rice" with the named line when fillers exist;
+    otherwise keep today's generic hint. Sauce & Side / Snack category recipes get no line.
+  - Render-only. No AppState writes, no new persisted field, no new tab or card, no Snack Pack.
+acceptance:
+  - [ ] Chicken adobo leftover (recipe protein only) with Broccoli + Jasmine Rice in stock →
+        "Optional: add a veg — Broccoli…"; with no veg/fruit in stock and rice in stock →
+        "Optional: add a carb — Jasmine Rice".
+  - [ ] Recipe with full balance, no balance data, or category Sauce & Side → no line.
+  - [ ] Never names an unavailable lot (0 qty, empty, printed-date expired) or a needs-check lot.
+  - [ ] Modal and Ready-to-eat show the same suggestion for the same recipe; 390px one line,
+        no overflow.
+  - [ ] Rendering leaves `AppState` deep-equal; no nutrition score, total or tracking UI added.
+  - [ ] Focused specs red on base, then green; full `npm test`, `npm run test:ledger-contract`,
+        `node --check app.js`, `git diff --check` green.
+constraints:
+  - Synthetic data only; no cookbook text in tests. Never merge or push `main`/`ffs-v1`/
+    `ffs-v1-refine`. Never deploy. Stop at `status: review`.
+verification:
+  - Screenshots desktop + 390px (Ready-to-eat + recipe modal) into feature-evidence/task-083/.
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 

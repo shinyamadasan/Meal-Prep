@@ -4,37 +4,38 @@
 
 ## Goal
 
-**Flexible Food System V1 — wave 1** (owner-approved 2026-11-25). Eat delicious, balanced meals
-whether or not we prepped, planned or decided — meal prep optional. Primary objective: versatility
-from ONE kitchen inventory (prep, cook fresh, or assemble low-effort meals), with no extra admin
-work and no unnecessary UI complexity. Inspired by Kylie Sakaida's *So Easy So Good*.
+**Flexible Food System V1 — final refinement** (owner-approved 2026-11-26). Maximum food
+flexibility with minimum decision-making and management: shop (restock / no-plan / planned, none
+mandatory), then eat via Instant Food, Quick Cook or Meal Prep from ONE kitchen inventory.
 
 ## Approach
 
-- Solo, dependency order: TASK-080 (truthful availability, read path) → TASK-081 (stock health,
-  read-only, per food class) → TASK-082 (no-plan grocery "Fill the gaps").
-- Codex builds each on a stacked branch off `ffs-v1`; Claude runs independent QA (full suite +
-  `npm run test:ledger-contract` re-run on the candidate) and review before releasing the next.
-- **Owner deploy hold:** max landing state is `approved`. No merge/push to `main`, no deploy.
-- Wave 2 prepared: TASK-083 (Balanced Plate + Snack Pack) at `status: todo`.
-- PROP-039 (private cookbook recipes) revised, awaiting owner approval. PROP-040 pending.
-- Live inventory: read-only audit only; snapshot preserved outside the public repo (D-087).
+- Review existing capability first (done 2026-11-26, recorded in the TASKS.md group header):
+  restock essentials = existing staples + Low/Empty auto-list; planned grocery = existing week
+  plan + batches; the three cooking modes = existing No-cook / Lowest effort / Batch-friendly
+  filters + Ready to eat. None of these gets new UI.
+- Build only the gaps: TASK-087 (Cook Now matching, finding A + D) and TASK-088 (expiry signals and
+  deletion safety, finding B, High/red-zone, solo) in parallel worktrees; then TASK-089 (Fill the
+  gaps polish + variety, finding C) and TASK-083 lite (Balanced Plate, Snack Pack deferred) on the
+  reviewed TASK-087 head.
+- Independent QA per task (full suite + `npm run test:ledger-contract` re-run by Claude), then
+  Claude merges approved heads into `ffs-v1-refine` and rebuilds the private offline preview.
+- TASK-084 deferred. Cookbook pack reviewed privately; Garlicky Roasted Chickpeas dropped.
+- **Owner deploy hold:** max landing state `approved`. No merge/push to `main`, no deploy.
 
 ## Scope
 
-**In:** TASK-080, TASK-081, TASK-082 (BQ-027/028/029).
-**Out:** stock-write fixes (audit F3/F4/F9, deferred solo High-risk), bridge worker changes,
-cookbook content in the repo, any deletion/cleanup of inventory records.
+**In:** TASK-087, TASK-088, TASK-089, TASK-083 (lite), TASK-085 refresh (integrated preview).
+**Out:** TASK-084, Snack Pack, nutrition scores/tracking, new shopping or cooking-mode UI, stock
+write paths (audit F3/F4/F9), bridge worker changes, any automatic record deletion.
 
 ## Source
 
-PROP-035/036/037/038 → BQ-027..030; planning/flexible-food-system-v1/*; D-086, D-087.
+Owner message "Flexible Food System — Final Refinement" (2026-11-26) · D-086 addendum 2 · D-088.
 
 ## Status
 
-in-progress — TASK-080 at `status: codex`.
-
----
+in-progress — plan committed on `ffs-v1-refine`; TASK-087 and TASK-088 released to Codex.
 
 ## Previous milestone (archived)
 
