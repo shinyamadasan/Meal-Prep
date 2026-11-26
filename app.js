@@ -187,7 +187,10 @@ const FRIDGE_SAFETY_EXCLUSIONS = /\b(?:eggs?|itlog|tofu|tokwa|tempeh|beans?|lent
 const THAWED_FOOD_DATE_HELP = 'Frozen until recently? Set its bought date to the day it went in the fridge.';
 
 function pantryFridgeSafety(p) {
-  if (p.storage === 'freezer') return null;
+  // Fridge limits only: frozen food is quality-only, and counter food is shelf-stable
+  // (canned luncheon meat, instant soup). Condiments and dry goods never take this path.
+  if ((p.storage || inferStorage(p.name, p.category)) !== 'fridge') return null;
+  if (stockFoodClass(p) !== 'perishable') return null;
   var name = (p.name || '').trim().toLowerCase();
   if (FRIDGE_SAFETY_EXCLUSIONS.test(name)) return null;
   var entry = stockIngredientEntry(name);
@@ -198,11 +201,12 @@ function pantryFridgeSafety(p) {
   var rule;
   for (var value of names) {
     rule = FRIDGE_SAFETY_LIMITS.find(candidate =>
-      (category === 'protein' || candidate.safetyClass === 'cooked-leftover') &&
+      (category === 'protein' || (candidate.safetyClass === 'cooked-leftover' &&
+        !['vegetable', 'fruit', 'dairy', 'pantry', 'grain'].includes(category))) &&
       candidate.match.test(value) && !candidate.exclude?.test(name));
     if (rule) break;
   }
-  if (!rule || (!p.storage && inferStorage(p.name, p.category) === 'freezer')) return null;
+  if (!rule) return null;
   var limitDays = Math.min(rule.days, entry?.fridgeDays ?? rule.days);
   var boughtDay = /^\d{4}-\d{2}-\d{2}$/.test(p.purchaseDate) ? stockCalendarDay(p.purchaseDate) : null;
   var daysLeft = boughtDay == null ? null : boughtDay + limitDays - stockCalendarDay(todayISO());

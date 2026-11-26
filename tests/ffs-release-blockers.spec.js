@@ -97,7 +97,7 @@ test('ordered safety rules honor food-specific boundaries, aliases, shorter DB l
     ['Hot dogs', '2026-11-18', 'cured-processed', 7, 'past-limit'],
     ['Ham', '2026-11-22', 'cured-processed', 3, 'past-limit'],
     ['Chicken adobo', '2026-11-21', 'cooked-leftover', 4, 'past-limit'],
-    ['Duck', '2026-11-23', 'poultry', 2, 'past-limit', { storage: 'counter' }]
+    ['Duck', '2026-11-23', 'poultry', 2, 'past-limit']
   ];
   const pantry = cases.map(([name, purchaseDate, , , , fields], i) => lot(String(i), name, { purchaseDate, ...fields }));
   const results = await page.evaluate(pantry => pantry.map(p => {
@@ -106,6 +106,19 @@ test('ordered safety rules honor food-specific boundaries, aliases, shorter DB l
   }), pantry);
   expect(results).toEqual(cases.map(([, , safetyClass, limit, safety]) =>
     [safetyClass, limit, safety, !safety, safety ? 'expired' : null]));
+
+  // Review fix: counter food is shelf-stable and condiments/vegetables never take the fridge path.
+  const notFridgeSafety = [
+    lot('c1', 'Spam', { storage: 'counter', purchaseDate: '2026-10-01' }),
+    lot('c2', 'Luncheon Meat', { storage: 'counter', purchaseDate: '2026-10-01' }),
+    lot('c3', 'Tuna', { storage: 'counter', purchaseDate: '2026-10-01' }),
+    lot('c4', 'Instant chicken soup', { category: 'Pantry', storage: 'counter', purchaseDate: '2026-10-01' }),
+    lot('c5', 'Curry Paste', { category: 'Pantry', purchaseDate: '2026-10-01' }),
+    lot('c6', 'Curry Paste', { category: 'Pantry' }),
+    lot('c7', 'Curry leaves', { category: 'Vegetable', purchaseDate: '2026-11-20' })
+  ];
+  expect(await page.evaluate(lots => lots.map(p => pantryDateSignal(p).safety ?? null), notFridgeSafety))
+    .toEqual(notFridgeSafety.map(() => null));
 
   const printed = { dateMode: 'expiry', expiryDate: '2026-11-25', purchaseDate: today, staple: true };
   expect(await page.evaluate(p => ({ signal: pantryDateSignal(p), available: pantryLotAvailable(p) }),
