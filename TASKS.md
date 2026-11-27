@@ -6917,7 +6917,7 @@ constraints: No change to which fields each tool changes or to its validation. N
 verification: as TASK-092.
 
 ### TASK-094 · PROP-041 P1-4 Safe purchase handling in `add_stock`
-status: codex
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (inventory write; food safety)
 source: BQ-032 / PROP-041 P1-4; audit C2; owner decision 4
@@ -6945,7 +6945,7 @@ constraints: No new tool, no lot creation (that is Phase 2). Keep `requestId` / 
 verification: as TASK-092.
 
 ### TASK-095 · PROP-041 P1-5 Recoverable chat removals: `undo_request`
-status: todo
+status: codex
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (restores records and clears tombstones)
 source: BQ-032 / PROP-041 P1-5; owner decisions 3 and 5
