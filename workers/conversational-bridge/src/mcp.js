@@ -490,7 +490,7 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'bought); it merges only when it equals the bought date of the lot, otherwise it must be recorded ' +
         'separately in the app. On needs_bought_date, ask the user when they bought it; use today only ' +
         'if they said "today" or "just bought", never guess. A future boughtDate is rejected. Other lots ' +
-        'keep their stored dates; stock bought BEFORE a lot's bought date is refused. Tell the user the ' +
+        'keep their stored dates; stock bought BEFORE the bought date of the lot is refused. Tell the user the ' +
         'bought date and storage of the lot from the result; when lot.storageSource is "inferred", say ' +
         'the storage was not recorded and was guessed from the ingredient. ' +
         'Stock-level-only staples and removed/tombstoned items must be handled in the app; use ' +
