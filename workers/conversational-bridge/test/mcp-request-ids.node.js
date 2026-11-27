@@ -127,6 +127,10 @@ test('every write tool requires requestId in its public schema; read tools do no
       assert.match(tool.description, /requestId is required/, tool.name);
       assert.match(tool.description, /SAME requestId when you retry/, tool.name);
       assert.match(tool.description, /request_id_reused/, tool.name);
+    } else if (tool.name === 'undo_request') {
+      // TASK-095: its own id is undoRequestId; requestId names the request to undo (mcp-undo.node.js).
+      assert.ok(tool.inputSchema.required.includes('undoRequestId'), tool.name);
+      assert.equal(tool.inputSchema.properties.undoRequestId.pattern, '^[A-Za-z0-9_-]{8,128}$', tool.name);
     } else {
       assert.equal(tool.inputSchema.properties && tool.inputSchema.properties.requestId, undefined, tool.name);
     }
@@ -221,7 +225,7 @@ test('the request record stores tool, argsHash, actor, timestamps (+30 days), re
   const args = { requestId: 'record-contents-1', ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', expectedRevision: 3 };
   const message = await b.call('consume_stock', args);
   const stored = b.fake.requestRecord('record-contents-1');
-  assert.deepEqual(Object.keys(stored).sort(), ['actor', 'added', 'argsHash', 'before', 'createdAt', 'expireAt', 'result', 'revisionAfter', 'revisionBefore', 'tool']);
+  assert.deepEqual(Object.keys(stored).sort(), ['actor', 'added', 'after', 'argsHash', 'before', 'createdAt', 'expireAt', 'result', 'revisionAfter', 'revisionBefore', 'tool']);
   assert.deepEqual(stored.added, {}, 'a partial consume adds no record');
   assert.equal(stored.tool, 'consume_stock');
   assert.equal(stored.argsHash, expectedHash(args));

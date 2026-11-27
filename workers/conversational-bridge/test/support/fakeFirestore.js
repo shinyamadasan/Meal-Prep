@@ -62,7 +62,7 @@ export function createFakeFirestore(initial = {}) {
       if (method !== 'GET') return respond(405, { error: { code: 405, status: 'INVALID_ARGUMENT', message: 'Unsupported method in fake.' } });
       const entry = requests.get(decodeURIComponent(requestMatch[1]));
       if (!entry) return respond(404, { error: { code: 404, status: 'NOT_FOUND', message: 'Document not found.' } });
-      return respond(200, { fields: entry.fields, createTime: entry.createTime, updateTime: entry.createTime });
+      return respond(200, { fields: entry.fields, createTime: entry.createTime, updateTime: entry.updateTime || entry.createTime });
     }
 
     if (!parsed.pathname.includes('/documents/users/')) {
@@ -120,6 +120,15 @@ export function createFakeFirestore(initial = {}) {
         if (pre.exists === false && exists) {
           return respond(409, { error: { code: 409, status: 'ALREADY_EXISTS', message: 'Document already exists.' } });
         }
+        // TASK-095: a masked field update of an existing record under its updateTime (undoneBy).
+        if (pre.updateTime) {
+          const entry = requests.get(requestMatch[1]);
+          if (!entry || (entry.updateTime || entry.createTime) !== pre.updateTime) {
+            return respond(400, { error: { code: 400, status: 'FAILED_PRECONDITION', message: 'updateTime mismatch — request record was modified.' } });
+          }
+          planned.push({ kind: 'requestUpdate', id: requestMatch[1], fieldPaths: (write.updateMask && write.updateMask.fieldPaths) || [], fields: write.update.fields || {} });
+          continue;
+        }
         planned.push({ kind: 'request', id: requestMatch[1], fields: write.update.fields || {} });
       } else if (typeof name === 'string' && USER_PATH.test(name)) {
         if (pre.exists === false && store.exists) {
@@ -136,7 +145,12 @@ export function createFakeFirestore(initial = {}) {
     const commitTime = nextUpdateTime();
     const writeResults = planned.map((p) => {
       if (p.kind === 'request') {
-        requests.set(p.id, { fields: p.fields, createTime: commitTime });
+        requests.set(p.id, { fields: p.fields, createTime: commitTime, updateTime: commitTime });
+      } else if (p.kind === 'requestUpdate') {
+        const entry = requests.get(p.id);
+        const fields = Object.assign({}, entry.fields);
+        p.fieldPaths.forEach((path) => { fields[path] = p.fields[path]; });
+        requests.set(p.id, { fields, createTime: entry.createTime, updateTime: commitTime });
       } else {
         p.fieldPaths.forEach((path) => setAtPath(store.fields, path, getAtPath(p.fields, path)));
         store.exists = true;

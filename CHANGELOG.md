@@ -5,6 +5,44 @@
 
 ---
 
+## TASK-095 — implementation complete (branch: task-095-mcp-undo; base: prop041-p1 2c90d22)
+Builder: Claude standing in for Codex (Codex at its usage limit). PROP-041 P1-5, owner decisions 3 and 5.
+changed:
+  - `workers/conversational-bridge/src/operations/requests.js`: `afterSnapshot()` (after-state of
+    every changed/added pantry/cookedMeals record + the value left in each touched tombstone);
+    `buildRequestRecord()` stores `after` on every NEW record (and `undoes` on an undo record);
+    `hashableArgs()/argsHash()` take the unhashed-key set (`UNDO_UNHASHED_ARG_KEYS`); new pure
+    `UndoRefusedError`, `checkUndoable()`, `planUndo()`.
+  - `src/firestore.js`: `getRequestDocument()` (record + `updateTime`; `getRequestRecord()` now
+    wraps it, same result); `commitRequestWrite()` optional `markRequest` third write — a masked
+    `undoneBy` update of the original record under its `updateTime` precondition, same commit.
+  - `src/mcp.js`: tool `undo_request({ requestId, undoRequestId, expectedRevision })` (strict schema,
+    write scope, destructive/idempotent annotations); `requestWriteTool()` gains optional plan hooks
+    (`idKey`, `unhashed`, `load`, `step.markRequest`/`step.undoes`, `onCommitConflict`) and
+    writes `after` into every record. Other tools' validation, field paths and results unchanged.
+  - Tests: new `test/mcp-undo.node.js` (28); fake Firestore models a guarded masked update of a
+    request record; tool-list tests now expect ten tools; record-keys test includes `after`; the
+    requestId-schema test checks `undo_request`'s `undoRequestId`.
+  - Docs: Worker README TASK-095 section; `docs/DATA_MODEL.md` (`after`, `undoes`, `undoneBy`);
+    `docs/DECISIONS.md` D-090 addendum (four choices). app.js unchanged.
+decisions:
+  - `consume_ready_food` undo is REFUSED (`undo_not_supported`): the ledger contract is append-only with
+    a closed six-field schema and `portionsConsumed` 1..99, so no fact can be deleted and no
+    compensating (negative) fact exists; restoring portions alone would leave a fact for food not
+    eaten. Any record whose `added.mealConsumptions` is non-empty is refused the same way.
+  - Refusals write nothing, not even the undo's record (the `undoRequestId` stays unspent; a retry
+    re-evaluates). Every restored record gets `updatedAt` = undo time (not only revived ones), so a
+    stale synced copy cannot win the D-020 merge. A revived record's tombstone is deleted (D-083);
+    other touched tombstones return to their prior value exactly. A batch the request added is removed
+    with a fresh tombstone only while untouched and no meal-consumption fact names it.
+findings (recorded, not fixed):
+  - F1: an app save that re-normalises an untouched record (adds/reorders a field, re-encodes a number)
+    makes undo refuse as `changed_since` — fails safe, may refuse more often than a user expects.
+  - F2: a request record now holds before + after + added copies; still far below Firestore's 1 MiB
+    document limit for single-item tools, but Phase 2 `apply_changes` (10 operations) should check it.
+  - F3: inventory operations stamp `updatedAt`/tombstones with the real clock, not the injected one
+    (pre-existing); undo uses the injected clock.
+
 ## TASK-096 — refresh four outdated production smoke specs (branch: task-096-prod-smoke-refresh; base: 48c8ec2)
 changed: `tests/production-smoke-kitchen-truth.spec.js` (3 tests), `tests/production-smoke-low-effort.spec.js` (1 test); `planning/ROADMAP.md` Known Issues entry "Stale production smoke specs (post FFS-V1)" removed; TASKS.md status. No app, HTML, CSS or Worker change.
 - `live: Home shows Needs Attention…`: Expired fixtures are now a printed use-by (`dateMode: 'expiry'`, past `expiryDate`) and a past-limit fridge-safety lot (raw chicken bought 4 days ago, D-089); "Old Broccoli" (estimate) is asserted under Check with Still good / Toss; Keep / Remove asserted on both Expired rows; `Remove expired (1)` proves only the printed record is bulk-eligible; tap-target height kept.

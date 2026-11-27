@@ -8,7 +8,7 @@ import {
 } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
-import { commitRequestWrite, getRequestRecord, getUserDocument, RequestAlreadyRecordedError, RevisionConflictError } from './firestore.js';
+import { commitRequestWrite, getRequestDocument, getRequestRecord, getUserDocument, RequestAlreadyRecordedError, RevisionConflictError } from './firestore.js';
 import { AmbiguousError, InsufficientServingsError, InsufficientStockError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
@@ -97,6 +97,16 @@ const MARK_IN_STOCK_ANNOTATIONS = {
 // replay (same revision) is a revision_conflict with zero mutation; a call with the new revision is
 // a different call, not a replay.
 const SET_QUANTITY_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
+// undo_request (TASK-095) can remove a ready-food batch and overwrites values, so destructiveHint is
+// true. idempotentHint is true: repeating the same call (same undoRequestId) replays the stored
+// result, and any other undo of the same request is refused as already_undone.
+const UNDO_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: true,
@@ -207,6 +217,22 @@ function addStockInputSchema() {
     boughtDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+// TASK-095: requestId names the request to undo; undoRequestId is this undo's own id.
+function undoRequestInputSchema() {
+  return z.strictObject({
+    requestId: requestIdSchema(),
+    undoRequestId: requestIdSchema(),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+function undoRecordRefSchema() {
+  return z.strictObject({
+    collection: z.enum(['pantry', 'cookedMeals']),
+    id: z.string()
   });
 }
 
@@ -517,6 +543,41 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     async (args) => addStockTool(env, deps, ctx, args)
   );
 
+  server.registerTool(
+    'undo_request',
+    {
+      title: 'Undo an earlier chat change',
+      description: 'Undo ONE earlier chat change (within 30 days) when the user asks to undo, reverse or ' +
+        'put back something chat did. requestId is the requestId of the change to undo (the one you sent ' +
+        'with it); undoRequestId is a NEW unique id for this undo (8-128 characters of A-Z, a-z, 0-9, _ or ' +
+        '-), and you send the SAME undoRequestId when you retry this undo after a timeout: a retried ' +
+        'undoRequestId never applies twice and returns the original result with replayed:true. Never ' +
+        'reuse an undoRequestId for a different undo (request_id_reused). Removed items come back with ' +
+        'the same id, changed items return to their earlier values, and ready food that change recorded is ' +
+        'removed again. The undo is refused and NOTHING changes when: the change is unknown or older than ' +
+        '30 days (request_not_found, undo_expired); it was already undone (already_undone); any affected ' +
+        'item changed since (changed_since) or a removed item\'s id is in use again (id_in_use); it was ' +
+        'itself an undo (undo_of_undo); it changed nothing (nothing_to_undo); it recorded food that was ' +
+        'eaten (undo_not_supported: eaten-meal history is permanent); or its record is incomplete ' +
+        '(undo_record_incomplete). Tell the user the reason and suggest fixing it in the app. Requires ' +
+        'expectedRevision from a fresh read; on revision_conflict, re-read before deciding whether to retry. ' +
+        'Undo one change per call.',
+      inputSchema: undoRequestInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
+        undoneRequestId: z.string(),
+        undoneTool: z.string(),
+        restored: z.array(undoRecordRefSchema()),
+        removed: z.array(undoRecordRefSchema())
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: UNDO_ANNOTATIONS
+    },
+    async (args) => undoRequestTool(env, deps, ctx, args)
+  );
+
   return server;
 }
 
@@ -530,10 +591,18 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
 // (write null, e.g. an already-out item) leaves the user document alone but still commits its
 // request record, so the id is spent: a lost-response retry gets the same "unchanged" answer
 // instead of applying a change nobody confirmed (review should-fix 2).
+// TASK-095 (undo_request) adds four optional plan hooks, unused by the other tools:
+//   `idKey` / `unhashed` - the argument naming THIS request's id and the keys left out of argsHash;
+//   `load(io)`           - async, after the replay check and before the user-document read;
+//                          its value is passed to apply(doc, loaded);
+//   step.markRequest     - a guarded field update of another request record in the same commit;
+//   `onCommitConflict`   - async, may replace a revision_conflict from the commit with a clearer error.
+// Every request record also stores `after` (TASK-095): the after-state undo compares against.
 async function requestWriteTool(env, deps, ctx, tool, args, plan) {
   try {
     const auth = requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    requests.validateRequestId(args ? args.requestId : undefined);
+    const idKey = plan.idKey || 'requestId';
+    requests.validateRequestId(args ? args[idKey] : undefined);
     if (plan.precheck) plan.precheck(args);
 
     const fetchImpl = deps.fetchImpl || fetch;
@@ -544,15 +613,18 @@ async function requestWriteTool(env, deps, ctx, tool, args, plan) {
     const commitWrite = deps.commitRequestWrite || commitRequestWrite;
     const nowMs = typeof deps.now === 'function' ? Number(deps.now()) : Date.now();
 
-    const hash = await requests.argsHash(args, cryptoImpl);
+    const hash = await requests.argsHash(args, cryptoImpl, plan.unhashed);
     const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const stored = await readRequest(env, accessToken, args.requestId, fetchImpl);
+    const ownId = args[idKey];
+    const stored = await readRequest(env, accessToken, ownId, fetchImpl);
     if (stored) return toolResult(requests.replayResult(stored, tool, hash));
 
+    const io = { env, accessToken, fetchImpl, deps, nowMs };
+    const loaded = plan.load ? await plan.load(io) : undefined;
     const doc = await readDoc(env, accessToken, fetchImpl);
     if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
 
-    const step = plan.apply(doc);
+    const step = plan.apply(doc, loaded);
     const write = step.write || null;
     const revisionAfter = write ? doc.revision + 1 : doc.revision;
     const result = step.result(revisionAfter);
@@ -565,18 +637,21 @@ async function requestWriteTool(env, deps, ctx, tool, args, plan) {
       revisionAfter,
       result,
       before: write ? requests.beforeSnapshot(doc, write) : requests.EMPTY_BEFORE,
-      added: write ? requests.addedRecords(doc, write) : {}
+      added: write ? requests.addedRecords(doc, write) : {},
+      after: write ? requests.afterSnapshot(doc, write) : requests.EMPTY_AFTER,
+      undoes: step.undoes
     });
     try {
       await commitWrite(env, accessToken, Object.assign({}, write || { fieldPaths: [], fields: {}, recordOnly: true }, {
         expectedUpdateTime: doc.updateTime,
         nextVersion: revisionAfter,
-        requestId: args.requestId,
+        requestId: ownId,
         record
-      }), fetchImpl);
+      }, step.markRequest ? { markRequest: step.markRequest } : {}), fetchImpl);
     } catch (error) {
       // A concurrent call with this requestId committed first: answer as its replay.
       if (error instanceof RequestAlreadyRecordedError) return toolResult(requests.replayResult(error.record, tool, hash));
+      if (error instanceof RevisionConflictError && plan.onCommitConflict) await plan.onCommitConflict(io);
       throw error;
     }
     return toolResult(result);
@@ -763,6 +838,61 @@ async function recordReadyFoodTool(env, deps, ctx, args) {
   });
 }
 
+// undo_request (TASK-095, PROP-041 P1-5): puts back what one earlier chat request changed. Its
+// own id is `undoRequestId`; `requestId` names the request to undo (part of argsHash, so the same
+// undoRequestId used for a different request is request_id_reused). Flow: the shared adapter
+// (auth, id shapes, replay of THIS undo) -> load the original record with its updateTime ->
+// record-level refusals -> read the user document -> expectedRevision -> requests.planUndo() ->
+// ONE commit: the guarded user-document update, this undo's create-only record, and `undoneBy` on
+// the original record under its updateTime precondition (two undos can never both apply).
+// A refusal writes nothing, not even this undo's record: undoRequestId stays unspent, so a retry
+// re-evaluates against the then-current state (TASK-095 decision, README).
+async function undoRequestTool(env, deps, ctx, args) {
+  let originalUpdateTime = null;
+  const readOriginal = (io) => (deps.getRequestDocument || getRequestDocument)(io.env, io.accessToken, args.requestId, io.fetchImpl);
+  return requestWriteTool(env, deps, ctx, requests.UNDO_TOOL, args, {
+    idKey: 'undoRequestId',
+    unhashed: requests.UNDO_UNHASHED_ARG_KEYS,
+    fallback: 'The request could not be undone.',
+    mapError: undoError,
+    precheck: (a) => requests.validateRequestId(a.requestId),
+    load: async (io) => {
+      const found = await readOriginal(io);
+      requests.checkUndoable(found ? found.record : null, args.requestId, io.nowMs);
+      originalUpdateTime = found.updateTime;
+      return Object.assign({ nowMs: io.nowMs }, found);
+    },
+    apply: (doc, original) => {
+      const plan = requests.planUndo(original.record, doc, args.requestId, original.nowMs);
+      return {
+        write: plan.write,
+        undoes: args.requestId,
+        markRequest: { requestId: args.requestId, updateTime: originalUpdateTime, fields: { undoneBy: args.undoRequestId } },
+        result: (revision) => ({
+          ok: true,
+          revision,
+          undoneRequestId: args.requestId,
+          undoneTool: original.record.tool,
+          restored: plan.restored,
+          removed: plan.removed
+        })
+      };
+    },
+    // Lost the commit race: if another undo of the same request won, say so plainly.
+    onCommitConflict: async (io) => {
+      const found = await readOriginal(io);
+      if (found && found.record && found.record.undoneBy != null) requests.checkUndoable(found.record, args.requestId, io.nowMs);
+    }
+  });
+}
+
+function undoError(error, fallback) {
+  if (error instanceof requests.UndoRefusedError) {
+    return { content: [{ type: 'text', text: error.reason + ': ' + error.message }], isError: true };
+  }
+  return inventoryStockError(error, fallback);
+}
+
 function readyFoodError(error, fallback) {
   if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
   const reused = requestError(error);
@@ -833,7 +963,8 @@ const TOOL_SECURITY_SCHEMES = {
   mark_in_stock: WRITE_SECURITY_SCHEMES,
   set_inventory_quantity: WRITE_SECURITY_SCHEMES,
   consume_stock: WRITE_SECURITY_SCHEMES,
-  add_stock: WRITE_SECURITY_SCHEMES
+  add_stock: WRITE_SECURITY_SCHEMES,
+  undo_request: WRITE_SECURITY_SCHEMES
 };
 
 async function addToolSecuritySchemes(response) {

@@ -110,7 +110,7 @@ function text(message) {
   return message.result.content[0].text;
 }
 
-test('tools/list exposes exactly nine tools; set_inventory_quantity has a strict schema with an expectedUnit precondition and no unit', async () => {
+test('tools/list exposes exactly ten tools; set_inventory_quantity has a strict schema with an expectedUnit precondition and no unit', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(1, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
   );
@@ -118,7 +118,7 @@ test('tools/list exposes exactly nine tools; set_inventory_quantity has a strict
   const names = tools.map((tool) => tool.name);
   assert.deepEqual(names, [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', NAME, 'consume_stock', 'add_stock'
+    'mark_out_of_stock', 'mark_in_stock', NAME, 'consume_stock', 'add_stock', 'undo_request'
   ]);
   assert.doesNotMatch(names.join(' '), /create_inventory|mutate_inventory|shopping|convert|leftover/i);
 

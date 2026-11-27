@@ -447,8 +447,13 @@ otherwise it becomes `null` (unknown) rather than an invented number.
   { pantry?: { id: priorValue|null }, cookedMeals?: {...} } }` — full copies of the records the
   write changed or removed and the prior value of each tombstone entry it touched, and `added` =
   `{ pantry?, cookedMeals?, mealConsumptions?: [...] }` — full copies of records the write added
-  (TASK-095 undo input). A no-op change (already out / already full) stores a record with empty
-  `before`/`added` and does not touch `users/{uid}`. A subcollection because the app saves `users/{uid}` with a full overwrite. Not read,
+  (TASK-095 undo input), and `after` (TASK-095) = same shape as `before` — full copies of the
+  records the write changed or added and the value it left in each touched tombstone entry
+  (null = none), which undo compares with the live document. An `undo_request` record also has
+  `undoes` (the requestId it undid); an undone record gains `undoneBy` (the undo's id), set in the
+  undo's own commit under the record's `updateTime` precondition. A no-op change (already out /
+  already full) stores a record with empty `before`/`added`/`after` and does not touch
+  `users/{uid}`. A subcollection because the app saves `users/{uid}` with a full overwrite. Not read,
   synced or restored by the app; not part of `version`.
 - `sharedRecipes` — public community feed (orphaned feature).
 - `familyInvitations` — invitation records, `status: pending | accepted` (accept flow incomplete).
