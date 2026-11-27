@@ -117,6 +117,11 @@ export function pantrySafety(p, today) {
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
   }
   let daysLeft = Number.isFinite(signal.daysLeft) ? signal.daysLeft : null;
+  // An absurd stored shelf life (e.g. 1e20) gives a day count the schema cannot carry; that lot
+  // alone is unknown instead of failing the whole read (review S1).
+  if (daysLeft != null && !Number.isSafeInteger(daysLeft)) {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
+  }
   let kind = signal.kind;
   // Within a fridge safety limit the app shows the shelf-life estimate, which can outlast the
   // limit (raw chicken: 3-day protein estimate, 2-day poultry limit). Chat gets the sooner day, so

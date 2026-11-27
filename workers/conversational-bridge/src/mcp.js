@@ -237,10 +237,14 @@ function readyFoodReadItemSchema() {
 const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, daysLeft, usable}, ' +
   'computed with the app\'s own food-safety rules for the household\'s calendar day. NEVER suggest, ' +
   'plan with, or describe as available any item with usable:false. status "unknown" means safety ' +
-  'information is missing (for example no storage location or no valid date): it is NOT usable; ' +
+  'information is missing or unreadable (for example no storage location, a ready-food batch with ' +
+  'no valid cooked date, or a record the app must fix): it is NOT usable; ' +
   'tell the user to check it in the app. status "check" means the user must look at it before ' +
   'using it; say so whenever you mention it. status "expired" is never usable. Give the label as ' +
-  'the reason; daysLeft is whole days left on the household calendar.';
+  'the reason; daysLeft is whole days left on the household calendar. A pantry item labelled "No ' +
+  'date recorded" has no freshness information; say so when you suggest it. safety.usable is the ' +
+  'only availability signal: inStock, staple and servingsRemaining are bookkeeping fields and never ' +
+  'override it.';
 
 export function createReadServer(env = {}, deps = {}, ctx = {}) {
   const server = new McpServer({

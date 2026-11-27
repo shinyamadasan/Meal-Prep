@@ -155,8 +155,8 @@ for (const today of safetyFixture.todays) {
 
   test(`get_ready_food safety equals the shared cooked-meal verdict for every parity-fixture case (today = ${today})`, async () => {
     const cookedMeals = cookedCases.map((c) => Object.assign({ id: c.id }, resolveRecord(c.record, today)));
-    // G1 fixed: a string or fractional portionsRemaining is floored for the integer count, so
-    // every batch is served and the read never fails for one odd record.
+    // G1 fixed: a batch the read schema cannot carry is served as unknown / invalid-record
+    // (asserted in the G1 test below), so the read never fails for one odd record.
     const { message, calls } = await callRead('get_ready_food', { revision: 6, pantry: [], cookedMeals }, manilaNoon(today));
     assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
     const toolItems = message.result.structuredContent.items;
@@ -177,9 +177,16 @@ for (const today of safetyFixture.todays) {
       } else {
         assert.deepEqual(signal, testCase.expected[today].signal, label);
       }
-      const unknown = !validCookedDay(meal.cookedDate) || (signal.daysLeft == null && meal.storage !== 'freezer');
       assert.equal(item.cookedMealId, testCase.id, label);
       assertSafetyShape(item.safety, label);
+      // A batch the read schema cannot carry (G1): unknown / invalid-record, never usable.
+      const pr = meal.portionsRemaining;
+      if (pr != null && !(Number.isInteger(pr) && pr >= 0 && pr <= 99)) {
+        assert.deepEqual(item.safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before eating', daysLeft: null, usable: false }, label);
+        assert.equal(item.servingsRemaining, null, label);
+        return;
+      }
+      const unknown = !validCookedDay(meal.cookedDate) || (signal.daysLeft == null && meal.storage !== 'freezer');
       assert.equal(item.safety.status, unknown ? 'unknown' : statusFromKind(signal.kind), label);
       assert.equal(item.safety.daysLeft, finiteOrNull(signal.daysLeft), label);
       assert.equal(item.safety.usable, available && !unknown && signal.kind !== 'expired', label);
@@ -302,19 +309,45 @@ test('review fix: counter and freezer lots past their estimate are check, never 
   }
 });
 
-test('review fix G1: one string or fractional portion count no longer fails the whole ready-food read', async () => {
+test('review fix G1: one unreadable ready-food batch is unknown and the rest still load', async () => {
   const today = '2026-11-26';
-  const cookedMeals = [
-    { id: 'text', name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: '3' },
-    { id: 'half', name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2.5 },
-    { id: 'whole', name: 'Sinigang', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 }
-  ];
-  const { message } = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals }, manilaNoon(today));
+  const good = { id: 'good', name: 'Sinigang', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 };
+  const bad = [
+    { id: 'half', portionsRemaining: 0.5 },
+    { id: 'text', portionsRemaining: '2' },
+    { id: 'blank', portionsRemaining: '' },
+    { id: 'bool', portionsRemaining: true },
+    { id: 'neg', portionsRemaining: -1 },
+    { id: 'big', portionsRemaining: 1000 },
+    { id: 'counter', storage: 'counter' },
+    { id: 'src', source: 'mystery' },
+    { id: 'numname', name: 7 }
+  ].map((o) => Object.assign({ name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 }, o));
+  const { message } = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals: [good].concat(bad) }, manilaNoon(today));
   assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
   const byId = Object.fromEntries(message.result.structuredContent.items.map((item) => [item.cookedMealId, item]));
-  assert.equal(byId.text.servingsRemaining, 3);
-  assert.equal(byId.half.servingsRemaining, 2);
-  assert.equal(byId.whole.servingsRemaining, 2);
+  assert.equal(byId.good.safety.usable, true);
+  assert.equal(byId.good.servingsRemaining, 2);
+  for (const b of bad) {
+    const item = byId[b.id];
+    assert.deepEqual(item.safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before eating', daysLeft: null, usable: false }, b.id);
+    assert.equal(item.servingsRemaining, null, b.id);
+    assert.equal(item.trackedPortions, false, b.id);
+  }
+});
+
+test('review fix S1: an absurd stored shelf life is unknown and does not fail get_inventory', async () => {
+  const today = '2026-11-26';
+  const pantry = [
+    { id: 'huge', name: 'Rice', category: 'Grain', storage: 'counter', purchaseDate: today, dateMode: 'purchase', shelfLifeDays: 1e20, quantity: 1, unit: 'kg' },
+    { id: 'fine', name: 'Rice', category: 'Grain', storage: 'counter', purchaseDate: today, dateMode: 'purchase', shelfLifeDays: 365, quantity: 1, unit: 'kg' }
+  ];
+  const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
+  const byId = Object.fromEntries(message.result.structuredContent.items.map((item) => [item.ingredientId, item]));
+  assert.equal(byId.huge.safety.status, 'unknown');
+  assert.equal(byId.huge.safety.usable, false);
+  assert.equal(byId.fine.safety.usable, true);
 });
 
 test('read-tool descriptions forbid suggesting unusable food; record_ready_food no longer claims unknown freshness', async () => {

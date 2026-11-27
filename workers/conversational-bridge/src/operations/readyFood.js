@@ -36,20 +36,13 @@ function tracksPortions(meal) {
   return meal != null && meal.portionsRemaining != null && Number.isFinite(Number(meal.portionsRemaining));
 }
 
-// The integer count chat sees (TASK-092 G1): the app floors the stored value for its count, so a
-// string or fractional portionsRemaining no longer fails the whole get_ready_food read.
-function servingsView(meal) {
-  if (!tracksPortions(meal)) return null;
-  return Math.max(0, Math.floor(Number(meal.portionsRemaining)));
-}
-
 function toReadyFoodItem(meal) {
   return {
     cookedMealId: String(meal.id),
     recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
     source: meal.source != null ? meal.source : null,
     name: meal.name != null ? meal.name : null,
-    servingsRemaining: servingsView(meal),
+    servingsRemaining: tracksPortions(meal) ? meal.portionsRemaining : null,
     trackedPortions: tracksPortions(meal),
     storage: meal.storage || 'fridge',
     cookedDate: meal.cookedDate != null ? meal.cookedDate : null,
@@ -130,11 +123,44 @@ export function readyFoodSafety(meal, today) {
 
 // get_ready_food's item (TASK-092): the existing read item plus the safety verdict. Write results
 // keep toReadyFoodItem().
+//
+// G1 (review): one stored batch the read schema cannot carry (a portion count that is not a whole
+// number 0..99, a storage or source outside the enums, a non-text name or date) must not fail the
+// whole read. That batch alone is shown as unknown and not usable, with schema-safe fields. This
+// is stricter than the app (D-091). Write results keep toReadyFoodItem() unchanged.
+function textOrNullValue(value) {
+  return typeof value === 'string' ? value : null;
+}
+
+function readableBatch(meal) {
+  const pr = meal.portionsRemaining;
+  return (pr == null || (Number.isInteger(pr) && pr >= 0 && pr <= PORTION_COUNT_MAX)) &&
+    (!meal.storage || VALID_STORAGE.includes(meal.storage)) &&
+    (meal.source == null || READY_FOOD_SOURCES.includes(meal.source)) &&
+    (meal.name == null || typeof meal.name === 'string') &&
+    (meal.cookedDate == null || typeof meal.cookedDate === 'string') &&
+    (meal.updatedAt == null || typeof meal.updatedAt === 'string');
+}
+
 export function listReadyFoodWithSafety(cookedMeals, today) {
   requireHouseholdDay(today);
-  return (cookedMeals || []).map((meal) => Object.assign(toReadyFoodItem(meal), {
-    safety: readyFoodSafety(meal, today)
-  }));
+  return (cookedMeals || []).map((meal) => {
+    if (readableBatch(meal)) {
+      return Object.assign(toReadyFoodItem(meal), { safety: readyFoodSafety(meal, today) });
+    }
+    return {
+      cookedMealId: String(meal.id),
+      recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
+      source: READY_FOOD_SOURCES.includes(meal.source) ? meal.source : null,
+      name: textOrNullValue(meal.name),
+      servingsRemaining: null,
+      trackedPortions: false,
+      storage: VALID_STORAGE.includes(meal.storage) ? meal.storage : 'fridge',
+      cookedDate: textOrNullValue(meal.cookedDate),
+      updatedAt: textOrNullValue(meal.updatedAt),
+      safety: { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before eating', daysLeft: null, usable: false }
+    };
+  });
 }
 
 function findMealIndex(cookedMeals, cookedMealId) {
