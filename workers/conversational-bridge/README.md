@@ -518,6 +518,13 @@ shared TASK-093 adapter: the same `undoRequestId` + same `requestId` replays, a 
   or tombstone differs from the request's after-state, or the batch to remove was eaten from) and
   `id_in_use` (a removed id is back). `revision_conflict` as for every write. A refusal does NOT
   record the `undoRequestId`: it stays unspent and a retry re-evaluates.
+- **Known limits (accepted).** Two chat changes to the same record: only the LATER one can be
+  undone; after undoing it, the earlier one is still refused as `changed_since` (the record now
+  holds the earlier change's `before`, not its `after`, and has a new `updatedAt`). A revived record
+  is appended at the end of its array, not at its old position (order carries no meaning in the
+  app). A batch `record_ready_food` added had no `updatedAt`; the app stamps one on load and saves
+  it, so for an added record whose written copy had no `updatedAt`, a live `updatedAt` alone is not
+  a change (every other field must still match).
 - **Eaten food is never undone.** `mealConsumptions` facts are append-only with a closed schema and
   `portionsConsumed` 1..99 (ledger contract), so there is no way to delete or offset one. Undoing
   `consume_ready_food` is refused (`undo_not_supported`); the user corrects portions in the app.

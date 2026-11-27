@@ -544,3 +544,54 @@ test('planUndo refuses a record that appended a ledger fact, whatever its tool n
   };
   assert.throws(() => requests.planUndo(record, seed(), 'synthetic-02', CLOCK_MS), (e) => e.reason === 'undo_not_supported');
 });
+
+// ── TASK-095 review fixes ───────────────────────────────────────────────────────────────────────
+
+test('review must-fix: undo record_ready_food after the app stamped and saved updatedAt on the new batch', async () => {
+  const b = bridge();
+  const created = ok(await b.call('record_ready_food', { requestId: 'cook-stamp-01', name: 'Soup', servings: 2, storage: 'fridge', cookedDate: '2026-11-26', expectedRevision: 3 }));
+  const id = created.item.cookedMealId;
+  assert.equal(find(b.fake.store.fields.cookedMeals, id).updatedAt, undefined, 'the bridge writes no updatedAt');
+  // The app's loadFromFirestore stamps a missing updatedAt and the 30 s autosave writes it back.
+  simulateAppWrite(b.fake, (doc) => { find(doc.cookedMeals, id).updatedAt = '2026-11-27T03:30:00.000Z'; });
+  const result = ok(await b.undo('cook-stamp-01', 'undo-stamp-01', 5));
+  assert.deepEqual(result.removed, [{ collection: 'cookedMeals', id }]);
+  assert.deepEqual(b.fake.store.fields.cookedMeals, [MEAL]);
+  assert.equal(b.fake.store.fields.deletions.cookedMeals[id], CLOCK_ISO);
+});
+
+test('review must-fix: a real edit of the added batch is still refused, with or without an updatedAt stamp', async () => {
+  for (const stamp of [false, true]) {
+    const b = bridge();
+    const created = ok(await b.call('record_ready_food', { requestId: 'cook-edit-001', name: 'Soup', servings: 2, storage: 'fridge', cookedDate: '2026-11-26', expectedRevision: 3 }));
+    const id = created.item.cookedMealId;
+    simulateAppWrite(b.fake, (doc) => {
+      const batch = find(doc.cookedMeals, id);
+      batch.storage = 'freezer';
+      if (stamp) batch.updatedAt = '2026-11-27T03:30:00.000Z';
+    });
+    await assertRefused(b, b.undo('cook-edit-001', 'undo-edit-001', 5), 'changed_since');
+  }
+});
+
+test('review: a revived record carries an updatedAt newer than its old removal record (consistent clocks)', async () => {
+  const b = bridge();
+  ok(await b.call('mark_out_of_stock', { requestId: 'out-eggs-clk1', ingredientId: 'eggs', expectedRevision: 3 }));
+  const tombstone = b.fake.store.fields.deletions.pantry.eggs;
+  assert.ok(tombstone);
+  // The inventory write stamps its tombstone with the real clock; run the undo a minute later.
+  b.clock.ms = Math.max(Date.parse(tombstone), CLOCK_MS) + 60000;
+  ok(await b.undo('out-eggs-clk1', 'undo-eggs-clk', 4));
+  const eggs = find(b.fake.store.fields.pantry, 'eggs');
+  assert.ok(Date.parse(eggs.updatedAt) > Date.parse(tombstone), 'revived updatedAt ' + eggs.updatedAt + ' > tombstone ' + tombstone);
+  assert.equal(b.fake.store.fields.deletions.pantry.eggs, undefined);
+});
+
+test('review: two chat changes to one record - only the later can be undone; the earlier is then refused', async () => {
+  const b = bridge();
+  ok(await b.call('consume_stock', { requestId: 'use-chick-a01', ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', expectedRevision: 3 }));
+  ok(await b.call('consume_stock', { requestId: 'use-chick-b01', ingredientId: 'chicken', quantity: 50, expectedUnit: 'g', expectedRevision: 4 }));
+  ok(await b.undo('use-chick-b01', 'undo-chick-b1', 5));
+  assert.equal(find(b.fake.store.fields.pantry, 'chicken').quantity, 400);
+  await assertRefused(b, b.undo('use-chick-a01', 'undo-chick-a1', 6), 'changed_since');
+});

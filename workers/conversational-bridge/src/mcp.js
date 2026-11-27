@@ -556,7 +556,8 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'the same id, changed items return to their earlier values, and ready food that change recorded is ' +
         'removed again. The undo is refused and NOTHING changes when: the change is unknown or older than ' +
         '30 days (request_not_found, undo_expired); it was already undone (already_undone); any affected ' +
-        'item changed since (changed_since) or a removed item\'s id is in use again (id_in_use); it was ' +
+        'item changed since (changed_since; so to undo two changes to the same item, only the latest can ' +
+        'be undone - the earlier one is then refused) or a removed item\'s id is in use again (id_in_use); it was ' +
         'itself an undo (undo_of_undo); it changed nothing (nothing_to_undo); it recorded food that was ' +
         'eaten (undo_not_supported: eaten-meal history is permanent); or its record is incomplete ' +
         '(undo_record_incomplete). Tell the user the reason and suggest fixing it in the app. Requires ' +

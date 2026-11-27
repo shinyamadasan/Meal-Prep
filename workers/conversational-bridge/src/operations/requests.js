@@ -214,6 +214,17 @@ function same(a, b) {
   return canonicalJson(a) === canonicalJson(b);
 }
 
+// A record the request ADDED is unchanged when it deep-equals the copy the request wrote. One
+// exception (TASK-095 review must-fix): record_ready_food writes its batch without `updatedAt`, and
+// the app stamps one on load and saves it back (loadFromFirestore + autosave), so when the written
+// copy had no `updatedAt` a live `updatedAt` alone is not a change. Every other field must match.
+function sameAdded(live, written) {
+  if (written == null || typeof written !== 'object' || written.updatedAt != null) return same(live, written);
+  if (!isPlainObject(live)) return false;
+  const { updatedAt: _ignored, ...rest } = live;
+  return same(rest, written);
+}
+
 function snapshotShapeOk(snapshot) {
   return isPlainObject(snapshot) &&
     SNAPSHOT_FIELDS.every((field) => Array.isArray(snapshot[field]) &&
@@ -314,7 +325,7 @@ export function planUndo(record, doc, requestId, nowMs) {
       if (beforeIds.has(id)) return;
       if (!addedIds.has(id)) throw incomplete(requestId, 'is inconsistent (an after-state record with no before-state)');
       const found = at(id);
-      if (found.length !== 1 || !same(current[found[0]], written)) throw changedSince(requestId, 'The ' + field + ' record "' + id + '"');
+      if (found.length !== 1 || !sameAdded(current[found[0]], written)) throw changedSince(requestId, 'The ' + field + ' record "' + id + '"');
       if (field === 'cookedMeals') {
         if (!Array.isArray(doc.mealConsumptions)) throw incomplete(requestId, 'cannot be checked against unreadable meal history');
         if (doc.mealConsumptions.some((f) => f && f.cookedMealId != null && String(f.cookedMealId) === id)) {
