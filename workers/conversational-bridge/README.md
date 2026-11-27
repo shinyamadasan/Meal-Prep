@@ -492,6 +492,49 @@ write tools are unchanged; `requestId` / `expectedRevision` guards are unchanged
   and time-zone failures before Firestore, replay and `request_id_reused` on a changed
   `boughtDate`).
 
+## TASK-095 recoverable chat changes: `undo_request` (PROP-041 P1-5, local only — NOT deployed)
+
+One new write tool, `undo_request({ requestId, undoRequestId, expectedRevision })` (ten tools in
+all). `requestId` names the earlier chat change to undo; `undoRequestId` is the undo's OWN id
+(same 8-128 `[A-Za-z0-9_-]` rule), so the undo is itself recorded and replay-safe through the
+shared TASK-093 adapter: the same `undoRequestId` + same `requestId` replays, a different
+`requestId` is `request_id_reused`. Logic lives in `operations/requests.js`
+(`checkUndoable()`, `planUndo()`, pure); `mcp.js` stays a thin adapter.
+
+- **Input it needs.** Every new request record also stores `after` (the after-state of each
+  record the write changed or added, and the value it left in each tombstone entry it touched).
+  Records without it (none are deployed) are refused as `undo_record_incomplete`.
+- **What it restores.** Changed records get their `before` copy back; removed records come back
+  with the same id and their tombstone is deleted (the app's restore, D-083); every restored record
+  gets `updatedAt` = the undo time. A ready-food batch the request created is removed again with a
+  fresh tombstone (D-071). Other tombstone entries the request touched return to their prior value.
+- **ONE commit, three writes:** the guarded user-document update, the undo's create-only record
+  (with `undoes`), and `undoneBy` on the original record under that record's `updateTime`
+  precondition — two undos of one request can never both apply.
+- **Refused with zero writes** (reason is the text prefix): `request_not_found` (no record, or
+  removed by the TTL policy), `undo_expired` (now >= `expireAt`, injected clock), `undo_of_undo`,
+  `already_undone`, `nothing_to_undo` (a no-op original), `undo_not_supported`
+  (`consume_ready_food`, see below), `undo_record_incomplete`, `changed_since` (an affected record
+  or tombstone differs from the request's after-state, or the batch to remove was eaten from) and
+  `id_in_use` (a removed id is back). `revision_conflict` as for every write. A refusal does NOT
+  record the `undoRequestId`: it stays unspent and a retry re-evaluates.
+- **Known limits (accepted).** Two chat changes to the same record: only the LATER one can be
+  undone; after undoing it, the earlier one is still refused as `changed_since` (the record now
+  holds the earlier change's `before`, not its `after`, and has a new `updatedAt`). A revived record
+  is appended at the end of its array, not at its old position (order carries no meaning in the
+  app). A batch `record_ready_food` added had no `updatedAt`; the app stamps one on load and saves
+  it, so for an added record whose written copy had no `updatedAt`, a live `updatedAt` alone is not
+  a change (every other field must still match).
+- **Eaten food is never undone.** `mealConsumptions` facts are append-only with a closed schema and
+  `portionsConsumed` 1..99 (ledger contract), so there is no way to delete or offset one. Undoing
+  `consume_ready_food` is refused (`undo_not_supported`); the user corrects portions in the app.
+  No undo ever writes `mealConsumptions`.
+- **IAM:** marking `undoneBy` is an update of an `mcpRequests` document; the role's existing
+  `datastore.entities.update` covers it (plus TASK-093's `create`).
+- Tests: `test/mcp-undo.node.js` (undo of each write tool, stale-after-edit, removed id reused,
+  tombstone changed, expired, missing, incomplete record, no-op original, double undo sequential and
+  concurrent, the original-record precondition alone, undo-of-undo, replay, reused id).
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other

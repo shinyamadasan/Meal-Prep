@@ -5,6 +5,27 @@
 
 ---
 
+## TASK-095 · 2026-11-27 · undo_request (PROP-041 P1-5)
+Builder: Claude standing in for Codex.
+suite: `npm run test:bridge` 358/358 PASS (330 before + 28 in `test/mcp-undo.node.js`); `npm test` (local)
+912/912 PASS (port 47813 free; rewritten `feature-evidence` screenshots restored with
+`git checkout -- feature-evidence`); `npm run test:ledger-contract` 13/13 PASS; `node --check` on every
+Worker src/test JS file; `git diff --check` clean; `tools/Verify-Decisions.ps1` 117/117;
+`npx wrangler deploy --dry-run` builds (dry run only, nothing deployed).
+covered: undo of set_inventory_quantity, consume_stock (partial and to zero, revived with the same id,
+tombstone cleared, other tombstones kept), add_stock, mark_out_of_stock (staple and removed non-staple),
+mark_in_stock, record_ready_food (batch removed + tombstone, facts untouched); consume_ready_food refused
+(`undo_not_supported`, facts byte-identical); stale-after-edit (app edit and later chat change),
+tombstone changed/cleared, removed id reused (`id_in_use`), batch eaten from/edited/named by a fact,
+unrelated later changes kept; expired (at expireAt refused, 1 ms before allowed); missing record;
+incomplete record (no `after`, no `before`, bad `after`, no `expireAt`); no-op original; double undo
+sequential and concurrent (one commit lands, loser `already_undone`, no loser record); original-record
+precondition alone; undo-of-undo; replay of the undo (stale revision too), reused undoRequestId, self id;
+stale expectedRevision then retry with the same id; validation before any Firestore access; exact
+three-write commit body; `after` stored on new records; pure planner tombstone restore. Every refusal
+asserts zero commits and a byte-identical user document and request store.
+result: all pass. TASK-095 set to `review`.
+
 ## TASK-096 · 2026-11-26 · production smoke refresh
 suite: `npx playwright test tests/production-smoke-kitchen-truth.spec.js tests/production-smoke-low-effort.spec.js --project=prod` 17/17 PASS against https://shinyamadasan.github.io/Meal-Prep/ (signed-out fresh contexts; no sign-in, no account write); full `npm run test:prod` 155 passed, 4 skipped (pre-existing conditional skips), 0 failed; `npm test` (local) 905/905 PASS, `suite-classification` included; `git diff --check` clean.
 result: the four previously failing prod specs pass and assert shipped D-088/D-089/TASK-079 behaviour; no assertion weakened. TASK-096 set to `review`.

@@ -228,6 +228,13 @@ export function encodeRequestRecord(record) {
 
 // The stored request record, or null when this requestId has never committed.
 export async function getRequestRecord(env, accessToken, requestId, fetchImpl = fetch) {
+  const found = await getRequestDocument(env, accessToken, requestId, fetchImpl);
+  return found ? found.record : null;
+}
+
+// The stored request record plus its Firestore updateTime (TASK-095: undo marks the original
+// record with `undoneBy` under an updateTime precondition), or null when it never committed.
+export async function getRequestDocument(env, accessToken, requestId, fetchImpl = fetch) {
   let response;
   try {
     response = await fetchImpl(FIRESTORE_HOST + '/v1/' + requestDocumentPath(env, requestId), {
@@ -247,7 +254,7 @@ export async function getRequestRecord(env, accessToken, requestId, fetchImpl = 
   } catch (cause) {
     throw new InfrastructureError('Firestore returned an unreadable request record.', cause);
   }
-  return decodeFields(doc.fields || {});
+  return { record: decodeFields(doc.fields || {}), updateTime: doc.updateTime || null };
 }
 
 // ONE atomic `documents:commit` of two writes — both apply or neither does:
@@ -258,7 +265,10 @@ export async function getRequestRecord(env, accessToken, requestId, fetchImpl = 
 // A failed precondition is either a newer user document (-> RevisionConflictError with fresh
 // state, as before) or the same requestId committed first by a concurrent call (->
 // RequestAlreadyRecordedError carrying that record, so the caller answers it as a replay).
-export async function commitRequestWrite(env, accessToken, { fieldPaths, fields, expectedUpdateTime, nextVersion, requestId, record, recordOnly }, fetchImpl = fetch) {
+// `markRequest` (undo_request only, TASK-095) adds a third write to the same commit: a field update
+// of ANOTHER request record (`undoneBy`) guarded by that record's updateTime, so two undos of one
+// request can never both apply.
+export async function commitRequestWrite(env, accessToken, { fieldPaths, fields, expectedUpdateTime, nextVersion, requestId, record, recordOnly, markRequest }, fetchImpl = fetch) {
   const writes = [];
   // recordOnly: a no-op change commits only its request record (the user document is untouched,
   // its version unchanged), so the requestId is spent and a retry replays the same answer.
@@ -273,6 +283,14 @@ export async function commitRequestWrite(env, accessToken, { fieldPaths, fields,
     update: { name: requestDocumentPath(env, requestId), fields: encodeRequestRecord(record) },
     currentDocument: { exists: false }
   });
+  if (markRequest) {
+    if (!markRequest.updateTime) throw new InfrastructureError('A request record update needs its updateTime.');
+    writes.push({
+      update: { name: requestDocumentPath(env, markRequest.requestId), fields: encodeFields(markRequest.fields) },
+      updateMask: { fieldPaths: Object.keys(markRequest.fields) },
+      currentDocument: { updateTime: markRequest.updateTime }
+    });
+  }
   const url = FIRESTORE_HOST + '/v1/projects/' + env.FIRESTORE_PROJECT_ID + '/databases/(default)/documents:commit';
 
   let response;

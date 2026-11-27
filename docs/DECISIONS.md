@@ -3673,6 +3673,26 @@ fixed first. A second copy of the safety rules in the Worker would drift; a shar
 **Consequences.** BQ-030/031 (TASK-083 follow-ups, TASK-084) are frozen. PROP-041 Phases 2-3 need a
 new owner approval. Phase 1 lands `approved` (held); nothing deploys without the owner.
 
+**Addendum (TASK-095, `undo_request`, 2026-11-27 — Claude standing in for Codex).** Four
+non-obvious choices:
+1. **Eaten food cannot be undone from chat.** A `consume_ready_food` request appends a
+   `mealConsumptions` fact. The ledger contract (LEDGER_CONTRACT.md, MEAL_LEDGER_SOURCE_CONTRACT_V1)
+   makes facts append-only with a closed six-field schema and `portionsConsumed` 1..99, so a fact can
+   neither be deleted nor offset by a negative/compensating fact. Restoring the portions alone would
+   leave a fact for food that was never eaten. Its undo is refused (`undo_not_supported`); the user
+   corrects portions in the app.
+2. **Every restored record gets `updatedAt` = the undo time,** not only revived ones (D-083 restamps
+   revived records). Otherwise a stale synced copy carrying the request's newer `updatedAt` would win
+   the app's D-020 merge and silently redo the change.
+3. **A revived record's tombstone is deleted** even if `before.deletions` recorded an older value for
+   it (the app's restore clears matching tombstones, D-083); every other tombstone entry the request
+   touched returns to its prior value exactly. A record the request ADDED (a ready-food batch) is
+   removed with a fresh tombstone (D-071), and only while no meal-consumption fact names it.
+4. **A refused undo writes nothing, not even its own record**, so `undoRequestId` is not spent and a
+   retry re-evaluates. Only an applied undo is recorded (replay-safe like every chat write); a second
+   undo is refused through `undoneBy` on the original record, written in the same commit under that
+   record's `updateTime` precondition.
+
 ## D-091 — Shared food-safety core: default-path rules for the Worker
 
 **Date:** 2026-11-27 · **Tasks:** TASK-091, TASK-092 · **Decided by:** Claude (owner-approved Phase 1 scope)
