@@ -4,6 +4,47 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-094 (PROP-041 P1-4 safe purchase handling in add_stock) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `859e44c`. Independent
+STRICT review round 1: **FAIL** — must-fix: a lot whose stored `storage` is not text (`{}`, `1`)
+merged without a bought date (the shared rules read it as "not fridge", skipping the poultry
+limit), committed, then failed output validation, although `get_inventory` calls the same lot
+`invalid-record`. Should-fix: `'Fridge'` / `' fridge'` skipped the fridge limits; an older
+`boughtDate` on a non-safety lot let older stock take a newer clock; a malformed stored date was
+stated back; inferred storage was reported as stored; staples are now date-checked (owner note).
+
+Review fixes (Claude; evidence here, not in CHANGELOG/TEST_REPORT):
+- `0f4fb6d`: `requireMergeableLot` applies `readableLot` and the app's exact storage values
+  (`fridge`/`freezer`/`counter`; `''`/null fall back to the shared inference); an earlier
+  `boughtDate` than a non-safety lot's date is refused; `lot.boughtDate` null unless a real
+  calendar day; `lot.storageSource` = recorded / inferred / null; test fixtures used storage
+  `'pantry'`, which the app never writes. **This commit shipped a JS syntax error** (unescaped
+  apostrophe in the `add_stock` description) — pushed to the task branch before the suite ran.
+- `450f1be`: repairs that string (`node --check` + 329/329 before commit).
+- `eff9993`: tests for `''` storage and MCP-level refusals of `{}` / `'Fridge'` (zero writes, no
+  request record); README matches the code.
+Round 2 STRICT re-review of `859e44c..450f1be`: **PASS, no must-fix** — every place `app.js` sets
+pantry `storage` yields only fridge/freezer/counter/''; no input found that merges into a lot the
+app or `get_inventory` flags, or commits then fails output validation.
+Claude's gates on the merged head: `test:bridge` 330/330. Reviewer: `npm test` 912/912, ledger
+13/13, `git diff --check` clean. Private production-export check (pure functions, 2026-11-27):
+`add_stock` accepts the same 11 of 97 lots before and after this task and refuses the same 8
+(now with the app's wording: 7 estimate passed, 1 past the fridge limit). 59 lots are refused
+by the pre-existing ambiguous-staple rule (audit C5) and 13 stock-level staples need
+`mark_in_stock` — a Phase 2 scope point for the owner, not changed here.
+
+Accepted deviations: an out-of-stock lot with ok/use-soon dates can be refilled (fridge-safety
+lots still need an exact `boughtDate`); `boughtDate` is not stored on non-safety lots (older is
+refused, newer keeps the older date — warnings come sooner); staples are now date-checked (a
+staple past its estimate or with a printed date is refused); `needs_bought_date:` is a
+`ValidationError` message prefix. Recorded, not fixed: a non-staple lot with `stockLevel: 'empty'`
+and a quantity merges but stays "Out of stock" in `get_inventory` (stockLevel only reset for
+staples); duplicate ids (first match) — both pre-existing.
+Merged into `prop041-p1` (`362ee10`). **Gate: `approved` (held)** — red zone: inventory write path
+and food safety.
+
+---
 ## Review TASK-093 (PROP-041 P1-3 no duplicate writes) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `711118f`. Independent
