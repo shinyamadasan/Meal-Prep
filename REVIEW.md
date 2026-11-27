@@ -4,6 +4,43 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-095 (PROP-041 P1-5 recoverable chat changes: undo_request) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `2f086fa`. Independent
+STRICT review round 1: **FAIL** — must-fix: undoing `record_ready_food` was almost always refused
+as `changed_since`: `recordCookedFood()` writes the batch without `updatedAt`, the app's
+`loadFromFirestore` stamps one and the 30 s autosave writes it back, so the live batch never
+deep-equalled the request's `after` copy. Should-fix: a consistent-clock test that a revived
+record's `updatedAt` is newer than its old tombstone; document the later-then-earlier undo limit;
+note that revived records are appended at the end of the array.
+
+Review fixes (Claude; evidence here, not in CHANGELOG/TEST_REPORT):
+- `a199ac9`: `sameAdded()` — for a record the request ADDED whose written copy had no
+  `updatedAt`, a live `updatedAt` alone is not a change; every other field must still match
+  (records that existed before keep the strict `same()`). Tests: undo after the app stamped and
+  saved the batch; a real edit still refused (with and without a stamp); revived `updatedAt` newer
+  than its tombstone; two changes to one record (only the later undoes). README "Known limits" and
+  the tool description updated. The must-fix test fails with the fix reverted.
+- `119c107`: review nit — `sameAdded` strips `updatedAt` from both copies (a written `null` no
+  longer makes an untouched record unmatchable; latent, no tool writes it today).
+Round 2 STRICT re-review of `2f086fa..a199ac9`: **PASS, no must-fix.** Reviewer traced every
+`app.js` path a bridge-created batch takes (`normalizeCookedMeal`, `loadFromFirestore`,
+`unionByIdLWW`, realtime snapshot, `mergeCloudConflict`, save): only `updatedAt` changes, so the fix
+is complete; adversarial `planUndo` probes (extra/removed fields, null vs missing, non-object live
+record, stamped pantry add) are all refused correctly.
+Gates: `test:bridge` 362/362 (Claude, task head and merged head); reviewer `npm test` 912/912,
+ledger 13/13, `git diff --check` clean.
+
+Accepted deviations / recorded, not fixed: refusals do not record the `undoRequestId`; undoing
+`consume_ready_food` is refused (`undo_not_supported`: ledger facts are never deleted or offset);
+only the later of two changes to one record can be undone; revived records are appended at the end
+of their array; the undo's tombstone uses the Worker clock, so a device clock running fast could
+stamp a batch later than its removal and a stale copy could win that device's next sign-in merge
+(the same exposure `finish_ready_food` already has).
+Merged into `prop041-p1` (`32f7699`). **Gate: `approved` (held)** — red zone: Firestore writes to
+`pantry`, `cookedMeals`, `deletions` and `mcpRequests`.
+
+---
 ## Review TASK-094 (PROP-041 P1-4 safe purchase handling in add_stock) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `859e44c`. Independent
