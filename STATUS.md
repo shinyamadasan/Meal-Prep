@@ -5,6 +5,24 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-11-27 — PROP-041 Phase 1 complete (held); release prepared; Phase 2 prioritised
+
+**Owner decisions:** accepted Phase 1's independent review and QA; prepare a controlled release;
+no merge or deploy until the owner approves the final checklist; Phase 2 priorities (stock-tracking
+ambiguity, registration, prepared ingredients, staple levels) on a separate track; production
+inventory untouched.
+**State:** TASK-091..095 `approved` (held) on `prop041-p1` (`4b09ecd`). Gates on that head:
+`test:bridge` 362/362, `test:ledger-contract` 13/13, `npm test` 912/912, `git diff --check` clean;
+`wrangler deploy --dry-run` PASS (310 KiB gzip). TASK-097 (staple parity) `codex` on BQ-034.
+**Release findings** (`planning/PROP-041-P1-RELEASE.md`): no active REST client found (recommend
+retiring `BRIDGE_API_TOKEN` at deploy); clock-skew undo issue not a blocker (follow-up recorded);
+bridge service account holds only get+update — needs `datastore.entities.create` only; TTL policy
+refused by Firestore because billing is disabled (owner decision: Blaze or defer).
+**Blockers (owner):** approve the checklist; TTL/billing choice; REST token choice; Cloudflare
+access (`wrangler login` or owner-run steps); ChatGPT smoke (6.3/6.4); Phase 2 decisions D1-D3.
+
+---
+
 ## 2026-11-26 — V1 accepted; scope frozen; PROP-041 Phase 1 approved and planned
 
 **Owner decisions:** V1 release accepted. Application feature scope frozen (D-090). PROP-041 Phase 1

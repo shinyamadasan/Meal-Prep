@@ -7007,6 +7007,49 @@ constraints: Test files only. Signed-out fresh contexts only — never sign in, 
   account. No app/Worker change. Push only the task branch. Stop at `status: review`.
 verification: the commands above; `git diff --check`; CHANGELOG/TEST_REPORT.
 
+<!-- ═══════════════════════════════════════════════════════
+     BQ-034 · PROP-041 Phase 2 (prioritised 2026-11-27) — separate track from the Phase 1 release
+     Risk: High (bridge write paths) · Execution: Solo
+     Integration branch `prop041-p2` from `prop041-p1`. Landing `approved` (held). No deploy.
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-097 · PROP-041 P2-0a Staple parity: the bridge uses the app's `isStaple`
+status: codex
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (changes which lots the quantity and stock-level write tools accept)
+source: BQ-034 / PROP-041 Phase 2 priority 1 (stock-tracking ambiguity, 59 of 97 lots)
+depends-on: Phase 1 on `prop041-p1` (TASK-091 shared core). Does not wait for the Phase 1 release.
+branch: `task-097-staple-parity` from `prop041-p2` (Claude creates `prop041-p2` from `prop041-p1`)
+files: `workers/conversational-bridge/src/operations/inventory.js`; `src/mcp.js` (output schema +
+  descriptions); Worker tests; `workers/conversational-bridge/README.md`; CHANGELOG.md;
+  TEST_REPORT.md; TASKS.md status.
+objective: Chat classifies every lot as staple or non-staple exactly as the app does, so lots the
+  app treats as ordinary quantity items are no longer refused as `ambiguous`, without changing any
+  stored record.
+acceptance:
+  - [ ] `classifyStaple()` / `isStapleRecord()` delegate to `MealPrepFoodSafety.isStaple` (stored
+        flag → exact-name `INGREDIENT_DB.isStaple` → category `Pantry` → non-staple). A record the
+        shared function cannot read (non-object, throwing `name`/`category`) is refused as today
+        (`invalid-record` in reads; no write), never guessed.
+  - [ ] Every write tool that refused `ambiguous` for staple classification (`set_inventory_quantity`,
+        `mark_out_of_stock`, `mark_in_stock`, `consume_stock`, `add_stock`) now follows the app's
+        answer; all Phase 1 guards are unchanged (`requestId`, revision, P1-4 safety refusals, undo).
+  - [ ] `get_inventory` items add `tracking`: `level` (staple), `quantity` (non-staple with a finite
+        quantity and a unit), `presence` (non-staple without a usable quantity or unit). Quantity
+        tools refuse a `presence` lot with a validation error telling chat to ask the user for an
+        amount (no write, no request record). Descriptions explain the three kinds.
+  - [ ] Parity test: for a fixture set covering flag true/false/missing, an `INGREDIENT_DB` staple by
+        exact name (e.g. one with `isStaple: true`), a near-miss name, category `Pantry` in any case,
+        and empty category, the bridge's classification equals `MealPrepFoodSafety.isStaple`.
+  - [ ] Tests for each tool on a previously ambiguous quantity lot (accepted) and a presence-only lot
+        (refused, zero writes). Existing tests that asserted `ambiguous` are updated only where the
+        app's rule now gives an answer; say which in CHANGELOG.
+  - [ ] README: replace the "ambiguous staple" section with the parity rule and `tracking`.
+constraints: Bridge only — no app, shared-core or stored-data change. No new tool. Keep
+  `consume_ready_food` / ledger untouched. No deploy. Stop at `status: review`.
+verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`; `git diff --check`;
+  `node --check` on changed files. Claude adds a private real-export count (read-only) at review.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`
