@@ -265,6 +265,8 @@ function safetySchema() {
 // Write tools keep inventoryItemSchema() / readyFoodItemSchema() unchanged.
 function inventoryReadItemSchema() {
   return inventoryItemSchema().extend({
+    // TASK-097: how the lot is tracked; null only for an invalid-record lot (never guessed).
+    tracking: z.enum(['level', 'quantity', 'presence']).nullable(),
     category: z.string().nullable(),
     purchaseDate: z.string().nullable(),
     expiryDate: z.string().nullable(),
@@ -291,6 +293,17 @@ const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, day
   'only availability signal: inStock, staple and servingsRemaining are bookkeeping fields and never ' +
   'override it.';
 
+// TASK-097: staple classification is the app's own rule (shared/foodSafety.js isStaple).
+const TRACKING_TEXT = 'Every pantry item carries tracking, decided by the app\'s own staple rule: "level" = a ' +
+  'staple tracked by stockLevel (full/ok/low/empty), changed with mark_in_stock / mark_out_of_stock (add_stock ' +
+  'and consume_stock also accept a staple that has a recorded quantity, within their unit rules; consume_stock ' +
+  'only when the whole recorded amount is used); "quantity" = a non-staple with a recorded quantity and unit, ' +
+  'changed with set_inventory_quantity, consume_stock and add_stock within their unit rules (a negative stored ' +
+  'quantity can only be corrected with set_inventory_quantity); "presence" = a non-staple recorded without an amount: being listed ' +
+  'means it is in stock and the quantity tools refuse it, so never invent an amount; ask the user how much they ' +
+  'have. tracking null means the record could not be read (safety reason invalid-record): do not change it ' +
+  'from chat.';
+
 // TASK-093: appended to every write tool's description.
 const REQUEST_ID_TEXT = ' requestId is required: generate a new unique id (8-128 characters of A-Z, a-z, 0-9, _ or -) ' +
   'once for each change the user asks for, and send the SAME requestId when you retry that same change ' +
@@ -308,7 +321,7 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     'get_inventory',
     {
       title: 'Get inventory',
-      description: 'Read the owner\'s current canonical pantry inventory. ' + SAFETY_RULES_TEXT,
+      description: 'Read the owner\'s current canonical pantry inventory. ' + TRACKING_TEXT + ' ' + SAFETY_RULES_TEXT,
       inputSchema: z.strictObject({}),
       outputSchema: z.strictObject({
         ok: z.literal(true),
@@ -403,7 +416,8 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
       description: 'Mark one existing pantry item out of stock using ingredientId from ' +
         'get_inventory. Never guess or fuzzy-match an id; if multiple rows match the user\'s ' +
         'words, ask which row. Staples remain as empty; non-staples are permanently removed ' +
-        'from ChatGPT. On ambiguous, ask the user to set the staple flag in the app. Requires ' +
+        'from ChatGPT (staple or not is the app\'s own rule: tracking "level" in get_inventory). On ' +
+        'invalid_record, ask the user to check the item in the app. Requires ' +
         'expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: inventoryStockInputSchema(),
       outputSchema: z.strictObject({
@@ -454,10 +468,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         '5) call this tool. Stored unit g: "I have 650g chicken" -> quantity=650, expectedUnit="g". ' +
         'Stored unit g: "I have 0.65kg chicken" -> do NOT send quantity=0.65 with expectedUnit="g"; ' +
         'resolve or ask first. The tool never converts units; g vs kg, ml vs L, pieces vs cans are ' +
-        'rejected as unit_mismatch. For none left or out of milk, use mark_out_of_stock. Staples are refused (use ' +
-        'mark_in_stock / mark_out_of_stock). Take ingredientId ONLY from get_inventory; never guess or ' +
-        'fuzzy-match, and ask which row if several match. On ambiguous, ask the user to set the staple ' +
-        'flag in the app. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
+        'rejected as unit_mismatch. For none left or out of milk, use mark_out_of_stock. Only items with ' +
+        'tracking "quantity" in get_inventory: staples (tracking "level") are refused (use ' +
+        'mark_in_stock / mark_out_of_stock), and an item with tracking "presence" (no amount recorded) is ' +
+        'refused as presence_only: never invent an amount, ask the user. Take ingredientId ONLY from ' +
+        'get_inventory; never guess or fuzzy-match, and ask which row if several match. On invalid_record, ' +
+        'ask the user to check the item in the app. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
         'whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: setInventoryQuantityInputSchema(),
       outputSchema: z.strictObject({
@@ -480,10 +496,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'get_inventory; never guess or fuzzy-match, and ask which row if several match. Submit the ' +
         'amount the user used and its stated unit as expectedUnit; only exact same-unit arithmetic ' +
         'and g/kg or ml/L metric scaling are supported. Do not infer cups, density, pieces-to-mass, ' +
-        'or can/package conversions. Partial consumption is for explicitly non-staple rows; a staple ' +
-        'can only be marked empty when its exact current amount is consumed. If the user says “all”, ' +
+        'or can/package conversions. Partial consumption is for items with tracking "quantity" in ' +
+        'get_inventory; a staple can only be marked empty when its exact current amount is consumed, and ' +
+        'an item with tracking "presence" (no amount recorded) is refused as presence_only: never invent ' +
+        'an amount, ask the user. If the user says “all”, ' +
         'first read the current quantity, unit, and revision, then submit that exact amount against ' +
-        'that revision. On insufficient_stock, unit mismatch, or ambiguous, stop and clarify. This is ' +
+        'that revision. On insufficient_stock, unit mismatch, presence_only, or invalid_record, stop and clarify. This is ' +
         'a delta and is NOT safe to replay with a fresh revision; on revision_conflict, re-read before ' +
         'deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: consumeStockInputSchema(),
@@ -520,7 +538,8 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'bought date and storage of the lot from the result; when lot.storageSource is "inferred", say ' +
         'the storage was not recorded and was guessed from the ingredient. ' +
         'Stock-level-only staples and removed/tombstoned items must be handled in the app; use ' +
-        'mark_in_stock for a stock-level-only staple. This delta is NOT safe to replay with a fresh ' +
+        'mark_in_stock for a stock-level-only staple. An item with tracking "presence" in get_inventory (no ' +
+        'amount recorded) is refused as presence_only: never invent an amount, ask the user. This delta is NOT safe to replay with a fresh ' +
         'revision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: addStockInputSchema(),
       outputSchema: z.strictObject({

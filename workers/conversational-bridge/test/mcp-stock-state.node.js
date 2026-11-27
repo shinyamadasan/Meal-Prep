@@ -137,7 +137,9 @@ test('tools/list exposes exactly ten tools with strict stock schemas and annotat
   assert.equal(out.annotations.destructiveHint, true);
   assert.equal(inStock.annotations.destructiveHint, false);
   assert.match(out.description, /permanently removed/);
-  assert.match(out.description, /ambiguous/);
+  // TASK-097: staple classification is the app's rule; only an unreadable record is refused.
+  assert.match(out.description, /tracking "level"/);
+  assert.match(out.description, /invalid_record/);
 });
 
 test('stock tools require write scope; read-only, wrong-owner, missing-scope and no-token calls touch no Firestore', async () => {
@@ -254,13 +256,15 @@ test('already-empty and already-tombstoned out-of-stock calls are unchanged succ
   assert.equal(removed.fake.store.fields.version, 0);
 });
 
-test('ambiguous and unknown out-of-stock ids return distinct canonical errors with zero mutation', async () => {
-  const ambiguous = bridge({ pantry: [{ id: 'x', name: 'Garlic', category: 'Vegetable' }] });
+test('unreadable and unknown out-of-stock ids return distinct canonical errors with zero mutation', async () => {
+  // TASK-097: an unflagged non-Pantry row (formerly ambiguous) now follows the app's rule (see
+  // mcp-staple-parity.node.js); a category the shared rule cannot read is refused instead.
+  const ambiguous = bridge({ pantry: [{ id: 'x', name: 'Garlic', category: { name: 'Vegetable' } }] });
   const before = JSON.stringify(ambiguous.fake.store);
   const ambiguousMessage = await responseMessage(await ambiguous.call('mark_out_of_stock', { ingredientId: 'x', expectedRevision: 0 }));
   assert.equal(ambiguousMessage.result.isError, true);
-  assert.match(ambiguousMessage.result.content[0].text, /^ambiguous:/);
-  assert.match(ambiguousMessage.result.content[0].text, /Set an explicit staple value/);
+  assert.match(ambiguousMessage.result.content[0].text, /^invalid_record:/);
+  assert.match(ambiguousMessage.result.content[0].text, /check it in the app/);
   assert.equal(JSON.stringify(ambiguous.fake.store), before);
 
   const unknown = bridge({ pantry: [] });

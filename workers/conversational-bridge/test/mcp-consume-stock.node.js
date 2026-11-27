@@ -249,13 +249,16 @@ test('exact zero staple keeps stable identity and marks stockLevel empty without
   assert.deepEqual(unchangedFields(b.fake), before);
 });
 
-test('over-consume, partial staple, ambiguous staple, blank stored unit, and missing quantity fail without writes', async () => {
+test('over-consume, partial staple, unreadable record, blank stored unit, and missing quantity fail without writes', async () => {
   const cases = [
     [{ id: 'chicken', name: 'Chicken', quantity: 500, unit: 'g', staple: false }, { ingredientId: 'chicken', quantity: 900, expectedUnit: 'g' }, /insufficient_stock/],
     [{ id: 'rice', name: 'Rice', quantity: 500, unit: 'g', staple: true, stockLevel: 'full' }, { ingredientId: 'rice', quantity: 300, expectedUnit: 'g' }, /partial staple consumption is unsupported/i],
-    [{ id: 'x', name: 'Custom', quantity: 500, unit: 'g', category: 'Dairy' }, { ingredientId: 'x', quantity: 500, expectedUnit: 'g' }, /^ambiguous:/],
-    [{ id: 'chicken', name: 'Chicken', quantity: 500, unit: '', staple: false }, { ingredientId: 'chicken', quantity: 10, expectedUnit: 'g' }, /stored unit is missing/i],
-    [{ id: 'chicken', name: 'Chicken', quantity: null, unit: 'g', staple: false }, { ingredientId: 'chicken', quantity: 10, expectedUnit: 'g' }, /stored quantity is missing or invalid/i]
+    // TASK-097: an unflagged non-Pantry row is now the app's non-staple (see the parity tests); a
+    // record whose category the shared rule cannot read is refused as invalid_record instead.
+    [{ id: 'x', name: 'Custom', quantity: 500, unit: 'g', category: { label: 'Dairy' } }, { ingredientId: 'x', quantity: 500, expectedUnit: 'g' }, /^invalid_record:/],
+    // TASK-097: a non-staple without a usable unit or quantity is tracking 'presence'.
+    [{ id: 'chicken', name: 'Chicken', quantity: 500, unit: '', staple: false }, { ingredientId: 'chicken', quantity: 10, expectedUnit: 'g' }, /^presence_only:/],
+    [{ id: 'chicken', name: 'Chicken', quantity: null, unit: 'g', staple: false }, { ingredientId: 'chicken', quantity: 10, expectedUnit: 'g' }, /^presence_only:/]
   ];
   for (const [row, delta, expected] of cases) {
     const b = bridge({ pantry: [row] });

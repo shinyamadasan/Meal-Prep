@@ -140,11 +140,11 @@ paths:
         '409': { $ref: '#/components/responses/RevisionConflict' }
         '422':
           description: >
-            `ambiguous` — the record has no explicit staple flag and a category that doesn't
-            resolve it (e.g. an off-"pantry"-category ingredient the app would only classify via
-            INGREDIENT_DB, which this Worker doesn't have). Refused rather than risking a
-            destructive tombstone on a record that might actually be a staple; set an explicit
-            staple value on the record in the app, then retry.
+            `validation_failed` with a message starting `invalid_record:` — a stored field of the
+            record (name, category, quantity, unit, storage or stock level) is not in the form the
+            app writes, so the Worker cannot classify it safely (TASK-097: staple classification is
+            the app's own rule, `MealPrepFoodSafety.isStaple`). Refused rather than risking a
+            destructive tombstone; fix the record in the app, then retry.
           content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
         '502': { $ref: '#/components/responses/InfrastructureError' }
   /v1/inventory/mark-in-stock:

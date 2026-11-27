@@ -239,8 +239,8 @@ surface to exactly six: `get_inventory`, `get_ready_food`, `record_ready_food`,
   unchanged.
 - `mark_out_of_stock` keeps a staple row and sets its stock state to empty. A non-staple row is
   permanently removed from the ChatGPT tool surface and receives a pantry tombstone; no MCP tool
-  can recreate it. An unresolved staple classification returns `ambiguous` without writing and
-  tells the caller to have the user set the staple flag in the app.
+  can recreate it. Staple or not is the app's own rule (TASK-097, see "Staple parity" below); a
+  record that rule cannot read is refused as `invalid_record` without writing.
 - `mark_in_stock` applies only to an existing staple and sets its stock state to full. It does not
   create items, restore removed non-staples, change quantities, or remove tombstones.
 - Already-empty, already-tombstoned, and already-full requests preserve the canonical unchanged
@@ -280,8 +280,9 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
   translates zero into an out-of-stock call, and never creates a zero-quantity row.
 - The row's stored unit is preserved and nothing is converted.
 - Explicit staple rows are refused (staples are tracked by stock level: use `mark_in_stock` /
-  `mark_out_of_stock`). A row with no staple flag and a non-pantry category returns `ambiguous`
-  without writing, like `mark_out_of_stock`. Unknown or tombstoned ids return `not_found`.
+  `mark_out_of_stock`). Since TASK-097 staple-ness is the app's own rule, and a presence-only row
+  (no usable quantity and unit) is refused as `presence_only` before the unit precondition. Unknown
+  or tombstoned ids return `not_found`.
 - A same-value set is NOT a no-op: canonical `setQuantity()` always stamps `updatedAt`, so it is a
   normal guarded write with one revision increment. Replay with the old revision conflicts.
   `destructiveHint: true` because the tool overwrites an existing quantity (false means additive
@@ -308,8 +309,9 @@ TASK-077 later added one more tool.
 - Partial quantity consumption is limited to explicitly non-staple rows. Over-consume returns
   `insufficient_stock` and writes nothing. Exact-zero non-staple consumption uses the canonical
   removal plus pantry tombstone path. Partial staple consumption is unsupported; exact depletion
-  uses `markOutOfStock()` to retain the staple id and set `stockLevel: 'empty'`. Ambiguous
-  classification fails without a write.
+  uses `markOutOfStock()` to retain the staple id and set `stockLevel: 'empty'`. A presence-only
+  row is refused as `presence_only` and an unreadable one as `invalid_record` (TASK-097), without a
+  write.
 - The tool uses `mealprep:write`, one observed revision, and one update-time-guarded patch. It never
   retries and is non-idempotent: replaying with a fresh revision consumes again. Its write boundary
   is pantry, `deletions.pantry` only for exact-zero non-staple removal, and the normal version field.
@@ -535,6 +537,43 @@ shared TASK-093 adapter: the same `undoRequestId` + same `requestId` replays, a 
   tombstone changed, expired, missing, incomplete record, no-op original, double undo sequential and
   concurrent, the original-record precondition alone, undo-of-undo, replay, reused id).
 
+## TASK-097 staple parity and `tracking` (PROP-041 P2-0a, local only — NOT deployed)
+
+Before TASK-097 the bridge had no `INGREDIENT_DB`, so a pantry record with no `staple` flag and a
+category other than `Pantry` was refused as `ambiguous` by every stock write (59 of 97 real lots).
+The bridge now uses the app's own rule from the shared core.
+
+- **Parity rule.** `classifyStaple()` / `isStapleRecord()` (`operations/inventory.js`) call
+  `MealPrepFoodSafety.isStaple` (`shared/foodSafety.js`), the same function `app.js` uses: stored
+  `staple === true` / `false` -> exact-name (case-insensitive, untrimmed) `INGREDIENT_DB.isStaple` ->
+  category `Pantry` in any case -> otherwise non-staple. Aliases and near-miss names do not match.
+  `test/mcp-staple-parity.node.js` checks the bridge against `isStaple` for every fixture.
+- **Unreadable records are never guessed.** A record the shared rule throws on (not an object; a
+  name or category that is a number, map or array where the rule reads it), or one the read gate
+  (`readableLot`) rejects (a non-text unit/storage/name, a non-number quantity, an unknown
+  `stockLevel`), is `invalid`: `get_inventory` flags it `safety.reason: 'invalid-record'`, `usable: false`, `tracking: null`, and
+  every write tool refuses it as `invalid_record` with zero writes and no request record.
+- **`tracking` on `get_inventory` items.** `level` = a staple (tracked by `stockLevel`; use
+  `mark_in_stock` / `mark_out_of_stock`; `add_stock` / `consume_stock` also accept a staple with a
+  recorded quantity, in its exact unit). `quantity` = a non-staple with a finite `quantity` (any
+  sign; the app treats <= 0 as not available) and a non-blank `unit` (the quantity tools apply). `presence` = a non-staple without a
+  usable quantity or unit: being listed means in stock, and no amount is known. `null` only for an
+  invalid record. Write-result items keep their existing shape (no `tracking`).
+- **Quantity tools refuse presence lots.** `set_inventory_quantity`, `consume_stock` and `add_stock`
+  return a `presence_only` validation error telling chat to ask the user for the amount (never
+  invent one): zero writes, no request record, so the `requestId` is not spent.
+- **What changes in practice.** A formerly `ambiguous` lot now gets the app's answer: a counted
+  non-staple works with the quantity tools (still behind the P1-4 `add_stock` safety refusals);
+  `mark_out_of_stock` removes a non-staple with a tombstone (undoable, TASK-095) and keeps an
+  `INGREDIENT_DB` staple such as `Garlic (Bawang)` as `stockLevel: 'empty'`. `requestId`,
+  `expectedRevision`, undo and every other Phase 1 guard are unchanged. No stored record changes.
+- The `ambiguous` error code is still mapped by the REST and MCP layers but is no longer produced
+  for staple classification. Over REST, `mark-out-of-stock` and `mark-in-stock` refuse an
+  unreadable record as `422 validation_failed` whose message starts `invalid_record:` (accepted,
+  TASK-097 review S4). REST `set-quantity` is the raw absolute write (D-082/TASK-065) and is NOT
+  classified: it still writes such records (pre-existing; REST has no known client and is slated
+  for retirement or parity, release checklist 2.1).
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
@@ -686,26 +725,21 @@ one resolving what "today"/"yesterday" meant) supplies it. Malformed shape, an i
 empty) is `400`. A syntactically valid JSON body that fails a domain/schema rule (wrong type,
 missing/extra field, out-of-range value) is `422 validation_failed`. The two are never conflated.
 
-**The reserved `ambiguous` code** is used by `mark-out-of-stock` when a pantry record has no
-explicit `staple` flag and a category that doesn't resolve it either — see the classification
-note below. It means "refused because the bridge cannot safely tell," not "malformed request."
+**The reserved `ambiguous` code** is no longer produced for staple classification (TASK-097): the
+bridge uses the app's own `isStaple`. On `mark-out-of-stock` / `mark-in-stock`, a pantry record
+that rule or the read gate cannot read is refused as `422 validation_failed` with an
+`invalid_record:` message instead of being guessed; `set-quantity` is not classified (see above).
 
 ## Known, recorded judgment calls (not gaps — see CHANGELOG.md for the full reasoning)
 
-- **Pantry staple classification (corrected after independent review).** The bridge reproduces
-  app.js's `isStaple()` as far as it can without `INGREDIENT_DB`: explicit `staple === true` /
-  `staple === false` first, then the category-only fallback (`staple !== false && category ===
-  'pantry'`). What it CANNOT reproduce is the middle step — an `INGREDIENT_DB` lookup by name that
-  can mark a record staple regardless of category (real seed-data examples: `Garlic (Bawang)` and
-  `Evaporated Milk` are `isStaple: true` with category `Vegetable`/`Dairy`, not `Pantry`; and at
-  least two active pantry-creation call sites in `app.js` store `staple: undefined` outright for
-  an unmatched custom ingredient — this is a live, common case, not rare legacy data). A record
-  with no explicit flag and a non-`'pantry'` category is genuinely unprovable server-side, so
-  `mark-out-of-stock` refuses it with `422 ambiguous` rather than guessing — guessing "non-staple"
-  risks tombstoning a record the real app would only have marked empty, which is real data loss;
-  refusing costs the caller a retry after the app-side record gets an explicit flag. Reads
-  (`GET /v1/inventory`) still report a best-effort `staple`/`inStock` for display, treating the
-  ambiguous case as non-staple, since a read can't destroy anything.
+- **Pantry staple classification (TASK-097 staple parity).** The bridge calls the app's own
+  `MealPrepFoodSafety.isStaple` from `shared/foodSafety.js`: stored flag -> exact-name
+  `INGREDIENT_DB.isStaple` -> category `Pantry` (any case) -> non-staple. Before TASK-097 it had no
+  `INGREDIENT_DB` and refused every unflagged, non-`Pantry` record as `ambiguous`, because guessing
+  "non-staple" could tombstone a real staple such as `Garlic (Bawang)` (category `Vegetable`). With
+  the shared rule the bridge gives the app's exact answer, so that refusal is gone; only a record the
+  rule cannot read is refused (`invalid_record`). Reads report `tracking` (`level` / `quantity` /
+  `presence`); see the TASK-097 section above.
 - **`cookedDate` is a required, caller-supplied field (corrected after independent review).** An
   earlier draft had the Worker stamp its own UTC "today," which could silently disagree with
   app.js's LOCAL-calendar-date `todayISO()` by a day near midnight. Since nothing is deployed yet
