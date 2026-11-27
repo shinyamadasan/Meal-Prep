@@ -258,18 +258,21 @@ export async function getRequestRecord(env, accessToken, requestId, fetchImpl = 
 // A failed precondition is either a newer user document (-> RevisionConflictError with fresh
 // state, as before) or the same requestId committed first by a concurrent call (->
 // RequestAlreadyRecordedError carrying that record, so the caller answers it as a replay).
-export async function commitRequestWrite(env, accessToken, { fieldPaths, fields, expectedUpdateTime, nextVersion, requestId, record }, fetchImpl = fetch) {
-  const writes = [
-    {
+export async function commitRequestWrite(env, accessToken, { fieldPaths, fields, expectedUpdateTime, nextVersion, requestId, record, recordOnly }, fetchImpl = fetch) {
+  const writes = [];
+  // recordOnly: a no-op change commits only its request record (the user document is untouched,
+  // its version unchanged), so the requestId is spent and a retry replays the same answer.
+  if (!recordOnly) {
+    writes.push({
       update: { name: documentPath(env), fields: encodeFields(Object.assign({}, fields, { version: nextVersion })) },
       updateMask: { fieldPaths: fieldPaths.concat(['version']) },
       currentDocument: expectedUpdateTime ? { updateTime: expectedUpdateTime } : { exists: false }
-    },
-    {
-      update: { name: requestDocumentPath(env, requestId), fields: encodeRequestRecord(record) },
-      currentDocument: { exists: false }
-    }
-  ];
+    });
+  }
+  writes.push({
+    update: { name: requestDocumentPath(env, requestId), fields: encodeRequestRecord(record) },
+    currentDocument: { exists: false }
+  });
   const url = FIRESTORE_HOST + '/v1/projects/' + env.FIRESTORE_PROJECT_ID + '/databases/(default)/documents:commit';
 
   let response;

@@ -13,6 +13,7 @@
 //
 // Pure apart from Web Crypto's SHA-256 digest: no Firestore, no clock (callers pass `nowMs`).
 import { ValidationError } from '../errors.js';
+import { readableId } from './inventory.js';
 
 export const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 export const REQUEST_ID_MESSAGE = 'requestId must be 8-128 characters using only A-Z, a-z, 0-9, _ or -.';
@@ -96,7 +97,28 @@ export function beforeSnapshot(doc, write) {
   return out;
 }
 
-export function buildRequestRecord({ tool, argsHash: hash, actor, nowMs, revisionBefore, revisionAfter, result, before }) {
+// What the write ADDS, as the other half of the undo input (review should-fix 1): every record in
+// a written array whose id was not in the stored array — a new ready-food batch, or the ledger fact
+// consume_ready_food appends to mealConsumptions (TASK-095 compensates for it instead of guessing
+// it back from cookedMealId + consumedAt). Changed records keep their id and are in `before`.
+const ADDED_FIELDS = ['pantry', 'cookedMeals', 'mealConsumptions'];
+
+export function addedRecords(doc, write) {
+  const paths = new Set(write.fieldPaths);
+  const out = {};
+  ADDED_FIELDS.forEach((field) => {
+    if (!paths.has(field)) return;
+    // Only text or finite-number ids are compared (String() on a stored map id throws).
+    const ids = new Set((doc[field] || []).filter((r) => r && readableId(r.id)).map((r) => String(r.id)));
+    const added = (write.fields[field] || []).filter((r) => r && readableId(r.id) && !ids.has(String(r.id)));
+    if (added.length) out[field] = added;
+  });
+  return out;
+}
+
+export const EMPTY_BEFORE = Object.freeze({ pantry: [], cookedMeals: [], deletions: {} });
+
+export function buildRequestRecord({ tool, argsHash: hash, actor, nowMs, revisionBefore, revisionAfter, result, before, added }) {
   if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new Error('A request record needs a finite clock.');
   return {
     tool,
@@ -107,7 +129,8 @@ export function buildRequestRecord({ tool, argsHash: hash, actor, nowMs, revisio
     revisionBefore,
     revisionAfter,
     result,
-    before
+    before,
+    added: added || {}
   };
 }
 

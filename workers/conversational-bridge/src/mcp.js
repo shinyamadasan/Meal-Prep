@@ -507,7 +507,9 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
 //   -> compare expectedRevision (no retry) -> the canonical operation (unchanged) -> ONE commit of
 //   the guarded user-document update plus the create-only request record.
 // `plan.apply(doc)` returns { write: { fieldPaths, fields } | null, result(revision) }. A no-op
-// (write null, e.g. an already-out item) writes nothing and records nothing, as before.
+// (write null, e.g. an already-out item) leaves the user document alone but still commits its
+// request record, so the id is spent: a lost-response retry gets the same "unchanged" answer
+// instead of applying a change nobody confirmed (review should-fix 2).
 async function requestWriteTool(env, deps, ctx, tool, args, plan) {
   try {
     const auth = requireMcpWriteContext(env, ctx, deps.nowSeconds);
@@ -531,9 +533,8 @@ async function requestWriteTool(env, deps, ctx, tool, args, plan) {
     if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
 
     const step = plan.apply(doc);
-    if (!step.write) return toolResult(step.result(doc.revision));
-
-    const revisionAfter = doc.revision + 1;
+    const write = step.write || null;
+    const revisionAfter = write ? doc.revision + 1 : doc.revision;
     const result = step.result(revisionAfter);
     const record = requests.buildRequestRecord({
       tool,
@@ -543,10 +544,11 @@ async function requestWriteTool(env, deps, ctx, tool, args, plan) {
       revisionBefore: doc.revision,
       revisionAfter,
       result,
-      before: requests.beforeSnapshot(doc, step.write)
+      before: write ? requests.beforeSnapshot(doc, write) : requests.EMPTY_BEFORE,
+      added: write ? requests.addedRecords(doc, write) : {}
     });
     try {
-      await commitWrite(env, accessToken, Object.assign({}, step.write, {
+      await commitWrite(env, accessToken, Object.assign({}, write || { fieldPaths: [], fields: {}, recordOnly: true }, {
         expectedUpdateTime: doc.updateTime,
         nextVersion: revisionAfter,
         requestId: args.requestId,

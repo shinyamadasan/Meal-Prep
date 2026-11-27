@@ -445,8 +445,10 @@ otherwise it becomes `null` (unknown) rather than an invented number.
   `revisionBefore`, `revisionAfter`, `result` (the tool result, returned again with
   `replayed: true` on a retry), and `before` = `{ pantry: [...], cookedMeals: [...], deletions:
   { pantry?: { id: priorValue|null }, cookedMeals?: {...} } }` — full copies of the records the
-  write changed or removed and the prior value of each tombstone entry it touched (TASK-095 undo
-  input). A subcollection because the app saves `users/{uid}` with a full overwrite. Not read,
+  write changed or removed and the prior value of each tombstone entry it touched, and `added` =
+  `{ pantry?, cookedMeals?, mealConsumptions?: [...] }` — full copies of records the write added
+  (TASK-095 undo input). A no-op change (already out / already full) stores a record with empty
+  `before`/`added` and does not touch `users/{uid}`. A subcollection because the app saves `users/{uid}` with a full overwrite. Not read,
   synced or restored by the app; not part of `version`.
 - `sharedRecipes` — public community feed (orphaned feature).
 - `familyInvitations` — invitation records, `status: pending | accepted` (accept flow incomplete).

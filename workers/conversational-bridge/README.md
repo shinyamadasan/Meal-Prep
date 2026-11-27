@@ -415,8 +415,10 @@ and the read tools are unchanged. Deploy is held for the owner (BQ-032).
   (the exact tool result), and `before`: a full copy of every pantry / cookedMeals record the write
   changed or removed, plus `before.deletions.{pantry|cookedMeals}[id]` = the prior tombstone value
   of every tombstone entry the write touched (`null` = there was none). A record the write only
-  creates (`record_ready_food`) has no `before`; its id is in `result`. This is TASK-095's undo
-  input.
+  creates (`record_ready_food`) has no `before`. `added` = `{ pantry?, cookedMeals?,
+  mealConsumptions? }`: full copies of the records the write added (a new id), e.g. the new batch
+  from `record_ready_food` or the ledger fact `consume_ready_food` appends. `before` + `added` are
+  TASK-095's undo input.
 - **Replay.** The adapter reads the request record first (after auth and validation, before the
   user document). Same `requestId` + same tool + same `argsHash` returns the stored result with
   `replayed: true` and writes nothing, even if `expectedRevision` is now stale. Same `requestId`
@@ -424,8 +426,11 @@ and the read tools are unchanged. Deploy is held for the owner (BQ-032).
   fails its precondition and the request record now exists (a concurrent call with the same id
   won), the record is read back and answered the same way; otherwise it is `revision_conflict` as
   before. `replayed` is optional in every write output schema and present only on a replay.
-- **No-ops are not recorded.** `mark_out_of_stock` / `mark_in_stock` on an already-out / already-
-  full item still return `unchanged: true` without any write, so no record is created.
+- **No-ops spend their id.** `mark_out_of_stock` / `mark_in_stock` on an already-out / already-
+  full item return `unchanged: true` and leave the user document (and `version`) untouched, but
+  still commit the request record alone. A lost-response retry with the same id gets the same
+  answer instead of applying a change nobody confirmed (e.g. after the item was restocked in the
+  app); the id cannot be reused for a different change.
 - **Safe id lookups.** Write lookups (`findPantryIndex()`, `findMealIndex()`) now use the reads'
   `readableId()` rule: a stored id that is not text or a finite number is skipped instead of being
   passed to `String()`, which can throw (TASK-092 review carry-over). REST uses the same lookups.

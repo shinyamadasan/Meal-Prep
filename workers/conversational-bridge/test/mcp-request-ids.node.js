@@ -221,7 +221,8 @@ test('the request record stores tool, argsHash, actor, timestamps (+30 days), re
   const args = { requestId: 'record-contents-1', ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', expectedRevision: 3 };
   const message = await b.call('consume_stock', args);
   const stored = b.fake.requestRecord('record-contents-1');
-  assert.deepEqual(Object.keys(stored).sort(), ['actor', 'argsHash', 'before', 'createdAt', 'expireAt', 'result', 'revisionAfter', 'revisionBefore', 'tool']);
+  assert.deepEqual(Object.keys(stored).sort(), ['actor', 'added', 'argsHash', 'before', 'createdAt', 'expireAt', 'result', 'revisionAfter', 'revisionBefore', 'tool']);
+  assert.deepEqual(stored.added, {}, 'a partial consume adds no record');
   assert.equal(stored.tool, 'consume_stock');
   assert.equal(stored.argsHash, expectedHash(args));
   assert.equal(stored.argsHash, expectedHash({ quantity: 100, expectedUnit: 'g', ingredientId: 'chicken' }), 'requestId and expectedRevision are not hashed');
@@ -270,13 +271,47 @@ test('before: ready food — a final serving snapshots the batch and its tombsto
   assert.ok(created.result.item.cookedMealId, 'the created id is in the stored result');
 });
 
-test('a no-op write (already full / already out) commits nothing and records nothing, as before', async () => {
+test('a no-op write (already full) leaves the user document alone but spends the requestId', async () => {
   const b = bridge();
+  const versionBefore = b.fake.store.fields.version;
+  const pantryBefore = JSON.stringify(b.fake.store.fields.pantry);
   const message = await b.call('mark_in_stock', { requestId: 'noop-full-01', ingredientId: 'salt', expectedRevision: 3 });
   assert.equal(message.result.structuredContent.unchanged, true);
   assert.equal(message.result.structuredContent.revision, 3);
-  assert.equal(b.count('commit'), 0);
-  assert.equal(b.fake.requestRecord('noop-full-01'), undefined);
+  assert.equal(b.count('commit'), 1, 'one record-only commit');
+  assert.equal(b.fake.store.fields.version, versionBefore, 'user document version unchanged');
+  assert.equal(JSON.stringify(b.fake.store.fields.pantry), pantryBefore, 'pantry unchanged');
+  const record = b.fake.requestRecord('noop-full-01');
+  assert.equal(record.tool, 'mark_in_stock');
+  assert.equal(record.revisionBefore, 3);
+  assert.equal(record.revisionAfter, 3);
+  assert.deepEqual(record.before, { pantry: [], cookedMeals: [], deletions: {} });
+  assert.deepEqual(record.added, {});
+
+  // Lost response, then a retry with the same id: the stored answer, nothing applied.
+  const again = await b.call('mark_in_stock', { requestId: 'noop-full-01', ingredientId: 'salt', expectedRevision: 3 });
+  assert.deepEqual(again.result.structuredContent, Object.assign({}, message.result.structuredContent, { replayed: true }));
+  assert.equal(b.count('commit'), 1);
+  // The same id for a different change is refused.
+  const reused = await b.call('mark_out_of_stock', { requestId: 'noop-full-01', ingredientId: 'salt', expectedRevision: 3 });
+  assert.match(text(reused), /^request_id_reused/);
+});
+
+test('added: consume_ready_food records the ledger fact it appended; record_ready_food records the new batch', async () => {
+  const b = bridge();
+  const consumptionsBefore = (b.fake.store.fields.mealConsumptions || []).length;
+  await b.call('consume_ready_food', { requestId: 'eat-one-0001', cookedMealId: 'meal-1', servings: 1, expectedRevision: 3 });
+  const rec = b.fake.requestRecord('eat-one-0001');
+  const written = b.fake.store.fields.mealConsumptions;
+  assert.equal(written.length, consumptionsBefore + 1);
+  assert.deepEqual(rec.added, { mealConsumptions: [written[written.length - 1]] });
+  assert.equal(rec.added.mealConsumptions[0].cookedMealId, 'meal-1');
+
+  const c = bridge();
+  await c.call('record_ready_food', Object.assign({ requestId: 'new-batch-02' }, VALID_CALLS.record_ready_food));
+  const created = c.fake.requestRecord('new-batch-02');
+  assert.equal(created.added.cookedMeals.length, 1);
+  assert.equal(String(created.added.cookedMeals[0].id), created.result.item.cookedMealId);
 });
 
 // ── Replay and reuse ─────────────────────────────────────────────────────────────────────────
