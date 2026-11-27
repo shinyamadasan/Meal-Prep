@@ -46,7 +46,8 @@ export function testEnv(overrides = {}) {
     TARGET_UID: 'test-uid-1',
     ACCESS_TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
     ACCESS_POLICY_AUD: 'test-access-policy-audience',
-    MCP_AUTHORIZED_OWNER_SUBJECT: 'test-owner-subject'
+    MCP_AUTHORIZED_OWNER_SUBJECT: 'test-owner-subject',
+    HOUSEHOLD_TIME_ZONE: 'Asia/Manila'
   }, overrides);
 }
 

@@ -18,9 +18,15 @@
 // client-side.
 import { NotFoundError, ValidationError, InsufficientServingsError } from '../errors.js';
 import '../../../../shared/readyFoodContract.js';
+// Shared food-safety rules (TASK-091/092): the get_ready_food safety verdict only.
+import '../../../../shared/foodSafety.js';
+import { isCalendarDay, requireHouseholdDay, useSoonLabel } from './inventory.js';
 
 const READY_FOOD_CONTRACT = globalThis.MealPrepReadyFoodContract;
+const FoodSafety = globalThis.MealPrepFoodSafety;
 export const READY_FOOD_SOURCES = READY_FOOD_CONTRACT.sources;
+export const READY_FOOD_DEFAULT_FRIDGE_LIFE = READY_FOOD_CONTRACT.defaultFridgeLife;
+export const READY_FOOD_DEFAULT_FREEZER_LIFE = READY_FOOD_CONTRACT.defaultFreezerLife;
 
 const PORTION_COUNT_MAX = 99;
 const VALID_STORAGE = ['fridge', 'freezer'];
@@ -46,6 +52,82 @@ function toReadyFoodItem(meal) {
 
 export function listReadyFood(cookedMeals) {
   return (cookedMeals || []).map(toReadyFoodItem);
+}
+
+// Chat's safety verdict for one ready-food batch (TASK-092, D-091), from the shared cooked-meal
+// rules on the household day. `usable` is the app's own getReadyFoodSuggestions() availability
+// (shared cookedMealAvailable(): named, portions left, not past its shelf life), except that an
+// `expired` or `unknown` batch is never usable. Stricter than the app in one way: a missing or
+// invalid cookedDate (or an unreadable fridge shelf life) is `unknown`, where the app has no
+// date to judge and keeps the batch. A frozen batch with a valid cookedDate but no freezer
+// quality window stays `ok` (freezing is a quality limit, not a safety limit; D-089).
+export function readyFoodSafety(meal, today) {
+  requireHouseholdDay(today);
+  let signal;
+  let available;
+  let shelfLife;
+  try {
+    signal = FoodSafety.cookedDateSignal(meal, today);
+    available = FoodSafety.cookedMealAvailable(meal, today);
+    shelfLife = FoodSafety.cookedShelfLife(meal);
+  } catch {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
+  }
+  const daysLeft = Number.isFinite(signal.daysLeft) ? signal.daysLeft : null;
+  const frozen = meal.storage === 'freezer';
+  let status;
+  let reason;
+  let label;
+  if (!isCalendarDay(meal.cookedDate)) {
+    status = 'unknown';
+    reason = 'unknown-cooked-date';
+    label = 'No valid cooked date - check it in the app before eating';
+  } else if (daysLeft == null && !frozen) {
+    status = 'unknown';
+    reason = 'unknown-shelf-life';
+    label = 'Fridge shelf life unreadable - check it in the app before eating';
+  } else if (signal.kind === 'expired') {
+    status = 'expired';
+    reason = 'past-safety-limit';
+    label = 'Past safe fridge time - do not eat (' + shelfLife + '-day limit)';
+  } else if (signal.kind === 'check') {
+    status = 'check';
+    reason = 'freezer-window-passed';
+    label = 'Freezer quality window passed \u2014 check it';
+  } else if (signal.kind === 'use-soon') {
+    status = 'use-soon';
+    reason = 'use-soon';
+    label = useSoonLabel(daysLeft);
+  } else if (daysLeft == null) {
+    status = 'ok';
+    reason = 'no-quality-window';
+    label = 'Frozen - no quality date recorded';
+  } else {
+    status = 'ok';
+    reason = 'in-date';
+    label = daysLeft + 'd left';
+  }
+  const usable = available === true && status !== 'expired' && status !== 'unknown';
+  if (!usable && (status === 'ok' || status === 'use-soon')) {
+    // The date allows it; the app's availability rule does not.
+    if (!meal.name) {
+      reason = 'unnamed';
+      label = 'Record has no name - check it in the app';
+    } else {
+      reason = 'no-portions-left';
+      label = 'No portions left';
+    }
+  }
+  return { status, reason, label, daysLeft, usable };
+}
+
+// get_ready_food's item (TASK-092): the existing read item plus the safety verdict. Write results
+// keep toReadyFoodItem().
+export function listReadyFoodWithSafety(cookedMeals, today) {
+  requireHouseholdDay(today);
+  return (cookedMeals || []).map((meal) => Object.assign(toReadyFoodItem(meal), {
+    safety: readyFoodSafety(meal, today)
+  }));
 }
 
 function findMealIndex(cookedMeals, cookedMealId) {

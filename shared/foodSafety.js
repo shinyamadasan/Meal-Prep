@@ -257,6 +257,39 @@ function cookedDateSignal(meal, today) {
   return { kind: kind, daysLeft: daysLeft };
 }
 
+// ── Ready-food portions and availability (TASK-092, moved from app.js) ───────
+var PORTION_COUNT_MAX = 99;
+
+// A portion count, or null for "not tracked". Fractions are floored — half a
+// meal portion is not a concept this app has, and pretending otherwise would
+// invite exactly the weighing behaviour this wave is meant to avoid.
+function portionCountOrNull(value, min) {
+  if (value == null || value === '') return null;
+  var n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  n = Math.floor(n);
+  if (n < min) return null;
+  if (n > PORTION_COUNT_MAX) return PORTION_COUNT_MAX;
+  return n;
+}
+
+// Does this batch track portions at all?
+function cookedMealTracksPortions(meal) {
+  return !!meal && portionCountOrNull(meal.portionsRemaining, 0) != null;
+}
+
+// The app's ready-food availability rule (the getReadyFoodSuggestions() filter):
+// named, not out of tracked portions, and not past its shelf life. Expired batches
+// are excluded because recommending food past its date would be actively harmful.
+function cookedMealAvailable(m, today) {
+  requireToday(today);
+  if (!m || !m.name) return false;
+  if (cookedMealTracksPortions(m) && m.portionsRemaining <= 0) return false;
+  var daysLeft = daysLeftFrom(m.cookedDate, cookedShelfLife(m), today);
+  if (daysLeft != null && daysLeft < 0) return false; // expired — not a meal suggestion
+  return true;
+}
+
 // ── Ingredient Autocomplete Database ──────────────────────────────────────────
 // Each entry carries storage location, per-ingredient shelf life, and an
 // isStaple flag so inferStorage() / ingredientShelfLife() / isStaple() all
@@ -459,6 +492,10 @@ root.MealPrepFoodSafety = Object.freeze({
   pantryLotAvailable: pantryLotAvailable,
   isStaple: isStaple,
   cookedShelfLife: cookedShelfLife,
-  cookedDateSignal: cookedDateSignal
+  cookedDateSignal: cookedDateSignal,
+  PORTION_COUNT_MAX: PORTION_COUNT_MAX,
+  portionCountOrNull: portionCountOrNull,
+  cookedMealTracksPortions: cookedMealTracksPortions,
+  cookedMealAvailable: cookedMealAvailable
 });
 })(globalThis);

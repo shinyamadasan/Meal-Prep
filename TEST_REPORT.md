@@ -1276,3 +1276,33 @@ untested: `npx wrangler deploy --dry-run` (wrangler is not installed locally; th
   pattern matches the bundled `readyFoodContract.js`), the offline service-worker install in a
   real browser, the private release-fixture round trip (Claude runs it), production, real
   devices and coverage instrumentation.
+
+## TASK-092 · 2026-11-27
+baseline: the ready-food fixture `expected` (29 cases × 3 todays) was generated from the
+  unmodified app (`origin/prop041-p1` b5b97da) in Playwright with `page.clock.setFixedTime`,
+  before app.js changed.
+full local: `npm test` (Playwright local), run twice.
+  - Run 1: 911 passed, 1 failed. The failure was `meal-prep-first.spec.js` "regeneration
+    identity is exact: a checked Rice never lends its state to Rice Vinegar", a shopping-list
+    test the diff does not touch. Rerun alone with `--repeat-each=3`: 57/57 passed.
+  - Run 2: 912 passed, 0 failed (909 existing + 3 new in `tests/ready-food-parity.spec.js`).
+  - No existing app-suite expectation was edited. The `feature-evidence/task-079` screenshots
+    the suite rewrites were restored.
+ledger: `npm run test:ledger-contract` passed 13/13.
+bridge: `npm run test:bridge` passed 283/283 (262 existing + 21 new: household-day 5,
+  mcp-safety 11, ready-food-parity 5). The two existing `test/mcp.node.js` read-shape assertions
+  were updated for the new fields.
+parity: the response verdict equals the shared verdict for all 52 TASK-091 pantry cases and all
+  8 TASK-091 cooked + 29 ready-food cases at 2026-11-26, 2026-12-31 and 2028-02-29. The
+  browser (app and shared) and Node match the ready-food fixture.
+boundary: Asia/Manila turns the day at 16:00:00 UTC (15:59:59 = same day). Raw chicken at its
+  2-day limit and a 4-day adobo flip from usable to expired at 16:00 UTC.
+static: `node --check` passed on every changed JS file. `git diff --check` was clean.
+self-review/qa: Code Health and the applicable AI checks in `QA.md` passed:
+  - one shared calendar-day check;
+  - no app handler, CSS, persisted-field, saveData/cloudReady, tombstone, auth, OAuth, route,
+    secret or Firestore change;
+  - write tools and REST unchanged;
+  - no secrets or debug leftovers.
+untested: `npx wrangler deploy --dry-run` (wrangler not installed), a live ChatGPT read
+  (deploy held), production, real devices, coverage instrumentation.
