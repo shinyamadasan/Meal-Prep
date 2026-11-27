@@ -6837,7 +6837,7 @@ verification: `npm test`; `npm run test:ledger-contract`; `npm run test:bridge` 
   SELF_REVIEW.md + QA.md; CHANGELOG/TEST_REPORT entries.
 
 ### TASK-092 · PROP-041 P1-2 Truthful MCP reads: safety verdict on every inventory and ready-food item
-status: review
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (Worker; what chat is allowed to recommend)
 source: BQ-032 / PROP-041 P1-2; audit C1 and C3 (planning/PROPOSALS.md PROP-041)
@@ -6879,7 +6879,7 @@ verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`;
   `npx wrangler deploy --dry-run` only; SELF_REVIEW + QA; CHANGELOG/TEST_REPORT.
 
 ### TASK-093 · PROP-041 P1-3 No duplicate writes: required requestId + atomic request record
-status: todo
+status: codex
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (every Worker write path; Firestore commit)
 source: BQ-032 / PROP-041 P1-3; owner decisions 2 and 5

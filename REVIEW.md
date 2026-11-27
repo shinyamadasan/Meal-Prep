@@ -4,6 +4,45 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-092 (PROP-041 P1-2 truthful MCP reads) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Codex (`6025a12`). Independent STRICT review + QA: separate Claude sessions, four rounds.
+Round 1 FAIL — M1: counter/freezer lots past their shelf-life estimate (no printed date) were
+`ok / in-date / "-5d left"` while the app row shows "Estimated window passed"; S1/G1: one stored
+batch or lot the read schema cannot carry failed the WHOLE read. Rounds 2-3 FAIL on further
+single-record cases (huge or infinite shelf lives, non-text fields, null/array entries, ids stored
+as maps). Round 4 **PASS, no must-fix**: 19,382 fuzz cases through the real MCP route, zero read
+errors, no `usable:true` or `ok` where the shared rules flag the item.
+
+Review fixes (Claude, on the task branch; evidence here, not in CHANGELOG/TEST_REPORT):
+- `a5380e5`, `2ed3b34`: estimate-passed lots are `check` / `estimate-passed` (usable unchanged);
+  an unreadable ready-food batch is `unknown` / `invalid-record`, not a failed read; S2/S3 wording
+  (unknown covers unreadable records; "No date recorded" = no freshness information;
+  `safety.usable` is the only availability signal).
+- `5625c08`: per-lot `invalid-record` gate on `get_inventory`; non-safe-integer day counts unknown;
+  null entries skipped; past-estimate + out-of-stock keeps the warning wording; tests hard-code values.
+- `4e0e637`: ids read only when text or a finite number (placeholder `unreadable-id-<n>`);
+  entries with no id or arrays skipped (the app's `unionById` rule); +/-Infinity/NaN day counts unknown.
+- `323dfd4`: `classifyStaple` keeps the old category text for every value `String()` converts, so
+  write tools are unchanged (round-4 should-fix 1).
+Claude's gates on `323dfd4`: `test:bridge` 291/291; private production-export check (pure read
+functions, 2026-11-27): 97 pantry = 5 expired (not usable), 24 check, 68 ok; 4 ready food all not
+usable (3 past the fridge limit, 1 freezer window passed); no unknown. Reviewer round 4 on
+`4e0e637`: `npm test` 912/912, ledger 13/13, `git diff --check` clean.
+
+Accepted deviations: staple keeps the bridge's own classification (acceptance said "null when
+absent"); `daysLeft` = sooner of estimate and fridge safety limit; ready food `unknown` on a
+missing/invalid cookedDate; extra files (app.js wrappers, shared portion helpers, parity fixture).
+Recorded, not fixed here: placeholder id is not guaranteed unique against a real id literally
+`unreadable-id-<n>`; write tools' `findPantryIndex`/`findMealIndex` still throw on a map id (pre-
+existing; TASK-093 touches every write path); REST `/v1/inventory` and `/v1/ready-food` carry no
+safety (G3); `npx wrangler deploy --dry-run` not run (wrangler not installed) — required before any
+Worker deploy; app-side oddities (raw protein on the counter, capitalised storage, rollover
+purchaseDate) unchanged under D-090.
+Merged into `prop041-p1` (`2aa6dab`). **Gate: `approved` (held)** — red zone: Worker read path that
+decides what chat may recommend; no Worker deploy until the owner approves Phase 1.
+
+---
 ## Review TASK-091 (PROP-041 P1-1 shared food-safety core) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit). Independent STRICT review + QA: separate
