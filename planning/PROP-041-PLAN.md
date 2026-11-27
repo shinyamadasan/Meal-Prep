@@ -95,7 +95,11 @@ recorded and undoable (P1-3, P1-5).
 | later | P2-2, P2-5, P2-6 | Edit items, move ready food, multi-operation requests. | — |
 | follow-up | Undo tombstone time | Write the undo tombstone as `max(now, live updatedAt + 1 ms)` (release finding 2.2). | none |
 
-### Owner decisions needed before tasks 2-5 are released
+### Decisions D1-D3 — ADOPTED 2026-11-27 (owner: "make reasonable, reversible implementation decisions
+independently"; Claude's recommendations below are the decisions). Tasks: TASK-098 (levels, D1),
+TASK-099 (register + edit, D3), TASK-100 (convert, D2), TASK-101 (batch). Recorded in D-092.
+
+### Owner decisions (as recommended)
 - **D1 — presence-only items.** Recommended: both conversions allowed on explicit instruction ("salt
   is a staple, we have plenty" → staple, level full; "we have 200 g of paprika" → quantity), one
   item per request, undoable; chat never converts on its own. Alternative: staple only.
