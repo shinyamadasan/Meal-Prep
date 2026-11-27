@@ -1,0 +1,967 @@
+{
+  "tabs": {
+    "dashboard": {
+      "pageScreens": 1.64,
+      "sectionHeight": 1224,
+      "interactive": 51,
+      "interactiveAboveFold": 16,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "1 to check · 3 use soon · 3 meal ideas Review",
+          "screen": 0.86
+        },
+        {
+          "text": "❤️ My Favorites",
+          "screen": 1
+        },
+        {
+          "text": "NEED IDEAS? WHAT TO COOK OR EAT",
+          "screen": 1.53
+        }
+      ],
+      "headerHeight": 66
+    },
+    "planner": {
+      "pageScreens": 1,
+      "sectionHeight": 408,
+      "interactive": 59,
+      "interactiveAboveFold": 21,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Plan",
+          "screen": 0.16
+        },
+        {
+          "text": "This week's batches",
+          "screen": 0.31
+        },
+        {
+          "text": "By day optional",
+          "screen": 0.61
+        }
+      ],
+      "headerHeight": 66
+    },
+    "grocery": {
+      "pageScreens": 1.99,
+      "sectionHeight": 1518,
+      "interactive": 54,
+      "interactiveAboveFold": 23,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "No plan? Fill the gaps",
+          "screen": 0.22
+        },
+        {
+          "text": "Grain ≈ ₱16.5",
+          "screen": 0.44
+        },
+        {
+          "text": "Pantry",
+          "screen": 0.77
+        },
+        {
+          "text": "Protein ≈ ₱100",
+          "screen": 1.37
+        },
+        {
+          "text": "Vegetable ≈ ₱9",
+          "screen": 1.58
+        }
+      ],
+      "headerHeight": 66
+    },
+    "prep": {
+      "pageScreens": 1,
+      "sectionHeight": 385,
+      "interactive": 6,
+      "interactiveAboveFold": 6,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Prep",
+          "screen": 0.16
+        },
+        {
+          "text": "Preview the AI Prep Brief",
+          "screen": 0.58
+        }
+      ],
+      "headerHeight": 66
+    },
+    "fridge": {
+      "pageScreens": 4.12,
+      "sectionHeight": 3298,
+      "interactive": 82,
+      "interactiveAboveFold": 16,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Fridge",
+          "screen": 0.16
+        },
+        {
+          "text": "Stock health",
+          "screen": 0.36
+        },
+        {
+          "text": "Cooked & Stored — prepped meals, takeout, and leftovers + Add meal",
+          "screen": 0.44
+        },
+        {
+          "text": "Prepared Flavors — sauces/marinades you've batched and have on hand",
+          "screen": 1.55
+        },
+        {
+          "text": "Ingredients on hand — raw, not meals (25 items) ▼",
+          "screen": 1.8
+        }
+      ],
+      "headerHeight": 66
+    },
+    "recipes": {
+      "pageScreens": 54.47,
+      "sectionHeight": 45817,
+      "interactive": 586,
+      "interactiveAboveFold": 16,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Recipes",
+          "screen": 0.16
+        },
+        {
+          "text": "Sinangag",
+          "screen": 1.34
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 2.06
+        },
+        {
+          "text": "Arroz Caldo",
+          "screen": 2.6
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 3.35
+        },
+        {
+          "text": "Tortang Talong",
+          "screen": 3.94
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 4.66
+        },
+        {
+          "text": "Corned Beef Guisado",
+          "screen": 5.2
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 5.94
+        },
+        {
+          "text": "Chicken Adobo",
+          "screen": 6.51
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 7.25
+        },
+        {
+          "text": "Pork Sinigang",
+          "screen": 7.84
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 8.56
+        },
+        {
+          "text": "Chicken Tinola",
+          "screen": 9.15
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 9.87
+        },
+        {
+          "text": "Ginisang Monggo",
+          "screen": 10.46
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 11.18
+        },
+        {
+          "text": "Giniling na Baboy",
+          "screen": 11.77
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 12.51
+        },
+        {
+          "text": "Paksiw na Bangus",
+          "screen": 13.13
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 13.85
+        },
+        {
+          "text": "Bistek Tagalog",
+          "screen": 14.44
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 15.16
+        },
+        {
+          "text": "Nilaga",
+          "screen": 15.75
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 16.49
+        },
+        {
+          "text": "Giniling na Sardinas",
+          "screen": 17.06
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 17.8
+        },
+        {
+          "text": "Pinakbet",
+          "screen": 18.37
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 19.09
+        },
+        {
+          "text": "Bicol Express",
+          "screen": 19.75
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 20.5
+        },
+        {
+          "text": "Tapsilog",
+          "screen": 21.09
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 21.8
+        },
+        {
+          "text": "Longsilog",
+          "screen": 22.42
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 23.14
+        },
+        {
+          "text": "Champorado",
+          "screen": 23.71
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 24.42
+        },
+        {
+          "text": "Bulalo",
+          "screen": 24.97
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 25.71
+        },
+        {
+          "text": "Chicken Sopas",
+          "screen": 26.33
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 27.04
+        },
+        {
+          "text": "Fish Sinigang",
+          "screen": 27.71
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 28.43
+        },
+        {
+          "text": "Lomi",
+          "screen": 29.04
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 29.79
+        },
+        {
+          "text": "Caldereta",
+          "screen": 30.43
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 31.17
+        },
+        {
+          "text": "Menudo",
+          "screen": 31.84
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 32.58
+        },
+        {
+          "text": "Laing",
+          "screen": 33.25
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 33.99
+        },
+        {
+          "text": "Ginataang Manok",
+          "screen": 34.63
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 35.37
+        },
+        {
+          "text": "Rice Cooker Chicken & Rice",
+          "screen": 35.99
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 36.73
+        },
+        {
+          "text": "Rice Cooker Chicken Mushroom Rice",
+          "screen": 37.38
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 38.12
+        },
+        {
+          "text": "Rice Cooker Chicken with Steamed Vegetables",
+          "screen": 38.74
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 39.48
+        },
+        {
+          "text": "Rice Cooker Longganisa & Pechay Rice",
+          "screen": 40.1
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 40.86
+        },
+        {
+          "text": "Oven Garlic-Soy Chicken Breast",
+          "screen": 41.4
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 42.14
+        },
+        {
+          "text": "Honey-Garlic Oven Chicken",
+          "screen": 42.71
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 43.45
+        },
+        {
+          "text": "Sheet-Pan Chicken & Vegetables",
+          "screen": 44.02
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 44.76
+        },
+        {
+          "text": "Oven-Roast Liempo",
+          "screen": 45.43
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 46.17
+        },
+        {
+          "text": "Instant Pot Chicken Adobo",
+          "screen": 46.72
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 47.46
+        },
+        {
+          "text": "Instant Pot Shredded Chicken",
+          "screen": 48.05
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 48.79
+        },
+        {
+          "text": "Pressure Cooker Nilagang Baka",
+          "screen": 49.33
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 50.08
+        },
+        {
+          "text": "Lechon Manok Rice Bowl",
+          "screen": 50.69
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 51.44
+        },
+        {
+          "text": "Tuna Vegetable Rice Bowl",
+          "screen": 52
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 52.75
+        },
+        {
+          "text": "Overnight Oats with Banana & Peanut Butter",
+          "screen": 53.36
+        },
+        {
+          "text": "Ingredients:",
+          "screen": 54.13
+        }
+      ],
+      "headerHeight": 66
+    },
+    "nutrition": {
+      "pageScreens": 10.34,
+      "sectionHeight": 8565,
+      "interactive": 43,
+      "interactiveAboveFold": 1,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Nutrition Tracking",
+          "screen": 0.16
+        },
+        {
+          "text": "Weekly Nutrition Summary",
+          "screen": 0.8
+        },
+        {
+          "text": "Daily Breakdown",
+          "screen": 1.4
+        },
+        {
+          "text": "Find Recipes by Nutrition",
+          "screen": 2.03
+        },
+        {
+          "text": "Sinangag",
+          "screen": 2.22
+        },
+        {
+          "text": "Arroz Caldo",
+          "screen": 2.42
+        },
+        {
+          "text": "Tortang Talong",
+          "screen": 2.63
+        },
+        {
+          "text": "Corned Beef Guisado",
+          "screen": 2.83
+        },
+        {
+          "text": "Chicken Adobo",
+          "screen": 3.03
+        },
+        {
+          "text": "Pork Sinigang",
+          "screen": 3.23
+        },
+        {
+          "text": "Chicken Tinola",
+          "screen": 3.43
+        },
+        {
+          "text": "Ginisang Monggo",
+          "screen": 3.63
+        },
+        {
+          "text": "Giniling na Baboy",
+          "screen": 3.84
+        },
+        {
+          "text": "Paksiw na Bangus",
+          "screen": 4.04
+        },
+        {
+          "text": "Bistek Tagalog",
+          "screen": 4.24
+        },
+        {
+          "text": "Nilaga",
+          "screen": 4.44
+        },
+        {
+          "text": "Giniling na Sardinas",
+          "screen": 4.64
+        },
+        {
+          "text": "Pinakbet",
+          "screen": 4.84
+        },
+        {
+          "text": "Bicol Express",
+          "screen": 5.05
+        },
+        {
+          "text": "Tapsilog",
+          "screen": 5.25
+        },
+        {
+          "text": "Longsilog",
+          "screen": 5.45
+        },
+        {
+          "text": "Champorado",
+          "screen": 5.65
+        },
+        {
+          "text": "Bulalo",
+          "screen": 5.85
+        },
+        {
+          "text": "Chicken Sopas",
+          "screen": 6.05
+        },
+        {
+          "text": "Fish Sinigang",
+          "screen": 6.26
+        },
+        {
+          "text": "Lomi",
+          "screen": 6.46
+        },
+        {
+          "text": "Caldereta",
+          "screen": 6.66
+        },
+        {
+          "text": "Menudo",
+          "screen": 6.86
+        },
+        {
+          "text": "Laing",
+          "screen": 7.06
+        },
+        {
+          "text": "Ginataang Manok",
+          "screen": 7.26
+        },
+        {
+          "text": "Rice Cooker Chicken & Rice",
+          "screen": 7.47
+        },
+        {
+          "text": "Rice Cooker Chicken Mushroom Rice",
+          "screen": 7.67
+        },
+        {
+          "text": "Rice Cooker Chicken with Steamed Vegetables",
+          "screen": 7.87
+        },
+        {
+          "text": "Rice Cooker Longganisa & Pechay Rice",
+          "screen": 8.09
+        },
+        {
+          "text": "Oven Garlic-Soy Chicken Breast",
+          "screen": 8.29
+        },
+        {
+          "text": "Honey-Garlic Oven Chicken",
+          "screen": 8.49
+        },
+        {
+          "text": "Sheet-Pan Chicken & Vegetables",
+          "screen": 8.69
+        },
+        {
+          "text": "Oven-Roast Liempo",
+          "screen": 8.9
+        },
+        {
+          "text": "Instant Pot Chicken Adobo",
+          "screen": 9.1
+        },
+        {
+          "text": "Instant Pot Shredded Chicken",
+          "screen": 9.3
+        },
+        {
+          "text": "Pressure Cooker Nilagang Baka",
+          "screen": 9.5
+        },
+        {
+          "text": "Lechon Manok Rice Bowl",
+          "screen": 9.7
+        },
+        {
+          "text": "Tuna Vegetable Rice Bowl",
+          "screen": 9.9
+        },
+        {
+          "text": "Overnight Oats with Banana & Peanut Butter",
+          "screen": 10.11
+        }
+      ],
+      "headerHeight": 66
+    },
+    "ingredients": {
+      "pageScreens": 44.19,
+      "sectionHeight": 37129,
+      "interactive": 826,
+      "interactiveAboveFold": 13,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Price Book",
+          "screen": 0.16
+        }
+      ],
+      "headerHeight": 66
+    },
+    "flavors": {
+      "pageScreens": 1.85,
+      "sectionHeight": 1405,
+      "interactive": 16,
+      "interactiveAboveFold": 9,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Flavor Library",
+          "screen": 0.16
+        },
+        {
+          "text": "PREPARED FLAVORS",
+          "screen": 0.46
+        }
+      ],
+      "headerHeight": 66
+    },
+    "hacks": {
+      "pageScreens": 4.36,
+      "sectionHeight": 3518,
+      "interactive": 44,
+      "interactiveAboveFold": 11,
+      "horizontalOverflow": false,
+      "headings": [
+        {
+          "text": "Cooking Hacks & Meal Prep Tips",
+          "screen": 0.16
+        },
+        {
+          "text": "🍱 Batch Cooking",
+          "screen": 0.4
+        },
+        {
+          "text": "Rice and Kamote Prep",
+          "screen": 0.48
+        },
+        {
+          "text": "Two Lechon Manok Hack",
+          "screen": 0.71
+        },
+        {
+          "text": "Oven Chicken, Three Sauces",
+          "screen": 0.98
+        },
+        {
+          "text": "Make Sauces Separately",
+          "screen": 1.24
+        },
+        {
+          "text": "🏪 Storage",
+          "screen": 1.53
+        },
+        {
+          "text": "Egg Prep Strategy",
+          "screen": 1.61
+        },
+        {
+          "text": "2-Hour Safety Rule",
+          "screen": 1.82
+        },
+        {
+          "text": "Freeze the Protein, Cook Rice Fresh",
+          "screen": 2
+        },
+        {
+          "text": "Count Portions When You Store It",
+          "screen": 2.25
+        },
+        {
+          "text": "⚡ Equipment",
+          "screen": 2.63
+        },
+        {
+          "text": "One-Pan Veggie Method",
+          "screen": 2.7
+        },
+        {
+          "text": "Rice and Steamed Veg in One Pot",
+          "screen": 2.92
+        },
+        {
+          "text": "Pressure-Cooker Batch Meat",
+          "screen": 3.19
+        },
+        {
+          "text": "💰 Budget",
+          "screen": 3.5
+        },
+        {
+          "text": "Bone-In Cuts",
+          "screen": 3.57
+        },
+        {
+          "text": "Seasonal Vegetables",
+          "screen": 3.78
+        },
+        {
+          "text": "⏱️ Time-Saving",
+          "screen": 4.03
+        },
+        {
+          "text": "Frozen Vegetables Skip the Chopping",
+          "screen": 4.1
+        }
+      ],
+      "headerHeight": 66
+    }
+  },
+  "modals": {
+    "recipe-details": {
+      "id": "recipe-modal",
+      "scrollScreens": 3.95,
+      "fields": 56,
+      "buttons": 11
+    },
+    "recipe-edit": {
+      "id": "recipe-modal",
+      "scrollScreens": 4.25,
+      "fields": 56,
+      "buttons": 11
+    },
+    "add-recipe": {
+      "id": "recipe-modal",
+      "scrollScreens": 3.11,
+      "fields": 40,
+      "buttons": 7
+    },
+    "batch-picker": {
+      "id": "batch-picker-modal",
+      "scrollScreens": 0.8,
+      "fields": 1,
+      "buttons": 121
+    },
+    "prep-mode": {
+      "id": "prep-mode-modal",
+      "scrollScreens": 0.9,
+      "fields": 23,
+      "buttons": 2
+    },
+    "manual-cooked": {
+      "id": "manual-cooked-modal",
+      "scrollScreens": 1.18,
+      "fields": 8,
+      "buttons": 3
+    },
+    "bulk-add": {
+      "id": "bulk-add-modal",
+      "scrollScreens": 0.92,
+      "fields": 3,
+      "buttons": 4
+    },
+    "settings": {
+      "id": "settings-modal",
+      "scrollScreens": 0.96,
+      "fields": 1,
+      "buttons": 11
+    },
+    "help": {
+      "id": "help-modal",
+      "scrollScreens": 0.93,
+      "fields": 0,
+      "buttons": 2
+    },
+    "ingredient-browser": {
+      "id": "ingredient-browser-modal",
+      "scrollScreens": 0.88,
+      "fields": 9,
+      "buttons": 213
+    }
+  },
+  "jobs": {
+    "eatNow": {
+      "readyHeadingScreen": 0.55,
+      "firstUseBtnScreen": 0.59
+    },
+    "quickCook": {
+      "chipScreen": 1.03,
+      "chips": 10,
+      "filtersAbove": 3
+    },
+    "outOfX": {
+      "pantrySearchScreen": 2.11,
+      "pantryInputScreen": 1.86,
+      "pantryListScreen": 2.18,
+      "pantryItems": 0
+    },
+    "justShopped": {
+      "firstItemScreen": 0.47,
+      "rows": 17
+    },
+    "noPlan": {
+      "roles": 7,
+      "height": 794
+    },
+    "flavor": {
+      "cards": 10,
+      "screens": 1.85
+    }
+  },
+  "notes": [],
+  "firstRun": {
+    "openModals": [
+      "kitchen-setup-modal"
+    ],
+    "recipes": 40
+  },
+  "seed": {
+    "recipes": 40,
+    "pantry": 25,
+    "cooked": 3,
+    "batches": 3,
+    "flavors": 10,
+    "prepared": 2,
+    "grocery": 17
+  },
+  "recipeCard": {
+    "count": 40,
+    "cardHeight": 1039,
+    "cardsPerScreen": 0.81,
+    "firstCardScreen": 1.13,
+    "textNodes": 49,
+    "buttons": 13,
+    "sample": [
+      "🥞",
+      "Sinangag",
+      "Breakfast",
+      "Sample",
+      "♥",
+      "−",
+      "2 servings",
+      "Base: 2",
+      "+",
+      "1",
+      "2",
+      "4",
+      "6",
+      "8",
+      "Prep: 5m",
+      "Cook: 10m",
+      "⚡ 15m hands-on",
+      "Low",
+      "🍳 Pan",
+      "Minimal cleanup",
+      "Carb ✓",
+      "Nutrition per serving:",
+      "290",
+      "cal",
+      "5g",
+      "protein",
+      "52g",
+      "carbs",
+      "7g",
+      "fat",
+      "1g",
+      "fiber",
+      "290mg",
+      "sodium",
+      "−",
+      "2",
+      "+",
+      "servings",
+      "Ingredients:",
+      "2 cups cooked White Rice (Bigas)"
+    ]
+  },
+  "navLabels": [
+    {
+      "text": "Home",
+      "visible": true
+    },
+    {
+      "text": "Plan",
+      "visible": true
+    },
+    {
+      "text": "Shop",
+      "visible": true
+    },
+    {
+      "text": "Prep",
+      "visible": true
+    },
+    {
+      "text": "Fridge4",
+      "visible": true
+    },
+    {
+      "text": "Recipes",
+      "visible": false
+    },
+    {
+      "text": "⋯ More",
+      "visible": true
+    }
+  ],
+  "overflow360": {
+    "dashboard": 360,
+    "planner": 360,
+    "grocery": 360,
+    "prep": 360,
+    "fridge": 360,
+    "recipes": 360,
+    "nutrition": 360,
+    "ingredients": 360,
+    "flavors": 360,
+    "hacks": 360
+  }
+}
