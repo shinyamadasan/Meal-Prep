@@ -6879,7 +6879,7 @@ verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`;
   `npx wrangler deploy --dry-run` only; SELF_REVIEW + QA; CHANGELOG/TEST_REPORT.
 
 ### TASK-093 · PROP-041 P1-3 No duplicate writes: required requestId + atomic request record
-status: review
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (every Worker write path; Firestore commit)
 source: BQ-032 / PROP-041 P1-3; owner decisions 2 and 5
@@ -6917,7 +6917,7 @@ constraints: No change to which fields each tool changes or to its validation. N
 verification: as TASK-092.
 
 ### TASK-094 · PROP-041 P1-4 Safe purchase handling in `add_stock`
-status: todo
+status: codex
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (inventory write; food safety)
 source: BQ-032 / PROP-041 P1-4; audit C2; owner decision 4

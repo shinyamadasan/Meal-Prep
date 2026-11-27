@@ -4,6 +4,43 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-093 (PROP-041 P1-3 no duplicate writes) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `711118f`. Independent
+STRICT review + QA: separate Claude session — **PASS, no must-fix.** Reviewer evidence: captured the
+real `documents:commit` body (one commit, user-doc `updateMask` = the tool's unchanged field paths
++ `version`, `updateTime` precondition; create-only `mcpRequests/{requestId}`); precondition
+failure answers replay / `request_id_reused` / `revision_conflict` correctly and can never replay a
+different request; concurrent identical requests cannot both apply; argsHash canonicalisation
+probes (key order, 1 vs 1.0, undefined vs missing, null vs missing, "1" vs 1); `before` snapshots
+complete for every write tool; `createdAt`/`expireAt` stored as timestamps (+30 days); no secrets;
+size bounded (8 KiB request cap).
+
+Review fixes (Claude): `3ccbb83` — the record gains `added` (full copies of records a write adds:
+the `mealConsumptions` ledger fact from `consume_ready_food`, the new batch from
+`record_ready_food`) so TASK-095 never guesses them back; a no-op change (already out / already
+full) commits its request record alone (user document and `version` untouched), so a lost-response
+retry replays the same answer and the id cannot be reused. `eff5099` — tests assert the record-only
+commit body and the no-op failure paths. Focused STRICT re-review of `711118f..3ccbb83`: **PASS, no
+must-fix**; normal commits byte-identical to `711118f` apart from `added` (16 captured scenarios);
+`added` correct for every tool. Accepted: a no-op "unchanged" answer is computed from a read with
+no commit-time precondition, so a same-id retry can repeat a stale "unchanged" for up to 30 days;
+nothing is written and the returned revision shows the staleness.
+Gates: `test:bridge` 317/317 (Claude, merged head); reviewer `npm test` 912/912, ledger 13/13,
+`git diff --check` clean.
+
+Accepted deviations: REST routes take no `requestId` (separate write path; a retried REST write can
+still apply twice — REST is not chat's path); a missing `requestId` is a schema error before the
+write-scope check; `RequestIdReusedError` lives in `operations/requests.js`.
+Owner deploy blockers (Phase 1 release checklist): F1 — the bridge service-account role
+`mealPrepBridgeFirestore` needs `datastore.entities.create` or every chat write fails closed; a
+Firestore TTL policy on collection group `mcpRequests`, field `expireAt`; `npx wrangler deploy
+--dry-run`. Recorded, not fixed: F2 — `consumeReadyFood()` still calls `String()` on stored
+`mealConsumptions` ids (fails closed, no write).
+Merged into `prop041-p1` (`d8920f9`). **Gate: `approved` (held)** — red zone: every chat write path
+and a new Firestore subcollection.
+
+---
 ## Review TASK-092 (PROP-041 P1-2 truthful MCP reads) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Codex (`6025a12`). Independent STRICT review + QA: separate Claude sessions, four rounds.
