@@ -2726,7 +2726,8 @@ Verify: app.js contains "if (Array.isArray(data.plannedBatches)) AppState.planne
 Verify: app.js does not contain "Add pull-to-refresh functionality"
 Verify: tests/scroll-no-reload.spec.js contains "scrolling back up inside an open modal does not reload the app"
 Verify: tests/meal-prep-first.spec.js contains "a loose match never deletes unrelated stock: only the tapped record changes"
-Verify: app.js contains "const rowKey = (category, name) => String(category) + '\u0000' + String(name);"
+Verify: tests/meal-prep-first.spec.js contains "a checked batch ingredient stays checked when that batch's servings change"
+(Anchor updated 2026-11-26: TASK-090 B2 replaced the `rowKey` helper with one Shop row per ingredient; the regression test is the stable anchor.)
 Verify: tests/meal-prep-first.spec.js contains "REGRESSION: changing an unrelated batch"
 
 ---
@@ -3091,9 +3092,9 @@ While tracing the same code, two small additive fixes landed alongside it:
 names that surface by topic in its red-zone list — even though each change is additive (one line)
 and touches no tombstone, merge-precedence, or Firestore-shape logic.
 
-Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the removed recipe"
-Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the cleared day"
-Verify: app.js contains "saveData(); // TASK-064: this clear must persist, or a reload resurrects the old weekly plan"
+Verify: tests/plan-persistence-and-picker.spec.js contains "removeRecipeFromSlot() persists across reload"
+Verify: tests/plan-persistence-and-picker.spec.js contains "clearWeeklyPlan() persists across reload"
+(Anchors updated 2026-11-26: TASK-090 removed the `// TASK-064` comments; the `saveData()` calls remain and the persistence tests are the stable anchors.)
 Verify: app.js contains "batch-name batch-name-btn"
 Verify: app.js contains "storage-alert-recipe-link"
 Verify: tests/plan-persistence-and-picker.spec.js contains "clearDay() persists"
