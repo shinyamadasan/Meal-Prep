@@ -172,7 +172,8 @@ export function listReadyFoodWithSafety(cookedMeals, today) {
 }
 
 function findMealIndex(cookedMeals, cookedMealId) {
-  return cookedMeals.findIndex((m) => m && String(m.id) === String(cookedMealId));
+  // Same safe id rule as the reads (readableId); see inventory.js findPantryIndex().
+  return cookedMeals.findIndex((m) => m && readableId(m.id) && String(m.id) === String(cookedMealId));
 }
 
 function validateServings(value, field) {

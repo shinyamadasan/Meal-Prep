@@ -8,6 +8,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -39,7 +40,7 @@ function rpcRequest(id, method, params = {}) {
 }
 
 function toolCall(id, name, args = {}) {
-  return rpcRequest(id, 'tools/call', { name, arguments: args });
+  return rpcRequest(id, 'tools/call', { name, arguments: withRequestId(name, args) });
 }
 
 function contextWithScope(scope, overrides = {}) {
@@ -69,7 +70,7 @@ function readDeps(doc) {
       nowSeconds: NOW,
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
-      patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+      getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
       fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
     }
   };

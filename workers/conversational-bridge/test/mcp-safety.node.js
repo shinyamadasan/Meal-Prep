@@ -67,7 +67,7 @@ async function callRead(tool, doc, instant, env = testEnv()) {
     now: () => new Date(instant),
     getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
     getUserDocument: async () => { calls.read += 1; return doc; },
-    patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+    getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
     fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
   };
   const response = await routeRequest(mcpRequest(toolCall(1, tool)), env, deps, validContext());

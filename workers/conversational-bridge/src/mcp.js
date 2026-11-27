@@ -8,10 +8,11 @@ import {
 } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { getFirestoreAccessToken } from './auth.js';
-import { getUserDocument, patchUserDocument, RevisionConflictError } from './firestore.js';
+import { commitRequestWrite, getRequestRecord, getUserDocument, RequestAlreadyRecordedError, RevisionConflictError } from './firestore.js';
 import { AmbiguousError, InsufficientServingsError, InsufficientStockError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
+import * as requests from './operations/requests.js';
 import { householdDayFromEnv } from './householdDay.js';
 import '../../../shared/foodSafety.js';
 import {
@@ -109,6 +110,15 @@ function toolResult(data) {
   };
 }
 
+// TASK-093: required on every write tool. Same rule as operations/requests.js validateRequestId(),
+// which the adapter repeats before any Firestore access.
+function requestIdSchema() {
+  return z.string().regex(requests.REQUEST_ID_PATTERN, requests.REQUEST_ID_MESSAGE);
+}
+
+// Present (true) only when a retried request returns its stored result instead of writing again.
+const REPLAYED_SCHEMA = z.boolean().optional();
+
 function inventoryItemSchema() {
   return z.strictObject({
     ingredientId: z.string(),
@@ -137,6 +147,7 @@ function recordReadyFoodInputSchema() {
     cookedDate: z.unknown().optional(),
     recipeId: z.unknown().optional(),
     source: z.enum(readyFood.READY_FOOD_SOURCES).optional(),
+    requestId: requestIdSchema(),
     expectedRevision: z.unknown().optional()
   });
 }
@@ -150,6 +161,7 @@ function consumeReadyFoodInputSchema() {
   return z.strictObject({
     cookedMealId: z.string().min(1),
     servings: z.number(),
+    requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -157,6 +169,7 @@ function consumeReadyFoodInputSchema() {
 function inventoryStockInputSchema() {
   return z.strictObject({
     ingredientId: z.string().min(1),
+    requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -169,6 +182,7 @@ function setInventoryQuantityInputSchema() {
     ingredientId: z.string().min(1),
     quantity: z.number().positive('quantity must be a number > 0. For none left, use mark_out_of_stock.'),
     expectedUnit: z.string().min(1),
+    requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -178,6 +192,7 @@ function consumeStockInputSchema() {
     ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
     quantity: z.number().finite().positive(),
     expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
+    requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -187,6 +202,7 @@ function addStockInputSchema() {
     ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
     quantity: z.number().finite().positive(),
     expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
+    requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
 }
@@ -245,6 +261,13 @@ const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, day
   'date recorded" has no freshness information; say so when you suggest it. safety.usable is the ' +
   'only availability signal: inStock, staple and servingsRemaining are bookkeeping fields and never ' +
   'override it.';
+
+// TASK-093: appended to every write tool's description.
+const REQUEST_ID_TEXT = ' requestId is required: generate a new unique id (8-128 characters of A-Z, a-z, 0-9, _ or -) ' +
+  'once for each change the user asks for, and send the SAME requestId when you retry that same change ' +
+  '(for example after a timeout or a dropped connection). A retried requestId never applies twice: it ' +
+  'returns the original result with replayed:true and changes nothing. Never reuse a requestId for a ' +
+  'different change; that is refused as request_id_reused.';
 
 export function createReadServer(env = {}, deps = {}, ctx = {}) {
   const server = new McpServer({
@@ -308,11 +331,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'app still applies its ' + COOKED_FRIDGE_LIMIT + '-day fridge safety limit from cookedDate, so a ' +
         'fridge record shows Expired after ' + COOKED_FRIDGE_LIMIT + ' days and the app can offer it for ' +
         'removal; a freezer record without a source has no quality date. cookedDate is the day it was ' +
-        'cooked on the household calendar.',
+        'cooked on the household calendar.' + REQUEST_ID_TEXT,
       inputSchema: recordReadyFoodInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: readyFoodItemSchema()
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
@@ -328,11 +352,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
       description: 'Consume N servings from one existing ready-to-eat record, identified by ' +
         'cookedMealId (from get_ready_food). Consuming the final serving permanently removes the ' +
         'record. NOT safe to replay: calling again with a freshly read revision consumes again. ' +
-        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: consumeReadyFoodInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: readyFoodItemSchema().nullable(),
         removed: z.boolean()
       }),
@@ -350,11 +375,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'get_inventory. Never guess or fuzzy-match an id; if multiple rows match the user\'s ' +
         'words, ask which row. Staples remain as empty; non-staples are permanently removed ' +
         'from ChatGPT. On ambiguous, ask the user to set the staple flag in the app. Requires ' +
-        'expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+        'expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: inventoryStockInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: inventoryItemSchema().nullable(),
         unchanged: z.boolean(),
         removed: z.boolean()
@@ -372,11 +398,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
       description: 'Mark one existing staple pantry item in stock using ingredientId from ' +
         'get_inventory. Never guess or fuzzy-match an id; if multiple rows match the user\'s ' +
         'words, ask which row. This does not create an item or restore a removed non-staple. ' +
-        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.',
+        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: inventoryStockInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: inventoryItemSchema(),
         unchanged: z.boolean()
       }),
@@ -402,11 +429,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'mark_in_stock / mark_out_of_stock). Take ingredientId ONLY from get_inventory; never guess or ' +
         'fuzzy-match, and ask which row if several match. On ambiguous, ask the user to set the staple ' +
         'flag in the app. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
-        'whether to retry.',
+        'whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: setInventoryQuantityInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: inventoryItemSchema()
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
@@ -428,11 +456,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'first read the current quantity, unit, and revision, then submit that exact amount against ' +
         'that revision. On insufficient_stock, unit mismatch, or ambiguous, stop and clarify. This is ' +
         'a delta and is NOT safe to replay with a fresh revision; on revision_conflict, re-read before ' +
-        'deciding whether to retry.',
+        'deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: consumeStockInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: inventoryItemSchema().nullable(),
         removed: z.boolean()
       }),
@@ -454,11 +483,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'or can/package conversions. Printed-expiry lots, expired or date-ambiguous rows, stock-level-only ' +
         'staples, and removed/tombstoned items must be handled in the app; use mark_in_stock for a ' +
         'stock-level-only staple. This delta is NOT safe to replay with a fresh revision; on ' +
-        'revision_conflict, re-read before deciding whether to retry.',
+        'revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: addStockInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
         item: inventoryItemSchema()
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
@@ -470,178 +500,171 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
   return server;
 }
 
-// Same adapter shape as the stock-state tools: auth -> read -> compare expectedRevision (no retry)
-// -> canonical wrapper -> ONE guarded pantry write -> sanitized result.
-async function setInventoryQuantityTool(env, deps, ctx, args) {
+// Every write tool runs through this one adapter (TASK-093, PROP-041 P1-3):
+//   auth -> requestId shape (before ANY Firestore access) -> tool-specific prechecks ->
+//   argsHash -> read this request's record: present => stored result (replayed:true) or
+//   request_id_reused, zero writes, whatever expectedRevision now says -> read the user document
+//   -> compare expectedRevision (no retry) -> the canonical operation (unchanged) -> ONE commit of
+//   the guarded user-document update plus the create-only request record.
+// `plan.apply(doc)` returns { write: { fieldPaths, fields } | null, result(revision) }. A no-op
+// (write null, e.g. an already-out item) writes nothing and records nothing, as before.
+async function requestWriteTool(env, deps, ctx, tool, args, plan) {
   try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    const auth = requireMcpWriteContext(env, ctx, deps.nowSeconds);
+    requests.validateRequestId(args ? args.requestId : undefined);
+    if (plan.precheck) plan.precheck(args);
+
     const fetchImpl = deps.fetchImpl || fetch;
     const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
     const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
     const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
+    const readRequest = deps.getRequestRecord || getRequestRecord;
+    const commitWrite = deps.commitRequestWrite || commitRequestWrite;
+    const nowMs = typeof deps.now === 'function' ? Number(deps.now()) : Date.now();
 
+    const hash = await requests.argsHash(args, cryptoImpl);
     const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
+    const stored = await readRequest(env, accessToken, args.requestId, fetchImpl);
+    if (stored) return toolResult(requests.replayResult(stored, tool, hash));
+
     const doc = await readDoc(env, accessToken, fetchImpl);
     if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
 
-    const r = inventory.setCountedQuantity(doc.pantry, {
-      ingredientId: args.ingredientId,
-      quantity: args.quantity,
-      expectedUnit: args.expectedUnit
-    });
-    const written = await writeDoc(env, accessToken, {
-      fieldPaths: ['pantry'],
-      fields: { pantry: r.pantry },
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }, fetchImpl);
+    const step = plan.apply(doc);
+    if (!step.write) return toolResult(step.result(doc.revision));
 
-    return toolResult({ ok: true, revision: written.revision, item: r.item });
+    const revisionAfter = doc.revision + 1;
+    const result = step.result(revisionAfter);
+    const record = requests.buildRequestRecord({
+      tool,
+      argsHash: hash,
+      actor: auth.subject,
+      nowMs,
+      revisionBefore: doc.revision,
+      revisionAfter,
+      result,
+      before: requests.beforeSnapshot(doc, step.write)
+    });
+    try {
+      await commitWrite(env, accessToken, Object.assign({}, step.write, {
+        expectedUpdateTime: doc.updateTime,
+        nextVersion: revisionAfter,
+        requestId: args.requestId,
+        record
+      }), fetchImpl);
+    } catch (error) {
+      // A concurrent call with this requestId committed first: answer as its replay.
+      if (error instanceof RequestAlreadyRecordedError) return toolResult(requests.replayResult(error.record, tool, hash));
+      throw error;
+    }
+    return toolResult(result);
   } catch (error) {
-    return inventoryStockError(error, 'The inventory quantity could not be set.');
+    return (plan.mapError || inventoryStockError)(error, plan.fallback);
   }
+}
+
+// set_inventory_quantity: the canonical wrapper decides; one guarded pantry write.
+async function setInventoryQuantityTool(env, deps, ctx, args) {
+  return requestWriteTool(env, deps, ctx, 'set_inventory_quantity', args, {
+    fallback: 'The inventory quantity could not be set.',
+    apply: (doc) => {
+      const r = inventory.setCountedQuantity(doc.pantry, {
+        ingredientId: args.ingredientId,
+        quantity: args.quantity,
+        expectedUnit: args.expectedUnit
+      });
+      return {
+        write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({ ok: true, revision, item: r.item })
+      };
+    }
+  });
 }
 
 // Apply exactly one delta against the observed revision, then make one guarded write. Exact-zero
 // deletion and staple-empty semantics come from the canonical inventory operation.
 async function consumeStockTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
-
-    const r = inventory.consumeStock(doc.pantry, doc.deletions.pantry || {}, {
-      ingredientId: args.ingredientId,
-      quantity: args.quantity,
-      expectedUnit: args.expectedUnit
-    });
-    const write = r.removed
-      ? { fieldPaths: ['pantry', 'deletions.pantry'], fields: { pantry: r.pantry, deletions: { pantry: r.deletionsPantry } } }
-      : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } };
-    const written = await writeDoc(env, accessToken, Object.assign(write, {
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }), fetchImpl);
-
-    return toolResult({ ok: true, revision: written.revision, item: r.item, removed: r.removed });
-  } catch (error) {
-    return inventoryStockError(error, 'The inventory stock could not be consumed.');
-  }
+  return requestWriteTool(env, deps, ctx, 'consume_stock', args, {
+    fallback: 'The inventory stock could not be consumed.',
+    apply: (doc) => {
+      const r = inventory.consumeStock(doc.pantry, doc.deletions.pantry || {}, {
+        ingredientId: args.ingredientId,
+        quantity: args.quantity,
+        expectedUnit: args.expectedUnit
+      });
+      return {
+        write: pantryWriteSpec(r),
+        result: (revision) => ({ ok: true, revision, item: r.item, removed: r.removed })
+      };
+    }
+  });
 }
 
 // Apply exactly one purchase delta to the observed existing row, then make one guarded pantry write.
 async function addStockTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
-
-    const r = inventory.addStock(doc.pantry, doc.deletions.pantry || {}, {
-      ingredientId: args.ingredientId,
-      quantity: args.quantity,
-      expectedUnit: args.expectedUnit
-    });
-    const written = await writeDoc(env, accessToken, {
-      fieldPaths: ['pantry'],
-      fields: { pantry: r.pantry },
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }, fetchImpl);
-
-    return toolResult({ ok: true, revision: written.revision, item: r.item });
-  } catch (error) {
-    return inventoryStockError(error, 'The inventory stock could not be increased.');
-  }
+  return requestWriteTool(env, deps, ctx, 'add_stock', args, {
+    fallback: 'The inventory stock could not be increased.',
+    apply: (doc) => {
+      const r = inventory.addStock(doc.pantry, doc.deletions.pantry || {}, {
+        ingredientId: args.ingredientId,
+        quantity: args.quantity,
+        expectedUnit: args.expectedUnit
+      });
+      return {
+        write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({ ok: true, revision, item: r.item })
+      };
+    }
+  });
 }
 
 async function markOutOfStockTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
-
-    const r = inventory.markOutOfStock(doc.pantry, doc.deletions.pantry || {}, {
-      ingredientId: args.ingredientId
-    });
-    if (r.unchanged) {
-      return toolResult({ ok: true, revision: doc.revision, item: r.item, unchanged: true, removed: r.removed });
+  return requestWriteTool(env, deps, ctx, 'mark_out_of_stock', args, {
+    fallback: 'The inventory item could not be marked out of stock.',
+    apply: (doc) => {
+      const r = inventory.markOutOfStock(doc.pantry, doc.deletions.pantry || {}, {
+        ingredientId: args.ingredientId
+      });
+      return {
+        write: r.unchanged ? null : pantryWriteSpec(r),
+        result: (revision) => ({ ok: true, revision, item: r.item, unchanged: r.unchanged, removed: r.removed })
+      };
     }
-
-    const write = r.removed
-      ? { fieldPaths: ['pantry', 'deletions.pantry'], fields: { pantry: r.pantry, deletions: { pantry: r.deletionsPantry } } }
-      : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } };
-    const written = await writeDoc(env, accessToken, Object.assign(write, {
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }), fetchImpl);
-
-    return toolResult({
-      ok: true,
-      revision: written.revision,
-      item: r.item,
-      unchanged: false,
-      removed: r.removed
-    });
-  } catch (error) {
-    return inventoryStockError(error, 'The inventory item could not be marked out of stock.');
-  }
+  });
 }
 
 async function markInStockTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-    if (args.expectedRevision !== doc.revision) throw new RevisionConflictError(doc);
-
-    const r = inventory.markInStock(doc.pantry, { ingredientId: args.ingredientId });
-    if (r.unchanged) {
-      return toolResult({ ok: true, revision: doc.revision, item: r.item, unchanged: true });
+  return requestWriteTool(env, deps, ctx, 'mark_in_stock', args, {
+    fallback: 'The inventory item could not be marked in stock.',
+    apply: (doc) => {
+      const r = inventory.markInStock(doc.pantry, { ingredientId: args.ingredientId });
+      return {
+        write: r.unchanged ? null : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({ ok: true, revision, item: r.item, unchanged: r.unchanged })
+      };
     }
+  });
+}
 
-    const written = await writeDoc(env, accessToken, {
-      fieldPaths: ['pantry'],
-      fields: { pantry: r.pantry },
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }, fetchImpl);
+// The pantry field-path split shared by consume_stock and mark_out_of_stock: a removal also
+// writes the tombstone bucket (D-071).
+function pantryWriteSpec(r) {
+  return r.removed
+    ? { fieldPaths: ['pantry', 'deletions.pantry'], fields: { pantry: r.pantry, deletions: { pantry: r.deletionsPantry } } }
+    : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } };
+}
 
-    return toolResult({ ok: true, revision: written.revision, item: r.item, unchanged: false });
-  } catch (error) {
-    return inventoryStockError(error, 'The inventory item could not be marked in stock.');
+function requestError(error) {
+  if (error instanceof requests.RequestIdReusedError) {
+    return { content: [{ type: 'text', text: 'request_id_reused: ' + error.message }], isError: true };
   }
+  return null;
 }
 
 function inventoryStockError(error, fallback) {
   if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
+  const reused = requestError(error);
+  if (reused) return reused;
   if (error instanceof RevisionConflictError) {
     return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
   }
@@ -665,54 +688,21 @@ function inventoryStockError(error, fallback) {
 // readyFood.consumeReadyFood() (the canonical op shared with REST, TASK-071) -> ONE guarded write
 // of cookedMeals + mealConsumptions (+ tombstone), same field-path spec as REST.
 async function consumeReadyFoodTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-
-    if (args.expectedRevision !== doc.revision) {
-      throw new RevisionConflictError(doc);
+  return requestWriteTool(env, deps, ctx, 'consume_ready_food', args, {
+    fallback: 'The ready-food record could not be consumed.',
+    mapError: readyFoodError,
+    apply: (doc) => {
+      // Project only the two business fields the canonical operation destructures.
+      const r = readyFood.consumeReadyFood(
+        { cookedMeals: doc.cookedMeals, deletionsCookedMeals: doc.deletions.cookedMeals || {}, mealConsumptions: doc.mealConsumptions },
+        { cookedMealId: args.cookedMealId, servings: args.servings }
+      );
+      return {
+        write: readyFood.consumeWriteSpec(r),
+        result: (revision) => ({ ok: true, revision, item: r.item, removed: r.removed })
+      };
     }
-
-    // Project only the two business fields the canonical operation destructures.
-    const r = readyFood.consumeReadyFood(
-      { cookedMeals: doc.cookedMeals, deletionsCookedMeals: doc.deletions.cookedMeals || {}, mealConsumptions: doc.mealConsumptions },
-      { cookedMealId: args.cookedMealId, servings: args.servings }
-    );
-    const write = readyFood.consumeWriteSpec(r);
-    const written = await writeDoc(env, accessToken, Object.assign(write, {
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }), fetchImpl);
-
-    return toolResult({
-      ok: true,
-      revision: written.revision,
-      item: r.item,
-      removed: r.removed
-    });
-  } catch (error) {
-    if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
-    if (error instanceof RevisionConflictError) {
-      return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
-    }
-    if (error instanceof InsufficientServingsError) {
-      return { content: [{ type: 'text', text: 'insufficient_servings: ' + error.message + ' (remaining: ' + error.detail.remaining + ')' }], isError: true };
-    }
-    if (error instanceof NotFoundError) {
-      return { content: [{ type: 'text', text: 'not_found: ' + error.message }], isError: true };
-    }
-    if (error instanceof ValidationError) {
-      return { content: [{ type: 'text', text: error.message }], isError: true };
-    }
-    return { content: [{ type: 'text', text: 'The ready-food record could not be consumed.' }], isError: true };
-  }
+  });
 }
 
 // Mirrors index.js's POST /v1/ready-food/record flow exactly: auth -> expectedRevision shape ->
@@ -720,52 +710,46 @@ async function consumeReadyFoodTool(env, deps, ctx, args) {
 // validation+record-shape function) -> write. No persistence or business validation is
 // reimplemented here (D-082 decision 7 / TASK-069).
 async function recordReadyFoodTool(env, deps, ctx, args) {
-  try {
-    requireMcpWriteContext(env, ctx, deps.nowSeconds);
-    requireValidExpectedRevision(args ? args.expectedRevision : undefined);
-
-    const fetchImpl = deps.fetchImpl || fetch;
-    const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
-    const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
-    const readDoc = deps.getUserDocument || getUserDocument;
-    const writeDoc = deps.patchUserDocument || patchUserDocument;
-
-    const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
-    const doc = await readDoc(env, accessToken, fetchImpl);
-
-    if (args.expectedRevision !== doc.revision) {
-      throw new RevisionConflictError(doc);
+  return requestWriteTool(env, deps, ctx, 'record_ready_food', args, {
+    fallback: 'The ready-food record could not be created.',
+    mapError: readyFoodError,
+    precheck: (a) => requireValidExpectedRevision(a ? a.expectedRevision : undefined),
+    apply: (doc) => {
+      // Project only the canonical business fields recordCookedFood() actually destructures —
+      // expectedRevision and requestId (not business fields) must never reach it.
+      const r = readyFood.recordCookedFood({
+        name: args.name,
+        servings: args.servings,
+        storage: args.storage,
+        cookedDate: args.cookedDate,
+        recipeId: args.recipeId,
+        source: args.source
+      });
+      return {
+        write: { fieldPaths: ['cookedMeals'], fields: { cookedMeals: (doc.cookedMeals || []).concat([r.record]) } },
+        result: (revision) => ({ ok: true, revision, item: r.item })
+      };
     }
+  });
+}
 
-    // Project only the canonical business fields recordCookedFood() actually destructures —
-    // expectedRevision (already validated above, not a business field) must never reach it.
-    const r = readyFood.recordCookedFood({
-      name: args.name,
-      servings: args.servings,
-      storage: args.storage,
-      cookedDate: args.cookedDate,
-      recipeId: args.recipeId,
-      source: args.source
-    });
-    const nextMeals = (doc.cookedMeals || []).concat([r.record]);
-    const written = await writeDoc(env, accessToken, {
-      fieldPaths: ['cookedMeals'],
-      fields: { cookedMeals: nextMeals },
-      expectedUpdateTime: doc.updateTime,
-      nextVersion: doc.revision + 1
-    }, fetchImpl);
-
-    return toolResult({ ok: true, revision: written.revision, item: r.item });
-  } catch (error) {
-    if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
-    if (error instanceof RevisionConflictError) {
-      return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
-    }
-    if (error instanceof ValidationError) {
-      return { content: [{ type: 'text', text: error.message }], isError: true };
-    }
-    return { content: [{ type: 'text', text: 'The ready-food record could not be created.' }], isError: true };
+function readyFoodError(error, fallback) {
+  if (error instanceof McpAuthError) return mcpAuthChallenge(error, MCP_WRITE_SCOPE);
+  const reused = requestError(error);
+  if (reused) return reused;
+  if (error instanceof RevisionConflictError) {
+    return { content: [{ type: 'text', text: 'revision_conflict: ' + error.message }], isError: true };
   }
+  if (error instanceof InsufficientServingsError) {
+    return { content: [{ type: 'text', text: 'insufficient_servings: ' + error.message + ' (remaining: ' + error.detail.remaining + ')' }], isError: true };
+  }
+  if (error instanceof NotFoundError) {
+    return { content: [{ type: 'text', text: 'not_found: ' + error.message }], isError: true };
+  }
+  if (error instanceof ValidationError) {
+    return { content: [{ type: 'text', text: error.message }], isError: true };
+  }
+  return { content: [{ type: 'text', text: fallback }], isError: true };
 }
 
 // Mirrors index.js's validateBody() expectedRevision shape check exactly (same message, code,

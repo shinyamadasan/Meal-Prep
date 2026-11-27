@@ -1723,3 +1723,72 @@ findings (recorded, NOT changed):
   - G4: `npx wrangler deploy --dry-run` not run. wrangler is not installed (not a dependency,
     not global), and fetching it was not authorised.
 → status set to `review` in TASKS.md
+
+## TASK-093 — implementation complete (branch: task-093-mcp-request-ids)
+Builder: Claude standing in for Codex (Codex at its usage limit).
+changed:
+  - `workers/conversational-bridge/src/operations/requests.js` (new, pure apart from Web Crypto
+    SHA-256): `REQUEST_ID_PATTERN` (`^[A-Za-z0-9_-]{8,128}$`), `validateRequestId()`,
+    `canonicalJson()` (keys sorted at every depth), `hashableArgs()` (drops `requestId` and
+    `expectedRevision`), `argsHash()`, `beforeSnapshot()`, `buildRequestRecord()` (`expireAt` =
+    `createdAt` + `REQUEST_RETENTION_DAYS` = 30), `replayResult()`, `RequestIdReusedError`
+    (code `request_id_reused`).
+  - `src/firestore.js`: `getRequestRecord()` (404 => null), `commitRequestWrite()` (ONE
+    `documents:commit`: the same guarded user-document update as `patchUserDocument()` plus a
+    create-only `users/{uid}/mcpRequests/{requestId}` record), `encodeRequestRecord()`
+    (`createdAt`/`expireAt` as `timestampValue` for TTL), `RequestAlreadyRecordedError`. On
+    FAILED_PRECONDITION / ABORTED / ALREADY_EXISTS it reads the request record: present =>
+    RequestAlreadyRecordedError (answered as a replay), absent => RevisionConflictError with
+    fresh state, as before. `patchUserDocument()` is unchanged and now used by REST only.
+  - `src/mcp.js`: the seven write tools now share one adapter, `requestWriteTool()`: auth ->
+    requestId -> tool prechecks -> argsHash -> request-record read (replay or reuse, zero writes,
+    before any expectedRevision check) -> user-doc read -> expectedRevision -> the unchanged
+    canonical operation -> one commit. Each tool supplies only `apply(doc)` (same operation, same
+    field paths as before). A no-op (`unchanged: true`) still writes nothing and records nothing.
+    `requestIdSchema()` is required in every write input schema; `replayed` (optional boolean) is
+    in every write output schema; `REQUEST_ID_TEXT` is appended to every write description.
+    Error mapping adds `request_id_reused: ...`. Read tools unchanged.
+  - `src/operations/inventory.js` `findPantryIndex()` and `src/operations/readyFood.js`
+    `findMealIndex()`: match only ids that pass `readableId()` (TASK-092 review carry-over), so a
+    stored map id is skipped instead of being passed to `String()`.
+  - `workers/conversational-bridge/README.md`: TASK-093 section, including the two one-time owner
+    steps (IAM `datastore.entities.create`, TTL policy on collection group `mcpRequests` field
+    `expireAt`). `docs/DATA_MODEL.md` Firestore layout: the `mcpRequests` subcollection.
+    `docs/ARCHITECTURE.md`: "Chat write requests" subsection.
+tests:
+  - `test/mcp-request-ids.node.js` (new, 24 cases, all pass): schema + validation on all seven
+    tools (13 bad ids each, zero Firestore calls), boundary ids, one-commit shape per tool
+    (mask, updateTime precondition, version, create-only record, no PATCH), not-yet-created doc,
+    record contents (hash, actor, timestamps, exact +30 days, revisions, result, before),
+    `before` for removals / prior tombstones / ready food / created record, no-op not recorded,
+    replay on all seven tools, stale-revision replay, request_id_reused (args and tool),
+    timeout-landed replay, timeout-lost retry, concurrent same-id (one landed commit, one
+    replay) on all seven tools, concurrent different ids (loser leaves no record), reused id
+    losing the race, pure helpers, transport errors, hostile map-id lookups.
+  - Existing write-tool tests: each call now gets a fresh requestId through
+    `test/support/requestIds.js` `withRequestId()` (tests can still set or omit it); deps stubs
+    renamed `patchUserDocument` -> `commitRequestWrite` (+ `getRequestRecord: async () => null`);
+    schema assertions add `requestId` / `replayed`; the consume-parity and mcp-consume fetch
+    instrumentation read the user write from a commit; the OAuth step-up test sends a requestId.
+    No behavioural expectation was changed.
+  - `test/support/fakeFirestore.js`: models `mcpRequests` (kept outside `store`) and an atomic
+    `documents:commit` (all preconditions checked first, then all writes or none).
+blockers: none for review. Deploy needs the owner steps above (not done; deploy is held).
+deviations:
+  - REST routes do not share the MCP write path, so they are unchanged and take no requestId
+    (the `actor: rest` value is unused). The task said index.js changes only "if they share".
+  - A missing requestId is rejected by the tool schema before the handler runs, so a read-only
+    token calling a write tool WITHOUT a requestId gets a schema error, not the write step-up
+    challenge. With a requestId the step-up is unchanged (oauth integration test).
+  - No-op writes (already out / already full) create no record (nothing committed). Retrying one
+    later with the same id and a stale revision is a revision_conflict, as before.
+  - `RequestIdReusedError` lives in `operations/requests.js`, not `errors.js`.
+findings (recorded, not fixed):
+  - F1 IAM: the bridge role has only `datastore.entities.get`/`update`; creating the request
+    record needs `datastore.entities.create`. Without it every MCP write fails closed after
+    deploy. Owner step, documented in the README.
+  - F2 `readyFood.consumeReadyFood()` still calls `String()` on every `mealConsumptions` id when
+    picking a fresh id; a hostile map id there makes consume fail closed (fallback error, no
+    write). Out of this task's pantry/cookedMeals scope.
+  - F3 `npx wrangler deploy --dry-run` not run: wrangler is not installed locally.
+→ status set to `review` in TASKS.md

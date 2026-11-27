@@ -6879,7 +6879,7 @@ verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`;
   `npx wrangler deploy --dry-run` only; SELF_REVIEW + QA; CHANGELOG/TEST_REPORT.
 
 ### TASK-093 · PROP-041 P1-3 No duplicate writes: required requestId + atomic request record
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (every Worker write path; Firestore commit)
 source: BQ-032 / PROP-041 P1-3; owner decisions 2 and 5

@@ -5,6 +5,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv, request } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -36,7 +37,7 @@ function rpcRequest(id, method, params = {}) {
 }
 
 function toolCall(id, name, args = {}) {
-  return rpcRequest(id, 'tools/call', { name, arguments: args });
+  return rpcRequest(id, 'tools/call', { name, arguments: withRequestId(name, args) });
 }
 
 function contextWithScope(scope, overrides = {}) {
@@ -66,7 +67,7 @@ function countingDeps(doc) {
       nowSeconds: NOW,
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
-      patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+      getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
       fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
     }
   };
@@ -125,8 +126,8 @@ test('tools/list exposes exactly nine tools; set_inventory_quantity has a strict
   assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
-  assert.deepEqual([...tool.inputSchema.required].sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
+  assert.deepEqual([...tool.inputSchema.required].sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
   assert.equal(tool.inputSchema.properties.quantity.exclusiveMinimum, 0);
   assert.equal(tool.inputSchema.properties.expectedRevision.minimum, 0);
   assert.deepEqual(tool.annotations, { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false });
@@ -407,7 +408,7 @@ test('persistence failure is sanitized and does not mutate the source document',
     nowSeconds: NOW,
     getFirestoreAccessToken: async () => 'token',
     getUserDocument: async () => source,
-    patchUserDocument: async () => { throw new Error('secret-firestore-detail'); }
+    getRequestRecord: async () => null, commitRequestWrite: async () => { throw new Error('secret-firestore-detail'); }
   };
   const message = await responseMessage(await routeRequest(
     mcpRequest(toolCall(1, NAME, VALID)), testEnv(), deps, contextWithScope([MCP_WRITE_SCOPE])

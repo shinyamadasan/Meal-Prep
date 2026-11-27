@@ -7,6 +7,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -37,7 +38,7 @@ function rpcRequest(id, method, params = {}) {
 }
 
 function toolCall(id, name, args = {}) {
-  return rpcRequest(id, 'tools/call', { name, arguments: args });
+  return rpcRequest(id, 'tools/call', { name, arguments: withRequestId(name, args) });
 }
 
 function contextWithScope(scope, overrides = {}) {
@@ -69,7 +70,7 @@ function countingDeps(doc) {
       nowSeconds: NOW,
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
-      patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+      getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
       fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
     }
   };
@@ -213,7 +214,7 @@ test('the tool never retries internally: a stale call performs exactly one read 
     nowSeconds: NOW,
     getFirestoreAccessToken: async () => 'fake',
     getUserDocument: async () => { calls.read += 1; return { revision: 9, updateTime: 't', pantry: [], cookedMeals: [MEAL], deletions: {} }; },
-    patchUserDocument: async () => { calls.write += 1; throw new Error('write reached'); }
+    getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write reached'); }
   };
   const response = await routeRequest(
     mcpRequest(toolCall(1, 'consume_ready_food', VALID_ARGS)), testEnv(), deps, contextWithScope([MCP_WRITE_SCOPE])
@@ -233,16 +234,20 @@ function racingBridge(initialFields) {
   const barrier = new Promise((resolve) => { release = resolve; });
   const fetchImpl = async (url, init = {}) => {
     const method = (init.method || 'GET').toUpperCase();
-    const isDoc = new URL(url).pathname.includes('/documents/users/');
+    const u = new URL(url);
+    // TASK-093: the user-document GET (not the request-record GET) and the ONE commit whose
+    // user-document write carries the updateTime precondition.
+    const isDoc = /\/documents\/users\/[^/]+$/.test(u.pathname);
+    const isCommit = u.pathname.endsWith('/documents:commit') && method === 'POST';
     if (isDoc && method === 'GET') {
       stats.docGets += 1;
       const response = await fake.fetch(url, init);
       if (stats.docGets === 2) release();
       return response;
     }
-    if (isDoc && method === 'PATCH') {
+    if (isCommit) {
       stats.patches += 1;
-      stats.patchPreconditions.push(new URL(url).searchParams.get('currentDocument.updateTime'));
+      stats.patchPreconditions.push(JSON.parse(init.body).writes[0].currentDocument.updateTime);
       await barrier;
       const response = await fake.fetch(url, init);
       if (response.ok) stats.patchOk += 1;
@@ -430,13 +435,13 @@ test('consume_ready_food advertises typed, required, strict input and the exact 
   const tool = (await responseMessage(response)).result.tools.find((t) => t.name === 'consume_ready_food');
   const input = tool.inputSchema;
   assert.equal(input.additionalProperties, false);
-  assert.deepEqual([...input.required].sort(), ['cookedMealId', 'expectedRevision', 'servings']);
+  assert.deepEqual([...input.required].sort(), ['cookedMealId', 'expectedRevision', 'requestId', 'servings']);
   assert.equal(input.properties.cookedMealId.type, 'string');
   assert.equal(input.properties.cookedMealId.minLength, 1);
   assert.equal(input.properties.servings.type, 'number', 'servings must stay a plain number so fractional >= 1 remains valid');
   assert.equal(input.properties.expectedRevision.type, 'integer');
   assert.equal(input.properties.expectedRevision.minimum, 0);
-  assert.deepEqual(Object.keys(tool.outputSchema.properties).sort(), ['item', 'ok', 'removed', 'revision']);
+  assert.deepEqual(Object.keys(tool.outputSchema.properties).sort(), ['item', 'ok', 'removed', 'replayed', 'revision']);
 });
 
 test('record_ready_food stays non-destructive while consume_ready_food is destructive (separate annotation constants)', async () => {

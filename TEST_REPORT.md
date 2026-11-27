@@ -1306,3 +1306,21 @@ self-review/qa: Code Health and the applicable AI checks in `QA.md` passed:
   - no secrets or debug leftovers.
 untested: `npx wrangler deploy --dry-run` (wrangler not installed), a live ChatGPT read
   (deploy held), production, real devices, coverage instrumentation.
+
+## TASK-093 · 2026-11-27
+Builder: Claude standing in for Codex.
+bridge: `npm run test:bridge` 315 passed, 0 failed (291 existing, all now sending a requestId,
+  + 24 new in `test/mcp-request-ids.node.js`).
+mutation check: reverting the `readableId()` lookup fix fails 1 new test; removing the
+  request-record replay branch fails 4 new tests.
+full local: `npm test` (Playwright local) 912 passed, 0 failed (2.4m). No app expectation edited;
+  the rewritten `feature-evidence/task-079` screenshots were restored.
+ledger: `npm run test:ledger-contract` 13 passed.
+static: `node --check` on every changed/new JS file; `git diff --check` clean.
+self-review/qa: Code Health and the applicable AI checks in `QA.md` passed: app.js, index.html,
+  style.css untouched; no saveData/cloudReady, tombstone-merge, OAuth, route or secret change;
+  every existing guard kept (expectedRevision, updateTime precondition, ambiguous refusal, OAuth
+  scope); one commit per write; no secrets or debug leftovers.
+untested: `npx wrangler deploy --dry-run` (wrangler not installed); real Firestore
+  `documents:commit` and its IAM permission (`datastore.entities.create` not yet granted —
+  owner step); TTL policy; production; live ChatGPT; coverage instrumentation.

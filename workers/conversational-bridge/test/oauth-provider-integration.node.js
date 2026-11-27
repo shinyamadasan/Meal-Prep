@@ -363,7 +363,7 @@ function writeIntegrationWorker() {
       nowSeconds: NOW,
       getFirestoreAccessToken: async () => 'fake-firestore-token',
       getUserDocument: async () => ({ revision, updateTime, pantry: [], cookedMeals }),
-      patchUserDocument: async (_env, _token, { fields, nextVersion }) => {
+      getRequestRecord: async () => null, commitRequestWrite: async (_env, _token, { fields, nextVersion }) => {
         cookedMeals = fields.cookedMeals;
         revision = nextVersion;
         updateTime = '2026-01-01T00:0' + revision + ':00.000000Z';
@@ -392,7 +392,7 @@ test('actual provider issues a write-scoped token that authorizes record_ready_f
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/call',
-      params: { name: 'record_ready_food', arguments: { name: 'Chili', servings: 2, storage: 'fridge', cookedDate: '2026-01-15', expectedRevision: 7 } }
+      params: { name: 'record_ready_food', arguments: { name: 'Chili', servings: 2, storage: 'fridge', cookedDate: '2026-01-15', requestId: 'oauth-integration-1', expectedRevision: 7 } }
     })
   }), env, {});
   const writeMessage = await mcpMessage(writeCall);
@@ -604,7 +604,7 @@ test('a read-only token gets record_ready_food\'s own insufficient_scope step-up
   assert.deepEqual(new Set(authServer.scopes_supported), new Set([MCP_SCOPE, MCP_WRITE_SCOPE]));
 
   const { access_token } = await issueTokens(worker, env, { scope: MCP_SCOPE });
-  const callResponse = await worker.fetch(mcpRequest('Bearer ' + access_token, 'tools/call', 'record_ready_food'), env, {});
+  const callResponse = await worker.fetch(mcpRequest('Bearer ' + access_token, 'tools/call', 'record_ready_food', { requestId: 'oauth-step-up-1' }), env, {});
   assert.equal(callResponse.status, 200);
   const message = await mcpMessage(callResponse);
   assert.equal(message.result.isError, true);
