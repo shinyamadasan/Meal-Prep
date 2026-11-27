@@ -39,23 +39,28 @@ function isStapleRecord(p) {
 }
 
 // How chat tracks a lot (TASK-097): 'level' = staple (stockLevel full/ok/low/empty); 'quantity' =
-// non-staple with a finite, non-negative quantity and a unit; 'presence' = non-staple recorded
-// without a usable amount (being listed is all it says). null = the record cannot be classified.
+// non-staple with a finite quantity (any sign; the app treats <= 0 as not available) and a unit;
+// 'presence' = non-staple recorded without a usable amount (being listed is all it says).
+// null = the record cannot be classified.
 function trackingOf(p, classification) {
   if (classification === 'staple') return 'level';
   if (classification !== 'non-staple') return null;
-  const counted = typeof p.quantity === 'number' && Number.isFinite(p.quantity) && p.quantity >= 0 &&
+  const counted = typeof p.quantity === 'number' && Number.isFinite(p.quantity) &&
     typeof p.unit === 'string' && p.unit.trim() !== '';
   return counted ? 'quantity' : 'presence';
 }
 
-// Every write gates on this: an unreadable record is refused, never guessed (TASK-097).
+// Every write gates on this: a record get_inventory flags invalid-record (tracking null) is refused,
+// never guessed or changed — the same gate as the read (readableLot + classification), so no write
+// can change a record chat was told not to touch, or save and then fail output validation
+// (TASK-097 review M1).
 function requireClassified(record, ingredientId) {
   const classification = classifyStaple(record);
-  if (classification === 'invalid') {
+  if (classification === 'invalid' || !readableLot(record)) {
     throw new ValidationError(
-      'invalid_record: ingredientId "' + ingredientId + '" could not be read safely (its name or category is not ' +
-      'text), so the bridge cannot tell whether it is a staple. Ask the user to check it in the app.',
+      'invalid_record: ingredientId "' + ingredientId + '" could not be read safely (a stored field such as its ' +
+      'name, category, quantity, unit, storage or stock level is not in the form the app writes), so it cannot be ' +
+      'changed from chat. Ask the user to check it in the app.',
       { field: 'ingredientId', code: 'invalid_record' }
     );
   }

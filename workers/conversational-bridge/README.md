@@ -549,12 +549,14 @@ The bridge now uses the app's own rule from the shared core.
   category `Pantry` in any case -> otherwise non-staple. Aliases and near-miss names do not match.
   `test/mcp-staple-parity.node.js` checks the bridge against `isStaple` for every fixture.
 - **Unreadable records are never guessed.** A record the shared rule throws on (not an object; a
-  name or category that is a number, map or array where the rule reads it) is `invalid`:
-  `get_inventory` flags it `safety.reason: 'invalid-record'`, `usable: false`, `tracking: null`, and
+  name or category that is a number, map or array where the rule reads it), or one the read gate
+  (`readableLot`) rejects (a non-text unit/storage/name, a non-number quantity, an unknown
+  `stockLevel`), is `invalid`: `get_inventory` flags it `safety.reason: 'invalid-record'`, `usable: false`, `tracking: null`, and
   every write tool refuses it as `invalid_record` with zero writes and no request record.
 - **`tracking` on `get_inventory` items.** `level` = a staple (tracked by `stockLevel`; use
-  `mark_in_stock` / `mark_out_of_stock`). `quantity` = a non-staple with a finite, non-negative
-  `quantity` and a non-blank `unit` (the quantity tools apply). `presence` = a non-staple without a
+  `mark_in_stock` / `mark_out_of_stock`; `add_stock` / `consume_stock` also accept a staple with a
+  recorded quantity, in its exact unit). `quantity` = a non-staple with a finite `quantity` (any
+  sign; the app treats <= 0 as not available) and a non-blank `unit` (the quantity tools apply). `presence` = a non-staple without a
   usable quantity or unit: being listed means in stock, and no amount is known. `null` only for an
   invalid record. Write-result items keep their existing shape (no `tracking`).
 - **Quantity tools refuse presence lots.** `set_inventory_quantity`, `consume_stock` and `add_stock`
@@ -566,7 +568,8 @@ The bridge now uses the app's own rule from the shared core.
   `INGREDIENT_DB` staple such as `Garlic (Bawang)` as `stockLevel: 'empty'`. `requestId`,
   `expectedRevision`, undo and every other Phase 1 guard are unchanged. No stored record changes.
 - The `ambiguous` error code is still mapped by the REST and MCP layers but is no longer produced
-  for staple classification.
+  for staple classification. Over REST an unreadable record is `422 validation_failed` whose
+  message starts `invalid_record:` (accepted, TASK-097 review S4; REST has no known client).
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 

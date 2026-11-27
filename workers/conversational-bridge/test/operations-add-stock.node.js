@@ -239,8 +239,11 @@ test('the bridge-only category shelf-life defaults and the UTC skew window are g
 test('review fixes: unreadable or non-exact storage is refused; older boughtDate refused; bad dates and inferred storage stated honestly', () => {
   const chicken = (storage) => ({ id: 'a', name: 'Chicken Breast', category: 'Protein', storage, purchaseDate: '2026-11-26', quantity: 500, unit: 'g', staple: false });
   for (const storage of [{}, 1, 'Fridge', ' fridge', 'pantry']) {
+    // Non-text storage is an unreadable record, refused first as invalid_record (TASK-097 review M1);
+    // text that is not exactly fridge/freezer/counter is refused by the TASK-094 lot gate.
+    const expected = typeof storage === 'string' ? /record the new purchase separately in the app/ : /^invalid_record:/;
     assert.throws(() => call([chicken(storage)], { ingredientId: 'a', quantity: 1, expectedUnit: 'g', boughtDate: '2026-11-26' }),
-      (e) => e instanceof ValidationError && /record the new purchase separately in the app/.test(e.message), JSON.stringify(storage));
+      (e) => e instanceof ValidationError && expected.test(e.message), JSON.stringify(storage));
   }
   // Non-safety lot: older stock must not take a newer lot's date; newer stock may join.
   const spinach = () => [{ id: 's', name: 'Spinach', category: 'Vegetable', storage: 'counter', purchaseDate: '2026-11-26', shelfLifeDays: 30, quantity: 1, unit: 'pcs', staple: false }];

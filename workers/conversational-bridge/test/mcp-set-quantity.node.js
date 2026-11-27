@@ -289,8 +289,9 @@ test('F: blank, null, missing and non-string stored units are rejected with zero
       const before = JSON.stringify(b.fake.store);
       const message = await responseMessage(await b.call(NAME, { ingredientId: 'x', quantity: 2, expectedUnit, expectedRevision: 0 }));
       // TASK-097: a non-staple without a usable unit is tracking 'presence', refused before the
-      // unit precondition (still zero mutation).
-      assert.match(text(message), /^presence_only:/, String(unit));
+      // unit precondition (still zero mutation). A non-text unit is an unreadable record (the read
+      // flags it invalid-record), refused as invalid_record (TASK-097 review M1).
+      assert.match(text(message), typeof unit === 'number' ? /^invalid_record:/ : /^presence_only:/, String(unit));
       assert.equal(JSON.stringify(b.fake.store), before);
     }
   }

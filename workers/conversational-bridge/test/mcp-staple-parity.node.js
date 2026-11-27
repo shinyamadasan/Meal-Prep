@@ -161,7 +161,7 @@ test('get_inventory reports tracking level / quantity / presence by the app\'s s
   assert.equal(byId.soy.inStock, true);
   assert.equal(byId.nounit.tracking, 'presence');
   assert.equal(byId.noqty.tracking, 'presence');
-  assert.equal(byId.neg.tracking, 'presence');
+  assert.equal(byId.neg.tracking, 'quantity'); // review S1: counted, any sign
   assert.equal(b.fake.counters.commits, 0);
 });
 
@@ -337,4 +337,39 @@ test('formerly ambiguous lot: stale revision conflicts, a retried requestId repl
   const undone = await b.call('undo_request', { requestId: 'cheese-set-0001', undoRequestId: 'cheese-undo-0001', expectedRevision: 5 });
   assert.equal(undone.isError, undefined, JSON.stringify(undone.content));
   assert.equal(b.fake.store.fields.pantry[0].quantity, 500);
+});
+
+// ── TASK-097 review M1 / S1 ─────────────────────────────────────────────────────────────────────
+
+test('review M1: every write refuses a record get_inventory flags invalid-record, with zero writes', async () => {
+  const cases = [
+    [{ id: 'b', name: 'Milk Z', quantity: '500', unit: 'ml', staple: false }, 'mark_out_of_stock', { ingredientId: 'b' }],
+    [{ id: 'd', name: 'Thing', storage: 5, staple: false, quantity: 1, unit: 'kg' }, 'consume_stock', { ingredientId: 'd', quantity: 1, expectedUnit: 'kg' }],
+    [{ id: 'd', name: 'Thing', storage: 5, staple: false, quantity: 1, unit: 'kg' }, 'set_inventory_quantity', { ingredientId: 'd', quantity: 2, expectedUnit: 'kg' }],
+    [{ id: 'd', name: 'Thing', storage: 5, staple: false, quantity: 1, unit: 'kg' }, 'add_stock', { ingredientId: 'd', quantity: 1, expectedUnit: 'kg' }],
+    [{ id: 'c', name: 'Salt', category: 'Pantry', unit: 5, stockLevel: 'full' }, 'mark_out_of_stock', { ingredientId: 'c' }],
+    [{ id: 'a', name: 'Salt', category: 'Pantry', stockLevel: 'bogus' }, 'mark_in_stock', { ingredientId: 'a' }],
+    [{ id: 'a', name: 'Salt', category: 'Pantry', stockLevel: 'bogus' }, 'mark_out_of_stock', { ingredientId: 'a' }]
+  ];
+  for (const [record, tool, args] of cases) {
+    const { fake, call } = bridge([record]);
+    const snapshot = () => JSON.stringify({ store: fake.store, requests: [...fake.requests.entries()] });
+    const read = await call('get_inventory', {});
+    const item = read.structuredContent.items.find((i) => i.safety && i.safety.reason === 'invalid-record');
+    assert.ok(item && item.tracking === null, tool + ': the read flags it');
+    const before = snapshot();
+    const res = await call(tool, Object.assign({ requestId: 'm1-' + tool.replace(/_/g, '-').slice(0, 20), expectedRevision: fake.store.fields.version }, args));
+    assert.equal(res.isError, true, tool + ' ' + JSON.stringify(record));
+    assert.match(JSON.stringify(res.content), /invalid_record/);
+    assert.equal(snapshot(), before, tool + ': zero writes, no request record');
+  }
+});
+
+test('review S1: a negative stored quantity is tracked as quantity (counted), so set_inventory_quantity can correct it', async () => {
+  const { fake, call } = bridge([{ id: 'e', name: 'Milk', quantity: -1, unit: 'L', staple: false }]);
+  const read = await call('get_inventory', {});
+  assert.equal(read.structuredContent.items[0].tracking, 'quantity');
+  const res = await call('set_inventory_quantity', { requestId: 'fix-neg-0001', ingredientId: 'e', quantity: 2, expectedUnit: 'L', expectedRevision: fake.store.fields.version });
+  assert.notEqual(res.isError, true, JSON.stringify(res.content));
+  assert.equal(fake.store.fields.pantry[0].quantity, 2);
 });
