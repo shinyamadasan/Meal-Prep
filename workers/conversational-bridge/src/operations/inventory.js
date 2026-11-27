@@ -45,8 +45,11 @@ function classifyStaple(p) {
   if (!p) return 'non-staple';
   if (p.staple === true) return 'staple';
   if (p.staple === false) return 'non-staple';
-  // Only text or a number is read as a category: String() on a stored map can throw.
-  const category = (typeof p.category === 'string' || typeof p.category === 'number' ? String(p.category) : '').trim().toLowerCase();
+  // Same text as before for every value String() can convert (write tools unchanged); a stored
+  // map whose toString cannot convert reads as no category instead of throwing.
+  let text = '';
+  try { text = p.category == null ? '' : String(p.category); } catch { text = ''; }
+  const category = text.trim().toLowerCase();
   if (category === 'pantry') return 'staple';
   return 'ambiguous';
 }
