@@ -80,14 +80,14 @@ function unchangedFields(fake) {
   return { cookedMeals: structuredClone(cookedMeals), mealConsumptions: structuredClone(mealConsumptions), shopping: structuredClone(shopping), recipes: structuredClone(recipes), deletions: structuredClone(deletions) };
 }
 
-test('tools/list exposes exactly ten tools and strict consume_stock input, output, write scope, and non-idempotent annotations', async () => {
+test('tools/list exposes exactly twelve tools and strict consume_stock input, output, write scope, and non-idempotent annotations', async () => {
   const { fake, env, deps } = bridge();
   const response = await routeRequest(request(rpc(1, 'tools/list')), env, deps, AUTH_CONTEXT());
   const message = await responseMessage(response);
   const tools = message.result.tools;
   assert.deepEqual(tools.map((tool) => tool.name), [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', NAME, 'add_stock', 'undo_request'
+    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', NAME, 'add_stock', 'add_pantry_item', 'update_pantry_item', 'undo_request'
   ]);
   const tool = tools.find((entry) => entry.name === NAME);
   assert.equal(tool.inputSchema.additionalProperties, false);

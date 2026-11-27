@@ -5,6 +5,70 @@
 
 ---
 
+## TASK-099 — implementation complete (branch: task-099-register-edit; base: prop041-p2 99a4bce)
+Builder: Claude sub-agent standing in for Codex. PROP-041 P2-1 + P2-2 (owner decisions D2-D3). Bridge only:
+no `app.js`, `shared/`, `index.html` or stored-shape change.
+changed:
+  - New `workers/conversational-bridge/src/operations/pantryItems.js` (pure): `validateAddPantryItemArgs()`,
+    `addPantryItem()`, `validateUpdatePantryItemArgs()`, `updatePantryItem()`, `readBackItem()`. Uses only
+    `MealPrepFoodSafety` (`INGREDIENT_DB`, `categoryShelfLife`, `defaultInferStorage`, `stockIngredientEntry`,
+    `pantryFridgeSafety`, `FRIDGE_SAFETY_LIMITS` / `FRIDGE_SAFETY_EXCLUSIONS`) and
+    `MealPrepReadyFoodContract`; read-back goes through the existing `listInventoryWithSafety()`, so the
+    `safety` is exactly `get_inventory`'s. No existing helper was refactored (only imported).
+  - `src/mcp.js`: two tools registered after `add_stock`, both through `requestWriteTool()` with a
+    precheck (household day from `HOUSEHOLD_TIME_ZONE` + argument rules) before any Firestore access:
+    `add_pantry_item` (annotations: not destructive, not idempotent) and `update_pantry_item` (destructive,
+    idempotent). Strict zod input schemas, output = `get_inventory` item + `shelfLifeDays`, `storageSource`,
+    and `prepared` / `unchanged` + `thawed`. Both added to `TOOL_SECURITY_SCHEMES` (write scope). An
+    optional `deps.random` (tests) feeds the id's random part, like `deps.now` feeds the clock.
+  - Record built by `add_pantry_item` (the app's `addToPantry()` / grocery `buy_` path): `id`
+    `buy_<now ms>_<Math.random base36 5>`; trimmed `name`; exact-name DB `category` else `''`;
+    `purchaseDate` = `boughtDate` else household today; `shelfLifeDays` = exact-name DB value else
+    `categoryShelfLife(category)`; `storage`; `quantity` > 0 else `null`; `unit` given else DB unit else `''`;
+    `staple` given, else `!!db.isStaple` when the name is in the DB (as the app stores it), else unset;
+    `stockLevel` (`level` or `full`) only for a stored staple; printed date -> `expiryDate` +
+    `dateMode: 'expiry'` (+ `printedDateKind` only for best-before); `updatedAt`. Keys the app leaves
+    `undefined` are omitted (Firestore drops them anyway); `expiryDate: null` is not written when there is
+    no printed date (the `buy_` path's shape).
+  - Docs: README "TASK-099 register and correct pantry items" section.
+design choices where the spec left room:
+  - Storage when not given: `defaultInferStorage(name)`; if that is null (name not in INGREDIENT_DB) the
+    call is refused `needs_storage` rather than storing a lot `get_inventory` would call `unknown`. "Raw
+    meat, poultry or fish" = the lot gets a shared fridge safety rule when evaluated as if in the fridge
+    (`pantryFridgeSafety`), which also covers cured/processed and cooked food (stricter than the wording).
+  - Those same lots also need an explicit `boughtDate` (`needs_bought_date`), per D3 / owner decision 4 ("a
+    missing date on raw meat is never invented"); everything else defaults to household today.
+  - `past_safety_limit`: a fridge lot whose shared fridge limit has already run out on the bought day is
+    refused; the freezer is suggested.
+  - `unrecognized_food` (extra guard): the spec's exact-name category leaves a name INGREDIENT_DB does not
+    know (by name or alias) with category `''`, and the shared fridge limits only fire for category
+    Protein, so "Venison Steak" in the fridge would get the 7-day default. In the fridge, such a name that
+    matches a poultry / seafood / whole-cut / variety / raw-sausage rule is refused, asking for the app's
+    name. The `ground` rule is left out of this name-only check because it matches "minced" (garlic).
+    Residual: an unknown ground-meat name without another meat word is not caught.
+  - Prepared shelf life: `min(ready-food default for the storage, ingredientShelfLife(name, category))`,
+    also when a printed date is given. So an unknown prepared name in the freezer gets 7 days (category
+    default), not 90; e.g. "Frozen Minced Garlic" -> 7. `prepared` is not stored.
+  - Duplicate guard compares storage as stored, else `defaultInferStorage` (so an older lot without a stored
+    storage is still compared); tombstoned ids are not active. Several matching lots are all listed.
+  - update: `thawedToday` must be `true`, needs `storage: 'fridge'`, a lot recorded in the freezer, and no
+    `boughtDate`. A new `printedDate` without a kind resets `printedDateKind` to use-by (stricter).
+    `printedDate: null` deletes `expiryDate`, `dateMode` and `printedDateKind`. A past-limit result on update
+    is NOT refused (it is a correction of the truth); `safety` states it. Freezer -> fridge thaw rule uses the
+    same "fridge safety limit" test as add. `shelfLifeDays` is not changed by a storage move (as the app's
+    `applyPantryStorage()`). No-op edit -> `unchanged: true`, no user-document write, request record kept.
+  - Results are refusals as plain `code: message` text like the other tools; refused calls write nothing and
+    do not spend the `requestId`.
+existing tests changed (why): six tools/list tests (`mcp.node.js`, `mcp-add-stock`, `mcp-consume-stock`,
+  `mcp-consume`, `mcp-set-quantity`, `mcp-stock-state`) assert the exact tool list; the list gains
+  `add_pantry_item`, `update_pantry_item` before `undo_request`, and the titles say twelve tools / ten write.
+  `test/support/requestIds.js` `WRITE_TOOL_NAMES` gains both tools (so the requestId contract test covers
+  them), and `mcp-request-ids.node.js` gets one valid call and the expected field mask for each (its
+  every-write-tool loops would otherwise send them empty arguments). No assertion was weakened.
+  - New `test/mcp-pantry-items.node.js` (17 tests).
+merge note: TASK-098 (`set_stock_level`) also edits the same tool-list assertions, `WRITE_TOOL_NAMES`,
+  `VALID_CALLS` and `TOOL_SECURITY_SCHEMES`; expect trivial conflicts there only.
+
 ## TASK-097 — implementation complete (branch: task-097-staple-parity; base: prop041-p2 bb7e8dd)
 Builder: Claude sub-agent standing in for Codex. PROP-041 Phase 2 priority 1 (P2-0a). Bridge only.
 changed:

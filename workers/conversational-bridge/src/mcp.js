@@ -11,6 +11,7 @@ import { getFirestoreAccessToken } from './auth.js';
 import { commitRequestWrite, getRequestDocument, getRequestRecord, getUserDocument, RequestAlreadyRecordedError, RevisionConflictError } from './firestore.js';
 import { AmbiguousError, InsufficientServingsError, InsufficientStockError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
+import * as pantryItems from './operations/pantryItems.js';
 import * as readyFood from './operations/readyFood.js';
 import * as requests from './operations/requests.js';
 import { householdDayFromEnv } from './householdDay.js';
@@ -97,6 +98,24 @@ const MARK_IN_STOCK_ANNOTATIONS = {
 // replay (same revision) is a revision_conflict with zero mutation; a call with the new revision is
 // a different call, not a replay.
 const SET_QUANTITY_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
+// add_pantry_item (TASK-099) creates one new lot with a fresh id on every applied call, so it is not
+// idempotent across different requestIds; it never removes or overwrites anything.
+const ADD_PANTRY_ITEM_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+};
+
+// update_pantry_item (TASK-099) overwrites storage and dates (destructive); the same arguments give
+// the same record, so repeating it adds no further effect.
+const UPDATE_PANTRY_ITEM_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: true,
@@ -220,6 +239,41 @@ function addStockInputSchema() {
   });
 }
 
+// TASK-099: add_pantry_item / update_pantry_item. Shapes are typed for the public schema; the
+// operation repeats every rule (operations/pantryItems.js) before and after the read.
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function addPantryItemInputSchema() {
+  return z.strictObject({
+    name: z.string().min(1).max(pantryItems.MAX_NAME_LENGTH).refine((value) => value.trim().length > 0),
+    quantity: z.number().finite().positive().optional(),
+    unit: z.string().min(1).max(pantryItems.MAX_UNIT_LENGTH).refine((value) => value.trim().length > 0).optional(),
+    storage: z.enum(pantryItems.PANTRY_STORAGE).optional(),
+    boughtDate: z.string().regex(CALENDAR_DAY).optional(),
+    printedDate: z.string().regex(CALENDAR_DAY).optional(),
+    printedDateKind: z.enum(pantryItems.PRINTED_DATE_KINDS).optional(),
+    staple: z.boolean().optional(),
+    level: z.enum(pantryItems.STOCK_LEVELS).optional(),
+    prepared: z.boolean().optional(),
+    confirmNewLot: z.boolean().optional(),
+    requestId: requestIdSchema(),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+function updatePantryItemInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
+    storage: z.enum(pantryItems.PANTRY_STORAGE).optional(),
+    boughtDate: z.string().regex(CALENDAR_DAY).optional(),
+    printedDate: z.string().regex(CALENDAR_DAY).nullable().optional(),
+    printedDateKind: z.enum(pantryItems.PRINTED_DATE_KINDS).optional(),
+    thawedToday: z.literal(true).optional(),
+    requestId: requestIdSchema(),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
 // TASK-095: requestId names the request to undo; undoRequestId is this undo's own id.
 function undoRequestInputSchema() {
   return z.strictObject({
@@ -274,6 +328,11 @@ function inventoryReadItemSchema() {
     printedDateKind: z.string().nullable(),
     safety: safetySchema()
   });
+}
+
+// TASK-099: the pantry-item tools state back the get_inventory item plus the stored shelf life.
+function pantryItemReadBackSchema() {
+  return inventoryReadItemSchema().extend({ shelfLifeDays: z.number().nullable() });
 }
 
 function readyFoodReadItemSchema() {
@@ -563,6 +622,72 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
   );
 
   server.registerTool(
+    'add_pantry_item',
+    {
+      title: 'Add a pantry item',
+      description: 'Register ONE new pantry lot the user explicitly asked to record: a grocery purchase, or (prepared: true) a ' +
+        'prepared ingredient such as frozen minced garlic or chopped onions. It creates a new record the same way the app\'s ' +
+        'own Add does and never changes an existing lot (to add to an existing lot use add_stock). name is used exactly as ' +
+        'given; the app\'s ingredient list (exact name) supplies category, shelf life, default unit and the staple flag. ' +
+        'boughtDate defaults to today on the household calendar; a future boughtDate is refused. storage: send it when the ' +
+        'user said it; otherwise it is inferred from the ingredient list and the result says storageSource "inferred": tell ' +
+        'the user ("stored in the fridge - say if not"). Raw meat, poultry, fish and other foods with a fridge safety limit ' +
+        'are never guessed: on needs_storage or needs_bought_date ask the user (use today only if they said "today" or ' +
+        '"just bought"). A fridge lot already past its fridge safety limit is refused (past_safety_limit). On ' +
+        'unrecognized_food, ask for the ingredient\'s name as the app lists it. A prepared ingredient needs storage (fridge ' +
+        'or freezer) and gets the ready-food shelf life for that storage, never longer than the raw ingredient\'s; this tool ' +
+        'does NOT deduct the raw ingredients used. printedDate is the date printed on the pack (printedDateKind "use-by", ' +
+        'the default, or "best-before"). staple: true makes it a staple tracked by level (default "full"). If the same ' +
+        'item with the same bought date and storage is already recorded, the result is ambiguous with its ingredientId: ' +
+        'ask the user, then use add_stock on that lot or call again with confirmNewLot: true and a new requestId. Never ' +
+        'register items the user did not mention. State back the stored name, amount, storage, bought date, printed date ' +
+        'and safety label from the result. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
+        'whether to retry.' + REQUEST_ID_TEXT,
+      inputSchema: addPantryItemInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
+        item: pantryItemReadBackSchema(),
+        storageSource: z.enum(['given', 'inferred']),
+        prepared: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: ADD_PANTRY_ITEM_ANNOTATIONS
+    },
+    async (args) => addPantryItemTool(env, deps, ctx, args)
+  );
+
+  server.registerTool(
+    'update_pantry_item',
+    {
+      title: 'Correct a pantry item\'s storage or dates',
+      description: 'Correct the storage location and/or dates of ONE existing pantry lot, using ingredientId ONLY from ' +
+        'get_inventory (never guess or fuzzy-match; ask which row if several match). storage is fridge, freezer or ' +
+        'counter; boughtDate is the bought day (not in the future); printedDate is the date printed on the pack (null ' +
+        'clears it; a new printed date counts as use-by unless printedDateKind "best-before" is sent). Moving raw meat, ' +
+        'poultry or fish from the freezer to the fridge needs the thaw day: on needs_thaw_date remind the user that fridge ' +
+        'time counts from thawing, then send thawedToday: true if it moved today, or boughtDate as the day it moved. Name, ' +
+        'amount, staple flag and level are not changed here. unchanged: true means nothing needed changing. On ' +
+        'invalid_record, ask the user to check the item in the app. Tell the user the new safety label from the result. ' +
+        'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
+      inputSchema: updatePantryItemInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
+        item: pantryItemReadBackSchema(),
+        storageSource: z.enum(['given', 'recorded', 'inferred']).nullable(),
+        unchanged: z.boolean(),
+        thawed: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: UPDATE_PANTRY_ITEM_ANNOTATIONS
+    },
+    async (args) => updatePantryItemTool(env, deps, ctx, args)
+  );
+
+  server.registerTool(
     'undo_request',
     {
       title: 'Undo an earlier chat change',
@@ -738,6 +863,54 @@ async function addStockTool(env, deps, ctx, args) {
       return {
         write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
         result: (revision) => ({ ok: true, revision, item: r.item, lot: r.lot })
+      };
+    }
+  });
+}
+
+// add_pantry_item (TASK-099): one new lot, built by operations/pantryItems.js; one guarded pantry
+// write. The household day and the arguments are checked before any Firestore access.
+function toolClock(deps) {
+  return typeof deps.now === 'function' ? Number(deps.now()) : Date.now();
+}
+
+async function addPantryItemTool(env, deps, ctx, args) {
+  let today;
+  return requestWriteTool(env, deps, ctx, 'add_pantry_item', args, {
+    fallback: 'The pantry item could not be added.',
+    precheck: (input) => {
+      today = householdDayFromEnv(env, deps.now);
+      pantryItems.validateAddPantryItemArgs(input, today);
+    },
+    apply: (doc) => {
+      const r = pantryItems.addPantryItem(doc.pantry || [], doc.deletions.pantry || {}, args, {
+        today,
+        nowMs: toolClock(deps),
+        random: typeof deps.random === 'function' ? deps.random : Math.random
+      });
+      return {
+        write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({ ok: true, revision, item: r.item, storageSource: r.storageSource, prepared: args.prepared === true })
+      };
+    }
+  });
+}
+
+// update_pantry_item (TASK-099): storage/date correction of one existing lot; one guarded pantry
+// write, or none when nothing changes (the request record is still kept, like mark_in_stock).
+async function updatePantryItemTool(env, deps, ctx, args) {
+  let today;
+  return requestWriteTool(env, deps, ctx, 'update_pantry_item', args, {
+    fallback: 'The pantry item could not be updated.',
+    precheck: (input) => {
+      today = householdDayFromEnv(env, deps.now);
+      pantryItems.validateUpdatePantryItemArgs(input, today);
+    },
+    apply: (doc) => {
+      const r = pantryItems.updatePantryItem(doc.pantry || [], doc.deletions.pantry || {}, args, { today, nowMs: toolClock(deps) });
+      return {
+        write: r.unchanged ? null : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({ ok: true, revision, item: r.item, storageSource: r.storageSource, unchanged: r.unchanged, thawed: r.thawed })
       };
     }
   });
@@ -984,6 +1157,8 @@ const TOOL_SECURITY_SCHEMES = {
   set_inventory_quantity: WRITE_SECURITY_SCHEMES,
   consume_stock: WRITE_SECURITY_SCHEMES,
   add_stock: WRITE_SECURITY_SCHEMES,
+  add_pantry_item: WRITE_SECURITY_SCHEMES,
+  update_pantry_item: WRITE_SECURITY_SCHEMES,
   undo_request: WRITE_SECURITY_SCHEMES
 };
 

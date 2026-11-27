@@ -38,7 +38,10 @@ const VALID_CALLS = {
   mark_in_stock: { ingredientId: 'rice', expectedRevision: 3 },
   set_inventory_quantity: { ingredientId: 'eggs', quantity: 12, expectedUnit: 'pcs', expectedRevision: 3 },
   consume_stock: { ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', expectedRevision: 3 },
-  add_stock: { ingredientId: 'eggs', quantity: 6, expectedUnit: 'pcs', expectedRevision: 3 }
+  add_stock: { ingredientId: 'eggs', quantity: 6, expectedUnit: 'pcs', expectedRevision: 3 },
+  // TASK-099
+  add_pantry_item: { name: 'Tofu', quantity: 2, unit: 'pcs', storage: 'fridge', expectedRevision: 3 },
+  update_pantry_item: { ingredientId: 'eggs', storage: 'counter', expectedRevision: 3 }
 };
 
 function seed(extra = {}) {
@@ -177,7 +180,9 @@ test('each write tool makes exactly ONE documents:commit with the guarded user u
     mark_in_stock: ['pantry', 'version'],
     set_inventory_quantity: ['pantry', 'version'],
     consume_stock: ['pantry', 'version'],
-    add_stock: ['pantry', 'version']
+    add_stock: ['pantry', 'version'],
+    add_pantry_item: ['pantry', 'version'],
+    update_pantry_item: ['pantry', 'version']
   };
   for (const name of WRITE_TOOL_NAMES) {
     const b = bridge();

@@ -9,7 +9,9 @@ export const WRITE_TOOL_NAMES = Object.freeze([
   'mark_in_stock',
   'set_inventory_quantity',
   'consume_stock',
-  'add_stock'
+  'add_stock',
+  'add_pantry_item',
+  'update_pantry_item'
 ]);
 
 let counter = 0;

@@ -7087,7 +7087,7 @@ verification: `node --check` on changed files and `npm run test:bridge` before e
   `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
 
 ### TASK-099 · PROP-041 P2-1 + P2-2 Register items (purchases, prepared ingredients) and edit storage/dates
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (creates pantry records; changes dates that drive food safety)
 source: BQ-034 / PROP-041 P2-1, P2-2; owner decisions D2-D3 (adopted 2026-11-27)

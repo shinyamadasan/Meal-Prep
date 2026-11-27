@@ -5,6 +5,35 @@
 
 ---
 
+## TASK-099 · 2026-11-27 · add_pantry_item + update_pantry_item (PROP-041 P2-1, P2-2)
+Builder: Claude sub-agent standing in for Codex.
+suite: `npm run test:bridge` 397/397 PASS (baseline on prop041-p2 99a4bce: 380; +17 in
+`test/mcp-pantry-items.node.js`; 8 existing test files updated for the two new tools, see CHANGELOG);
+`npm test` (local) 912/912 PASS; `npm run test:ledger-contract` 13/13 PASS; `node --check` on every
+changed Worker src/test file; `git diff --check` clean. No deploy, no production call.
+covered: tools/list schemas (strict keys, required fields, storage enum), write scope, annotations,
+descriptions; 16 malformed calls refused with zero Firestore access (blank name, quantity 0, `Fridge`,
+future and impossible boughtDate, kind without date, prepared without/with counter storage, unknown key,
+update with nothing to change, thawedToday false / without fridge / with boughtDate, kind while clearing,
+future boughtDate, bad storage); a known item (`Tomato (Kamatis)`) stored with the exact app record shape
+(id, category, purchaseDate today, DB shelf life/storage/unit, `staple: false`, updatedAt), inferred storage
+stated back, result item deep-equal to the `get_inventory` item (+ shelfLifeDays); unknown name ->
+needs_storage, then category '' + category shelf life, staple unset; DB staple (Salt) and explicit staple +
+level; level on non-staple refused; best-before stored, use-by stores no kind (daysLeft 5); raw chicken /
+salmon / ground pork: needs_storage, needs_bought_date (also in the freezer), accepted with both (poultry
+2-day limit, use-soon); fridge lot past its limit refused, same lot in the freezer recorded; unknown meat
+name refused in the fridge (unrecognized_food), alias name accepted, freezer accepted; prepared: freezer
+unknown name = min(90, 7), DB name = min(90, 180), fridge = 3, raw chicken prepared = 2, raw lots untouched;
+duplicate same name/day/storage ambiguous naming the id, confirmNewLot adds, different day or storage adds;
+replay of add (1 lot), undo of add (removed + tombstone at undo time); update storage + boughtDate (exact
+stored record, read-back = get_inventory), printed best-before, new date resets kind, null clears all three,
+amount untouched; freezer -> fridge raw chicken needs_thaw_date, thawedToday sets today (2 days), boughtDate
+sets that day, eggs move freely; not_found, invalid_record, unchanged (revision and store unchanged); undo of
+an edit restores the exact earlier record (updatedAt restamped), undo after a later edit -> changed_since;
+pure op does not mutate input and avoids an id collision. Every refusal: no commit, store and request
+records byte-identical.
+result: all pass. TASK-099 set to `review`.
+
 ## TASK-097 · 2026-11-27 · staple parity + tracking (PROP-041 P2-0a)
 Builder: Claude sub-agent standing in for Codex.
 suite: `npm run test:bridge` 378/378 PASS (baseline on prop041-p2 bb7e8dd: 362/362; +14 in

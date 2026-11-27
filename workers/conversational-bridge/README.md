@@ -574,6 +574,55 @@ The bridge now uses the app's own rule from the shared core.
   classified: it still writes such records (pre-existing; REST has no known client and is slated
   for retirement or parity, release checklist 2.1).
 
+## TASK-099 register and correct pantry items: `add_pantry_item`, `update_pantry_item` (PROP-041 P2-1 + P2-2, local only — NOT deployed)
+
+Two MCP write tools, both through `requestWriteTool()` (required `requestId` + `expectedRevision`,
+one atomic commit with the request record, undoable). Logic lives in `operations/pantryItems.js`
+and uses only the shared rules (`MealPrepFoodSafety`) and `MealPrepReadyFoodContract`; no app-only
+table (`PANTRY_KNOWLEDGE`, the app's loose `inferCategory()` match) is copied.
+
+- **`add_pantry_item`** creates ONE lot shaped like the app's manual Add / grocery `buy_` path:
+  `id` `buy_<ms>_<rand5>`; `name` (trimmed, used as given); `category` = exact-name `INGREDIENT_DB`
+  category, else `''`; `purchaseDate` = `boughtDate`, default the household day
+  (`HOUSEHOLD_TIME_ZONE`), never in the future; `shelfLifeDays` = exact-name `INGREDIENT_DB` value,
+  else `categoryShelfLife(category)` (the app's `ingredientShelfLife()`); `storage`; `quantity`
+  (> 0, else `null`); `unit` (given, else the DB unit, else `''`); `staple` (given, else
+  `!!INGREDIENT_DB.isStaple` when the name is in the DB, else left unset — the app's own rule);
+  `stockLevel` for a stored staple (`level`, default `full`; `level` on a non-staple is refused);
+  a printed date -> `expiryDate` + `dateMode: 'expiry'`, `printedDateKind` only for `best-before`;
+  `updatedAt` now. Keys the app would leave `undefined` are omitted.
+- **Storage (D3).** A given storage wins (`storageSource: 'given'`). Otherwise
+  `defaultInferStorage(name)` (`storageSource: 'inferred'`, stated back). Refused with
+  `needs_storage` when the shared rules give no storage (the name is not in `INGREDIENT_DB`) or when
+  the lot has a fridge safety limit (`pantryFridgeSafety` on the lot as if in the fridge: raw meat,
+  poultry, seafood, ground, variety, sausage, cured or cooked food). The same lots also need an
+  explicit `boughtDate` (`needs_bought_date`; never assumed to be today). A fridge lot already past
+  its fridge safety limit is refused (`past_safety_limit`). A fridge lot whose name matches a raw
+  poultry / seafood / whole-cut / variety / sausage rule but which `INGREDIENT_DB` does not know by
+  name or alias (category `''`, so the shared limits would not apply) is refused as
+  `unrecognized_food` instead of getting the 7-day default.
+- **Prepared ingredients (`prepared: true`).** `storage` fridge or freezer is required.
+  `shelfLifeDays` = `min(READY_FOOD_CONTRACT default life for that storage, the raw shelf life
+  above)`; with a printed date the same value is kept (the printed date governs). Not stored on the
+  record. Raw lots are NOT deducted (D2, TASK-100).
+- **Duplicate guard.** An active (not tombstoned) lot with the same name (case-insensitive,
+  trimmed), the same `purchaseDate` and the same storage (stored, else `defaultInferStorage`) is
+  `ambiguous`, naming its `ingredientId`(s): `add_stock` to it, or call again with
+  `confirmNewLot: true` and a new `requestId`. A different day or storage is a new lot.
+- **`update_pantry_item`** changes only `storage`, `purchaseDate` (`boughtDate`, or `thawedToday`
+  = household day), `expiryDate` / `dateMode` (`printedDate`; `null` clears both and the kind) and
+  `printedDateKind` (a new printed date is use-by unless `best-before` is sent). Moving a lot with a
+  fridge safety limit from the freezer to the fridge needs `thawedToday: true` or a `boughtDate`,
+  else `needs_thaw_date` (the thaw reminder). `thawedToday` is only valid with `storage: 'fridge'`
+  on a lot recorded in the freezer. Unknown / tombstoned ids are `not_found`; lots `get_inventory`
+  flags `invalid-record` are `invalid_record`. Values already as asked -> `unchanged: true`, no user
+  document write (the request record is still kept, like `mark_in_stock`).
+- **Results** state back `item` = the `get_inventory` item for the stored record (same `safety`
+  computation) plus `shelfLifeDays`, and `storageSource`; `add_pantry_item` adds `prepared`,
+  `update_pantry_item` adds `unchanged` and `thawed`.
+- **Undo.** `undo_request` removes an added lot with a fresh tombstone and restores an edited lot's
+  earlier values (TASK-095 planner, unchanged), refusing `changed_since` after a later edit.
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
