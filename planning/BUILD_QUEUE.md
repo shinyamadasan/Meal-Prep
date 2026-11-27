@@ -31,6 +31,11 @@
 - build: TASK-091 → TASK-095, strictly in order, solo, High risk, integration branch `prop041-p1`. Max landing state `approved`; no `main` merge, Worker deploy or Firestore setting change without owner approval. Phases 2-3 NOT approved.
 - detail: planning/PROP-041-PLAN.md; TASKS.md TASK-091..095
 
+### BQ-034 — PROP-041 Phase 2 (prioritised): stock tracking, registration, prepared ingredients, staple levels
+- source: PROP-041 Phase 2 · priority: P1 · prioritised: 2026-11-27 (owner, chat — "For Phase 2, prioritize resolving the inventory stock-tracking ambiguity affecting 59 of 97 items, along with new ingredient registration, prepared ingredient logging and staple stock-level updates. Keep Phase 2 implementation separate.")
+- build: TASK-097 (staple parity, no decision needed) ready on `prop041-p2` from `prop041-p1`. Tasks for staple levels, presence-only items, registration and prepared ingredients are written after owner decisions D1-D3 (planning/PROP-041-PLAN.md). Solo, High risk, landing `approved` (held). Separate from the Phase 1 release; no deploy without owner approval.
+- detail: planning/PROP-041-PLAN.md "Phase 2 — owner priorities"; TASKS.md TASK-097
+
 ### BQ-033 — Routine maintenance: refresh four outdated production smoke specs
 - source: owner, chat 2026-11-26 ("Correct the four outdated smoke tests separately as routine maintenance") · priority: P2
 - build: TASK-096. Test files only. Low risk; lands `done` after independent review.
