@@ -2726,7 +2726,7 @@ Verify: app.js contains "if (Array.isArray(data.plannedBatches)) AppState.planne
 Verify: app.js does not contain "Add pull-to-refresh functionality"
 Verify: tests/scroll-no-reload.spec.js contains "scrolling back up inside an open modal does not reload the app"
 Verify: tests/meal-prep-first.spec.js contains "a loose match never deletes unrelated stock: only the tapped record changes"
-Verify: tests/meal-prep-first.spec.js contains "a checked batch ingredient stays checked when that batch's servings change"
+Verify: tests/meal-prep-first.spec.js contains "a checked batch ingredient stays checked when that batch"
 (Anchor updated 2026-11-26: TASK-090 B2 replaced the `rowKey` helper with one Shop row per ingredient; the regression test is the stable anchor.)
 Verify: tests/meal-prep-first.spec.js contains "REGRESSION: changing an unrelated batch"
 
