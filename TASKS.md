@@ -6945,7 +6945,7 @@ constraints: No new tool, no lot creation (that is Phase 2). Keep `requestId` / 
 verification: as TASK-092.
 
 ### TASK-095 · PROP-041 P1-5 Recoverable chat removals: `undo_request`
-status: review
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (restores records and clears tombstones)
 source: BQ-032 / PROP-041 P1-5; owner decisions 3 and 5
