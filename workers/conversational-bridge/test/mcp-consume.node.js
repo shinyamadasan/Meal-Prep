@@ -423,7 +423,7 @@ test('tools/list keeps the ready-food and existing stock tools alongside add_sto
   const names = (await responseMessage(response)).result.tools.map((tool) => tool.name);
   assert.deepEqual(names, [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
+    'mark_out_of_stock', 'mark_in_stock', 'set_stock_level', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
   ]);
   assert.doesNotMatch(names.join(' '), /finish|remove|delete|patch|execute|set_inventory(?!_quantity)|mutate/i);
 });

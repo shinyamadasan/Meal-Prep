@@ -14,6 +14,7 @@ import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
 import * as requests from './operations/requests.js';
 import { householdDayFromEnv } from './householdDay.js';
+import { INVENTORY_UNITS } from './operations/quantity.js';
 import '../../../shared/foodSafety.js';
 import {
   MCP_SCOPE,
@@ -78,6 +79,16 @@ const ADD_STOCK_ANNOTATIONS = {
 };
 
 const MARK_OUT_OF_STOCK_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false
+};
+
+// set_stock_level (TASK-098) overwrites a staple's level (and can turn an item into a staple), so
+// destructiveHint is true; idempotentHint is true for the same reason as set_inventory_quantity:
+// the same arguments (same expectedRevision) add no further effect.
+const SET_STOCK_LEVEL_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: true,
   idempotentHint: true,
@@ -186,12 +197,25 @@ function inventoryStockInputSchema() {
 
 // quantity is typed > 0 so the public schema advertises the contract; the message steers a zero
 // ("none left") to mark_out_of_stock. expectedUnit is a precondition asserted against the stored
-// unit, never a replacement; there is no `unit` key, so strictObject rejects it.
+// unit, never a replacement. `unit` (TASK-098) is accepted ONLY for an item recorded without an
+// amount (tracking "presence"); the operation refuses it on every other item.
 function setInventoryQuantityInputSchema() {
   return z.strictObject({
     ingredientId: z.string().min(1),
     quantity: z.number().positive('quantity must be a number > 0. For none left, use mark_out_of_stock.'),
     expectedUnit: z.string().min(1),
+    unit: z.enum(INVENTORY_UNITS).optional(),
+    requestId: requestIdSchema(),
+    expectedRevision: z.number().int().nonnegative()
+  });
+}
+
+// TASK-098: makeStaple is true or absent (false is not a value, so it cannot be sent by habit).
+function setStockLevelInputSchema() {
+  return z.strictObject({
+    ingredientId: z.string().min(1),
+    level: z.enum(inventory.STOCK_LEVELS),
+    makeStaple: z.literal(true).optional(),
     requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
@@ -295,13 +319,15 @@ const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, day
 
 // TASK-097: staple classification is the app's own rule (shared/foodSafety.js isStaple).
 const TRACKING_TEXT = 'Every pantry item carries tracking, decided by the app\'s own staple rule: "level" = a ' +
-  'staple tracked by stockLevel (full/ok/low/empty), changed with mark_in_stock / mark_out_of_stock (add_stock ' +
+  'staple tracked by stockLevel (full/ok/low/empty), changed with set_stock_level (or mark_in_stock / mark_out_of_stock) (add_stock ' +
   'and consume_stock also accept a staple that has a recorded quantity, within their unit rules; consume_stock ' +
   'only when the whole recorded amount is used); "quantity" = a non-staple with a recorded quantity and unit, ' +
   'changed with set_inventory_quantity, consume_stock and add_stock within their unit rules (a negative stored ' +
   'quantity can only be corrected with set_inventory_quantity); "presence" = a non-staple recorded without an amount: being listed ' +
   'means it is in stock and the quantity tools refuse it, so never invent an amount; ask the user how much they ' +
-  'have. tracking null means the record could not be read (safety reason invalid-record): do not change it ' +
+  'have. Only on the user\'s explicit words, one item per call, a presence item becomes a staple (set_stock_level ' +
+  'with makeStaple: true, "salt is a staple") or a counted item (set_inventory_quantity with unit, "we have 200 g ' +
+  'of paprika"); never convert one on your own initiative. tracking null means the record could not be read (safety reason invalid-record): do not change it ' +
   'from chat.';
 
 // TASK-093: appended to every write tool's description.
@@ -457,6 +483,42 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
   );
 
   server.registerTool(
+    'set_stock_level',
+    {
+      title: 'Set staple stock level',
+      description: 'Set the stock level of one existing staple pantry item (tracking "level" in get_inventory) to ' +
+        'full, ok, low or empty ("we are low on rice", "salt is full"). empty keeps the item listed as out of ' +
+        'stock (staples are never removed); low and empty are what the app puts on the Shop list. The same level ' +
+        'again changes nothing (unchanged:true). Tell the user the item, its previousLevel and the new level from ' +
+        'the result. mark_in_stock (full) and mark_out_of_stock (empty) still work. makeStaple: true turns an item ' +
+        'with tracking "presence" (recorded without an amount) into a staple at this level, ONLY when the user says ' +
+        'so ("salt is a staple, we have plenty" -> level full, makeStaple true); never on your own initiative, and ' +
+        'one item per call. Without makeStaple a presence item is refused as presence_only: ask the user whether it ' +
+        'is a staple or how much they have (for an amount, use set_inventory_quantity with unit). An item with ' +
+        'tracking "quantity" keeps its count and is refused as quantity_tracked, with or without makeStaple. Take ' +
+        'ingredientId ONLY from get_inventory; never guess or fuzzy-match, and ask which row if several match. On ' +
+        'invalid_record, ask the user to check the item in the app. undo_request can put back a change. Requires ' +
+        'expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
+      inputSchema: setStockLevelInputSchema(),
+      outputSchema: z.strictObject({
+        ok: z.literal(true),
+        revision: z.number().int().nonnegative(),
+        replayed: REPLAYED_SCHEMA,
+        item: inventoryItemSchema(),
+        // null = the item had no level (it was not a staple, or a staple with none recorded).
+        previousLevel: z.enum(inventory.STOCK_LEVELS).nullable(),
+        level: z.enum(inventory.STOCK_LEVELS),
+        // true = makeStaple turned a presence item into a staple in this request.
+        converted: z.boolean(),
+        unchanged: z.boolean()
+      }),
+      _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
+      annotations: SET_STOCK_LEVEL_ANNOTATIONS
+    },
+    async (args) => setStockLevelTool(env, deps, ctx, args)
+  );
+
+  server.registerTool(
     'set_inventory_quantity',
     {
       title: 'Set inventory quantity',
@@ -470,8 +532,12 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'resolve or ask first. The tool never converts units; g vs kg, ml vs L, pieces vs cans are ' +
         'rejected as unit_mismatch. For none left or out of milk, use mark_out_of_stock. Only items with ' +
         'tracking "quantity" in get_inventory: staples (tracking "level") are refused (use ' +
-        'mark_in_stock / mark_out_of_stock), and an item with tracking "presence" (no amount recorded) is ' +
-        'refused as presence_only: never invent an amount, ask the user. Take ingredientId ONLY from ' +
+        'set_stock_level, mark_in_stock or mark_out_of_stock). An item with tracking "presence" (no amount recorded) is ' +
+        'refused as presence_only unless you also send unit: never invent an amount, ask the user. Only when the user ' +
+        'states the amount ("we have 200 g of paprika"), send quantity=200, unit="g" and expectedUnit="g" (unit is one ' +
+        'of ' + INVENTORY_UNITS.join(', ') + '; it must equal expectedUnit and, if the item already has a stored unit, that unit); ' +
+        'this records the quantity and unit and the item becomes tracking "quantity". unit is refused on any other item ' +
+        '(unit_not_allowed, or the staple refusal). Take ingredientId ONLY from ' +
         'get_inventory; never guess or fuzzy-match, and ask which row if several match. On invalid_record, ' +
         'ask the user to check the item in the app. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
         'whether to retry.' + REQUEST_ID_TEXT,
@@ -688,11 +754,38 @@ async function setInventoryQuantityTool(env, deps, ctx, args) {
       const r = inventory.setCountedQuantity(doc.pantry, {
         ingredientId: args.ingredientId,
         quantity: args.quantity,
-        expectedUnit: args.expectedUnit
+        expectedUnit: args.expectedUnit,
+        unit: args.unit
       });
       return {
         write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
         result: (revision) => ({ ok: true, revision, item: r.item })
+      };
+    }
+  });
+}
+
+// set_stock_level (TASK-098): one guarded pantry write, or a record-only commit for the same level.
+async function setStockLevelTool(env, deps, ctx, args) {
+  return requestWriteTool(env, deps, ctx, 'set_stock_level', args, {
+    fallback: 'The stock level could not be set.',
+    apply: (doc) => {
+      const r = inventory.setStockLevel(doc.pantry, {
+        ingredientId: args.ingredientId,
+        level: args.level,
+        makeStaple: args.makeStaple
+      });
+      return {
+        write: r.unchanged ? null : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
+        result: (revision) => ({
+          ok: true,
+          revision,
+          item: r.item,
+          previousLevel: r.previousLevel,
+          level: r.level,
+          converted: r.converted,
+          unchanged: r.unchanged
+        })
       };
     }
   });
@@ -981,6 +1074,7 @@ const TOOL_SECURITY_SCHEMES = {
   consume_ready_food: WRITE_SECURITY_SCHEMES,
   mark_out_of_stock: WRITE_SECURITY_SCHEMES,
   mark_in_stock: WRITE_SECURITY_SCHEMES,
+  set_stock_level: WRITE_SECURITY_SCHEMES,
   set_inventory_quantity: WRITE_SECURITY_SCHEMES,
   consume_stock: WRITE_SECURITY_SCHEMES,
   add_stock: WRITE_SECURITY_SCHEMES,

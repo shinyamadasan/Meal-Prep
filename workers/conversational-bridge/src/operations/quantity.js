@@ -48,3 +48,7 @@ export function convertQuantity(quantity, fromUnit, toUnit) {
   }
   return converted;
 }
+
+// The inventory units chat may record on an item that has no unit yet (TASK-098,
+// set_inventory_quantity `unit` on a presence-only item). Same vocabulary as convertQuantity().
+export const INVENTORY_UNITS = Object.freeze(Object.keys(UNIT_DEFINITIONS));
