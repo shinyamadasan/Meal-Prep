@@ -568,8 +568,11 @@ The bridge now uses the app's own rule from the shared core.
   `INGREDIENT_DB` staple such as `Garlic (Bawang)` as `stockLevel: 'empty'`. `requestId`,
   `expectedRevision`, undo and every other Phase 1 guard are unchanged. No stored record changes.
 - The `ambiguous` error code is still mapped by the REST and MCP layers but is no longer produced
-  for staple classification. Over REST an unreadable record is `422 validation_failed` whose
-  message starts `invalid_record:` (accepted, TASK-097 review S4; REST has no known client).
+  for staple classification. Over REST, `mark-out-of-stock` and `mark-in-stock` refuse an
+  unreadable record as `422 validation_failed` whose message starts `invalid_record:` (accepted,
+  TASK-097 review S4). REST `set-quantity` is the raw absolute write (D-082/TASK-065) and is NOT
+  classified: it still writes such records (pre-existing; REST has no known client and is slated
+  for retirement or parity, release checklist 2.1).
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
@@ -723,8 +726,9 @@ empty) is `400`. A syntactically valid JSON body that fails a domain/schema rule
 missing/extra field, out-of-range value) is `422 validation_failed`. The two are never conflated.
 
 **The reserved `ambiguous` code** is no longer produced for staple classification (TASK-097): the
-bridge uses the app's own `isStaple`. A pantry record that rule cannot read is refused as
-`422 validation_failed` with an `invalid_record:` message instead of being guessed.
+bridge uses the app's own `isStaple`. On `mark-out-of-stock` / `mark-in-stock`, a pantry record
+that rule or the read gate cannot read is refused as `422 validation_failed` with an
+`invalid_record:` message instead of being guessed; `set-quantity` is not classified (see above).
 
 ## Known, recorded judgment calls (not gaps — see CHANGELOG.md for the full reasoning)
 

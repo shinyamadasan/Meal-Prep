@@ -296,8 +296,10 @@ const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, day
 // TASK-097: staple classification is the app's own rule (shared/foodSafety.js isStaple).
 const TRACKING_TEXT = 'Every pantry item carries tracking, decided by the app\'s own staple rule: "level" = a ' +
   'staple tracked by stockLevel (full/ok/low/empty), changed with mark_in_stock / mark_out_of_stock (add_stock ' +
-  'and consume_stock also accept a staple that has a recorded quantity, in its exact unit); "quantity" = a non-staple with a recorded quantity and unit, changed with set_inventory_quantity, ' +
-  'consume_stock and add_stock in that unit; "presence" = a non-staple recorded without an amount: being listed ' +
+  'and consume_stock also accept a staple that has a recorded quantity, within their unit rules; consume_stock ' +
+  'only when the whole recorded amount is used); "quantity" = a non-staple with a recorded quantity and unit, ' +
+  'changed with set_inventory_quantity, consume_stock and add_stock within their unit rules (a negative stored ' +
+  'quantity can only be corrected with set_inventory_quantity); "presence" = a non-staple recorded without an amount: being listed ' +
   'means it is in stock and the quantity tools refuse it, so never invent an amount; ask the user how much they ' +
   'have. tracking null means the record could not be read (safety reason invalid-record): do not change it ' +
   'from chat.';
