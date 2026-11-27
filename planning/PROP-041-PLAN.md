@@ -1,6 +1,6 @@
 # PROP-041 — Conversational Food Management: smallest implementation plan
 
-Status: **plan approved in direction; owner decisions recorded 2026-11-26; implementation awaits explicit go-ahead after V1** · track: separate from the FFS-V1 release (does not block it)
+Status: **Phase 1 APPROVED for build 2026-11-26 (owner): TASK-091..095, deploy held. Phases 2-3 not approved.** · track: separate from FFS-V1 (released)
 Owner direction approved 2026-11-26 (chat). Nothing here is built or deployed without approval.
 Source audit: `planning/PROPOSALS.md` PROP-041.
 

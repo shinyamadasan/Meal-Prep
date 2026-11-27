@@ -26,17 +26,21 @@
 - build: TASK-082. Preserve Kylie's framework; count what we have; flexible choices; no plan required; no unnecessary purchases; versatility-first ranking. Owner deploy hold.
 - detail: TASKS.md TASK-082
 
-### BQ-032 — PROP-041 Conversational food management (separate track, after FFS-V1)
-- source: PROP-041 · priority: P1 (Phase 1 safety first) · approved: 2026-11-26 (owner, chat — direction; plan approval pending)
-- build: HELD. Not converted to TASKS until the owner approves `planning/PROP-041-PLAN.md` and its 5 decisions. Phase 1 (safety visibility, duplicate-write protection, safe merges, undo) ships before Phases 2-3. High risk, solo, `approved` gate. Never blocks the FFS-V1 release.
-- detail: planning/PROP-041-PLAN.md
+### BQ-032 — PROP-041 Phase 1: conversational food safety and reliability
+- source: PROP-041 · priority: P1 · approved: 2026-11-26 (owner, chat — "Approve PROP-041 Phase 1 only: shared food safety logic, MCP safety visibility, duplicate-write protection, safe purchase handling and recoverable removals. Use independent QA and review. Hold deployment until approval.")
+- build: TASK-091 → TASK-095, strictly in order, solo, High risk, integration branch `prop041-p1`. Max landing state `approved`; no `main` merge, Worker deploy or Firestore setting change without owner approval. Phases 2-3 NOT approved.
+- detail: planning/PROP-041-PLAN.md; TASKS.md TASK-091..095
 
-### BQ-030 — FFS-3 Balanced Plate hints + Snack Pack (wave 2, prepared)
+### BQ-033 — Routine maintenance: refresh four outdated production smoke specs
+- source: owner, chat 2026-11-26 ("Correct the four outdated smoke tests separately as routine maintenance") · priority: P2
+- build: TASK-096. Test files only. Low risk; lands `done` after independent review.
+
+### BQ-030 — [FROZEN 2026-11-26, D-090] FFS-3 Balanced Plate hints + Snack Pack (wave 2, prepared)
 - source: PROP-038 · priority: P2 · approved: 2026-11-25 (owner: "Prepare PROP-038 as the next wave")
 - build: TASK-083 drafted at `status: todo`; Claude releases it to Codex after the owner reviews wave 1.
 - detail: TASKS.md TASK-083
 
-### BQ-031 — FFS-4 Private cookbook recipes (source refs, original vs adaptation)
+### BQ-031 — [FROZEN 2026-11-26, D-090] FFS-4 Private cookbook recipes (source refs, original vs adaptation)
 - source: PROP-039 rev 2 · priority: P2 · approved: 2026-11-25 (owner, chat — "subject to implementation review after Wave 1")
 - build: TASK-084 prepared at `status: todo`; released after wave 1. High risk → held merge. Cookbook content stays private (import file outside repo).
 - detail: TASKS.md TASK-084

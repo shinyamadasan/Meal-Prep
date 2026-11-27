@@ -5,6 +5,19 @@ The top entry is the current **working memory** (where we are / next task / bloc
 
 ---
 
+## 2026-11-26 — V1 accepted; scope frozen; PROP-041 Phase 1 approved and planned
+
+**Owner decisions:** V1 release accepted. Application feature scope frozen (D-090). PROP-041 Phase 1
+only (shared safety logic, MCP safety visibility, duplicate-write protection, safe purchase handling,
+recoverable removals) with independent QA and review; deployment held. Four outdated smoke specs
+fixed separately as routine maintenance. Production inventory must not be modified.
+**State:** FFS-V1 tasks (TASK-080..083, 085..090) closed `done`. TASK-091 `codex` (first of five,
+sequential, on `prop041-p1`); TASK-092..095 `todo`. TASK-096 `codex` (tests only, from `main`).
+**Blockers:** none. Owner steps later: approve Phase 1 deployment; set the Firestore TTL policy on
+`mcpRequests.expireAt` at deploy time.
+
+---
+
 ## 2026-11-26 — Flexible Food System V1 RELEASED to production (PR #6)
 
 **Owner decisions:** release approved, conditional on backup recovery, data integrity, food-safety and

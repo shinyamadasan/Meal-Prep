@@ -5915,7 +5915,7 @@ merge/deployment gate: Owner-relayed targeted reviewer PASS; integrated and rele
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-080 · FFS-0 Truthful availability — read path only
-status: approved
+status: done
 owner: codex
 risk: Medium (logic change on read paths; no stock writes). Merge gate: `approved` (owner deploy hold).
 source: BQ-027 · PROP-035 · audit-evidence/2026-11-06 F1, F2 · D-086
@@ -5996,7 +5996,7 @@ blocker:
     retaining the assertion that correcting the vinegar leaves the Rice record intact.
 
 ### TASK-081 · FFS-1 Stock health — read-only inventory review by food class
-status: approved
+status: done
 owner: codex
 risk: Low (render-only). Merge gate: `approved` (owner deploy hold).
 source: BQ-028 · PROP-036 (revised by owner 2026-11-25: no universal cutoff) · D-087
@@ -6063,7 +6063,7 @@ verification:
     feature-evidence/task-081/. Full suite + ledger contract; SELF_REVIEW + QA notes.
 
 ### TASK-082 · FFS-2 No-plan grocery — "Fill the gaps" (Kylie's framework, inventory-aware)
-status: approved
+status: done
 owner: codex
 risk: Low (additive Shop card; adds rows only through the existing `buyMissingIngredient`
   path on tap). Merge gate: `approved` (owner deploy hold).
@@ -6183,7 +6183,7 @@ private data (NOT part of this task's commits): the curated recipe import file i
   Meal-Prep-private\cookbook\so-easy-so-good.private.json (outside the repo).
 
 ### TASK-086 · FFS-V1 fix: estimated shelf-life dates never make a lot unavailable
-status: approved
+status: done
 owner: codex
 risk: Medium (read-path logic in `pantryLotAvailable`; no write path, no persisted change).
   Merge gate: `approved` (owner deploy hold).
@@ -6233,7 +6233,7 @@ verification:
   - Tests first (red on base), then green. No screenshots needed (no visual change).
 
 ### TASK-085 · FFS-V1 integrated owner preview (after TASK-080..084 reviewed)
-status: review
+status: done
 checkpoint (2026-11-26, final refinement): integrated household-acceptance preview ready.
   Branch `ffs-v1-refine` = wave 1 + TASK-087/088/089/083-lite, all `approved` (held). Full local
   894/894, ledger contract 13/13 on the merged head. Preview rebuilt from it (private folder),
@@ -6293,7 +6293,7 @@ acceptance:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-087 · FFS-V1 Cook Now ingredient matching: required vs optional, alternatives, swaps
-status: approved
+status: done
 owner: codex
 risk: Medium (read-path logic; no persisted change, no write path). Merge gate: `approved` (hold).
 source: owner approval 2026-11-26 "Approve finding A" + finding D (compound names) · D-086
@@ -6414,7 +6414,7 @@ verification:
     showing all three tiers into feature-evidence/task-087/.
 
 ### TASK-088 · FFS-V1 Food availability and deletion safety: expired vs check vs stale
-status: approved
+status: done
 owner: codex
 risk: High (deletion paths, tombstones, a new optional synced pantry field; D-032 red zone).
   Solo build. Merge gate: `approved` (hold).
@@ -6515,7 +6515,7 @@ verification:
     feature-evidence/task-088/.
 
 ### TASK-089 · FFS-V1 Fill the gaps polish: categories, whole grain, near-twins, variety
-status: approved
+status: done
 owner: codex
 risk: Medium (render + suggestion logic; grocery rows use the existing shape). Gate: `approved`.
 source: owner approval 2026-11-26 "Approve finding C" + "Refine the grocery system" (B: rotate
@@ -6576,7 +6576,7 @@ verification:
   - Screenshots desktop + 390px into feature-evidence/task-089/.
 
 ### TASK-083 · FFS-3 Balanced Plate — lightweight, optional suggestions (owner-approved lite)
-status: approved
+status: done
 owner: codex
 risk: Medium (render-only logic; no persisted state). Merge gate: `approved` (owner deploy hold).
 source: BQ-030 · PROP-038 · owner approval 2026-11-26 "Approve a lightweight version of TASK-083…
@@ -6628,7 +6628,7 @@ verification:
   - Screenshots desktop + 390px (Ready-to-eat + recipe modal) into feature-evidence/task-083/.
 
 ### TASK-090 · FFS-V1 release blockers from the final verification round
-status: approved
+status: done
 owner: codex
 risk: High (TASK-088 safety logic, Shop list generation, staple sync, synced grocery rows).
   Solo build, never chained. Merge gate: `approved` (owner deploy hold).
@@ -6758,6 +6758,243 @@ constraints:
     `saveData()`/`cloudReady` guard, auth, ChronaSense or `workers/`.
   - Never delete records automatically. Never merge/push `main`, `ffs-v1`, `ffs-v1-refine`. Never
     deploy. Push only the task branch. Stop at `status: review` with CHANGELOG/TEST_REPORT entries.
+
+<!-- ═══════════════════════════════════════════════════════
+     BQ-032 · PROP-041 Phase 1 — Conversational food management: safety and reliability
+     (owner approval 2026-11-26: "Approve PROP-041 Phase 1 only: shared food safety logic, MCP safety
+     visibility, duplicate-write protection, safe purchase handling and recoverable removals.")
+     Risk: High (red zone: Worker Firestore writes, tombstones, app safety code) · Execution: Solo,
+     one task per run (Hard Rule 10). Build order is strictly TASK-091 → 092 → 093 → 094 → 095.
+     Branching: integration branch `prop041-p1` (from `main` at this plan commit). Each task branches
+     from the CURRENT `prop041-p1` head (after Claude merged the previous reviewed task) as
+     `task-0NN-<slug>`. Claude merges reviewed heads into `prop041-p1`. NEVER `main`.
+     DEPLOY GATE (owner): "Hold deployment until approval." Max landing state `approved`. No push to
+     `main`, no `wrangler deploy`, no Firestore console/TTL change, no production read or write.
+     SCOPE FREEZE (owner, D-090): no new application feature. App changes are limited to moving the
+     pure safety code into `shared/` with identical behaviour (TASK-091). Phase 2/3 are NOT approved.
+     Review: independent QA + STRICT review per task (a reviewer that did not build it), then Claude
+     re-runs the gates and writes REVIEW.md.
+     Detail and binding principles: planning/PROP-041-PLAN.md (Phase 1, owner decisions 1-6).
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-091 · PROP-041 P1-1 Shared food-safety core (app + Worker, identical verdicts)
+status: codex
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (moves the app's food-safety rules; red zone because the Worker will rely on them)
+source: BQ-032 / PROP-041 P1-1
+branch: `task-091-shared-food-safety` from `prop041-p1`
+files: `shared/foodSafety.js` (new); `app.js`; `index.html` (one `<script>` tag); `sw.js` (STATIC
+  list); `workers/conversational-bridge/src/operations/*.js` (import only, no behaviour use yet);
+  `tests/fixtures/food-safety-parity.json` (new); `tests/food-safety-parity.spec.js` (new, local);
+  `workers/conversational-bridge/test/food-safety-parity.node.js` (new); `docs/ARCHITECTURE.md`,
+  `docs/DATA_MODEL.md` (where the rules now live); CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+
+objective:
+  One source of truth for "safe to eat". Move the pure safety rules out of `app.js` into
+  `shared/foodSafety.js` (classic script, `(function (root) { ... })(globalThis)`, same pattern as
+  `shared/readyFoodContract.js`), exposed as a frozen `globalThis.MealPrepFoodSafety`. The app keeps
+  every existing global name as a thin wrapper, so no call site and no behaviour changes.
+
+scope (move, do not rewrite):
+  - Data: `INGREDIENT_DB`, `STOCK_CLASS_RULES`, `FRIDGE_SAFETY_LIMITS`, `COOKED_FRIDGE_LIMIT`,
+    `FRIDGE_SAFETY_EXCLUSIONS`, `FRESHNESS_WARN_DAYS`. The app binds
+    `const INGREDIENT_DB = MealPrepFoodSafety.INGREDIENT_DB` (etc.) so existing references keep working.
+  - Pure functions: `categoryShelfLife`, `stockIngredientEntry`, `stockFoodClass`, `stockCalendarDay`,
+    `daysLeftFrom`, `pantryDaysLeft`, `pantryFridgeSafety`, `pantryDateSignal`, `pantryLotAvailable`
+    (and the staple rule it needs, `isStaple`), `cookedShelfLife`, `cookedDateSignal`, plus the app's
+    existing ready-food usability rule if it is pure (find it from `getReadyFoodSuggestions`; if it is
+    not pure, leave it and say so in CHANGELOG).
+  - Every shared function takes `today` (`'YYYY-MM-DD'`, household calendar day) as an explicit
+    argument; none reads the clock. App wrappers pass `todayISO()`.
+  - Storage inference: shared functions take an optional `inferStorage(name, category)` hook. The app
+    passes its existing `inferStorage` (with `PANTRY_KNOWLEDGE`). The default (used by the Worker)
+    returns the lot's own `storage`, else INGREDIENT_DB's explicit `storage`, else `null`. A `null`
+    storage makes the safety verdict `unknown` (never usable) in the shared default path only; the
+    app's verdicts must not change.
+acceptance:
+  - [ ] `app.js` no longer defines any moved item; it defines thin wrappers with the old names and
+        signatures. `git grep` shows one definition of each rule (in `shared/foodSafety.js`).
+  - [ ] Full local suite passes with no edited expectations (`npm test`, currently 905/905).
+        `npm run test:ledger-contract` 13/13. `npm run test:bridge` all pass.
+  - [ ] Parity fixture (≥ 40 cases: each `FRIDGE_SAFETY_LIMITS` class, exclusions, freezer, counter,
+        printed expiry vs best-before, malformed dates, missing bought date, estimated windows, staples
+        Low/Empty, cooked fridge/freezer, `keptOn`) produces identical verdicts in the browser
+        (Playwright local) and in Node (Worker test), for a fixed `today` and for a month-end/leap-day
+        `today`.
+  - [ ] Worker loads the module by side-effect import (like `readyFoodContract.js`) and a Node test
+        proves it is available; Worker behaviour is otherwise unchanged in this task.
+  - [ ] `index.html` loads `shared/foodSafety.js` before `app.js`; `sw.js` STATIC includes it (and
+        `shared/readyFoodContract.js` if missing) so the offline app still works.
+  - [ ] No user-visible change: the restore/round-trip check against the private release fixture is
+        NOT required (Claude runs it), but no stored field, render, or copy changes.
+constraints:
+  - No new feature, field, UI, copy or rule change. Do not "fix" a rule while moving it — if you find
+    a bug, record it in CHANGELOG as a finding and leave behaviour identical.
+  - No framework, bundler, module system for the app (Hard Rule 9). No `saveData()`/`cloudReady`,
+    tombstone, auth or Firestore change. Push only the task branch. Stop at `status: review`.
+verification: `npm test`; `npm run test:ledger-contract`; `npm run test:bridge` (run `npm ci` in
+  `workers/conversational-bridge` first if needed); `node --check` on changed JS; `git diff --check`;
+  SELF_REVIEW.md + QA.md; CHANGELOG/TEST_REPORT entries.
+
+### TASK-092 · PROP-041 P1-2 Truthful MCP reads: safety verdict on every inventory and ready-food item
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (Worker; what chat is allowed to recommend)
+source: BQ-032 / PROP-041 P1-2; audit C1 and C3 (planning/PROPOSALS.md PROP-041)
+depends-on: TASK-091 merged into `prop041-p1`
+branch: `task-092-mcp-truthful-reads` from `prop041-p1`
+files: `workers/conversational-bridge/src/mcp.js`; `src/operations/inventory.js`;
+  `src/operations/readyFood.js`; `src/householdDay.js` (new, pure); `wrangler.jsonc` (`vars`);
+  Worker tests; Worker README.md; CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: Chat can no longer call unsafe or unknown food available.
+acceptance:
+  - [ ] Household calendar day comes from one Worker setting `HOUSEHOLD_TIME_ZONE` (`vars`,
+        default `"Asia/Manila"`) via `Intl.DateTimeFormat`; pure helper with an injectable clock;
+        tests cover the UTC/Manila midnight boundary. Invalid zone fails closed (`InfrastructureError`
+        at read, never a guessed day).
+  - [ ] `get_inventory` items add `purchaseDate`, `expiryDate`, `dateMode`, `printedDateKind`,
+        `category`, `storage`, `staple`, `stockLevel` (null when absent) and
+        `safety: { status, reason, label, daysLeft, usable }` computed ONLY with TASK-091's shared
+        functions. `status` ∈ `ok | use-soon | check | expired | unknown`; `usable` equals the app's
+        `pantryLotAvailable` verdict; unknown safety ⇒ `usable:false`.
+  - [ ] `get_ready_food` items add the same `safety` object from the shared cooked-meal rules.
+  - [ ] Tool descriptions say: never suggest an item with `usable:false`; `unknown` is not usable;
+        `check` means look at it first. `record_ready_food` description fixed for audit C3.
+  - [ ] Output schemas updated (strict); all existing read and write tools keep behaviour; a test
+        proves the shared verdict and the response verdict match for every parity-fixture case.
+constraints: Read tools only (plus descriptions). No write behaviour, no new tool, no OAuth/route/
+  secret change. No deploy. Stop at `status: review`.
+verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`; `git diff --check`;
+  `npx wrangler deploy --dry-run` only; SELF_REVIEW + QA; CHANGELOG/TEST_REPORT.
+
+### TASK-093 · PROP-041 P1-3 No duplicate writes: required requestId + atomic request record
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (every Worker write path; Firestore commit)
+source: BQ-032 / PROP-041 P1-3; owner decisions 2 and 5
+depends-on: TASK-092 merged into `prop041-p1`
+branch: `task-093-mcp-request-ids` from `prop041-p1`
+files: `workers/conversational-bridge/src/firestore.js`; `src/mcp.js`; `src/index.js` (REST write
+  routes, if they share the write path); `src/operations/requests.js` (new, pure); Worker tests;
+  README.md; `docs/DATA_MODEL.md` (new subcollection); CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: A retried or replayed chat write can never apply twice.
+acceptance:
+  - [ ] Every MCP write tool requires `requestId` (string, 8-128 chars, `[A-Za-z0-9_-]`). Missing or
+        malformed ⇒ validation error before any Firestore access.
+  - [ ] Each write is ONE Firestore `documents:commit` containing (a) the existing guarded user-doc
+        update (same field paths, `version` increment, `currentDocument.updateTime` precondition) and
+        (b) a create-only `users/{uid}/mcpRequests/{requestId}` document (`currentDocument.exists:
+        false`). Both apply or neither does.
+  - [ ] The request record stores: `tool`, `argsHash` (SHA-256 of canonical args without
+        `requestId`/`expectedRevision`), `actor` (OAuth subject or `rest`), `createdAt`, `expireAt`
+        (createdAt + 30 days, for an owner-set Firestore TTL policy), `revisionBefore`,
+        `revisionAfter`, the tool result, and `before`: a full copy of every pantry / cookedMeals
+        record the write changed or removed plus the prior tombstone entries it touched (input for
+        TASK-095).
+  - [ ] Replay with the same `requestId` and same `argsHash` returns the stored result with
+        `replayed:true` and writes nothing (even if `expectedRevision` is now stale). Same `requestId`
+        with different args ⇒ `request_id_reused` error, zero writes. Commit race on the request doc
+        ⇒ read it back and return it as a replay.
+  - [ ] Tests: replay after success, replay after a simulated timeout where the commit DID land,
+        concurrent identical requests (one write), different-args reuse, record contents, 30-day
+        `expireAt`, and every existing write-tool test still passes with a `requestId` added.
+  - [ ] README documents the one-time owner step: Firestore TTL policy on collection group
+        `mcpRequests`, field `expireAt` (not performed by this task).
+constraints: No change to which fields each tool changes or to its validation. No Firestore rules
+  change (the Worker uses its service account). No pruning job. No deploy, no production access.
+  Stop at `status: review`.
+verification: as TASK-092.
+
+### TASK-094 · PROP-041 P1-4 Safe purchase handling in `add_stock`
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (inventory write; food safety)
+source: BQ-032 / PROP-041 P1-4; audit C2; owner decision 4
+depends-on: TASK-093 merged into `prop041-p1`
+branch: `task-094-safe-add-stock` from `prop041-p1`
+files: `workers/conversational-bridge/src/operations/inventory.js`; `src/mcp.js`; Worker tests;
+  README.md; CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: New food never inherits an older or unsafe lot's clock, and no bought date is invented.
+acceptance:
+  - [ ] `add_stock` decides mergeability ONLY with the shared verdict (TASK-091) for the household
+        day (TASK-092). Remove `CATEGORY_SHELF_LIFE_DAYS`, `DEFAULT_CATEGORY_SHELF_LIFE_DAYS` and the
+        UTC ±1-day skew logic from `validateMergeFreshness`.
+  - [ ] Refuse (validation error, zero writes, message says "record the new purchase separately in
+        the app") when the target lot is not `usable`, is `unknown`, is `check`, or has a printed date.
+  - [ ] For a lot with a fridge safety class (raw meat, poultry, seafood, ground, variety, sausage,
+        cooked): require a new optional input `boughtDate` (`YYYY-MM-DD`). Missing ⇒ `needs_bought_date`
+        clarification error (description: ask the user; use today only if they said "today"/"just
+        bought"). Different from the lot's `purchaseDate` ⇒ refuse as a separate lot. Equal ⇒ merge.
+        A future `boughtDate` is rejected.
+  - [ ] Staples and non-safety lots keep today's merge behaviour when usable. The success result
+        states back the lot's bought date and storage.
+  - [ ] Tests for each branch, including the household-day boundary and a lot exactly at its limit.
+constraints: No new tool, no lot creation (that is Phase 2). Keep `requestId` / revision guards.
+  No deploy. Stop at `status: review`.
+verification: as TASK-092.
+
+### TASK-095 · PROP-041 P1-5 Recoverable chat removals: `undo_request`
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (restores records and clears tombstones)
+source: BQ-032 / PROP-041 P1-5; owner decisions 3 and 5
+depends-on: TASK-094 merged into `prop041-p1`
+branch: `task-095-mcp-undo` from `prop041-p1`
+files: `workers/conversational-bridge/src/operations/requests.js`; `src/mcp.js`; Worker tests;
+  README.md; `docs/DECISIONS.md` (D-090 addendum only if a non-obvious choice is made);
+  CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: Any chat write, including a removal, can be undone for 30 days without overwriting
+  newer changes.
+acceptance:
+  - [ ] New write tool `undo_request({ requestId, undoRequestId, expectedRevision })`; it is itself
+        recorded and replay-safe (TASK-093).
+  - [ ] Restores the `before` snapshot of the original request: removed records come back with the
+        same id, changed records return to their prior values, and tombstones the request wrote are
+        cleared the same way the app's restore revives records (D-083: `updatedAt` restamped,
+        tombstone deleted).
+  - [ ] Refuses with zero writes when: the request record is missing or past `expireAt`; it was
+        already undone (record `undoneBy`); any affected record changed since (its current value
+        differs from the request's after-state), or a removed id is in use again; or the original was
+        itself an undo (no undo-of-undo in Phase 1).
+  - [ ] Ready-food `mealConsumptions` facts are never deleted by undo; undoing `consume_ready_food`
+        restores portions and records a compensating fact only if the ledger contract allows it —
+        otherwise refuse that tool's undo and document why (`npm run test:ledger-contract` must pass).
+  - [ ] Tests: undo of each write tool, stale-after-edit refusal, expired, double undo, replay.
+constraints: No bulk operation, no confirmation flow (Phase 2). No deploy. Stop at `status: review`.
+verification: as TASK-092, plus `npm run test:ledger-contract`.
+
+<!-- ═══════════════════════════════════════════════════════
+     BQ-033 · Routine maintenance: refresh four outdated production smoke specs
+     Risk: Low (test-only; no app, Worker or data change) · Execution: Solo
+     Branch `task-096-prod-smoke-refresh` from `main`. Landing: `done` after independent review
+     (D-032: reversible, tests only). Independent of BQ-032.
+     ═══════════════════════════════════════════════════════ -->
+
+### TASK-096 · Refresh four outdated production smoke specs (post FFS-V1)
+status: codex
+owner: Codex (build) · independent review · Claude (verdict)
+risk: Low
+source: BQ-033; ROADMAP Known Issues "Stale production smoke specs (post FFS-V1)"
+branch: `task-096-prod-smoke-refresh` from `main`
+files: `tests/production-smoke-kitchen-truth.spec.js`; `tests/production-smoke-low-effort.spec.js`;
+  `planning/ROADMAP.md` (delete the Known Issues entry); CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: Make the four failing `test:prod` specs describe the shipped behaviour (D-088, TASK-079).
+acceptance:
+  - [ ] `live: Home shows Needs Attention…`, `live: bulk cleanup crosses MASS_DELETE_GUARD…` and
+        `live: Keep invents no date…`: fixtures that must be **Expired** use a printed expiry date
+        (`dateMode: 'expiry'`) or a past-limit fridge-safety lot; estimated-window produce is asserted
+        under **Check**. Keep every original guarantee: Keep invents no date and lapses next day; bulk
+        cleanup crosses `MASS_DELETE_GUARD`, tombstones every id and spares use-soon; the expired count
+        is exact. Do not weaken an assertion to make it pass.
+  - [ ] `the deployed build serves the low-effort wave code`: vocabulary includes `air-fryer` in the
+        app's order.
+  - [ ] `npx playwright test tests/production-smoke-kitchen-truth.spec.js
+        tests/production-smoke-low-effort.spec.js --project=prod` passes against the live site, and
+        the full `npm run test:prod` has 0 failures. `npm test` (local) still passes
+        (`suite-classification` included).
+constraints: Test files only. Signed-out fresh contexts only — never sign in, never write to an
+  account. No app/Worker change. Push only the task branch. Stop at `status: review`.
+verification: the commands above; `git diff --check`; CHANGELOG/TEST_REPORT.
 
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 

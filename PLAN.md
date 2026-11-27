@@ -4,39 +4,39 @@
 
 ## Goal
 
-**Flexible Food System V1 — final refinement** (owner-approved 2026-11-26). Maximum food
-flexibility with minimum decision-making and management: shop (restock / no-plan / planned, none
-mandatory), then eat via Instant Food, Quick Cook or Meal Prep from ONE kitchen inventory.
+**PROP-041 Phase 1 — conversational food safety and reliability** (owner-approved 2026-11-26).
+Chat (ChatGPT via the MCP bridge) must give the same "safe to eat" answers as the app, never apply a
+write twice, never merge new food into an old or unsafe lot, and make every chat removal recoverable.
+Flexible Food System V1 is released and accepted (PR #6, 2026-11-26); application feature scope is
+frozen (D-090).
 
 ## Approach
 
-- Review existing capability first (done 2026-11-26, recorded in the TASKS.md group header):
-  restock essentials = existing staples + Low/Empty auto-list; planned grocery = existing week
-  plan + batches; the three cooking modes = existing No-cook / Lowest effort / Batch-friendly
-  filters + Ready to eat. None of these gets new UI.
-- Build only the gaps: TASK-087 (Cook Now matching, finding A + D) and TASK-088 (expiry signals and
-  deletion safety, finding B, High/red-zone, solo) in parallel worktrees; then TASK-089 (Fill the
-  gaps polish + variety, finding C) and TASK-083 lite (Balanced Plate, Snack Pack deferred) on the
-  reviewed TASK-087 head.
-- Independent QA per task (full suite + `npm run test:ledger-contract` re-run by Claude), then
-  Claude merges approved heads into `ffs-v1-refine` and rebuilds the private offline preview.
-- TASK-084 deferred. Cookbook pack reviewed privately; Garlicky Roasted Chickpeas dropped.
-- **Owner deploy hold:** max landing state `approved`. No merge/push to `main`, no deploy.
+- TASK-091 moves the app's pure safety rules into `shared/foodSafety.js` with identical behaviour
+  (parity-tested in browser and Node). TASK-092..095 build the Worker side on that one source.
+- Strictly sequential, solo, one task per run (High risk, Hard Rule 10). Each task: Codex builds →
+  independent QA + STRICT review → Claude re-runs gates, writes REVIEW.md, merges into `prop041-p1`.
+- Exit gate: Worker suite, ledger contract, full app suite, parity test, then an owner-approved
+  read-only live check in ChatGPT after deployment.
+- **Owner deploy hold:** max landing state `approved`. No `main` merge, `wrangler deploy` or
+  Firestore TTL setting until the owner approves.
+- Separately: TASK-096 refreshes four outdated production smoke specs (tests only).
 
 ## Scope
 
-**In:** TASK-087, TASK-088, TASK-089, TASK-083 (lite), TASK-085 refresh (integrated preview).
-**Out:** TASK-084, Snack Pack, nutrition scores/tracking, new shopping or cooking-mode UI, stock
-write paths (audit F3/F4/F9), bridge worker changes, any automatic record deletion.
+**In:** TASK-091..095 (PROP-041 P1-1..P1-5), TASK-096 (smoke maintenance).
+**Out:** PROP-041 Phases 2-3, any new app feature or UI (scope freeze, D-090), TASK-084/BQ-030/031,
+changes to the owner's production inventory, Firestore rules, OAuth/second member.
 
 ## Source
 
-Owner message "Flexible Food System — Final Refinement" (2026-11-26) · D-086 addendum 2 · D-088.
+Owner message 2026-11-26: "Accept the V1 release. Keep the application feature scope frozen.
+Approve PROP-041 Phase 1 only … Use independent QA and review. Hold deployment until approval.
+Correct the four outdated smoke tests separately as routine maintenance." · BQ-032, BQ-033 · D-090.
 
 ## Status
 
-review — TASK-087/088/089/083-lite approved (held) and integrated on `ffs-v1-refine`; integrated
-preview handed to the owner for household acceptance. Awaiting owner merge/deploy decision.
+in-progress — TASK-091 and TASK-096 at `codex`; TASK-092..095 `todo` (sequential).
 
 ## Previous milestone (archived)
 

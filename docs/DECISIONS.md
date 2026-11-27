@@ -3653,3 +3653,21 @@ compatible; incompatible ones stay separate with a visible note. Empty staples r
 **Why.** Lost safety is not reversible; a conservative false "do not use" costs one edit. Bulk
 deletion stays limited to printed and actual-cook dates (D-088) so no record is removed on an
 estimate.
+
+## D-090 — After FFS-V1: application feature scope frozen; PROP-041 Phase 1 only
+
+**Date:** 2026-11-26 · **Tasks:** TASK-091..096 · **Decided by:** owner (chat)
+
+**Decision.** FFS-V1 is accepted. The application's feature scope is frozen while the household
+establishes its food system through everyday use: no new app features, screens or rules. Only
+PROP-041 Phase 1 is approved (safety and reliability of chat writes), plus routine test
+maintenance. The one app-side change allowed is moving the pure food-safety rules into
+`shared/foodSafety.js` unchanged, so the app and the Worker share one rule set.
+
+**Why.** Real use should drive the next changes, not more features. Chat already writes to the
+household inventory, so its safety gaps (audit C1-C3, duplicate writes, unrecoverable removals) are
+fixed first. A second copy of the safety rules in the Worker would drift; a shared classic script
+(the `shared/readyFoodContract.js` pattern) keeps one source without a build step (D-001).
+
+**Consequences.** BQ-030/031 (TASK-083 follow-ups, TASK-084) are frozen. PROP-041 Phases 2-3 need a
+new owner approval. Phase 1 lands `approved` (held); nothing deploys without the owner.
