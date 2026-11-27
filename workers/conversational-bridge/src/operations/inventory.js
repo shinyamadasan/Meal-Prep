@@ -59,7 +59,9 @@ function isStapleRecord(p) {
 }
 
 function findPantryIndex(pantry, ingredientId) {
-  return pantry.findIndex((p) => p && String(p.id) === String(ingredientId));
+  // Same safe id rule as the reads (readableId): a stored id that is not text or a finite number
+  // (a map, array, boolean) can never match and is never passed to String(), which can throw.
+  return pantry.findIndex((p) => p && readableId(p.id) && String(p.id) === String(ingredientId));
 }
 
 function toInventoryItem(p) {

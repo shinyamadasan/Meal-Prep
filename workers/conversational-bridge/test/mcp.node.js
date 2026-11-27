@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE } from '../src/mcpAuth.js';
 import { testEnv } from './support/fixtures.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -36,7 +37,7 @@ function rpcRequest(id, method, params = {}) {
 }
 
 function toolCall(id, name, args = {}) {
-  return rpcRequest(id, 'tools/call', { name, arguments: args });
+  return rpcRequest(id, 'tools/call', { name, arguments: withRequestId(name, args) });
 }
 
 function validContext(overrides = {}) {
@@ -68,7 +69,7 @@ function readDeps(doc) {
       now: () => new Date(NOW * 1000),
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
-      patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+      getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
       fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
     }
   };
@@ -123,7 +124,7 @@ test('tools/list exposes exactly nine tools total — two read, seven write — 
   assert.equal(recordReadyFood.inputSchema.additionalProperties, false);
   assert.deepEqual(
     new Set(Object.keys(recordReadyFood.inputSchema.properties)),
-    new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'source', 'expectedRevision'])
+    new Set(['name', 'servings', 'storage', 'cookedDate', 'recipeId', 'source', 'requestId', 'expectedRevision'])
   );
   assert.deepEqual(recordReadyFood.inputSchema.properties.source.enum, ['leftovers', 'takeout']);
   assert.equal(recordReadyFood.inputSchema.properties.servings.type, 'integer');
@@ -141,7 +142,7 @@ test('tools/list exposes exactly nine tools total — two read, seven write — 
   assert.equal(consumeReadyFood.inputSchema.additionalProperties, false);
   assert.deepEqual(
     new Set(Object.keys(consumeReadyFood.inputSchema.properties)),
-    new Set(['cookedMealId', 'servings', 'expectedRevision'])
+    new Set(['cookedMealId', 'servings', 'requestId', 'expectedRevision'])
   );
 
   const toolNames = message.result.tools.map((tool) => tool.name).join(' ');

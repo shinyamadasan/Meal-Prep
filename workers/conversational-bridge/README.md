@@ -391,6 +391,67 @@ secret or Firestore change. Deploy is held for the owner (BQ-032).
   fixtures and three `today`s, the boundary end to end, D-091, descriptions, schemas) and
   `test/ready-food-parity.node.js` (Node side of `tests/fixtures/ready-food-parity.json`).
 
+## TASK-093 no duplicate writes: required `requestId` + atomic request record (PROP-041 P1-3, local only — NOT deployed)
+
+A retried or replayed chat write can never apply twice. MCP write tools only; REST `/v1/*` routes
+and the read tools are unchanged. Deploy is held for the owner (BQ-032).
+
+- **Required `requestId`** on all seven MCP write tools (`record_ready_food`,
+  `consume_ready_food`, `mark_out_of_stock`, `mark_in_stock`, `set_inventory_quantity`,
+  `consume_stock`, `add_stock`): a string of 8-128 characters from `[A-Za-z0-9_-]`. The public
+  schema enforces it and `requests.validateRequestId()` repeats the rule inside the adapter, so a
+  missing or malformed id is a validation error before any Firestore access. Each description
+  tells chat to generate a new id per change and to resend the SAME id when retrying that change.
+- **One atomic commit.** `firestore.js` `commitRequestWrite()` sends ONE `documents:commit` with
+  two writes: (a) the same guarded user-document update as before (same field paths plus
+  `version`, version + 1, `currentDocument.updateTime` precondition, or `exists:false` for a
+  not-yet-created document) and (b) a create-only `users/{uid}/mcpRequests/{requestId}` document
+  (`currentDocument.exists:false`). Both apply or neither does. `patchUserDocument()` is now used
+  by REST only.
+- **The request record** (`operations/requests.js` `buildRequestRecord()`): `tool`, `argsHash`
+  (SHA-256 hex of the canonical, key-sorted JSON of the arguments without `requestId` and
+  `expectedRevision`), `actor` (the OAuth owner subject), `createdAt` and `expireAt` (Firestore
+  timestamps; `expireAt` = `createdAt` + 30 days), `revisionBefore`, `revisionAfter`, `result`
+  (the exact tool result), and `before`: a full copy of every pantry / cookedMeals record the write
+  changed or removed, plus `before.deletions.{pantry|cookedMeals}[id]` = the prior tombstone value
+  of every tombstone entry the write touched (`null` = there was none). A record the write only
+  creates (`record_ready_food`) has no `before`. `added` = `{ pantry?, cookedMeals?,
+  mealConsumptions? }`: full copies of the records the write added (a new id), e.g. the new batch
+  from `record_ready_food` or the ledger fact `consume_ready_food` appends. `before` + `added` are
+  TASK-095's undo input.
+- **Replay.** The adapter reads the request record first (after auth and validation, before the
+  user document). Same `requestId` + same tool + same `argsHash` returns the stored result with
+  `replayed: true` and writes nothing, even if `expectedRevision` is now stale. Same `requestId`
+  with different arguments or a different tool is `request_id_reused`, zero writes. If the commit
+  fails its precondition and the request record now exists (a concurrent call with the same id
+  won), the record is read back and answered the same way; otherwise it is `revision_conflict` as
+  before. `replayed` is optional in every write output schema and present only on a replay.
+- **No-ops spend their id.** `mark_out_of_stock` / `mark_in_stock` on an already-out / already-
+  full item return `unchanged: true` and leave the user document (and `version`) untouched, but
+  still commit the request record alone. A lost-response retry with the same id gets the same
+  answer instead of applying a change nobody confirmed (e.g. after the item was restocked in the
+  app); the id cannot be reused for a different change.
+- **Safe id lookups.** Write lookups (`findPantryIndex()`, `findMealIndex()`) now use the reads'
+  `readableId()` rule: a stored id that is not text or a finite number is skipped instead of being
+  passed to `String()`, which can throw (TASK-092 review carry-over). REST uses the same lookups.
+- Tests: `test/mcp-request-ids.node.js` (schema and validation on every tool, commit shape, record
+  contents and 30-day `expireAt`, `before` snapshots, replay after success / stale revision /
+  timeout that landed, concurrent identical and different requests, reuse, no-op, transport, the
+  hostile-id lookups). Existing write-tool tests send a fresh `requestId` per call
+  (`test/support/requestIds.js`); the fake Firestore models `documents:commit` and the
+  `mcpRequests` subcollection.
+
+**One-time owner steps before this can be deployed (NOT performed by TASK-093):**
+
+1. **IAM.** The bridge's custom Firestore role holds only `datastore.entities.get` and
+   `datastore.entities.update` (see "Production enablement checklist"). A request record is a NEW
+   document, so the role also needs `datastore.entities.create`. Without it every MCP write fails
+   closed (a permission error, nothing written). Grant it, then verify with one controlled write.
+2. **TTL policy.** In the Firebase / Google Cloud console, add a Firestore TTL policy on
+   collection group `mcpRequests`, field `expireAt`. Firestore then deletes each record some time
+   after its `expireAt` (typically within a day or so; deletion is not instant). No code or
+   pruning job depends on it; until it exists, records simply stay.
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other

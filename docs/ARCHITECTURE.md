@@ -362,6 +362,18 @@ both reproduce them. The ready-food suggestion filter in `getReadyFoodSuggestion
 `app.js` (an inline predicate over `AppState`); its freshness part is the shared
 `daysLeftFrom()` + `cookedShelfLife()`.
 
+### Chat write requests (`src/operations/requests.js`, TASK-093, PROP-041 P1-3)
+Every MCP write tool requires a caller-generated `requestId` and runs through one adapter in
+`src/mcp.js` (`requestWriteTool()`): auth → `requestId` shape → read
+`users/{uid}/mcpRequests/{requestId}` (present: same tool + `argsHash` returns the stored result
+with `replayed: true`, otherwise `request_id_reused`; zero writes either way) → read the user
+document → `expectedRevision` → the canonical operation → ONE `documents:commit`
+(`firestore.js` `commitRequestWrite()`) holding the guarded user-document update and the
+create-only request record. Both apply or neither. A commit that loses to the same `requestId` is
+read back and answered as a replay. The record keeps the result and `before` snapshots for 30 days
+(`expireAt`, owner-set TTL) as TASK-095's undo input; see `docs/DATA_MODEL.md` Firestore layout.
+REST routes keep `patchUserDocument()` and take no `requestId`.
+
 ## Safety / cross-cutting
 - All user strings pass `escapeHtml()` before `innerHTML`.
 - Global error handler: `window.addEventListener('error', …)` shows a dismissable banner.

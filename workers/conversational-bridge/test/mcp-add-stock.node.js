@@ -5,6 +5,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -22,7 +23,7 @@ function requestRaw(body) {
   return new Request(MCP_URL, { method: 'POST', headers: { Host: 'localhost', Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' }, body });
 }
 function rpc(id, method, params = {}) { return { jsonrpc: '2.0', id, method, params }; }
-function toolCall(id, name, args = {}) { return rpc(id, 'tools/call', { name, arguments: args }); }
+function toolCall(id, name, args = {}) { return rpc(id, 'tools/call', { name, arguments: withRequestId(name, args) }); }
 
 async function responseMessage(response) {
   const raw = await response.text();
@@ -61,7 +62,7 @@ function countingDeps(doc) {
       nowSeconds: NOW,
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
-      patchUserDocument: async () => { calls.write += 1; throw new Error('write reached'); },
+      getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write reached'); },
       fetchImpl: async () => { calls.fetch += 1; throw new Error('fetch reached'); }
     }
   };
@@ -77,7 +78,7 @@ test('tools/list exposes exactly nine tools and add_stock strict schema, scope, 
   ]);
   const tool = tools.find((entry) => entry.name === 'add_stock');
   assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
   assert.equal(tool.inputSchema.properties.quantity.type, 'number');
   assert.equal(tool.inputSchema.properties.expectedRevision.type, 'integer');
   assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);

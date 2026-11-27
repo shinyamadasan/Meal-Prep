@@ -5,6 +5,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const MCP_URL = 'https://localhost/mcp';
 const NOW = 1_800_000_000;
@@ -41,7 +42,7 @@ async function responseMessage(response) {
 }
 
 function rpc(id, method, params = {}) { return { jsonrpc: '2.0', id, method, params }; }
-function toolCall(id, args) { return rpc(id, 'tools/call', { name: NAME, arguments: args }); }
+function toolCall(id, args) { return rpc(id, 'tools/call', { name: NAME, arguments: withRequestId(NAME, args) }); }
 const VALID = { ingredientId: 'chicken', quantity: 300, expectedUnit: 'g', expectedRevision: 4 };
 
 function bridge(initialFields = {}) {
@@ -68,7 +69,7 @@ function countingDeps(doc) {
     nowSeconds: NOW,
     getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
     getUserDocument: async () => { calls.read += 1; return doc; },
-    patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
+    getRequestRecord: async () => null, commitRequestWrite: async () => { calls.write += 1; throw new Error('write path reached'); },
     fetchImpl: async () => { calls.fetch += 1; throw new Error('external fetch reached'); }
   };
   return { calls, deps };
@@ -90,7 +91,7 @@ test('tools/list exposes exactly nine tools and strict consume_stock input, outp
   ]);
   const tool = tools.find((entry) => entry.name === NAME);
   assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity']);
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
   assert.equal(tool.inputSchema.properties.ingredientId.type, 'string');
   assert.equal(tool.inputSchema.properties.ingredientId.minLength, 1);
   assert.equal(tool.inputSchema.properties.quantity.type, 'number');
@@ -328,7 +329,7 @@ test('duplicate-name selection follows stable id and persistence errors are sani
   const source = { revision: 4, updateTime: 't', pantry: [first], cookedMeals: [], deletions: {} };
   const before = JSON.stringify(source);
   const deps = { nowSeconds: NOW, getFirestoreAccessToken: async () => 'token', getUserDocument: async () => source,
-    patchUserDocument: async () => { throw new Error('secret-firestore-detail'); } };
+    getRequestRecord: async () => null, commitRequestWrite: async () => { throw new Error('secret-firestore-detail'); } };
   const failed = await responseMessage(await routeRequest(request(toolCall(8, VALID)), testEnv(), deps, AUTH_CONTEXT()));
   assert.equal(failed.result.isError, true);
   assert.doesNotMatch(JSON.stringify(failed), /secret-firestore-detail/);

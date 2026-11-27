@@ -10,6 +10,7 @@ import { NotFoundError, ValidationError, InsufficientServingsError } from '../sr
 import { MCP_ISSUER, MCP_RESOURCE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import { testEnv, request } from './support/fixtures.js';
 import { createFakeFirestore } from './support/fakeFirestore.js';
+import { withRequestId } from './support/requestIds.js';
 
 const NOW = 1_800_000_000;
 const FACT_KEYS = ['consumedAt', 'cookedMealId', 'id', 'mealName', 'portionsConsumed', 'recipeId'];
@@ -140,7 +141,7 @@ function mcpRequest(args) {
   return new Request('https://localhost/mcp', {
     method: 'POST',
     headers: { Host: 'localhost', Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json', Authorization: 'Bearer oauth-test-token' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'consume_ready_food', arguments: args } })
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'consume_ready_food', arguments: withRequestId('consume_ready_food', args) } })
   });
 }
 async function mcpMessage(response) {
@@ -155,18 +156,38 @@ const mcpContext = () => ({
   props: { ownerSubject: 'test-owner-subject', issuer: MCP_ISSUER, resource: MCP_RESOURCE, notBefore: NOW - 1 }
 });
 
-// Wraps the fake so every document GET mask and PATCH (mask, precondition) is observable, with an
-// optional hook to hold/force-fail PATCHes.
+// TASK-093: REST still writes with a PATCH; MCP writes with ONE documents:commit whose user-document
+// write carries the same mask and updateTime precondition (plus a create-only request record).
+// userWriteOf() reads either shape, so both surfaces are held to the same single-guarded-write rule.
+const USER_DOC_PATH = /\/documents\/users\/[^/]+$/;
+function isUserDocUrl(u) { return USER_DOC_PATH.test(u.pathname); }
+function userWriteOf(u, init, method) {
+  if (isUserDocUrl(u) && method === 'PATCH') {
+    return { mask: u.searchParams.getAll('updateMask.fieldPaths'), precondition: u.searchParams.get('currentDocument.updateTime') };
+  }
+  if (u.pathname.endsWith('/documents:commit') && method === 'POST') {
+    const writes = JSON.parse(init.body).writes;
+    const user = writes.find((w) => USER_DOC_PATH.test(w.update.name));
+    const record = writes.find((w) => /\/mcpRequests\//.test(w.update.name));
+    assert.equal(writes.length, 2, 'one user write + one request record');
+    assert.deepEqual(record.currentDocument, { exists: false }, 'request record is create-only');
+    return { mask: user.updateMask.fieldPaths, precondition: user.currentDocument.updateTime };
+  }
+  return null;
+}
+
+// Wraps the fake so every document GET mask and write (mask, precondition) is observable, with an
+// optional hook to hold/force-fail writes.
 function instrumented(fields, { patchHook } = {}) {
   const fake = createFakeFirestore({ fields });
   const seen = { getMasks: [], patches: [], ok: 0 };
   const fetchImpl = async (url, init = {}) => {
     const u = new URL(url);
-    const isDoc = u.pathname.includes('/documents/users/');
     const method = (init.method || 'GET').toUpperCase();
-    if (isDoc && method === 'GET') seen.getMasks.push(u.searchParams.getAll('mask.fieldPaths'));
-    if (isDoc && method === 'PATCH') {
-      seen.patches.push({ mask: u.searchParams.getAll('updateMask.fieldPaths'), precondition: u.searchParams.get('currentDocument.updateTime') });
+    if (isUserDocUrl(u) && method === 'GET') seen.getMasks.push(u.searchParams.getAll('mask.fieldPaths'));
+    const write = userWriteOf(u, init, method);
+    if (write) {
+      seen.patches.push(write);
       if (patchHook) { const forced = await patchHook(); if (forced) return forced; }
       const response = await fake.fetch(url, init);
       if (response.ok) seen.ok += 1;
@@ -305,15 +326,15 @@ function racing(fields) {
   let release;
   const barrier = new Promise((resolve) => { release = resolve; });
   const fetchImpl = async (url, init = {}) => {
-    const isDoc = new URL(url).pathname.includes('/documents/users/');
+    const u = new URL(url);
     const method = (init.method || 'GET').toUpperCase();
-    if (isDoc && method === 'GET') {
+    if (isUserDocUrl(u) && method === 'GET') {
       stats.gets += 1;
       const r = await fake.fetch(url, init);
       if (stats.gets === 2) release();
       return r;
     }
-    if (isDoc && method === 'PATCH') {
+    if (userWriteOf(u, init, method)) {
       stats.patches += 1;
       await barrier;
       const r = await fake.fetch(url, init);
