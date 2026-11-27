@@ -221,8 +221,9 @@ function same(a, b) {
 function sameAdded(live, written) {
   if (written == null || typeof written !== 'object' || written.updatedAt != null) return same(live, written);
   if (!isPlainObject(live)) return false;
-  const { updatedAt: _ignored, ...rest } = live;
-  return same(rest, written);
+  const { updatedAt: _live, ...liveRest } = live;
+  const { updatedAt: _written, ...writtenRest } = written;
+  return same(liveRest, writtenRest);
 }
 
 function snapshotShapeOk(snapshot) {
