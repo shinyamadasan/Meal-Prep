@@ -127,7 +127,7 @@ test('the deployed build serves the low-effort wave code', async ({ page }) => {
   expect(present.fns).toEqual([]); // every new function is live
   expect(present.equipmentVocab).toEqual([
     'rice-cooker', 'rice-cooker-steamer', 'instant-pot', 'pressure-cooker',
-    'oven', 'pan', 'egg-boiler', 'microwave', 'no-cook'
+    'oven', 'air-fryer', 'pan', 'egg-boiler', 'microwave', 'no-cook'
   ]);
   expect(present.effortVocab).toEqual(['assembly', 'very-low', 'low', 'normal']);
   expect(present.tagVocab).toEqual([

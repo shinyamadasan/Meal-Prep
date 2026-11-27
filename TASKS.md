@@ -6971,7 +6971,7 @@ verification: as TASK-092, plus `npm run test:ledger-contract`.
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-096 · Refresh four outdated production smoke specs (post FFS-V1)
-status: codex
+status: review
 owner: Codex (build) · independent review · Claude (verdict)
 risk: Low
 source: BQ-033; ROADMAP Known Issues "Stale production smoke specs (post FFS-V1)"

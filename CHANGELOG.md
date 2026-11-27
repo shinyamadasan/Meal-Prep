@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-096 — refresh four outdated production smoke specs (branch: task-096-prod-smoke-refresh; base: 48c8ec2)
+changed: `tests/production-smoke-kitchen-truth.spec.js` (3 tests), `tests/production-smoke-low-effort.spec.js` (1 test); `planning/ROADMAP.md` Known Issues entry "Stale production smoke specs (post FFS-V1)" removed; TASKS.md status. No app, HTML, CSS or Worker change.
+- `live: Home shows Needs Attention…`: Expired fixtures are now a printed use-by (`dateMode: 'expiry'`, past `expiryDate`) and a past-limit fridge-safety lot (raw chicken bought 4 days ago, D-089); "Old Broccoli" (estimate) is asserted under Check with Still good / Toss; Keep / Remove asserted on both Expired rows; `Remove expired (1)` proves only the printed record is bulk-eligible; tap-target height kept.
+- `live: bulk cleanup crosses MASS_DELETE_GUARD…`: the six bulk records now carry a past printed use-by (still 6 pantry + 1 cooked = 7 > guard). Added an estimated Check item and a safety lot; asserts the exact Expired id set (8), bulk-eligible 7, `Remove expired (7)`, 7 named rows in the confirm list, exactly 7 tombstones, and that use-soon, Check, safety and fresh records survive in memory and localStorage.
+- `live: Keep invents no date…`: the kept record is a past printed use-by, asserted Expired and bulk-eligible before Keep; Keep leaves `expiryDate`/`dateMode` untouched and adds no `purchaseDate`; same-day suppression and next-day lapse (attention, bulk, banner = 1) unchanged.
+- `the deployed build serves the low-effort wave code`: equipment vocabulary includes `air-fryer` after `oven`, matching `RECIPE_EQUIPMENT`.
+
 ## TASK-038 — release preparation; owner integration approval pending (2026-11-01)
 reviewed application candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527` (base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`; REVIEW_ONLY, **not integrated**).
 changes in candidate: `app.js` updates `loadWeekTemplate()` to fill only empty meals/snacks, preserve already-planned slots, skip deleted recipe IDs, handle incomplete saved templates, update weekly statistics/grocery list, and report filled count or no-op; new `tests/week-template-fill.spec.js` adds nine local regression cases. Only these two application files changed.
