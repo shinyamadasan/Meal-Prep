@@ -7,6 +7,7 @@ import { routeRequest } from '../src/index.js';
 import { MCP_ISSUER, MCP_RESOURCE, MCP_SCOPE, MCP_WRITE_SCOPE } from '../src/mcpAuth.js';
 import * as inventory from '../src/operations/inventory.js';
 import { testEnv } from './support/fixtures.js';
+import { householdDayFromEnv } from '../src/householdDay.js';
 import { createFakeFirestore, simulateAppWrite } from './support/fakeFirestore.js';
 
 const NOW = 1_800_000_000;
@@ -26,11 +27,13 @@ const SALT = { id: 'salt', name: 'Custom Salt', category: 'Condiment', storage: 
 const PAPRIKA = { id: 'paprika', name: 'Custom Paprika', category: 'Spice', quantity: 2, storage: 'counter', updatedAt: STAMP };
 const SOY = { id: 'soy', name: 'Custom Soy Sauce', category: 'Condiment', unit: 'ml', storage: 'counter', updatedAt: STAMP };
 const CHICKEN = { id: 'chicken', name: 'Chicken Thigh', category: 'Protein', staple: false, updatedAt: STAMP };
+// A presence-only item the user once said is not a staple (stored staple:false), safe to convert.
+const VINEGAR = { id: 'vinegar', name: 'Custom Cane Vinegar', category: 'Condiment', staple: false, storage: 'counter', updatedAt: STAMP };
 
 function seed() {
   return {
     version: 3,
-    pantry: [RICE, GARLIC, OIL, EGGS, SALT, PAPRIKA, SOY, CHICKEN].map((r) => structuredClone(r)),
+    pantry: [RICE, GARLIC, OIL, EGGS, SALT, PAPRIKA, SOY, CHICKEN, VINEGAR].map((r) => structuredClone(r)),
     cookedMeals: [],
     mealConsumptions: [],
     deletions: { pantry: {}, cookedMeals: {} }
@@ -291,9 +294,13 @@ test('makeStaple on presence items with a stray quantity or unit keeps those fie
   ok(await b.level({ ingredientId: 'soy', level: 'ok', makeStaple: true }));
   assert.deepEqual(withoutUpdatedAt(find(b, 'soy')), Object.assign(withoutUpdatedAt(SOY), { staple: true, stockLevel: 'ok' }));
   // Stored staple:false is the user's earlier answer; makeStaple is their new, explicit one.
-  ok(await b.level({ ingredientId: 'chicken', level: 'full', makeStaple: true }));
+  ok(await b.level({ ingredientId: 'vinegar', level: 'full', makeStaple: true }));
+  assert.deepEqual(withoutUpdatedAt(find(b, 'vinegar')), Object.assign(withoutUpdatedAt(VINEGAR), { staple: true, stockLevel: 'full' }));
+  // Raw protein with no bought date is not usable, so it is refused (review MF-1) and nothing is
+  // added to it: no storage, no date.
+  await assertRefused(b, b.level({ ingredientId: 'chicken', level: 'full', makeStaple: true }), /^unsafe_conversion: /);
   const chicken = find(b, 'chicken');
-  assert.deepEqual(withoutUpdatedAt(chicken), Object.assign(withoutUpdatedAt(CHICKEN), { staple: true, stockLevel: 'full' }));
+  assert.deepEqual(chicken, CHICKEN);
   for (const key of ['storage', 'purchaseDate', 'expiryDate', 'dateMode', 'shelfLifeDays']) assert.equal(chicken[key], undefined, key);
 });
 
@@ -421,9 +428,9 @@ test('undo makeStaple removes the staple flag and level again (the item is prese
   const b = bridge();
   ok(await b.level({ requestId: 'undo-salt-make', ingredientId: 'salt', level: 'full', makeStaple: true }));
   await assertUndoRestores(b, 'undo-salt-make', SALT, 'set_stock_level');
-  ok(await b.level({ requestId: 'undo-chkn-make', ingredientId: 'chicken', level: 'ok', makeStaple: true }));
-  await assertUndoRestores(b, 'undo-chkn-make', CHICKEN, 'set_stock_level');
-  assert.equal(find(b, 'chicken').staple, false, 'the stored false flag comes back');
+  ok(await b.level({ requestId: 'undo-vngr-make', ingredientId: 'vinegar', level: 'ok', makeStaple: true }));
+  await assertUndoRestores(b, 'undo-vngr-make', VINEGAR, 'set_stock_level');
+  assert.equal(find(b, 'vinegar').staple, false, 'the stored false flag comes back');
   const read = ok(await b.call('get_inventory', {}));
   assert.equal(read.items.find((i) => i.ingredientId === 'salt').tracking, 'presence');
 });
@@ -457,4 +464,141 @@ test('a second undo of the same set_stock_level is already_undone', async () => 
   ok(await b.level({ requestId: 'twice-rice-01', ingredientId: 'rice', level: 'ok' }));
   ok(await b.undo('twice-rice-01'));
   await assertRefused(b, b.undo('twice-rice-01'), /^already_undone: /);
+});
+
+// ── Review fixes (STRICT review of 1a781aa) ───────────────────────────────────────────────────
+
+function bridgeWith(...records) {
+  const fields = seed();
+  fields.pantry.push(...records.map((r) => structuredClone(r)));
+  return bridge(fields);
+}
+
+async function safetyOf(b, id) {
+  const read = ok(await b.call('get_inventory', {}));
+  return read.items.find((i) => i.ingredientId === id).safety;
+}
+
+const LEFTOVER = { id: 'lo', name: 'Leftover adobo', category: 'Other', storage: 'fridge', updatedAt: STAMP };
+
+test('MF-1: makeStaple never turns an unsafe fridge leftover into a usable item (no bought date, past the fridge limit)', async () => {
+  // The household day the tool uses (pantrySafety, same as get_inventory).
+  assert.equal(householdDayFromEnv(testEnv(), () => CLOCK_MS), '2026-11-27');
+  for (const record of [LEFTOVER, Object.assign({}, LEFTOVER, { purchaseDate: '2026-11-01' })]) {
+    const b = bridgeWith(record);
+    const before = await safetyOf(b, 'lo');
+    assert.equal(before.status, 'expired');
+    assert.equal(before.usable, false);
+    assert.equal(before.reason, record.purchaseDate ? 'past-safety-limit' : 'no-bought-date');
+    const requestId = rid('unsafe');
+    const message = await assertRefused(b, b.level({ requestId, ingredientId: 'lo', level: 'full', makeStaple: true }), /^unsafe_conversion: /);
+    assert.match(message, /Keep the item as it is/);
+    assert.match(message, /check it in the app/);
+    assert.equal(b.fake.requestRecord(requestId), undefined, 'requestId not spent');
+    assert.deepEqual(find(b, 'lo'), record);
+    assert.deepEqual(await safetyOf(b, 'lo'), before);
+    // The unspent requestId still works for a different, allowed change.
+    ok(await b.level({ requestId, ingredientId: 'rice', level: 'low' }));
+  }
+});
+
+test('MF-1: a raw Protein lot that is not usable (no bought date, past its limit) is refused and keeps its record', async () => {
+  const past = { id: 'beef', name: 'Ground Beef', category: 'Protein', storage: 'fridge', purchaseDate: '2026-11-20', updatedAt: STAMP };
+  const b = bridgeWith(past);
+  assert.equal((await safetyOf(b, 'beef')).usable, false);
+  await assertRefused(b, b.level({ ingredientId: 'beef', level: 'ok', makeStaple: true }), /^unsafe_conversion: .*not usable now/);
+  await assertRefused(b, b.level({ ingredientId: 'chicken', level: 'ok', makeStaple: true }), /^unsafe_conversion: .*No bought date/);
+  assert.deepEqual(find(b, 'beef'), past);
+  assert.deepEqual(find(b, 'chicken'), CHICKEN);
+});
+
+test('MF-1 operation level: an ok item converts with an identical verdict; an unsafe one throws; the household day is required', () => {
+  const r = inventory.setStockLevel([SALT], { ingredientId: 'salt', level: 'full', makeStaple: true }, '2026-11-27');
+  assert.equal(r.converted, true);
+  assert.deepEqual(inventory.pantrySafety(r.pantry[0], '2026-11-27'), inventory.pantrySafety(SALT, '2026-11-27'));
+  assert.throws(() => inventory.setStockLevel([LEFTOVER], { ingredientId: 'lo', level: 'full', makeStaple: true }, '2026-11-27'),
+    (error) => error.code === 'validation_failed' && /^unsafe_conversion:/.test(error.message));
+  assert.throws(() => inventory.setStockLevel([SALT], { ingredientId: 'salt', level: 'full', makeStaple: true }), /household day/);
+});
+
+test('MF-1: an ok presence item still converts and reads the same safety verdict', async () => {
+  const b = bridge();
+  const before = await safetyOf(b, 'salt');
+  assert.equal(before.usable, true);
+  const result = ok(await b.level({ ingredientId: 'salt', level: 'full', makeStaple: true }));
+  assert.equal(result.converted, true);
+  assert.deepEqual(await safetyOf(b, 'salt'), before);
+});
+
+test('MF-2: full/ok clear suggestDismissed like the app; low/empty keep it; undo restores it exactly', async () => {
+  const dismissed = Object.assign({}, RICE, { id: 'rice2', stockLevel: 'low', suggestDismissed: true });
+  const b = bridgeWith(dismissed);
+  const requestId = rid('dismiss');
+  ok(await b.level({ requestId, ingredientId: 'rice2', level: 'full' }));
+  assert.equal('suggestDismissed' in find(b, 'rice2'), false, 'full clears the dismissal');
+  await assertUndoRestores(b, requestId, dismissed, 'set_stock_level');
+  assert.equal(find(b, 'rice2').suggestDismissed, true, 'undo restores the dismissal');
+  ok(await b.level({ ingredientId: 'rice2', level: 'empty' }));
+  assert.equal(find(b, 'rice2').suggestDismissed, true, 'empty keeps the dismissal');
+  ok(await b.level({ ingredientId: 'rice2', level: 'ok' }));
+  assert.equal('suggestDismissed' in find(b, 'rice2'), false, 'ok clears the dismissal');
+});
+
+test('should-fix 2: a non-staple presence item left at stockLevel empty drops it when the user gives an amount; undo restores it', async () => {
+  const stray = { id: 'ketchup', name: 'Custom Ketchup', category: 'Condiment', staple: false, stockLevel: 'empty', storage: 'counter', updatedAt: STAMP };
+  const b = bridgeWith(stray);
+  const before = await safetyOf(b, 'ketchup');
+  assert.equal(before.reason, 'out-of-stock');
+  assert.equal(before.usable, false);
+  const requestId = rid('stray');
+  ok(await b.setQty({ requestId, ingredientId: 'ketchup', quantity: 500, unit: 'ml', expectedUnit: 'ml' }));
+  const live = find(b, 'ketchup');
+  assert.equal('stockLevel' in live, false);
+  assert.equal(live.quantity, 500);
+  assert.equal((await safetyOf(b, 'ketchup')).usable, true);
+  await assertUndoRestores(b, requestId, stray, 'set_inventory_quantity');
+  assert.equal(find(b, 'ketchup').stockLevel, 'empty');
+});
+
+test('should-fix 2: when the lot would still not be available, recording the amount is refused (stale_stock_level)', async () => {
+  const stray = { id: 'lo2', name: 'Leftover adobo', category: 'Other', staple: false, stockLevel: 'empty', storage: 'fridge', updatedAt: STAMP };
+  const b = bridgeWith(stray);
+  const requestId = rid('stale');
+  const message = await assertRefused(b, b.setQty({ requestId, ingredientId: 'lo2', quantity: 1, unit: 'pcs', expectedUnit: 'pcs' }), /^stale_stock_level: /);
+  assert.match(message, /check the item in the app/);
+  assert.equal(b.fake.requestRecord(requestId), undefined);
+});
+
+test('should-fix 3: makeStaple drops a stray zero quantity (no "full with zero quantity"); undo restores it', async () => {
+  const zero = { id: 'pepper', name: 'Custom Pepper Blend', category: 'Spice', quantity: 0, storage: 'counter', updatedAt: STAMP };
+  const b = bridgeWith(zero);
+  const requestId = rid('zero');
+  ok(await b.level({ requestId, ingredientId: 'pepper', level: 'full', makeStaple: true }));
+  const live = find(b, 'pepper');
+  assert.equal('quantity' in live, false);
+  assert.equal(live.staple, true);
+  assert.equal(live.stockLevel, 'full');
+  assert.equal((await safetyOf(b, 'pepper')).usable, true);
+  await assertUndoRestores(b, requestId, zero, 'set_stock_level');
+  assert.equal(find(b, 'pepper').quantity, 0);
+});
+
+test('should-fix 4: tracking text tells chat availability comes from inStock / safety.usable', async () => {
+  const tool = (await tools()).find((t) => t.name === 'get_inventory');
+  assert.match(tool.description, /inStock and safety\.usable/);
+  assert.doesNotMatch(tool.description, /being listed means it is in stock/);
+});
+
+test('MF-1: a usable fridge leftover is refused when the staple verdict would differ (status, or a longer daysLeft)', async () => {
+  // 2026-11-25: use-soon 2d left -> ok 5d left (status differs). 2026-11-27: 4d left -> 7d left
+  // (same status, but the 4-day fridge limit would stop applying).
+  for (const purchaseDate of ['2026-11-25', '2026-11-27']) {
+    const record = Object.assign({}, LEFTOVER, { purchaseDate });
+    const b = bridgeWith(record);
+    const before = await safetyOf(b, 'lo');
+    assert.equal(before.usable, true);
+    const message = await assertRefused(b, b.level({ ingredientId: 'lo', level: 'ok', makeStaple: true }), /^unsafe_conversion: .*would change its safety check/);
+    assert.match(message, /Keep the item as it is/);
+    assert.deepEqual(await safetyOf(b, 'lo'), before);
+  }
 });

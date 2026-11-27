@@ -323,9 +323,10 @@ const TRACKING_TEXT = 'Every pantry item carries tracking, decided by the app\'s
   'and consume_stock also accept a staple that has a recorded quantity, within their unit rules; consume_stock ' +
   'only when the whole recorded amount is used); "quantity" = a non-staple with a recorded quantity and unit, ' +
   'changed with set_inventory_quantity, consume_stock and add_stock within their unit rules (a negative stored ' +
-  'quantity can only be corrected with set_inventory_quantity); "presence" = a non-staple recorded without an amount: being listed ' +
-  'means it is in stock and the quantity tools refuse it, so never invent an amount; ask the user how much they ' +
-  'have. Only on the user\'s explicit words, one item per call, a presence item becomes a staple (set_stock_level ' +
+  'quantity can only be corrected with set_inventory_quantity); "presence" = a non-staple recorded without an amount: ' +
+  'the quantity tools refuse it, so never invent an amount; ask the user how much they have. tracking never says ' +
+  'whether an item is available: for that use inStock and safety.usable (a presence item can be out of stock or ' +
+  'unsafe). Only on the user\'s explicit words, one item per call, a presence item becomes a staple (set_stock_level ' +
   'with makeStaple: true, "salt is a staple") or a counted item (set_inventory_quantity with unit, "we have 200 g ' +
   'of paprika"); never convert one on your own initiative. tracking null means the record could not be read (safety reason invalid-record): do not change it ' +
   'from chat.';
@@ -748,15 +749,20 @@ async function requestWriteTool(env, deps, ctx, tool, args, plan) {
 
 // set_inventory_quantity: the canonical wrapper decides; one guarded pantry write.
 async function setInventoryQuantityTool(env, deps, ctx, args) {
+  let today;
   return requestWriteTool(env, deps, ctx, 'set_inventory_quantity', args, {
     fallback: 'The inventory quantity could not be set.',
+    // Only the presence-item path (unit given) reads the household day (review should-fix 2).
+    precheck: (input) => {
+      if (input.unit !== undefined) today = householdDayFromEnv(env, deps.now);
+    },
     apply: (doc) => {
       const r = inventory.setCountedQuantity(doc.pantry, {
         ingredientId: args.ingredientId,
         quantity: args.quantity,
         expectedUnit: args.expectedUnit,
         unit: args.unit
-      });
+      }, today);
       return {
         write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
         result: (revision) => ({ ok: true, revision, item: r.item })
@@ -766,15 +772,21 @@ async function setInventoryQuantityTool(env, deps, ctx, args) {
 }
 
 // set_stock_level (TASK-098): one guarded pantry write, or a record-only commit for the same level.
+// The household day is fixed once per call, before any Firestore access; makeStaple's safety gate
+// (review MF-1) uses the same pantrySafety() verdict get_inventory gives for that day.
 async function setStockLevelTool(env, deps, ctx, args) {
+  let today;
   return requestWriteTool(env, deps, ctx, 'set_stock_level', args, {
     fallback: 'The stock level could not be set.',
+    precheck: () => {
+      today = householdDayFromEnv(env, deps.now);
+    },
     apply: (doc) => {
       const r = inventory.setStockLevel(doc.pantry, {
         ingredientId: args.ingredientId,
         level: args.level,
         makeStaple: args.makeStaple
-      });
+      }, today);
       return {
         write: r.unchanged ? null : { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
         result: (revision) => ({

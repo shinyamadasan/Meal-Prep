@@ -557,8 +557,9 @@ The bridge now uses the app's own rule from the shared core.
   `set_stock_level` (TASK-098) or `mark_in_stock` / `mark_out_of_stock`; `add_stock` / `consume_stock` also accept a staple with a
   recorded quantity, in its exact unit). `quantity` = a non-staple with a finite `quantity` (any
   sign; the app treats <= 0 as not available) and a non-blank `unit` (the quantity tools apply). `presence` = a non-staple without a
-  usable quantity or unit: being listed means in stock, and no amount is known. `null` only for an
-  invalid record. Write-result items keep their existing shape (no `tracking`).
+  usable quantity or unit: no amount is known. `tracking` never says whether an item is available:
+  use `inStock` and `safety.usable` (a presence item can read out of stock or unsafe; TASK-098
+  review). `null` only for an invalid record. Write-result items keep their existing shape (no `tracking`).
 - **Quantity tools refuse presence lots.** `set_inventory_quantity`, `consume_stock` and `add_stock`
   return a `presence_only` validation error telling chat to ask the user for the amount (never
   invent one): zero writes, no request record, so the `requestId` is not spent.
@@ -582,16 +583,31 @@ converts one on its own.
 
 - **`set_stock_level({ ingredientId, level, requestId, expectedRevision, makeStaple? })`.** `level` is
   `full` / `ok` / `low` / `empty`, for items with `tracking: 'level'`. It writes only `stockLevel`
-  (and `updatedAt`). `empty` keeps the record (staples are never removed, no tombstone). The same
+  (and `updatedAt`), and clears `suggestDismissed` when the new level is `full` or `ok`, as the app
+  does (`syncStapleToGrocery`, `cycleStapleLevel`, `setBrowserItemLevel`, the restock path; review
+  MF-2). `empty` keeps the record (staples are never removed, no tombstone). The same
   level is a no-op: `unchanged: true`, the user document is untouched, and a record-only commit spends
   the `requestId` (TASK-093). The result states back `item`, `previousLevel` (null when there was
   none) and `level`, plus `converted` and `unchanged`. Annotations: destructive, idempotent (same
   arguments, same revision = no further effect). `low` / `empty` reach Shop through the app's own
-  staple sync (TASK-090) the next time the app loads; the bridge does not write the grocery list or
-  `suggestDismissed`.
+  staple sync (`checkAndReplenishLowStock`, TASK-090), which runs when the Shop tab opens or after an
+  in-app edit, cooking or a grocery check — not on app load. The bridge never writes the grocery
+  list; `low` / `empty` keep `suggestDismissed` as stored.
 - **`makeStaple: true`** (true or absent; `false` fails the schema) on a `tracking: 'presence'` item
-  sets `staple: true` and `stockLevel: level`. Every other stored field is kept: a stray quantity or
-  unit stays, and no storage or date is ever added (raw meat, poultry and fish included, D3). A
+  sets `staple: true` and `stockLevel: level`. Every other stored field is kept: a stray unit or a
+  stray positive quantity stays, and no storage or date is ever added (raw meat, poultry and fish
+  included, D3). A stray numeric `quantity` <= 0 is removed, so the app's stock health does not read
+  "full with zero quantity" (undo restores it; review should-fix 3).
+- **Safety gate on `makeStaple` (review MF-1).** The shared `stockFoodClass()` reads a staple as
+  `pantry-staple`, which switches off `pantryFridgeSafety()`. So a conversion is allowed only when the
+  item's `pantrySafety()` verdict for the household day (the same one `get_inventory` returns) is
+  usable before the conversion AND the converted record gets the same `status`, `reason`, `usable`
+  and `daysLeft`. Otherwise it is refused as `unsafe_conversion:` (zero writes, `requestId` not
+  spent): chat keeps the item as it is and asks the user to check it in the app. Examples: a fridge
+  leftover with no bought date or past its fridge limit, raw protein with no bought date, and an
+  in-date leftover whose 4-day fridge limit would stop applying. The "before" verdict is read
+  without the fields the conversion replaces (`stockLevel`, a stray count <= 0); they only say "out
+  of stock", which the user has just corrected, and never change a date or safety rule. A
   stored `staple: false` is overwritten, because the user has just said otherwise. On an item that is
   already a staple it is accepted and changes only the level (`converted: false`).
 - **Refusals (zero writes, no request record, `requestId` not spent).** A presence item without
@@ -606,13 +622,18 @@ converts one on its own.
   already has a stored unit, that unit (never a relabel, `unit_mismatch:`). It records quantity and
   unit; the item then reads `tracking: 'quantity'` and follows the ordinary `expectedUnit` rule.
   `unit` on a counted item → `unit_not_allowed:`; on a staple → the staple refusal ("no unit can be
-  recorded"). A presence item without `unit` is still `presence_only:`.
+  recorded"). A presence item without `unit` is still `presence_only:`. A non-staple presence item
+  left at `stockLevel: 'empty'` would still read "Out of stock" with a quantity, so the stray level is
+  removed, but only when the shared `pantryLotAvailable()` then reads the lot as available for the
+  household day; otherwise the call is refused as `stale_stock_level:` (zero writes; review
+  should-fix 2). Other stray levels change no read and are kept.
 - **`mark_in_stock` / `mark_out_of_stock` are unchanged** (compatible aliases for `full` and, for a
   staple, `empty`).
 - **Undo.** Both tools write through `requestWriteTool()`, so the request record carries `before` /
   `after` and `undo_request` (TASK-095) restores the exact prior record with no code change: the
   previous level, or, for a conversion, the record without `staple` / `stockLevel` (a stored
-  `staple: false` comes back), or without the new quantity and unit. `updatedAt` is restamped (D-090
+  `staple: false` comes back), or without the new quantity and unit (and with a removed stray
+  `stockLevel`, `quantity` <= 0 or `suggestDismissed` back). `updatedAt` is restamped (D-090
   addendum 2). A later change to the item makes the earlier undo `changed_since`.
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
