@@ -6778,7 +6778,7 @@ constraints:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-091 · PROP-041 P1-1 Shared food-safety core (app + Worker, identical verdicts)
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (moves the app's food-safety rules; red zone because the Worker will rely on them)
 source: BQ-032 / PROP-041 P1-1

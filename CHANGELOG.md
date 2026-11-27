@@ -1524,3 +1524,90 @@ blockers: none.
 deviations: The single full local run passed 903/905. After fixing its two failures,
   all 83 tests in the affected suites passed, including both failures. Ledger passed 13/13.
 → status set to `review` in TASKS.md
+
+## TASK-091 — implementation complete (branch: task-091-shared-food-safety)
+changed:
+  - `shared/foodSafety.js` (new classic script, frozen `globalThis.MealPrepFoodSafety`, the
+    `shared/readyFoodContract.js` pattern, `'use strict'` so classic and ESM loads behave the
+    same). Moved unchanged: `INGREDIENT_DB` (byte-identical), `STOCK_CLASS_RULES`,
+    `FRIDGE_SAFETY_LIMITS`, `COOKED_FRIDGE_LIMIT`, `FRIDGE_SAFETY_EXCLUSIONS`,
+    `FRESHNESS_WARN_DAYS`, `categoryShelfLife`, `stockIngredientEntry`, `stockFoodClass`,
+    `stockCalendarDay`, `isStaple`, `cookedShelfLife` (all byte-identical bodies). Moved with
+    `today` / `inferStorage` threaded through: `daysLeftFrom`, `pantryDaysLeft`,
+    `pantryFridgeSafety`, `pantryDateSignal`, `pantryLotAvailable`, `cookedDateSignal`.
+    No shared function reads the clock. `requireToday()` throws a `TypeError` for a missing or
+    malformed `today`. The optional `inferStorage(name, category)` hook defaults to
+    `defaultInferStorage()`, which returns INGREDIENT_DB's explicit storage for an exact name,
+    else null. With no storage, `pantryDateSignal()` returns `kind: 'unknown'` and
+    `safety: 'unknown-storage'`, so `pantryLotAvailable()` is false. Only the default (Worker)
+    path can reach this, because the app's `inferStorage()` always returns a location.
+  - `app.js`: each moved function is now a one-line wrapper with its old name and signature,
+    passing `todayISO()` and the app's own `inferStorage`. Each moved data name is bound with
+    `const|var X = MealPrepFoodSafety.X`, and `INGREDIENT_DB` stays at its original position
+    so the TDZ is unchanged. `inferStorage`, `ingredientShelfLife`, `inferCategory`,
+    `pantryExpiryInfo`, `THAWED_FOOD_DATE_HELP` and `STOCK_REVIEW_POLICY` stay in app.js
+    (app-only or copy). `pantryDateSignal()` resolves storage once and reuses it for the
+    counter check. The value is the same; the app hook is pure.
+  - `index.html`: `<script src="shared/foodSafety.js">` loads after readyFoodContract and before
+    app.js. `sw.js` `STATIC` adds `./shared/readyFoodContract.js` (it was missing) and
+    `./shared/foodSafety.js`. `CACHE` is not bumped, because sw.js changed bytes and reinstalls.
+  - `workers/conversational-bridge/src/operations/inventory.js`: side-effect import only, with a
+    comment. No Worker behaviour change.
+  - `docs/ARCHITECTURE.md` (new "Shared food-safety rules" subsection) and `docs/DATA_MODEL.md`
+    (where INGREDIENT_DB now lives).
+tests:
+  - `tests/fixtures/food-safety-parity.json`: 76 cases × 3 todays (2026-11-26, month/year-end
+    2026-12-31, leap day 2028-02-29). It covers every `FRIDGE_SAFETY_LIMITS` class, exclusions,
+    freezer, counter, printed use-by vs best-before, malformed dates, a missing bought date,
+    estimate windows, staples Low/Empty, cooked fridge/freezer, `keptOn` and the 3 default-path
+    no-storage cases. `expected` was GENERATED FROM THE UNMODIFIED app.js (browser clock fixed
+    per day) before any app change. `expectedDefault` covers only the 3 no-storage cases.
+    `tests/fixtures/food-safety-parity-eval.js` is the one evaluator both sides load.
+  - `tests/food-safety-parity.spec.js` (4 cases):
+    - the old app globals reproduce the pre-move verdicts;
+    - the shared module in the browser matches the fixture with app storage and with default
+      storage;
+    - app data bindings are the shared objects, and every wrapper is a one-line
+      `return MealPrepFoodSafety.<name>(…)`;
+    - the script order and the sw.js STATIC list are correct.
+  - `workers/conversational-bridge/test/food-safety-parity.node.js` (8 cases):
+    - the rules are absent until the Worker's `src/index.js` is imported, then present and
+      frozen;
+    - fixture coverage and the parity runs for all 3 todays;
+    - the unknown-storage verdict;
+    - `today` validation and the hook.
+  - Mutation check (reverted, file restored byte-for-byte): changing `FRESHNESS_WARN_DAYS`, the
+    cooked-leftover limit, or the staple rule fails both parity tests.
+blockers: none.
+deviations:
+  - The task scope named no file for the shared evaluator, so it was added as
+    `tests/fixtures/food-safety-parity-eval.js` to keep the browser and Node evaluation
+    identical.
+  - The app now binds `FRIDGE_SAFETY_LIMITS`, `COOKED_FRIDGE_LIMIT` and
+    `FRIDGE_SAFETY_EXCLUSIONS`, and keeps the `pantryFridgeSafety` wrapper, but no other app.js
+    code reads them. They are kept because the task requires every old name to keep working.
+  - Ready-food usability rule NOT extracted. It is an inline anonymous filter inside
+    `getReadyFoodSuggestions()`, not a named function. It reads portions through
+    `cookedMealTracksPortions()`/`portionCountOrNull()`/`PORTION_COUNT_MAX` (app-wide UI
+    helpers). Extracting it would rewrite that function rather than move it. Its freshness part
+    is `daysLeftFrom(cookedDate, cookedShelfLife(m)) < 0`, and both of those are now shared.
+  - No new `docs/DECISIONS.md` entry. D-090 covers the move. Claude may want to record the
+    default-path `unknown-storage` verdict and the throw-on-bad-`today` rule there.
+findings (recorded, NOT changed — behaviour identical):
+  - F1: `daysLeftFrom()` accepts calendar-impossible dates, because V8 rolls `2026-02-30`
+    over to 2026-03-02 (fixture `days-left-impossible-start`). `pantryDateSignal()` nulls this
+    only for printed dates. A malformed bought date on a non-fridge-safety lot, or a malformed
+    `cookedDate`, still yields a rolled-over countdown.
+  - F2: a staple with a printed use-by in the past gets `kind: 'expired'` but stays
+    `pantryLotAvailable() === true`, because `isStaple()` returns before the expired check
+    (fixture `staple-printed-past`, Cooking Oil). This is relevant to TASK-092's
+    `usable` field.
+  - F3: when the category estimate is shorter than the food-specific fridge limit, the signal
+    shows the estimate. Examples: Bacon or Hotdog bought 6/5 days ago show `check`, "3/2 days
+    past", while the 7-day safety limit still has 1–2 days left. Leftover Adobo shows
+    `daysLeft 0` with 1 safety day left. This is conservative, but the label and the safety
+    clock disagree.
+  - F4: the shared `pantryFridgeSafety()` returns null (no fridge limit) when storage is
+    unknown on the default path. Callers must use `pantryDateSignal()`/`pantryLotAvailable()`,
+    which return unknown/unusable for that lot, and not `pantryFridgeSafety()` alone.
+→ status set to `review` in TASKS.md

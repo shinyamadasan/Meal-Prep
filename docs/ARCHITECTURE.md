@@ -341,6 +341,27 @@ shared/readyFoodContract.js: index.html loads it as a classic script and the Wor
 record_ready_food. This keeps the app's existing leftovers/takeout values and freshness defaults
 canonical without adding a build step.
 
+### Shared food-safety rules (`shared/foodSafety.js`, TASK-091, D-090)
+The pure "safe to eat" rules live in one classic script exposed as the frozen
+`globalThis.MealPrepFoodSafety`: the data `INGREDIENT_DB`, `STOCK_CLASS_RULES`,
+`FRIDGE_SAFETY_LIMITS`, `COOKED_FRIDGE_LIMIT`, `FRIDGE_SAFETY_EXCLUSIONS`, `FRESHNESS_WARN_DAYS`
+and the functions `categoryShelfLife`, `stockIngredientEntry`, `stockFoodClass`, `stockCalendarDay`,
+`daysLeftFrom`, `pantryDaysLeft`, `pantryFridgeSafety`, `pantryDateSignal`, `pantryLotAvailable`,
+`isStaple`, `cookedShelfLife`, `cookedDateSignal`. `index.html` loads it before `app.js` (and `sw.js`
+`STATIC` caches it); the Worker imports it by side effect from `src/operations/inventory.js`.
+No shared function reads the clock: each takes `today` (`YYYY-MM-DD`, household calendar day) and
+throws on a missing or malformed one. Storage comes from the lot, else an optional
+`inferStorage(name, category)` hook. `app.js` keeps every old global name as a one-line wrapper
+that passes `todayISO()` and the app's own `inferStorage()` (INGREDIENT_DB → PANTRY_KNOWLEDGE →
+category), which always answers, so app verdicts are unchanged. Without a hook (the Worker) the
+default is INGREDIENT_DB's explicit storage, else none, and no storage makes
+`pantryDateSignal()` return `kind: 'unknown'`, `safety: 'unknown-storage'` (never usable).
+`tests/fixtures/food-safety-parity.json` holds the pre-move verdicts; the browser spec
+(`tests/food-safety-parity.spec.js`) and the Worker test (`test/food-safety-parity.node.js`) must
+both reproduce them. The ready-food suggestion filter in `getReadyFoodSuggestions()` stays in
+`app.js` (an inline predicate over `AppState`); its freshness part is the shared
+`daysLeftFrom()` + `cookedShelfLife()`.
+
 ## Safety / cross-cutting
 - All user strings pass `escapeHtml()` before `innerHTML`.
 - Global error handler: `window.addEventListener('error', …)` shows a dismissable banner.
