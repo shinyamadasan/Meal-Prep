@@ -5,6 +5,10 @@
 
 ---
 
+## TASK-096 · 2026-11-26 · production smoke refresh
+suite: `npx playwright test tests/production-smoke-kitchen-truth.spec.js tests/production-smoke-low-effort.spec.js --project=prod` 17/17 PASS against https://shinyamadasan.github.io/Meal-Prep/ (signed-out fresh contexts; no sign-in, no account write); full `npm run test:prod` 155 passed, 4 skipped (pre-existing conditional skips), 0 failed; `npm test` (local) 905/905 PASS, `suite-classification` included; `git diff --check` clean.
+result: the four previously failing prod specs pass and assert shipped D-088/D-089/TASK-079 behaviour; no assertion weakened. TASK-096 set to `review`.
+
 ## TASK-038 — isolated candidate local validation (owner-relayed, 2026-11-01)
 candidate: `43aa739a17dd9b49682b0b7ff5c21720fc663527`; base `032e600ffc0f3b6d9d8e6d7e6998ed5d126dc77d`. Validated in a separate detached checkout. This report records the owner's supplied local execution evidence; AI Dev OS Builder did NOT run tests (tests gate SKIP).
 environment: Node 24.19.0, npm 11.17.0, Playwright 1.61.0.

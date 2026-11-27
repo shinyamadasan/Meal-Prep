@@ -202,10 +202,15 @@ test('live: an expired record is never merged into', async ({ page }) => {
 test('live: Home shows Needs Attention with Keep / Remove and bulk cleanup', async ({ page }) => {
   await loadLiveApp(page);
 
+  // D-088: only a passed PRINTED use-by is bulk-removable Expired; an estimated
+  // shelf life past its window is a quality Check. D-089: a fridge-safety lot
+  // past its limit is Expired too, but per-row Remove only (never in the bulk set).
   await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
     AppState.pantry = [
-      { id: 'prod_e1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
+      { id: 'prod_e1', name: 'Old Yogurt', category: 'Dairy', dateMode: 'expiry', expiryDate: day(2), storage: 'fridge' },
+      { id: 'prod_safe1', name: 'Raw Chicken Thigh', category: 'Protein', purchaseDate: day(4), storage: 'fridge' },
+      { id: 'prod_c1', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' },
       { id: 'prod_s1', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
@@ -217,11 +222,24 @@ test('live: Home shows Needs Attention with Keep / Remove and bulk cleanup', asy
   const card = page.locator('.dash-card--warn');
   await expect(card).toBeVisible();
   await expect(card).toContainText('Expired');
-  await expect(card).toContainText('Old Broccoli');
+  await expect(card).toContainText('Check');
   await expect(card).toContainText('Use soon');
+  const expiredRows = card.locator('.dash-attn-row--expired');
+  const checkRows = card.locator('.dash-attn-row--check');
+  await expect(expiredRows).toHaveCount(2);
+  await expect(expiredRows.filter({ hasText: 'Old Yogurt' })).toHaveCount(1);
+  await expect(expiredRows.filter({ hasText: 'Raw Chicken Thigh' })).toHaveCount(1);
+  await expect(checkRows).toHaveCount(1);
+  await expect(checkRows).toContainText('Old Broccoli');   // estimate past its window: Check, not Expired
   await expect(card).toContainText('Soon Tofu');
-  await expect(card.locator('.dash-keep-btn')).toHaveCount(1);
-  await expect(card.locator('.dash-remove-btn')).toHaveCount(1);
+  await expect(expiredRows.locator('.dash-keep-btn')).toHaveCount(2);
+  await expect(expiredRows.locator('.dash-keep-btn').first()).toHaveText('Keep');
+  await expect(expiredRows.locator('.dash-remove-btn')).toHaveCount(2);
+  await expect(expiredRows.locator('.dash-remove-btn').first()).toHaveText('Remove');
+  await expect(checkRows.locator('.dash-keep-btn')).toHaveText('Still good');
+  await expect(checkRows.locator('.dash-remove-btn')).toHaveText('Toss');
+  // Only the printed use-by is in the bulk set; the safety lot is per-row only.
+  await expect(card.locator('.dash-remove-all-btn')).toHaveCount(1);
   await expect(card.locator('.dash-remove-all-btn')).toContainText('Remove expired (1)');
 
   // The destructive control is a real tap target in production, not a text link.
@@ -265,16 +283,21 @@ test('live: bulk cleanup crosses MASS_DELETE_GUARD, tombstones every id, and spa
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [];
-    // Six expired — deliberately more than MASS_DELETE_GUARD (5), so the delete
-    // can only sync if the EXPLICIT tombstones are being written.
+    // Six past a PRINTED use-by — deliberately more than MASS_DELETE_GUARD (5),
+    // so the delete can only sync if the EXPLICIT tombstones are being written.
+    // (D-088: an estimated shelf life never makes a record bulk-removable.)
     for (let i = 0; i < 6; i++) {
       AppState.pantry.push({
         id: 'prod_exp_' + i, name: 'Expired ' + i, category: 'Vegetable',
-        purchaseDate: day(20), shelfLifeDays: 3, storage: 'fridge'
+        dateMode: 'expiry', expiryDate: day(5), storage: 'fridge'
       });
     }
     AppState.pantry.push({ id: 'prod_soon', name: 'Soon Tofu', category: 'Protein', purchaseDate: day(4), shelfLifeDays: 5, storage: 'fridge' });
     AppState.pantry.push({ id: 'prod_fine', name: 'Fresh Carrot', category: 'Vegetable', purchaseDate: day(0), shelfLifeDays: 20, storage: 'fridge' });
+    // Must also be spared: an estimate past its window (Check) and a fridge-safety
+    // lot past its limit (Expired, but per-row Remove only — D-089).
+    AppState.pantry.push({ id: 'prod_check', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(20), shelfLifeDays: 3, storage: 'fridge' });
+    AppState.pantry.push({ id: 'prod_safety', name: 'Raw Chicken Thigh', category: 'Protein', purchaseDate: day(4), storage: 'fridge' });
     AppState.cookedMeals = normalizeCookedMeals([
       { id: 'prod_cm_exp', name: 'Old Adobo', cookedDate: day(20), storage: 'fridge', fridgeLife: 4, freezerLife: 60 },
       { id: 'prod_cm_soon', name: 'Soon Sinigang', cookedDate: day(3), storage: 'fridge', fridgeLife: 4, freezerLife: 60 }
@@ -282,13 +305,27 @@ test('live: bulk cleanup crosses MASS_DELETE_GUARD, tombstones every id, and spa
     showTab('dashboard');
     renderDashboard();
     openAttentionView(); // compact by default now — force it open to reach Remove expired
-    return { expired: collectAttentionItems().expired.length };
+    const attention = collectAttentionItems();
+    return {
+      expired: attention.expired.map((e) => String(e.id)).sort(),
+      bulkEligible: attention.expired.filter((e) => !e.safety).length,
+      check: attention.check.map((e) => String(e.id)),
+      useSoon: attention.useSoon.map((e) => String(e.id)).sort()
+    };
   }, DAY_FN);
 
-  expect(before.expired).toBe(7);   // 6 pantry + 1 cooked
+  // 6 printed pantry + 1 cooked are bulk-removable; the safety lot is Expired but not bulk.
+  expect(before.expired).toEqual(
+    ['prod_cm_exp', 'prod_exp_0', 'prod_exp_1', 'prod_exp_2', 'prod_exp_3', 'prod_exp_4', 'prod_exp_5', 'prod_safety'].sort()
+  );
+  expect(before.bulkEligible).toBe(7);
+  expect(before.check).toEqual(['prod_check']);
+  expect(before.useSoon).toEqual(['prod_cm_soon', 'prod_soon']);
+  await expect(page.locator('.dash-remove-all-btn')).toContainText('Remove expired (7)');
 
   await page.locator('.dash-remove-all-btn').click();
   await page.waitForTimeout(400);
+  await expect(page.locator('.confirm-expired-list li')).toHaveCount(7);   // every record named
   await page.locator('.confirm-ok-btn').click();
   await page.waitForTimeout(800);
 
@@ -300,9 +337,10 @@ test('live: bulk cleanup crosses MASS_DELETE_GUARD, tombstones every id, and spa
     persisted: JSON.parse(localStorage.getItem('mealPrepAppData')).pantry.map((p) => String(p.id)).sort()
   }));
 
-  expect(after.pantry).toEqual(['prod_fine', 'prod_soon']);
+  const spared = ['prod_check', 'prod_fine', 'prod_safety', 'prod_soon'].sort();
+  expect(after.pantry).toEqual(spared);
   expect(after.cooked).toEqual(['prod_cm_soon']);       // use-soon cooked food spared
-  expect(after.persisted).toEqual(['prod_fine', 'prod_soon']);
+  expect(after.persisted).toEqual(spared);
   expect(after.tombstones).toEqual(
     ['prod_cm_exp', 'prod_exp_0', 'prod_exp_1', 'prod_exp_2', 'prod_exp_3', 'prod_exp_4', 'prod_exp_5'].sort()
   );
@@ -314,16 +352,20 @@ test('live: Keep invents no date and lapses the next day', async ({ page }) => {
   const dayN = await page.evaluate((dayFnSrc) => {
     const day = eval(dayFnSrc);
     AppState.deletions = {};
+    // A printed use-by in the past: genuinely Expired and bulk-removable (D-088).
     AppState.pantry = [
-      { id: 'prod_keep', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'prod_keep', name: 'Old Yogurt', category: 'Dairy', dateMode: 'expiry', expiryDate: day(3), storage: 'fridge' }
     ];
     AppState.cookedMeals = [];
-    const beforeDate = AppState.pantry[0].purchaseDate;
+    const beforeSignal = pantryDateSignal(AppState.pantry[0]).kind;
+    const beforeBulk = getExpiredPantryItems().length;
     keepAttentionItem('pantry', 'prod_keep');
     const p = AppState.pantry[0];
     return {
-      dateUnchanged: p.purchaseDate === beforeDate,
-      stillExpired: pantryDaysLeft(p) < 0,
+      beforeSignal,
+      beforeBulk,
+      dateUnchanged: p.expiryDate === day(3) && p.dateMode === 'expiry' && p.purchaseDate === undefined,
+      stillExpired: pantryDaysLeft(p) < 0 && pantryDateSignal(p).kind === 'expired',
       attention: collectAttentionItems().expired.length,
       bulk: getExpiredPantryItems().length,
       banner: getFreshnessAlerts().expired,
@@ -332,6 +374,8 @@ test('live: Keep invents no date and lapses the next day', async ({ page }) => {
     };
   }, DAY_FN);
 
+  expect(dayN.beforeSignal).toBe('expired');
+  expect(dayN.beforeBulk).toBe(1);
   expect(dayN.dateUnchanged).toBe(true);   // no invented expiry
   expect(dayN.stillExpired).toBe(true);    // Inventory still tells the truth
   expect(dayN.attention).toBe(0);
