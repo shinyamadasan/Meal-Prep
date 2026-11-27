@@ -36,13 +36,20 @@ function tracksPortions(meal) {
   return meal != null && meal.portionsRemaining != null && Number.isFinite(Number(meal.portionsRemaining));
 }
 
+// The integer count chat sees (TASK-092 G1): the app floors the stored value for its count, so a
+// string or fractional portionsRemaining no longer fails the whole get_ready_food read.
+function servingsView(meal) {
+  if (!tracksPortions(meal)) return null;
+  return Math.max(0, Math.floor(Number(meal.portionsRemaining)));
+}
+
 function toReadyFoodItem(meal) {
   return {
     cookedMealId: String(meal.id),
     recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
     source: meal.source != null ? meal.source : null,
     name: meal.name != null ? meal.name : null,
-    servingsRemaining: tracksPortions(meal) ? meal.portionsRemaining : null,
+    servingsRemaining: servingsView(meal),
     trackedPortions: tracksPortions(meal),
     storage: meal.storage || 'fridge',
     cookedDate: meal.cookedDate != null ? meal.cookedDate : null,

@@ -136,6 +136,8 @@ for (const today of safetyFixture.todays) {
         daysLeft = fridge.daysLeft;
         if (kind == null && daysLeft <= FoodSafety.FRESHNESS_WARN_DAYS) kind = 'use-soon';
       }
+      // Past its estimate (no printed date): the app shows "Estimated window passed" -> check.
+      if (kind == null && daysLeft != null && daysLeft < 0 && !signal.printed) kind = 'check';
       assert.equal(item.ingredientId, testCase.id, label);
       assertSafetyShape(item.safety, label);
       assert.equal(item.safety.status, statusFromKind(kind), label);
@@ -153,18 +155,14 @@ for (const today of safetyFixture.todays) {
 
   test(`get_ready_food safety equals the shared cooked-meal verdict for every parity-fixture case (today = ${today})`, async () => {
     const cookedMeals = cookedCases.map((c) => Object.assign({ id: c.id }, resolveRecord(c.record, today)));
-    // Pre-existing (not TASK-092): servingsRemaining is typed as an integer, so a batch with a
-    // string or fractional portionsRemaining fails the whole get_ready_food read closed. Those
-    // cases are checked through listReadyFoodWithSafety(), the function the tool returns.
-    const representable = (meal) => meal.portionsRemaining == null || Number.isInteger(meal.portionsRemaining);
-    const served = cookedMeals.filter(representable);
-    assert.ok(served.length >= cookedMeals.length - 6);
-    const { message, calls } = await callRead('get_ready_food', { revision: 6, pantry: [], cookedMeals: served }, manilaNoon(today));
+    // G1 fixed: a string or fractional portionsRemaining is floored for the integer count, so
+    // every batch is served and the read never fails for one odd record.
+    const { message, calls } = await callRead('get_ready_food', { revision: 6, pantry: [], cookedMeals }, manilaNoon(today));
     assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
     const toolItems = message.result.structuredContent.items;
-    assert.equal(toolItems.length, served.length);
+    assert.equal(toolItems.length, cookedMeals.length);
     const direct = listReadyFoodWithSafety(cookedMeals, today);
-    assert.deepEqual(toolItems, direct.filter((_, i) => representable(cookedMeals[i])));
+    assert.deepEqual(toolItems, direct);
     const items = direct;
     cookedCases.forEach((testCase, i) => {
       const item = items[i];
@@ -288,6 +286,35 @@ test('ready food: unknown cooked date is never usable; frozen without a quality 
   assert.deepEqual(byId['frozen-old'].safety, { status: 'check', reason: 'freezer-window-passed', label: 'Freezer quality window passed — check it', daysLeft: -230, usable: false });
   assert.deepEqual(byId.empty.safety, { status: 'ok', reason: 'no-portions-left', label: 'No portions left', daysLeft: 4, usable: false });
   assert.deepEqual(byId.fresh.safety, { status: 'use-soon', reason: 'use-soon', label: 'Use soon - 2d left', daysLeft: 2, usable: true });
+});
+
+test('review fix: counter and freezer lots past their estimate are check, never ok / in-date', async () => {
+  const today = '2026-11-26';
+  const pantry = [
+    { id: 'onion', name: 'Onion', category: 'Vegetable', storage: 'counter', purchaseDate: '2026-09-01', dateMode: 'purchase', shelfLifeDays: 30, quantity: 1, unit: 'kg' },
+    { id: 'thigh', name: 'Chicken Thigh', category: 'Protein', storage: 'freezer', purchaseDate: '2026-01-01', dateMode: 'purchase', shelfLifeDays: 90, quantity: 1, unit: 'kg' }
+  ];
+  const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  for (const item of message.result.structuredContent.items) {
+    const signal = FoodSafety.pantryDateSignal(pantry.find((p) => p.id === item.ingredientId), today);
+    assert.ok(signal.daysLeft < 0, item.ingredientId);
+    assert.deepEqual(item.safety, { status: 'check', reason: 'estimate-passed', label: 'Estimated window passed — check it', daysLeft: signal.daysLeft, usable: true }, item.ingredientId);
+  }
+});
+
+test('review fix G1: one string or fractional portion count no longer fails the whole ready-food read', async () => {
+  const today = '2026-11-26';
+  const cookedMeals = [
+    { id: 'text', name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: '3' },
+    { id: 'half', name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2.5 },
+    { id: 'whole', name: 'Sinigang', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 }
+  ];
+  const { message } = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals }, manilaNoon(today));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
+  const byId = Object.fromEntries(message.result.structuredContent.items.map((item) => [item.cookedMealId, item]));
+  assert.equal(byId.text.servingsRemaining, 3);
+  assert.equal(byId.half.servingsRemaining, 2);
+  assert.equal(byId.whole.servingsRemaining, 2);
 });
 
 test('read-tool descriptions forbid suggesting unusable food; record_ready_food no longer claims unknown freshness', async () => {

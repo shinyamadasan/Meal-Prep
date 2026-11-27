@@ -126,6 +126,10 @@ export function pantrySafety(p, today) {
     daysLeft = fridge.daysLeft;
     if (kind == null && daysLeft <= FoodSafety.FRESHNESS_WARN_DAYS) kind = 'use-soon';
   }
+  // The app's Fridge list shows any lot past its shelf-life estimate (no printed date) as
+  // "Estimated window passed" in check styling, wherever it is stored (counter, freezer,
+  // non-perishables). Chat must not call it in-date. Availability is unchanged (quality only).
+  if (kind == null && daysLeft != null && daysLeft < 0 && !signal.printed) kind = 'check';
   let status;
   let reason;
   let label;
