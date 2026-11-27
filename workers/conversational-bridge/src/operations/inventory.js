@@ -4,24 +4,17 @@
 // a NEW array/bucket plus the response item, so index.js can diff "did anything actually change"
 // cleanly for the `unchanged:true` cases the contract requires.
 //
-// CLASSIFICATION (D-082 addendum, corrected after independent review): the bridge has no access
-// to INGREDIENT_DB, so it cannot fully reproduce the client's isStaple(). It DOES reproduce the
-// client's other, INGREDIENT_DB-free fallback: an explicit flag, else `category === 'pantry'`.
-// That leaves one real gap — a record with no explicit `staple` and a category that ISN'T
-// 'pantry' can still be a staple in the live app via an INGREDIENT_DB entry (confirmed in
-// app.js's own seed data: e.g. 'Garlic (Bawang)' and 'Evaporated Milk' are `isStaple: true` with
-// category 'Vegetable'/'Dairy', not 'Pantry' — and at least two active pantry-creation call sites
-// store `staple: undefined` outright for an unmatched custom ingredient, so this isn't a rare
-// legacy-data corner case). classifyStaple() returns 'ambiguous' for exactly that gap, and
-// markOutOfStock() refuses to guess: guessing "non-staple" here risks tombstoning a record the
-// real app would only have marked empty, which is real, unrecoverable(ish) data loss; guessing
-// "staple" risks nothing (the record just survives with stockLevel stamped). See
-// AmbiguousError / the reserved `ambiguous` contract code in errors.js.
-import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
+// CLASSIFICATION (TASK-097, PROP-041 P2-0a): staple vs non-staple is the app's own answer,
+// MealPrepFoodSafety.isStaple from shared/foodSafety.js (stored flag -> exact-name INGREDIENT_DB
+// isStaple -> category 'Pantry' -> non-staple). Before TASK-097 the bridge had no INGREDIENT_DB and
+// refused every record it could not resolve as `ambiguous`; the shared core removes that gap. A
+// record the shared rule cannot read (not an object, or a name/category that is not text) is
+// `invalid`: reads flag it as invalid-record and every write refuses it, never guessing.
+import { InsufficientStockError, NotFoundError, ValidationError } from '../errors.js';
 import { convertQuantity } from './quantity.js';
 // Shared food-safety rules (TASK-091, D-090): defines globalThis.MealPrepFoodSafety, the same rules
-// the app uses. The get_inventory safety verdict (TASK-092) and add_stock's merge gate (TASK-094)
-// read it; the other write operations still use the bridge's own classification described above.
+// the app uses. The get_inventory safety verdict (TASK-092), add_stock's merge gate (TASK-094) and
+// the staple classification (TASK-097) all read it.
 import '../../../../shared/foodSafety.js';
 
 const FoodSafety = globalThis.MealPrepFoodSafety;
@@ -29,21 +22,56 @@ const FoodSafety = globalThis.MealPrepFoodSafety;
 const MAX_UNIT_LENGTH = 40;
 const MAX_STOCK_QUANTITY = Number.MAX_SAFE_INTEGER;
 
-function classifyStaple(p) {
-  if (!p) return 'non-staple';
-  if (p.staple === true) return 'staple';
-  if (p.staple === false) return 'non-staple';
-  // Same text as before for every value String() can convert (write tools unchanged); a stored
-  // map whose toString cannot convert reads as no category instead of throwing.
-  let text = '';
-  try { text = p.category == null ? '' : String(p.category); } catch { text = ''; }
-  const category = text.trim().toLowerCase();
-  if (category === 'pantry') return 'staple';
-  return 'ambiguous';
+// 'staple' | 'non-staple' | 'invalid'. Delegates to the shared rule; anything it cannot read throws
+// there (a stored map or number as name/category, a getter that throws) and is 'invalid' here.
+// Exported for the parity test (test/mcp-staple-parity.node.js).
+export function classifyStaple(p) {
+  if (p == null || typeof p !== 'object' || Array.isArray(p)) return 'invalid';
+  try {
+    return FoodSafety.isStaple(p) === true ? 'staple' : 'non-staple';
+  } catch {
+    return 'invalid';
+  }
 }
 
 function isStapleRecord(p) {
   return classifyStaple(p) === 'staple';
+}
+
+// How chat tracks a lot (TASK-097): 'level' = staple (stockLevel full/ok/low/empty); 'quantity' =
+// non-staple with a finite, non-negative quantity and a unit; 'presence' = non-staple recorded
+// without a usable amount (being listed is all it says). null = the record cannot be classified.
+function trackingOf(p, classification) {
+  if (classification === 'staple') return 'level';
+  if (classification !== 'non-staple') return null;
+  const counted = typeof p.quantity === 'number' && Number.isFinite(p.quantity) && p.quantity >= 0 &&
+    typeof p.unit === 'string' && p.unit.trim() !== '';
+  return counted ? 'quantity' : 'presence';
+}
+
+// Every write gates on this: an unreadable record is refused, never guessed (TASK-097).
+function requireClassified(record, ingredientId) {
+  const classification = classifyStaple(record);
+  if (classification === 'invalid') {
+    throw new ValidationError(
+      'invalid_record: ingredientId "' + ingredientId + '" could not be read safely (its name or category is not ' +
+      'text), so the bridge cannot tell whether it is a staple. Ask the user to check it in the app.',
+      { field: 'ingredientId', code: 'invalid_record' }
+    );
+  }
+  return classification;
+}
+
+// Quantity tools (set_inventory_quantity, consume_stock, add_stock) only change counted lots.
+function requireQuantityTracked(record, ingredientId, classification) {
+  if (classification === 'non-staple' && trackingOf(record, classification) === 'presence') {
+    throw new ValidationError(
+      'presence_only: ingredientId "' + ingredientId + '" is recorded without an amount (no usable quantity and ' +
+      'unit), so its amount cannot be changed from chat. Do not guess an amount: ask the user how much they ' +
+      'have, and tell them the amount can be recorded in the app.',
+      { field: 'ingredientId', code: 'presence_only', tracking: 'presence' }
+    );
+  }
 }
 
 function findPantryIndex(pantry, ingredientId) {
@@ -214,7 +242,10 @@ export function listInventoryWithSafety(pantry, today) {
       dateMode: textOrNull(p.dateMode),
       printedDateKind: textOrNull(p.printedDateKind)
     };
-    if (readableLot(p)) return Object.assign(toInventoryItem(p), dates, { safety: pantrySafety(p, today) });
+    const classification = classifyStaple(p);
+    if (readableLot(p) && classification !== 'invalid') {
+      return Object.assign(toInventoryItem(p), { tracking: trackingOf(p, classification) }, dates, { safety: pantrySafety(p, today) });
+    }
     return Object.assign({
       // An unreadable id gets a placeholder no write tool will match.
       ingredientId: readableId(p.id) ? String(p.id) : 'unreadable-id-' + index,
@@ -225,7 +256,9 @@ export function listInventoryWithSafety(pantry, today) {
       staple: isStapleRecord(p),
       stockLevel: READ_STOCK_LEVELS.includes(p.stockLevel) ? p.stockLevel : null,
       storage: textOrNull(p.storage),
-      updatedAt: textOrNull(p.updatedAt)
+      updatedAt: textOrNull(p.updatedAt),
+      // Unreadable: never guessed (TASK-097).
+      tracking: null
     }, dates, {
       safety: { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false }
     });
@@ -326,7 +359,7 @@ export function setQuantity(pantry, { ingredientId, quantity, unit }) {
 // delegates to the unchanged setQuantity() — no `unit` is passed, so the stored unit can never be
 // relabelled (500 g -> 500 kg). Zero is refused here, not translated: "none left" is
 // markOutOfStock(). Staples are modelled by stockLevel, not by a count, so they are refused; an
-// unclassifiable row is refused for the same reason markOutOfStock() refuses it.
+// unreadable row and a presence-only row (no amount recorded) are refused (TASK-097).
 export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUnit }) {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
     throw new ValidationError('quantity must be a finite number > 0. For none left, use mark_out_of_stock.', { field: 'quantity' });
@@ -334,18 +367,11 @@ export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUni
   const index = findPantryIndex(pantry, ingredientId);
   if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
 
-  const classification = classifyStaple(pantry[index]);
+  const classification = requireClassified(pantry[index], ingredientId);
   if (classification === 'staple') {
     throw new ValidationError('ingredientId "' + ingredientId + '" is a staple tracked by stock level, not by count; use mark_in_stock or mark_out_of_stock.', { field: 'ingredientId' });
   }
-  if (classification === 'ambiguous') {
-    throw new AmbiguousError(
-      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
-      'the bridge cannot safely tell whether it is counted or stock-level tracked. ' +
-      'Set an explicit staple value on this record (in the app) before retrying.',
-      { field: 'ingredientId', category: pantry[index].category != null ? pantry[index].category : null }
-    );
-  }
+  requireQuantityTracked(pantry[index], ingredientId, classification);
   // expectedUnit is an immutable PRECONDITION: exact equality with the stored unit, no trimming,
   // case folding or conversion (g != kg, ml != L, pieces != cans). It is never forwarded, so it
   // cannot relabel the row or be persisted.
@@ -374,16 +400,7 @@ export function markOutOfStock(pantry, deletionsPantry, { ingredientId }) {
   }
 
   const record = pantry[index];
-  const classification = classifyStaple(record);
-
-  if (classification === 'ambiguous') {
-    throw new AmbiguousError(
-      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
-      'the bridge cannot safely tell whether removing it or marking it empty is correct without INGREDIENT_DB. ' +
-      'Set an explicit staple value on this record (in the app) before retrying.',
-      { field: 'ingredientId', category: record.category != null ? record.category : null }
-    );
-  }
+  const classification = requireClassified(record, ingredientId);
 
   if (classification === 'staple') {
     if (record.stockLevel === 'empty') {
@@ -407,7 +424,7 @@ export function markInStock(pantry, { ingredientId }) {
   if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
 
   const record = pantry[index];
-  if (!isStapleRecord(record)) {
+  if (requireClassified(record, ingredientId) !== 'staple') {
     throw new ValidationError('ingredientId "' + ingredientId + '" is not a staple; its presence already means in stock.', { field: 'ingredientId' });
   }
   if (record.stockLevel === 'full') {
@@ -419,7 +436,7 @@ export function markInStock(pantry, { ingredientId }) {
   return { pantry: next, item: toInventoryItem(updated), unchanged: false };
 }
 
-// Apply a conversational delta to an existing, counted non-staple row. Exact-zero paths use
+// Apply a conversational delta to an existing, counted (tracking 'quantity') non-staple row. Exact-zero paths use
 // markOutOfStock() so they retain the canonical removal/tombstone or staple-empty behavior.
 export function consumeStock(pantry, deletionsPantry, { ingredientId, quantity, expectedUnit }) {
   if (typeof ingredientId !== 'string' || !ingredientId.trim()) {
@@ -436,14 +453,8 @@ export function consumeStock(pantry, deletionsPantry, { ingredientId, quantity, 
   if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
 
   const record = pantry[index];
-  const classification = classifyStaple(record);
-  if (classification === 'ambiguous') {
-    throw new AmbiguousError(
-      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
-      'set an explicit staple value in the app before retrying.',
-      { field: 'ingredientId', category: record.category != null ? record.category : null }
-    );
-  }
+  const classification = requireClassified(record, ingredientId);
+  requireQuantityTracked(record, ingredientId, classification);
 
   if (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity) || record.quantity < 0) {
     throw new ValidationError('The stored quantity is missing or invalid; re-read inventory and clarify before consuming.', { field: 'quantity' });
@@ -580,14 +591,8 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
   }
 
   const record = pantry[index];
-  const classification = classifyStaple(record);
-  if (classification === 'ambiguous') {
-    throw new AmbiguousError(
-      'ingredientId "' + ingredientId + '" has no explicit staple flag and a category that does not resolve it; ' +
-      'set an explicit staple value in the app before adding stock.',
-      { field: 'ingredientId', category: record.category != null ? record.category : null }
-    );
-  }
+  const classification = requireClassified(record, ingredientId);
+  requireQuantityTracked(record, ingredientId, classification);
   if (classification === 'staple' && (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity))) {
     throw new ValidationError('This staple has no counted quantity; use mark_in_stock instead.', { field: 'quantity' });
   }

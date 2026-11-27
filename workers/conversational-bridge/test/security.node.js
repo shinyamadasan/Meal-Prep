@@ -107,17 +107,24 @@ test('inventory: a stale expectedRevision is rejected with 409 and applies nothi
   assert.equal(fake.store.fields.pantry[0].quantity, 1, 'no partial write on conflict');
 });
 
-// Uses the contract's reserved `ambiguous` code (TASKS.md shared error codes) — added per
-// independent review finding 1: an undecorated, off-"pantry"-category record's staple-ness can't
-// be proven server-side (real INGREDIENT_DB entries like Garlic/Evaporated Milk are `isStaple:
-// true` despite a non-'Pantry' category), so a destructive mark-out-of-stock must refuse rather
-// than risk tombstoning a record the app would only have marked empty.
-test('inventory: mark-out-of-stock on an ambiguous (undecorated, non-"pantry"-category) record is refused, not destructive', async () => {
-  const { call, fake } = bridge({ pantry: [{ id: 'g1', name: 'Garlic', category: 'Vegetable', quantity: 3 }], version: 0 });
+// Independent review finding 1 (TASK-065): real INGREDIENT_DB entries like 'Garlic (Bawang)' are
+// `isStaple: true` despite a non-'Pantry' category, so a destructive mark-out-of-stock must never
+// tombstone a record the app would only mark empty. Before TASK-097 the bridge refused such
+// records as `ambiguous`; it now uses the app's isStaple (shared core), so the staple is kept.
+test('inventory: mark-out-of-stock on an INGREDIENT_DB staple with a non-"pantry" category keeps it (staple path)', async () => {
+  const { call, fake } = bridge({ pantry: [{ id: 'g1', name: 'Garlic (Bawang)', category: 'Vegetable', quantity: 3 }], version: 0 });
+  const res = await call('/v1/inventory/mark-out-of-stock', { method: 'POST', body: { ingredientId: 'g1', expectedRevision: 0 } });
+  assert.equal(res.status, 200);
+  assert.equal(fake.store.fields.pantry[0].id, 'g1', 'never tombstoned away');
+  assert.equal(fake.store.fields.pantry[0].stockLevel, 'empty');
+});
+
+test('inventory: mark-out-of-stock on a record the shared staple rule cannot read is refused, not destructive', async () => {
+  const { call, fake } = bridge({ pantry: [{ id: 'g1', name: 'Garlic', category: { label: 'Vegetable' }, quantity: 3 }], version: 0 });
   const res = await call('/v1/inventory/mark-out-of-stock', { method: 'POST', body: { ingredientId: 'g1', expectedRevision: 0 } });
   assert.equal(res.status, 422);
-  assert.equal((await json(res)).error.code, 'ambiguous');
-  assert.equal(fake.store.fields.version, 0, 'the ambiguous record must not have been touched');
+  assert.equal((await json(res)).error.code, 'validation_failed');
+  assert.equal(fake.store.fields.version, 0, 'the unreadable record must not have been touched');
   assert.equal(fake.store.fields.pantry[0].id, 'g1', 'and definitely not tombstoned away');
 });
 

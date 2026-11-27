@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listInventory, setQuantity, markOutOfStock, markInStock } from '../src/operations/inventory.js';
-import { NotFoundError, ValidationError, InsufficientServingsError, AmbiguousError } from '../src/errors.js';
+import { NotFoundError, ValidationError, InsufficientServingsError } from '../src/errors.js';
 import { listReadyFood, recordCookedFood, consumePortions, finishCookedMeal } from '../src/operations/readyFood.js';
 
 const COOKED_DATE = '2026-01-15';
@@ -85,15 +85,21 @@ test('markOutOfStock treats an undecorated record with category "pantry" as a st
   assert.deepEqual(result.deletionsPantry, {}, 'a category-fallback staple must never be tombstoned');
 });
 
-// The residual gap: no explicit flag AND a category that doesn't prove classification (real
-// app.js seed data has `isStaple: true` entries with category 'Vegetable'/'Dairy'/'Protein' —
-// e.g. Garlic, Evaporated Milk — so this is a genuine, common case, not a hypothetical). The
-// bridge cannot safely guess without INGREDIENT_DB, so a destructive mark-out-of-stock must
-// refuse rather than risk tombstoning a record that's actually a staple.
-test('markOutOfStock refuses an ambiguous record (no explicit flag, non-"pantry" category) rather than guessing destructively', () => {
-  const pantry = [{ id: 'g1', name: 'Garlic', category: 'Vegetable', quantity: 3 }];
-  assert.throws(() => markOutOfStock(pantry, {}, { ingredientId: 'g1' }), AmbiguousError);
-  // Confirm the refusal is a pure read: nothing was mutated or tombstoned by the failed attempt.
+// The former gap (before TASK-097): no explicit flag AND a non-Pantry category. Real INGREDIENT_DB
+// entries such as 'Garlic (Bawang)' are `isStaple: true` with category 'Vegetable', so guessing
+// non-staple could tombstone a staple. The bridge now uses the app's own isStaple (shared core),
+// so such a record is a staple (marked empty, never removed); an unreadable one is refused.
+test('markOutOfStock keeps an INGREDIENT_DB staple off-category (marks it empty, never tombstones it)', () => {
+  const pantry = [{ id: 'g1', name: 'Garlic (Bawang)', category: 'Vegetable', quantity: 3 }];
+  const result = markOutOfStock(pantry, {}, { ingredientId: 'g1' });
+  assert.equal(result.removed, false);
+  assert.equal(result.pantry.find((p) => p.id === 'g1').stockLevel, 'empty');
+  assert.deepEqual(result.deletionsPantry, {});
+});
+
+test('markOutOfStock refuses a record whose category the shared rule cannot read, with no mutation', () => {
+  const pantry = [{ id: 'g1', name: 'Garlic', category: { label: 'Vegetable' }, quantity: 3 }];
+  assert.throws(() => markOutOfStock(pantry, {}, { ingredientId: 'g1' }), (error) => error instanceof ValidationError && /^invalid_record:/.test(error.message));
   const stillThere = pantry.find((p) => p.id === 'g1');
   assert.ok(stillThere);
   assert.equal(stillThere.stockLevel, undefined);

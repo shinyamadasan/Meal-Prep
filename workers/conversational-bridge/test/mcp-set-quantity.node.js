@@ -288,7 +288,9 @@ test('F: blank, null, missing and non-string stored units are rejected with zero
       const b = bridge({ pantry: [row] });
       const before = JSON.stringify(b.fake.store);
       const message = await responseMessage(await b.call(NAME, { ingredientId: 'x', quantity: 2, expectedUnit, expectedRevision: 0 }));
-      assert.match(text(message), /^unit_mismatch:.*no stored unit/, String(unit));
+      // TASK-097: a non-staple without a usable unit is tracking 'presence', refused before the
+      // unit precondition (still zero mutation).
+      assert.match(text(message), /^presence_only:/, String(unit));
       assert.equal(JSON.stringify(b.fake.store), before);
     }
   }
@@ -337,11 +339,15 @@ test('duplicate-name rows: only the named id changes', async () => {
   assert.equal(fake.store.fields.pantry[1].quantity, 700);
 });
 
-test('staple, ambiguous and unknown rows are refused with distinct messages and zero mutation', async () => {
+test('staple, presence-only, unreadable and unknown rows are refused with distinct messages and zero mutation', async () => {
   const cases = [
     [{ id: 'eggs', name: 'Rice', staple: true, stockLevel: 'full' }, /^(?!ambiguous|not_found).*mark_in_stock or mark_out_of_stock/],
     [{ id: 'eggs', name: 'Salt', category: 'Pantry' }, /^(?!ambiguous|not_found).*mark_in_stock or mark_out_of_stock/],
-    [{ id: 'eggs', name: 'Garlic', category: 'Vegetable' }, /^ambiguous:.*Set an explicit staple value/]
+    // TASK-097: INGREDIENT_DB staple by exact name (category Vegetable) is a staple, as in the app.
+    [{ id: 'eggs', name: 'Garlic (Bawang)', category: 'Vegetable', quantity: 3, unit: 'pcs' }, /^(?!ambiguous|not_found).*mark_in_stock or mark_out_of_stock/],
+    // Was ambiguous before TASK-097; the app calls it non-staple, and with no amount it is presence-only.
+    [{ id: 'eggs', name: 'Garlic', category: 'Vegetable' }, /^presence_only:.*ask the user/],
+    [{ id: 'eggs', name: 'Garlic', category: ['Vegetable'] }, /^invalid_record:/]
   ];
   for (const [row, pattern] of cases) {
     const b = bridge({ pantry: [row] });

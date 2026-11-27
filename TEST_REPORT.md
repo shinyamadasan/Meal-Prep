@@ -5,6 +5,28 @@
 
 ---
 
+## TASK-097 · 2026-11-27 · staple parity + tracking (PROP-041 P2-0a)
+Builder: Claude sub-agent standing in for Codex.
+suite: `npm run test:bridge` 378/378 PASS (baseline on prop041-p2 bb7e8dd: 362/362; +14 in
+`test/mcp-staple-parity.node.js`, +2 split-out refusal tests in `operations.node.js` / `security.node.js`;
+12 existing tests updated, see CHANGELOG); `npm test` (local) 912/912 PASS (no `feature-evidence` churn);
+`npm run test:ledger-contract` 13/13 PASS; `node --check` on every changed Worker src/test file;
+`git diff --check` clean. No deploy, no production call.
+covered: bridge `classifyStaple` and get_inventory `staple`/`tracking` equal `MealPrepFoodSafety.isStaple`
+on 23 fixtures (flag true/false/null/missing/"true", INGREDIENT_DB staple exact + case-folded name,
+alias/trailing-space/no-parentheses near misses, DB entry without isStaple, category Pantry in three cases
+plus untrimmed, empty/null/missing/other category, unreadable fields the flag makes irrelevant); six
+unreadable records throw in the shared rule and are `invalid` in the bridge (invalid-record, tracking null,
+other lots still load); tracking level/quantity (incl. zero)/presence (no qty, no unit, blank unit,
+negative qty); per tool on a formerly ambiguous lot: set_inventory_quantity, consume_stock (partial g/kg
+and exact-zero removal + tombstone), add_stock, mark_out_of_stock (non-staple removed, INGREDIENT_DB staple
+kept empty), mark_in_stock (INGREDIENT_DB staple filled; non-staple still refused); INGREDIENT_DB staple
+still refused for counts; presence-only lot refused by all three quantity tools for four row shapes
+(`presence_only:`, byte-identical store, 0 commits, 0 request records, requestId not spent);
+`invalid_record` on all five write tools with zero writes; stale revision, requestId replay (1 commit) and
+undo on a formerly ambiguous lot.
+result: all pass. TASK-097 set to `review`. Claude's private real-export count (read-only) is still due at review.
+
 ## TASK-095 · 2026-11-27 · undo_request (PROP-041 P1-5)
 Builder: Claude standing in for Codex.
 suite: `npm run test:bridge` 358/358 PASS (330 before + 28 in `test/mcp-undo.node.js`); `npm test` (local)

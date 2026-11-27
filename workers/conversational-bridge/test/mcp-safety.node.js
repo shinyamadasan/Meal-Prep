@@ -255,6 +255,8 @@ test('D-091: expired or unknown is never usable, even where the app keeps it ava
     // In date, but an empty staple.
     { id: 'salt', name: 'Salt', staple: true, stockLevel: 'empty', storage: 'counter' },
     // A record the shared rules cannot read (non-string category): unknown, and the rest still load.
+    // TASK-097: the staple rule cannot read it either, so it is flagged invalid-record (was
+    // unreadable-record from the safety rules); still unknown and never usable, tracking null.
     { id: 'bad', name: 'Chicken Breast', category: 5, storage: 'fridge', purchaseDate: today, quantity: 1, unit: 'kg' }
   ];
   assert.equal(FoodSafety.pantryLotAvailable(pantry[0], today), true);
@@ -270,8 +272,12 @@ test('D-091: expired or unknown is never usable, even where the app keeps it ava
   assert.deepEqual(byId.oats.safety, { status: 'check', reason: 'best-before-passed', label: 'Best before passed — check it', daysLeft: -6, usable: true });
   assert.equal(byId.oats.printedDateKind, 'best-before');
   assert.deepEqual(byId.salt.safety, { status: 'ok', reason: 'out-of-stock', label: 'Out of stock', daysLeft: null, usable: false });
-  assert.deepEqual(byId.bad.safety, { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false });
+  assert.deepEqual(byId.bad.safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false });
   assert.equal(byId.bad.category, null);
+  assert.equal(byId.bad.tracking, null);
+  assert.equal(byId.bad.inStock, false);
+  assert.equal(byId.soy.tracking, 'level');
+  assert.equal(byId.mystery.tracking, 'quantity');
 });
 
 test('ready food: unknown cooked date is never usable; frozen without a quality window stays usable', async () => {
@@ -479,7 +485,7 @@ test('read-tool descriptions forbid suggesting unusable food; record_ready_food 
   }
   assert.deepEqual(Object.keys(tools.get_inventory.outputSchema.properties.items.items.properties).sort(), [
     'category', 'dateMode', 'expiryDate', 'inStock', 'ingredientId', 'name', 'printedDateKind', 'purchaseDate',
-    'quantity', 'safety', 'staple', 'stockLevel', 'storage', 'unit', 'updatedAt'
+    'quantity', 'safety', 'staple', 'stockLevel', 'storage', 'tracking', 'unit', 'updatedAt'
   ]);
   // Write-tool results keep their existing item shape (no read-only safety fields).
   for (const name of ['mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock', 'add_stock']) {

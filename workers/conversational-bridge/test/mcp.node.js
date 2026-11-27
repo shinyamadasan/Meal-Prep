@@ -170,6 +170,7 @@ test('get_inventory preserves the canonical revision and stable ingredient ids w
       stockLevel: 'ok',
       storage: 'pantry',
       updatedAt: null,
+      tracking: 'level',
       category: null,
       purchaseDate: null,
       expiryDate: null,

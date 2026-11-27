@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { consumeStock } from '../src/operations/inventory.js';
 import { convertQuantity } from '../src/operations/quantity.js';
-import { AmbiguousError, InsufficientStockError, ValidationError } from '../src/errors.js';
+import { InsufficientStockError, ValidationError } from '../src/errors.js';
 
 const NOW = '2026-10-08T12:00:00.000Z';
 const call = (pantry, args, deletionsPantry = {}) => consumeStock(pantry, deletionsPantry, args);
@@ -82,11 +82,13 @@ test('exact zero for a staple follows canonical markOutOfStock and retains its i
   assert.deepEqual(pantry[0], { id: 'rice', name: 'Rice', quantity: 500, unit: 'g', staple: true, stockLevel: 'full', storage: 'pantry' });
 });
 
-test('over-consume, partial staple, ambiguous staple, malformed stored quantity/unit, and unit mismatch fail safely', () => {
+test('over-consume, partial staple, unreadable record, malformed stored quantity/unit, and unit mismatch fail safely', () => {
   const cases = [
     [{ id: 'x', name: 'Chicken', quantity: 500, unit: 'g', staple: false }, { ingredientId: 'x', quantity: 900, expectedUnit: 'g' }, InsufficientStockError],
     [{ id: 'x', name: 'Rice', quantity: 500, unit: 'g', staple: true, stockLevel: 'full' }, { ingredientId: 'x', quantity: 300, expectedUnit: 'g' }, ValidationError],
-    [{ id: 'x', name: 'Custom', quantity: 500, unit: 'g', category: 'Dairy' }, { ingredientId: 'x', quantity: 500, expectedUnit: 'g' }, AmbiguousError],
+    // TASK-097: was AmbiguousError for category 'Dairy' (now the app's non-staple); an unreadable
+    // category is refused instead.
+    [{ id: 'x', name: 'Custom', quantity: 500, unit: 'g', category: { label: 'Dairy' } }, { ingredientId: 'x', quantity: 500, expectedUnit: 'g' }, ValidationError],
     [{ id: 'x', name: 'Chicken', quantity: null, unit: 'g', staple: false }, { ingredientId: 'x', quantity: 1, expectedUnit: 'g' }, ValidationError],
     [{ id: 'x', name: 'Chicken', quantity: 500, unit: '', staple: false }, { ingredientId: 'x', quantity: 1, expectedUnit: 'g' }, ValidationError],
     [{ id: 'x', name: 'Chicken', quantity: 500, unit: 'g', staple: false }, { ingredientId: 'x', quantity: 1, expectedUnit: 'ml' }, ValidationError]

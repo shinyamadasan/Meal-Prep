@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { addStock, validateBoughtDate } from '../src/operations/inventory.js';
-import { ValidationError, NotFoundError, AmbiguousError } from '../src/errors.js';
+import { ValidationError, NotFoundError } from '../src/errors.js';
 
 const FoodSafety = globalThis.MealPrepFoodSafety;
 // Every verdict is for an explicit household day (TASK-094): no test depends on the real clock.
@@ -81,10 +81,13 @@ test('delta can restore a numeric staple to full without changing its stable id'
   assert.equal(empty.item.stockLevel, 'full');
 });
 
-test('stock-level-only staples, ambiguous rows, absent rows, and tombstones fail without mutation', () => {
+test('stock-level-only staples, presence-only and unreadable rows, absent rows, and tombstones fail without mutation', () => {
   const cases = [
     [{ id: 'rice', staple: true, stockLevel: 'empty' }, {}, /use mark_in_stock/],
-    [{ id: 'custom', quantity: 1, unit: 'g', category: 'Dairy' }, {}, AmbiguousError]
+    // TASK-097: was AmbiguousError; an unflagged Dairy row with an amount is now the app's
+    // non-staple (accepted, see mcp-staple-parity). Presence-only and unreadable rows are refused.
+    [{ id: 'custom', category: 'Dairy' }, {}, /presence_only:/],
+    [{ id: 'custom', quantity: 1, unit: 'g', category: { label: 'Dairy' } }, {}, /invalid_record:/]
   ];
   for (const [row, tombstones, expected] of cases) {
     const pantry = [row];

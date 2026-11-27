@@ -5,6 +5,65 @@
 
 ---
 
+## TASK-097 — implementation complete (branch: task-097-staple-parity; base: prop041-p2 bb7e8dd)
+Builder: Claude sub-agent standing in for Codex. PROP-041 Phase 2 priority 1 (P2-0a). Bridge only.
+changed:
+  - `workers/conversational-bridge/src/operations/inventory.js`: `classifyStaple()` (now exported) calls
+    `MealPrepFoodSafety.isStaple` and returns `staple` / `non-staple` / `invalid` (not an object, or the
+    shared rule throws: a name/category that is a number, map or array where the rule reads it).
+    `isStapleRecord()` follows it. New `trackingOf()` (`level` / `quantity` / `presence` / null),
+    `requireClassified()` (every write tool: `invalid_record:` ValidationError) and
+    `requireQuantityTracked()` (set/consume/add: `presence_only:` ValidationError). All `AmbiguousError`
+    throws are gone. `listInventoryWithSafety()` adds `tracking`; a lot whose classification is `invalid`
+    takes the existing invalid-record branch (`tracking: null`), alongside the `readableLot` gate.
+  - `src/mcp.js`: `get_inventory` item schema adds `tracking` (`level|quantity|presence`, nullable);
+    `get_inventory` description gains the three-kind explanation (`TRACKING_TEXT`); mark_out_of_stock,
+    set_inventory_quantity, consume_stock and add_stock descriptions replace "On ambiguous…" with the
+    tracking / `presence_only` / `invalid_record` guidance. Write-result item schema unchanged.
+  - Tests: new `test/mcp-staple-parity.node.js` (14): parity of `classifyStaple` and `get_inventory`
+    `staple`/`tracking` against `MealPrepFoodSafety.isStaple` over 23 fixtures (flag true/false/null/missing/
+    string, INGREDIENT_DB staple by exact and case-folded name, alias and near-miss names, DB entry without
+    `isStaple`, category Pantry/pantry/PANTRY/" Pantry ", empty/null/missing category) plus 6 unreadable
+    records; get_inventory tracking kinds; description/schema; per-tool accepted cases on a formerly
+    ambiguous lot; presence-only refusals (zero writes, zero commits, no request record, requestId unspent);
+    invalid_record on all five write tools; stale revision, requestId replay and undo on a formerly
+    ambiguous lot.
+  - README: "TASK-097 staple parity and `tracking`" section; the old ambiguous-staple judgment call, the
+    reserved `ambiguous` code paragraph and three inline mentions now describe the parity rule.
+existing tests that asserted `ambiguous` (or a refusal it implied), and why each changed:
+  - `operations.node.js` "markOutOfStock refuses an ambiguous record" (`Garlic`, Vegetable): the app calls
+    plain `Garlic` non-staple (alias, not exact name). Rewritten to the case the test protected:
+    `Garlic (Bawang)` (INGREDIENT_DB staple, Vegetable) is now kept as `stockLevel: 'empty'`, never
+    tombstoned; plus a new unreadable-category refusal test.
+  - `security.node.js` REST mark-out-of-stock `422 ambiguous`: same reason; now `Garlic (Bawang)` → 200,
+    kept empty; a new test keeps the 422 (`validation_failed`) refusal for an unreadable category.
+  - `mcp-stock-state.node.js` "ambiguous and unknown out-of-stock ids": unflagged `Garlic`/Vegetable is now
+    the app's non-staple; the refusal case uses an unreadable (map) category → `invalid_record`.
+    Description test now checks `tracking "level"` and `invalid_record` instead of `ambiguous`.
+  - `mcp-set-quantity.node.js` "staple, ambiguous and unknown rows": `Garlic`/Vegetable with no amount is
+    now `presence_only`; added `Garlic (Bawang)` → staple refusal and an array category → `invalid_record`.
+  - `mcp-consume-stock.node.js` and `operations-consume-stock.node.js`: `Custom`/Dairy 500 g is now a
+    counted non-staple (accepted; covered in the parity file), so the refusal case uses a map category.
+  - `operations-add-stock.node.js`: `custom`/Dairy 1 g is now accepted; the refusal cases are a
+    presence-only row and a map-category row.
+other existing assertions that changed (not `ambiguous`):
+  - `mcp-set-quantity.node.js` F: non-staple rows with blank/null/missing/non-string stored unit now fail
+    `presence_only` (they have no usable unit) instead of `unit_mismatch … no stored unit`; still zero writes.
+  - `mcp-consume-stock.node.js`: blank stored unit / null stored quantity now fail `presence_only` instead
+    of "stored unit/quantity is missing"; still zero writes.
+  - `mcp-safety.node.js` D-091: the `category: 5` lot is now `invalid-record` ("Record could not be read")
+    instead of `unreadable-record` ("could not be checked"), because the staple rule cannot read it either;
+    still `unknown`, never usable. `mcp.node.js` / `mcp-safety.node.js` schema-key tests include `tracking`.
+decisions / notes:
+  - `tracking: 'quantity'` needs a finite quantity >= 0 and a non-blank unit; a negative stored quantity is
+    `presence`. A zero-quantity counted lot stays `quantity`.
+  - The shared rule does not trim category (`" Pantry "` is non-staple) — parity, not a bridge choice.
+  - `mark_out_of_stock` on a presence-only or formerly ambiguous non-staple now removes it with a tombstone
+    (the app's `correctKitchenStock` answer); it is undoable (TASK-095).
+  - `AmbiguousError` and its REST/MCP mappings remain (reserved code) but nothing throws it now. The
+    `errors.js` comment that still describes the old gap was left as is (file outside TASK-097's list).
+  - No app, `shared/`, stored-data, ledger, or Phase 1 guard change. Nothing deployed.
+
 ## TASK-095 — implementation complete (branch: task-095-mcp-undo; base: prop041-p1 2c90d22)
 Builder: Claude standing in for Codex (Codex at its usage limit). PROP-041 P1-5, owner decisions 3 and 5.
 changed:
