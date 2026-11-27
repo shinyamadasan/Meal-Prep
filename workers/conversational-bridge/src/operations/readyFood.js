@@ -20,7 +20,7 @@ import { NotFoundError, ValidationError, InsufficientServingsError } from '../er
 import '../../../../shared/readyFoodContract.js';
 // Shared food-safety rules (TASK-091/092): the get_ready_food safety verdict only.
 import '../../../../shared/foodSafety.js';
-import { isCalendarDay, requireHouseholdDay, useSoonLabel } from './inventory.js';
+import { isCalendarDay, isStoredRecord, readableId, requireHouseholdDay, useSoonLabel } from './inventory.js';
 
 const READY_FOOD_CONTRACT = globalThis.MealPrepReadyFoodContract;
 const FoodSafety = globalThis.MealPrepFoodSafety;
@@ -73,12 +73,12 @@ export function readyFoodSafety(meal, today) {
   } catch {
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
   }
-  const daysLeft = Number.isFinite(signal.daysLeft) ? signal.daysLeft : null;
-  // An absurd stored shelf life (e.g. freezerLife 1e20) gives a day count the schema cannot carry;
-  // that batch alone is unknown instead of failing the whole read (re-review must-fix 1).
-  if (daysLeft != null && !Number.isSafeInteger(daysLeft)) {
+  // An absurd stored shelf life (freezerLife 1e20, +/-Infinity, NaN) gives a day count the schema
+  // cannot carry or that would read as "no quality date"; that batch alone is unknown.
+  if (signal.daysLeft != null && !Number.isSafeInteger(signal.daysLeft)) {
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
   }
+  const daysLeft = signal.daysLeft == null ? null : signal.daysLeft;
   const frozen = meal.storage === 'freezer';
   let status;
   let reason;
@@ -139,7 +139,8 @@ function textOrNullValue(value) {
 
 function readableBatch(meal) {
   const pr = meal.portionsRemaining;
-  return (pr == null || (Number.isInteger(pr) && pr >= 0 && pr <= PORTION_COUNT_MAX)) &&
+  return readableId(meal.id) && (meal.recipeId == null || readableId(meal.recipeId)) &&
+    (pr == null || (Number.isInteger(pr) && pr >= 0 && pr <= PORTION_COUNT_MAX)) &&
     (!meal.storage || VALID_STORAGE.includes(meal.storage)) &&
     (meal.source == null || READY_FOOD_SOURCES.includes(meal.source)) &&
     (meal.name == null || typeof meal.name === 'string') &&
@@ -150,13 +151,14 @@ function readableBatch(meal) {
 export function listReadyFoodWithSafety(cookedMeals, today) {
   requireHouseholdDay(today);
   // A null or non-object entry is not a record; it is skipped, never a failed read.
-  return (cookedMeals || []).filter((meal) => meal != null && typeof meal === 'object').map((meal) => {
+  return (cookedMeals || []).filter(isStoredRecord).map((meal, index) => {
     if (readableBatch(meal)) {
       return Object.assign(toReadyFoodItem(meal), { safety: readyFoodSafety(meal, today) });
     }
     return {
-      cookedMealId: String(meal.id),
-      recipeId: meal.recipeId != null ? String(meal.recipeId) : null,
+      // An unreadable id gets a placeholder no write tool will match.
+      cookedMealId: readableId(meal.id) ? String(meal.id) : 'unreadable-id-' + index,
+      recipeId: readableId(meal.recipeId) ? String(meal.recipeId) : null,
       source: READY_FOOD_SOURCES.includes(meal.source) ? meal.source : null,
       name: textOrNullValue(meal.name),
       servingsRemaining: null,

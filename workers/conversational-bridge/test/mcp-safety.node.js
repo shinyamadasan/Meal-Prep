@@ -402,6 +402,65 @@ test('review fix S1: an absurd stored shelf life is unknown and does not fail ge
   assert.equal(byId.fine.safety.usable, true);
 });
 
+test('re-review #3: map ids, map category and array entries never fail a read', async () => {
+  const today = '2026-11-26';
+  const base = { name: 'Rice', category: 'Grain', storage: 'counter', purchaseDate: today, dateMode: 'purchase', shelfLifeDays: 365, quantity: 1, unit: 'kg' };
+  const pantry = [
+    Object.assign({ id: 'good' }, base),
+    Object.assign({}, base, { id: { toString: 'x' } }),
+    Object.assign({}, base, { id: 'cat', category: { toString: 'x' } }),
+    ['array-entry'],
+    Object.assign({}, base)
+  ];
+  const inv = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  assert.equal(inv.message.result.isError, undefined, JSON.stringify(inv.message.result.content));
+  const items = inv.message.result.structuredContent.items;
+  assert.deepEqual(items.map((i) => i.ingredientId), ['good', 'unreadable-id-1', 'cat']);
+  assert.equal(items[0].safety.usable, true);
+  assert.deepEqual(items[1].safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false });
+  assert.equal(items[2].category, null);
+
+  const meal = { name: 'Adobo', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 };
+  const cookedMeals = [
+    Object.assign({ id: 'good' }, meal),
+    Object.assign({ id: { toString: 'x' } }, meal),
+    Object.assign({ id: 'rid', recipeId: { toString: {} } }, meal),
+    ['array-entry'],
+    Object.assign({}, meal)
+  ];
+  const rf = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals }, manilaNoon(today));
+  assert.equal(rf.message.result.isError, undefined, JSON.stringify(rf.message.result.content));
+  const meals = rf.message.result.structuredContent.items;
+  assert.deepEqual(meals.map((m) => m.cookedMealId), ['good', 'unreadable-id-1', 'rid']);
+  assert.equal(meals[0].safety.usable, true);
+  for (const m of meals.slice(1)) {
+    assert.deepEqual(m.safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before eating', daysLeft: null, usable: false });
+    assert.equal(m.recipeId, null);
+  }
+});
+
+test('re-review #3: an infinite or NaN shelf life is unknown, never ok / No date recorded', async () => {
+  const today = '2026-11-26';
+  const lot = { name: 'Lettuce', category: 'Vegetable', purchaseDate: '2026-11-20', dateMode: 'purchase', quantity: 1, unit: 'pc', staple: false };
+  const pantry = [
+    Object.assign({ id: 'neginf-counter', storage: 'counter', shelfLifeDays: -Infinity }, lot),
+    Object.assign({ id: 'neginf-freezer', storage: 'freezer', shelfLifeDays: -Infinity }, lot),
+    Object.assign({ id: 'neg308', storage: 'counter', shelfLifeDays: -1e308 }, lot),
+    Object.assign({ id: 'posinf', storage: 'counter', shelfLifeDays: Infinity }, lot),
+    Object.assign({ id: 'neginf-text', storage: 'counter', shelfLifeDays: '-Infinity' }, lot)
+  ];
+  const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
+  for (const item of message.result.structuredContent.items) {
+    assert.equal(item.safety.status, 'unknown', item.ingredientId);
+    assert.equal(item.safety.usable, false, item.ingredientId);
+  }
+  const cookedMeals = [{ id: 'inf', name: 'Adobo', storage: 'freezer', cookedDate: today, freezerLife: Infinity, portionsRemaining: 2 }];
+  const rf = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals }, manilaNoon(today));
+  assert.deepEqual(rf.message.result.structuredContent.items[0].safety,
+    { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false });
+});
+
 test('read-tool descriptions forbid suggesting unusable food; record_ready_food no longer claims unknown freshness', async () => {
   const response = await routeRequest(mcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }), testEnv(), { nowSeconds: NOW }, validContext());
   const tools = Object.fromEntries((await responseMessage(response)).result.tools.map((tool) => [tool.name, tool]));

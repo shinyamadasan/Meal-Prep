@@ -45,7 +45,8 @@ function classifyStaple(p) {
   if (!p) return 'non-staple';
   if (p.staple === true) return 'staple';
   if (p.staple === false) return 'non-staple';
-  const category = (p.category == null ? '' : String(p.category)).trim().toLowerCase();
+  // Only text or a number is read as a category: String() on a stored map can throw.
+  const category = (typeof p.category === 'string' || typeof p.category === 'number' ? String(p.category) : '').trim().toLowerCase();
   if (category === 'pantry') return 'staple';
   return 'ambiguous';
 }
@@ -116,12 +117,12 @@ export function pantrySafety(p, today) {
     // A record the shared rules cannot read is unknown, never usable; it must not hide the rest.
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
   }
-  let daysLeft = Number.isFinite(signal.daysLeft) ? signal.daysLeft : null;
-  // An absurd stored shelf life (e.g. 1e20) gives a day count the schema cannot carry; that lot
-  // alone is unknown instead of failing the whole read (review S1).
-  if (daysLeft != null && !Number.isSafeInteger(daysLeft)) {
+  // An absurd stored shelf life (1e20, +/-Infinity, NaN) gives a day count the schema cannot carry
+  // or that would read as "no date"; that lot alone is unknown, never ok and never a failed read.
+  if (signal.daysLeft != null && !Number.isSafeInteger(signal.daysLeft)) {
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
   }
+  let daysLeft = signal.daysLeft == null ? null : signal.daysLeft;
   let kind = signal.kind;
   // Within a fridge safety limit the app shows the shelf-life estimate, which can outlast the
   // limit (raw chicken: 3-day protein estimate, 2-day poultry limit). Chat gets the sooner day, so
@@ -193,8 +194,18 @@ function textOrNullField(value) {
   return value == null || typeof value === 'string';
 }
 
+// An id is read only when it is text or a finite number (String() on a stored map can throw).
+export function readableId(value) {
+  return typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
+}
+
+// The app keeps only object records with an id (unionById); chat sees the same set.
+export function isStoredRecord(entry) {
+  return entry != null && typeof entry === 'object' && !Array.isArray(entry) && entry.id != null;
+}
+
 function readableLot(p) {
-  return textOrNullField(p.name) && textOrNullField(p.unit) && textOrNullField(p.storage) &&
+  return readableId(p.id) && textOrNullField(p.name) && textOrNullField(p.unit) && textOrNullField(p.storage) &&
     textOrNullField(p.updatedAt) &&
     (p.quantity == null || (typeof p.quantity === 'number' && Number.isFinite(p.quantity))) &&
     (p.stockLevel == null || READ_STOCK_LEVELS.includes(p.stockLevel));
@@ -202,7 +213,7 @@ function readableLot(p) {
 
 export function listInventoryWithSafety(pantry, today) {
   requireHouseholdDay(today);
-  return (pantry || []).filter((p) => p != null && typeof p === 'object').map((p) => {
+  return (pantry || []).filter(isStoredRecord).map((p, index) => {
     const dates = {
       category: textOrNull(p.category),
       purchaseDate: textOrNull(p.purchaseDate),
@@ -212,7 +223,8 @@ export function listInventoryWithSafety(pantry, today) {
     };
     if (readableLot(p)) return Object.assign(toInventoryItem(p), dates, { safety: pantrySafety(p, today) });
     return Object.assign({
-      ingredientId: String(p.id),
+      // An unreadable id gets a placeholder no write tool will match.
+      ingredientId: readableId(p.id) ? String(p.id) : 'unreadable-id-' + index,
       name: textOrNull(p.name),
       quantity: typeof p.quantity === 'number' && Number.isFinite(p.quantity) ? p.quantity : null,
       unit: textOrNull(p.unit),
