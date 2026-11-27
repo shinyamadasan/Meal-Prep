@@ -7014,7 +7014,7 @@ verification: the commands above; `git diff --check`; CHANGELOG/TEST_REPORT.
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-097 · PROP-041 P2-0a Staple parity: the bridge uses the app's `isStaple`
-status: codex
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (changes which lots the quantity and stock-level write tools accept)
 source: BQ-034 / PROP-041 Phase 2 priority 1 (stock-tracking ambiguity, 59 of 97 lots)

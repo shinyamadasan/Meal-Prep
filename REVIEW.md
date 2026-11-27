@@ -4,6 +4,43 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-097 (PROP-041 P2-0a staple parity) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `9f0d77c`. Independent
+STRICT review round 1: **FAIL** — parity itself correct (23 input shapes, no mismatch with the app's
+`isStaple`; unreadable input refused, never guessed). Must-fix M1: the new tool text and README
+promised that a record `get_inventory` flags `invalid-record` (`tracking: null`) is never changed
+from chat, but writes only refused what `isStaple` could not read, so records the read gate
+(`readableLot`) rejects (string quantity, non-text unit/storage, unknown stockLevel) could be
+removed, changed, or saved-then-failed output validation (pre-existing writes, new false promise).
+Should-fix: negative quantity tracked as `presence` (blocked its correction); `level` text
+contradicted add_stock/consume_stock; openapi still described `ambiguous`; REST code naming (S4).
+
+Review fixes (Claude; evidence here, not in CHANGELOG/TEST_REPORT):
+- `3fe1f00`: `requireClassified` applies the read gate too (`classification === 'invalid' ||
+  !readableLot(record)`), the exact complement of the read's readable condition; tests for every
+  repro (MCP, zero writes, no request record); a finite negative quantity is `quantity`; text and
+  openapi corrected. Two older assertions moved from `presence_only` / "record separately" to
+  `invalid_record` for non-text unit/storage only (stricter, not weakened).
+- `f1978ee`: README states REST `set-quantity` is the raw, unclassified absolute write
+  (pre-existing; REST has no known client, release checklist 2.1); tracking text gives the unit and
+  whole-amount rules.
+Round 2 STRICT re-review of `9f0d77c..3fe1f00`: **PASS, no must-fix** — 17 flagged records × 5
+tools, 0 MCP violations, store and request map byte-identical; nothing readable is over-refused;
+replay, undo, `already_undone`, `changed_since`, `presence_only` not spending its id, and add_stock
+safety all intact. Should-fix (REST set-quantity docs) and nits fixed in `f1978ee`.
+Gates: `test:bridge` 380/380 (Claude, merged head); reviewer `npm test` 912/912, ledger 13/13,
+`git diff --check` clean. Private real-export check (pure functions, 2026-11-27): the 59 formerly
+`ambiguous` lots now get the app's answer (all non-staple); `add_stock` accepts the same 11 of 97,
+and every refusal now names its real reason (41 no amount recorded, 27 safety, 13 staple levels).
+
+Accepted: REST reports `invalid_record` inside `422 validation_failed` (S4); REST `set-quantity`
+unclassified (follow-up with REST parity/retirement); arrays/strings as records are refused where
+the app calls them non-staple (stricter, never a guess); `AmbiguousError` mapping kept, unused.
+Merged into `prop041-p2` (`1692ca4`). **Gate: `approved` (held)** — red zone: changes which lots
+chat may tombstone. Separate from the Phase 1 release; no deploy.
+
+---
 ## Review TASK-095 (PROP-041 P1-5 recoverable chat changes: undo_request) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `2f086fa`. Independent
