@@ -6917,7 +6917,7 @@ constraints: No change to which fields each tool changes or to its validation. N
 verification: as TASK-092.
 
 ### TASK-094 · PROP-041 P1-4 Safe purchase handling in `add_stock`
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (inventory write; food safety)
 source: BQ-032 / PROP-041 P1-4; audit C2; owner decision 4

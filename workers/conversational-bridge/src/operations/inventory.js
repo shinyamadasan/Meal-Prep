@@ -20,26 +20,14 @@
 import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
 import { convertQuantity } from './quantity.js';
 // Shared food-safety rules (TASK-091, D-090): defines globalThis.MealPrepFoodSafety, the same rules
-// the app uses. Only the get_inventory safety verdict reads it (TASK-092); the write operations
-// below still use the bridge's own classification described above.
+// the app uses. The get_inventory safety verdict (TASK-092) and add_stock's merge gate (TASK-094)
+// read it; the other write operations still use the bridge's own classification described above.
 import '../../../../shared/foodSafety.js';
 
 const FoodSafety = globalThis.MealPrepFoodSafety;
 
 const MAX_UNIT_LENGTH = 40;
 const MAX_STOCK_QUANTITY = Number.MAX_SAFE_INTEGER;
-const MILLISECONDS_PER_DAY = 86400000;
-const UTC_LOCAL_DATE_SKEW_DAYS = 1;
-const DEFAULT_CATEGORY_SHELF_LIFE_DAYS = 7;
-
-const CATEGORY_SHELF_LIFE_DAYS = Object.freeze({
-  protein: 3,
-  vegetable: 7,
-  fruit: 5,
-  dairy: 7,
-  grain: 180,
-  pantry: 365
-});
 
 function classifyStaple(p) {
   if (!p) return 'non-staple';
@@ -498,53 +486,67 @@ export function consumeStock(pantry, deletionsPantry, { ingredientId, quantity, 
   };
 }
 
-function dateStringToUtcDay(value, field) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new ValidationError('The stored ' + field + ' is malformed; clarify freshness in the app before adding stock.', { field });
+const SEPARATE_PURCHASE = 'record the new purchase separately in the app.';
+
+// add_stock's bought-date input (TASK-094): optional, a real YYYY-MM-DD calendar day, never after
+// the household day. Checked before any Firestore access (mcp.js precheck) and again here.
+export function validateBoughtDate(boughtDate, today) {
+  requireHouseholdDay(today);
+  if (boughtDate === undefined) return;
+  if (!isCalendarDay(boughtDate)) {
+    throw new ValidationError('boughtDate must be a real calendar day in YYYY-MM-DD form.', { field: 'boughtDate' });
   }
-  const timestamp = Date.parse(value + 'T00:00:00.000Z');
-  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
-    throw new ValidationError('The stored ' + field + ' is malformed; clarify freshness in the app before adding stock.', { field });
+  if (boughtDate > today) {
+    throw new ValidationError('boughtDate ' + boughtDate + ' is after today (' + today + ' in the household time zone); a purchase cannot be in the future. Ask the user when it was bought.', { field: 'boughtDate' });
   }
-  return Math.floor(timestamp / MILLISECONDS_PER_DAY);
 }
 
-function validateMergeFreshness(record) {
+// May new stock join this lot? (TASK-094, PROP-041 P1-4, owner decision 4.) Decided ONLY by the
+// shared verdict for the household day (pantrySafety / shared/foodSafety.js), never by a bridge
+// default: new food must never inherit an older or unsafe lot's clock, and no bought date is
+// invented. A lot whose only problem is that it is out of stock (reason `out-of-stock`: an empty
+// staple, a zero count) is still a merge target: refilling it is what add_stock is for, and its
+// dates passed the same verdict. Returns the stated-back lot facts for the success result.
+function requireMergeableLot(record, boughtDate, today) {
   if (record.dateMode === 'expiry') {
-    throw new ValidationError('This item has a printed expiry date and cannot be merged safely; use the app to record the new purchase separately.', { field: 'dateMode' });
+    throw new ValidationError('This lot has a printed date, so new stock cannot share it; ' + SEPARATE_PURCHASE, { field: 'dateMode' });
   }
-  if (record.purchaseDate == null) return;
-
-  const purchaseDay = dateStringToUtcDay(record.purchaseDate, 'purchaseDate');
-  let shelfLifeDays = record.shelfLifeDays;
-  if (shelfLifeDays == null) {
-    if (record.category != null && typeof record.category !== 'string') {
-      throw new ValidationError('The stored category is malformed; clarify freshness in the app before adding stock.', { field: 'category' });
+  const verdict = pantrySafety(record, today);
+  // Allow-list, so any other or future status fails closed. Today an ok/use-soon lot that is not
+  // usable is always `out-of-stock`; the second clause keeps it that way if new reasons appear.
+  const mergeable = (verdict.status === 'ok' || verdict.status === 'use-soon') &&
+    (verdict.usable || verdict.reason === 'out-of-stock');
+  if (!mergeable) {
+    throw new ValidationError('This lot cannot take new stock safely (' + verdict.label + '); ' + SEPARATE_PURCHASE, { field: 'ingredientId', safety: verdict.status });
+  }
+  const fridge = FoodSafety.pantryFridgeSafety(record, today);
+  const lotBought = textOrNull(record.purchaseDate);
+  if (fridge) {
+    // Raw meat, poultry, seafood, ground, variety, sausage or cooked food in the fridge: its clock
+    // is the bought day, so the new purchase must be from that same day.
+    if (boughtDate === undefined) {
+      throw new ValidationError(
+        'needs_bought_date: this lot is ' + fridge.safetyClass + ' food with a ' + fridge.limitDays + '-day fridge limit counted from its bought date (' + lotBought + '). ' +
+        'Ask the user what day they bought the new stock and send it as boughtDate. Use today only if they said "today" or "just bought"; never guess.',
+        { field: 'boughtDate', code: 'needs_bought_date' }
+      );
     }
-    const category = (record.category || '').trim().toLowerCase();
-    shelfLifeDays = Object.hasOwn(CATEGORY_SHELF_LIFE_DAYS, category)
-      ? CATEGORY_SHELF_LIFE_DAYS[category]
-      : DEFAULT_CATEGORY_SHELF_LIFE_DAYS;
+    if (boughtDate !== lotBought) {
+      throw new ValidationError('This lot was bought on ' + lotBought + ' and the new stock on ' + boughtDate + '; they must not share one safety clock. ' + SEPARATE_PURCHASE, { field: 'boughtDate' });
+    }
   }
-  if (typeof shelfLifeDays !== 'number' || !Number.isFinite(shelfLifeDays) || !Number.isInteger(shelfLifeDays) || shelfLifeDays < 0) {
-    throw new ValidationError('The stored shelf life is malformed; clarify freshness in the app before adding stock.', { field: 'shelfLifeDays' });
+  let storage = textOrNull(record.storage);
+  if (!storage) {
+    try { storage = textOrNull(FoodSafety.defaultInferStorage(record.name)); } catch { storage = null; }
   }
-
-  const expiryDay = purchaseDay + shelfLifeDays;
-  const utcToday = Math.floor(Date.now() / MILLISECONDS_PER_DAY);
-  // The app uses the browser-local calendar day; this Worker has no stored caller timezone.
-  // A local date can be one day behind or ahead of UTC, so decide only outside that window.
-  if (expiryDay < utcToday - UTC_LOCAL_DATE_SKEW_DAYS) {
-    throw new ValidationError('This item is already expired and cannot be merged; use the app to record the new purchase separately.', { field: 'purchaseDate' });
-  }
-  if (expiryDay <= utcToday) {
-    throw new ValidationError('Freshness is near a UTC/local date boundary; re-check the item in the app before adding stock.', { field: 'purchaseDate' });
-  }
+  return { boughtDate: lotBought, storage };
 }
 
 // Apply a conversational purchase delta to an existing row only. Preserve the old lot's
-// freshness/storage metadata; reject printed-expiry rows, unsafe dates, and resurrection.
-export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expectedUnit }) {
+// freshness/storage metadata; reject resurrection and any lot the shared verdict for the household
+// day `today` does not allow new stock to join (requireMergeableLot).
+export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expectedUnit, boughtDate }, today) {
+  validateBoughtDate(boughtDate, today);
   if (typeof ingredientId !== 'string' || !ingredientId.trim()) {
     throw new ValidationError('ingredientId must be a non-blank string.', { field: 'ingredientId' });
   }
@@ -579,7 +581,7 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
   if (typeof record.unit !== 'string' || !record.unit.trim()) {
     throw new ValidationError('The stored unit is missing; re-read inventory and clarify before adding stock.', { field: 'expectedUnit' });
   }
-  if (classification === 'non-staple') validateMergeFreshness(record);
+  const lot = requireMergeableLot(record, boughtDate, today);
   const amount = convertQuantity(quantity, expectedUnit, record.unit);
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new ValidationError('The resulting stock quantity is outside the safely representable range.', { field: 'quantity' });
@@ -603,5 +605,5 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
     delete updated.suggestDismissed;
   }
   next[index] = updated;
-  return { pantry: next, item: toInventoryItem(updated), unchanged: false };
+  return { pantry: next, item: toInventoryItem(updated), lot, unchanged: false };
 }

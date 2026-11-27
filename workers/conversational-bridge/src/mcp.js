@@ -202,6 +202,9 @@ function addStockInputSchema() {
     ingredientId: z.string().min(1).refine((value) => value.trim().length > 0),
     quantity: z.number().finite().positive(),
     expectedUnit: z.string().min(1).refine((value) => value.trim().length > 0),
+    // TASK-094: the day the NEW stock was bought (household calendar). Required by the Worker for a
+    // fridge safety lot; a business argument, so it is part of the request's argsHash.
+    boughtDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     requestId: requestIdSchema(),
     expectedRevision: z.number().int().nonnegative()
   });
@@ -480,16 +483,28 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'State the exact amount and unit the user bought. The Worker adds this delta to the live ' +
         'stored quantity; do not calculate or submit an absolute total. Only exact same-unit arithmetic ' +
         'and g/kg or ml/L metric scaling are supported. Do not infer cups, density, pieces-to-mass, ' +
-        'or can/package conversions. Printed-expiry lots, expired or date-ambiguous rows, stock-level-only ' +
-        'staples, and removed/tombstoned items must be handled in the app; use mark_in_stock for a ' +
-        'stock-level-only staple. This delta is NOT safe to replay with a fresh revision; on ' +
-        'revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
+        'or can/package conversions. New stock only joins a lot the shared safety verdict allows: a lot ' +
+        'that is expired, unknown, check, or has a printed date is refused, and the user must record the ' +
+        'new purchase separately in the app. For a fridge safety lot (raw meat, poultry, seafood, ground ' +
+        'or variety meat, sausage, cooked food) send boughtDate (YYYY-MM-DD, the day the NEW stock was ' +
+        'bought); it merges only when it equals the bought date of the lot, otherwise it must be recorded ' +
+        'separately in the app. On needs_bought_date, ask the user when they bought it; use today only ' +
+        'if they said "today" or "just bought", never guess. A future boughtDate is rejected. Other lots ' +
+        'keep their stored dates. Tell the user the bought date and storage of the lot from the result. ' +
+        'Stock-level-only staples and removed/tombstoned items must be handled in the app; use ' +
+        'mark_in_stock for a stock-level-only staple. This delta is NOT safe to replay with a fresh ' +
+        'revision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
       inputSchema: addStockInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
         replayed: REPLAYED_SCHEMA,
-        item: inventoryItemSchema()
+        item: inventoryItemSchema(),
+        // TASK-094: stated back to the user ("bought 2026-11-27, stored in fridge").
+        lot: z.strictObject({
+          boughtDate: z.string().nullable(),
+          storage: z.string().nullable()
+        })
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },
       annotations: ADD_STOCK_ANNOTATIONS
@@ -603,18 +618,26 @@ async function consumeStockTool(env, deps, ctx, args) {
 }
 
 // Apply exactly one purchase delta to the observed existing row, then make one guarded pantry write.
+// The household day (TASK-092 setting, injectable clock) is fixed once per call, before any
+// Firestore access: an invalid HOUSEHOLD_TIME_ZONE or a malformed/future boughtDate fails here.
 async function addStockTool(env, deps, ctx, args) {
+  let today;
   return requestWriteTool(env, deps, ctx, 'add_stock', args, {
     fallback: 'The inventory stock could not be increased.',
+    precheck: (input) => {
+      today = householdDayFromEnv(env, deps.now);
+      inventory.validateBoughtDate(input.boughtDate, today);
+    },
     apply: (doc) => {
       const r = inventory.addStock(doc.pantry, doc.deletions.pantry || {}, {
         ingredientId: args.ingredientId,
         quantity: args.quantity,
-        expectedUnit: args.expectedUnit
-      });
+        expectedUnit: args.expectedUnit,
+        boughtDate: args.boughtDate
+      }, today);
       return {
         write: { fieldPaths: ['pantry'], fields: { pantry: r.pantry } },
-        result: (revision) => ({ ok: true, revision, item: r.item })
+        result: (revision) => ({ ok: true, revision, item: r.item, lot: r.lot })
       };
     }
   });
