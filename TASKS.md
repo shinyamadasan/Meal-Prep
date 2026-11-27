@@ -6778,7 +6778,7 @@ constraints:
      ═══════════════════════════════════════════════════════ -->
 
 ### TASK-091 · PROP-041 P1-1 Shared food-safety core (app + Worker, identical verdicts)
-status: review
+status: approved
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (moves the app's food-safety rules; red zone because the Worker will rely on them)
 source: BQ-032 / PROP-041 P1-1
@@ -6837,7 +6837,7 @@ verification: `npm test`; `npm run test:ledger-contract`; `npm run test:bridge` 
   SELF_REVIEW.md + QA.md; CHANGELOG/TEST_REPORT entries.
 
 ### TASK-092 · PROP-041 P1-2 Truthful MCP reads: safety verdict on every inventory and ready-food item
-status: todo
+status: codex
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (Worker; what chat is allowed to recommend)
 source: BQ-032 / PROP-041 P1-2; audit C1 and C3 (planning/PROPOSALS.md PROP-041)
@@ -6862,6 +6862,17 @@ acceptance:
         `check` means look at it first. `record_ready_food` description fixed for audit C3.
   - [ ] Output schemas updated (strict); all existing read and write tools keep behaviour; a test
         proves the shared verdict and the response verdict match for every parity-fixture case.
+planning notes from the TASK-091 review (binding, D-091):
+  - Chat `usable` is STRICTER than the app for one case (TASK-091 finding F2): an item whose
+    `status` is `expired` or `unknown` is `usable:false` even when the app's `pantryLotAvailable`
+    is true (e.g. a staple past its printed use-by). Otherwise `usable` equals `pantryLotAvailable`.
+    Do not change the app.
+  - Ready food: move the pure portion helpers the app uses in `getReadyFoodSuggestions`
+    (`cookedMealTracksPortions`, `portionCountOrNull`) into `shared/foodSafety.js` with app
+    wrappers (same pattern and parity rule as TASK-091) and derive ready-food `usable` from the same
+    shared rule the app uses; add parity cases. Do not reimplement it in the Worker.
+  - The Worker uses the shared default storage path (no `PANTRY_KNOWLEDGE`): a lot with no
+    `storage` whose exact name has no INGREDIENT_DB storage is `unknown` / not usable. Keep that.
 constraints: Read tools only (plus descriptions). No write behaviour, no new tool, no OAuth/route/
   secret change. No deploy. Stop at `status: review`.
 verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`; `git diff --check`;
