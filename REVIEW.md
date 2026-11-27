@@ -4,6 +4,27 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-091 (PROP-041 P1-1 shared food-safety core) — APPROVED (held) — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit). Independent STRICT review + QA: separate
+Claude session — **PASS, no must-fix.** Reviewer evidence: own base-vs-head harness, 21,931
+comparisons of the original app functions against the new wrappers (2,500 random lots, 600 cooked
+meals, 7 days incl. DST/leap/month-end), 0 mismatches; fixture expectations re-derived from the
+original `app.js` independently; 3 rule mutations each fail browser and Node parity tests.
+Claude's own gates on `116a3a9`: `test:bridge` 262/262; ledger contract + parity 17/17; private
+production-export check on an offline copy (Firebase removed): all 20 collections unchanged, zero
+data writes on load, the same 8 Expired / 7 Check items as the released app (day counts shifted by
+the calendar day only), recovery re-import passes, no page errors. Reviewer: `npm test` 909/909.
+Accepted deviations: extra shared evaluator test file; ready-food rule not extracted (moved into
+TASK-092 scope). Findings F1-F3 pre-date this task (unchanged behaviour). Decisions recorded in
+D-091: default-path `unknown` storage, throw on bad `today`, chat `usable` stricter than the app
+for expired/unknown items, and the accepted hard load dependency (`app.js` needs
+`shared/foodSafety.js`; it is in the service-worker cache list).
+Merged into `prop041-p1`. **Gate: `approved` (held)** — red zone: the safety rules the Worker will
+rely on; app ships only with the owner-approved Phase 1 release.
+
+---
+
 ## Review TASK-096 (refresh four outdated production smoke specs) — APPROVED → done — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit). Independent QA + review: separate Claude

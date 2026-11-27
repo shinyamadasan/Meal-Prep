@@ -3672,3 +3672,19 @@ fixed first. A second copy of the safety rules in the Worker would drift; a shar
 
 **Consequences.** BQ-030/031 (TASK-083 follow-ups, TASK-084) are frozen. PROP-041 Phases 2-3 need a
 new owner approval. Phase 1 lands `approved` (held); nothing deploys without the owner.
+
+## D-091 — Shared food-safety core: default-path rules for the Worker
+
+**Date:** 2026-11-27 · **Tasks:** TASK-091, TASK-092 · **Decided by:** Claude (owner-approved Phase 1 scope)
+
+**Decision.** `shared/foodSafety.js` (globalThis `MealPrepFoodSafety`) is the only definition of the
+food-safety rules. The app passes its own `todayISO()` and `inferStorage` (with `PANTRY_KNOWLEDGE`)
+through thin wrappers, so its verdicts are unchanged. Without a storage hook (the Worker), a lot
+with no `storage` whose exact name has no INGREDIENT_DB storage is `unknown` and never usable. A
+missing or malformed `today` throws instead of guessing a day. For chat, `usable` is stricter than
+the app in one case: an item whose status is `expired` or `unknown` is never usable, even when the
+app keeps it available (a staple past its printed use-by, TASK-091 finding F2). `app.js` now
+depends on `shared/foodSafety.js` at load time; the file is in the service-worker cache list.
+
+**Why.** One rule set cannot drift. Unknown safety must never read as safe (PROP-041 principle).
+The app's behaviour is frozen (D-090), so the stricter chat rule lives only in the Worker.
