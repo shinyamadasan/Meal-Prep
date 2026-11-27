@@ -279,6 +279,12 @@ test('a no-op write (already full) leaves the user document alone but spends the
   assert.equal(message.result.structuredContent.unchanged, true);
   assert.equal(message.result.structuredContent.revision, 3);
   assert.equal(b.count('commit'), 1, 'one record-only commit');
+  // The exact commit body: ONE write, the create-only request record; no user-document write.
+  const body = JSON.parse(b.calls.find((c) => c.kind === 'commit').init.body);
+  assert.equal(body.writes.length, 1);
+  assert.match(body.writes[0].update.name, /\/users\/[^/]+\/mcpRequests\/noop-full-01$/);
+  assert.deepEqual(body.writes[0].currentDocument, { exists: false });
+  assert.equal(body.writes[0].updateMask, undefined);
   assert.equal(b.fake.store.fields.version, versionBefore, 'user document version unchanged');
   assert.equal(JSON.stringify(b.fake.store.fields.pantry), pantryBefore, 'pantry unchanged');
   const record = b.fake.requestRecord('noop-full-01');
@@ -312,6 +318,32 @@ test('added: consume_ready_food records the ledger fact it appended; record_read
   const created = c.fake.requestRecord('new-batch-02');
   assert.equal(created.added.cookedMeals.length, 1);
   assert.equal(String(created.added.cookedMeals[0].id), created.result.item.cookedMealId);
+});
+
+test('no-op failure paths: concurrent same-id no-ops give one record and one replay; ABORTED with no record is revision_conflict', async () => {
+  const b = racingBridge();
+  const args = { requestId: 'noop-race-001', ingredientId: 'salt', expectedRevision: 3 };
+  const [x, y] = await Promise.all([b.call('mark_in_stock', args), b.call('mark_in_stock', args)]);
+  for (const m of [x, y]) {
+    assert.equal(m.result.isError, undefined, text(m));
+    assert.equal(m.result.structuredContent.unchanged, true);
+    assert.equal(m.result.structuredContent.revision, 3);
+  }
+  assert.equal([x, y].filter((m) => m.result.structuredContent.replayed === true).length, 1);
+  assert.equal(b.fake.store.fields.version, 3, 'user document untouched');
+  assert.equal(b.fake.requestRecord('noop-race-001').tool, 'mark_in_stock');
+
+  const aborted = bridge(seed(), {
+    hook: async (kind) => (kind === 'commit'
+      ? new Response(JSON.stringify({ error: { code: 409, status: 'ABORTED', message: 'Transaction aborted.' } }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } })
+      : null)
+  });
+  const failed = await aborted.call('mark_in_stock', { requestId: 'noop-abort-01', ingredientId: 'salt', expectedRevision: 3 });
+  assert.equal(failed.result.isError, true);
+  assert.match(text(failed), /^revision_conflict/);
+  assert.equal(aborted.fake.requestRecord('noop-abort-01'), undefined);
+  assert.equal(aborted.fake.store.fields.version, 3);
 });
 
 // ── Replay and reuse ─────────────────────────────────────────────────────────────────────────
