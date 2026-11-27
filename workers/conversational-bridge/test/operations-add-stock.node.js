@@ -252,3 +252,14 @@ test('review fixes: unreadable or non-exact storage is refused; older boughtDate
   assert.equal(inferred.lot.storageSource, 'inferred');
   assert.equal(inferred.lot.storage, 'counter');
 });
+
+test('review: empty-string storage behaves like none (inferred; fridge safety rules still apply)', () => {
+  const chicken = () => [{ id: 'c', name: 'Chicken Breast', category: 'Protein', storage: '', purchaseDate: '2026-11-26', quantity: 500, unit: 'g', staple: false }];
+  assert.throws(() => call(chicken(), { ingredientId: 'c', quantity: 1, expectedUnit: 'g' }),
+    (e) => e instanceof ValidationError && /^needs_bought_date/.test(e.message));
+  assert.throws(() => call(chicken(), { ingredientId: 'c', quantity: 1, expectedUnit: 'g', boughtDate: '2026-11-27' }),
+    (e) => e instanceof ValidationError && /record the new purchase separately in the app/.test(e.message));
+  const merged = call(chicken(), { ingredientId: 'c', quantity: 1, expectedUnit: 'g', boughtDate: '2026-11-26' });
+  assert.equal(merged.item.quantity, 501);
+  assert.deepEqual(merged.lot, { boughtDate: '2026-11-26', storage: 'fridge', storageSource: 'inferred' });
+});

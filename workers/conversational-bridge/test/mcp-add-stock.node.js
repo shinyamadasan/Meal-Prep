@@ -236,7 +236,10 @@ test('unit mismatch, unsupported units, expired, check or printed-date lots, and
     [{ ...RAW_CHICKEN, purchaseDate: '2026-11-20' }, { ...VALID, boughtDate: '2026-11-20' }],
     [{ ...RAW_CHICKEN, purchaseDate: null }, VALID],
     [{ ...FRESH_ROW, name: 'Mystery item', storage: null }, VALID],
-    [{ id: 'rice', name: 'Rice', staple: true, stockLevel: 'empty' }, { ...VALID, ingredientId: 'rice' }]
+    [{ id: 'rice', name: 'Rice', staple: true, stockLevel: 'empty' }, { ...VALID, ingredientId: 'rice' }],
+    // TASK-094 review: storage the read calls unreadable, or not exactly fridge/freezer/counter.
+    [{ ...RAW_CHICKEN, storage: {} }, { ...VALID, boughtDate: '2026-11-27' }],
+    [{ ...RAW_CHICKEN, storage: 'Fridge' }, { ...VALID, boughtDate: '2026-11-27' }]
   ];
   for (const [row, args] of cases) {
     const b = clockBridge(row, MANILA_LATE_EVENING);

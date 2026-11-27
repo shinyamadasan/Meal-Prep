@@ -463,8 +463,11 @@ write tools are unchanged; `requestId` / `expectedRevision` guards are unchanged
   (`HOUSEHOLD_TIME_ZONE`, same `householdDayFromEnv()` and injectable clock as the reads). The
   bridge-only `CATEGORY_SHELF_LIFE_DAYS` defaults and the UTC ±1-day skew window are removed.
 - **Refused, zero writes, no request record** (validation error; the message says to "record the
-  new purchase separately in the app"): a lot with a printed date (use-by or best-before, staple
-  or not), or a lot whose verdict is `expired`, `unknown` or `check`. A lot whose only problem is
+  new purchase separately in the app"): a lot `get_inventory` would call `invalid-record`
+  (`readableLot`), a lot whose stored `storage` is not exactly `fridge`, `freezer` or `counter`
+  (`''`/null fall back to the shared inference; `'Fridge'` or `{}` would skip the fridge limits), a
+  lot with a printed date (use-by or best-before, staple or not), or a lot whose verdict is
+  `expired`, `unknown` or `check`. A lot whose only problem is
   being out of stock (`reason: out-of-stock`, e.g. an empty staple with in-date or no dates) can
   still be refilled: that is not a date problem.
 - **Fridge safety lots** (shared `pantryFridgeSafety()` non-null: raw meat, poultry, seafood, ground
@@ -473,12 +476,15 @@ write tools are unchanged; `requestId` / `expectedRevision` guards are unchanged
   use today only if they said "today" or "just bought"). A different day than the lot's
   `purchaseDate` ⇒ refused as a separate lot. The same day ⇒ merge.
 - `boughtDate` must be a real calendar day not after the household day; a malformed or future date
-  (and an invalid `HOUSEHOLD_TIME_ZONE`) fails before any Firestore access. Other lots ignore
-  `boughtDate`; their stored dates never change.
+  (and an invalid `HOUSEHOLD_TIME_ZONE`) fails before any Firestore access. Other lots keep their
+  stored dates; a supplied `boughtDate` EARLIER than the lot's bought date is refused (older stock
+  must not take a newer clock), a later or equal one merges.
 - `boughtDate` is a business argument, so it is in the request's `argsHash`: the same `requestId`
   with a different (or missing) `boughtDate` is `request_id_reused`.
-- **Stated back.** The success result adds `lot: { boughtDate, storage }`: the lot's stored
-  `purchaseDate` (or null) and its storage (stored, else the shared rules' inferred location).
+- **Stated back.** The success result adds `lot: { boughtDate, storage, storageSource }`: the
+  lot's stored `purchaseDate` when it is a real calendar day (else null), its storage, and
+  `storageSource` = `recorded` (stored on the lot) or `inferred` (no storage recorded; guessed from
+  the ingredient, and chat says so) or null.
 - Tests: `test/operations-add-stock.node.js` (every refusal branch, each fridge safety class,
   the lot at its limit: "Use today" merges, the next day is refused; boughtDate validation;
   staple/non-safety merges and the stated-back lot) and `test/mcp-add-stock.node.js` (zero writes
