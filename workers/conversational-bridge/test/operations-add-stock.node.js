@@ -68,12 +68,12 @@ test('true loss of significance and numeric overflow reject without mutation', (
 });
 
 test('delta can restore a numeric staple to full without changing its stable id', () => {
-  const row = { id: 'rice', name: 'Rice', quantity: 2, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'pantry', suggestDismissed: true };
+  const row = { id: 'rice', name: 'Rice', quantity: 2, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'counter', suggestDismissed: true };
   const result = call([row], { ingredientId: 'rice', quantity: 500, expectedUnit: 'g' });
   assert.equal(result.pantry[0].id, 'rice');
   assert.equal(result.pantry[0].quantity, 2.5);
   assert.equal(result.pantry[0].stockLevel, 'full');
-  assert.equal(result.pantry[0].storage, 'pantry');
+  assert.equal(result.pantry[0].storage, 'counter');
   assert.equal('suggestDismissed' in result.pantry[0], false);
 
   const empty = call([{ ...row, quantity: 0 }], { ingredientId: 'rice', quantity: 500, expectedUnit: 'g' });
@@ -130,7 +130,7 @@ test('the merge gate is the shared verdict: printed-date, expired, unknown and c
     // Check: a perishable past its shelf-life estimate.
     freshRow({ name: 'Carrots', category: 'vegetable', storage: 'fridge', purchaseDate: '2026-11-10', shelfLifeDays: 7 }),
     // Check: a staple past its estimate (the bridge used to merge every staple without a date check).
-    { id: 'chicken', name: 'Rice', quantity: 2, unit: 'g', staple: true, storage: 'pantry', category: 'grain', purchaseDate: '2025-01-01', shelfLifeDays: 180 },
+    { id: 'chicken', name: 'Rice', quantity: 2, unit: 'g', staple: true, storage: 'counter', category: 'grain', purchaseDate: '2025-01-01', shelfLifeDays: 180 },
     // Unreadable shelf life: the shared verdict reads it as unknown.
     freshRow({ shelfLifeDays: 1e20 })
   ];
@@ -169,7 +169,7 @@ test('a fridge safety lot needs the bought date of the new stock: missing asks, 
     const merged = call(pantry, { ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', boughtDate: TODAY });
     assert.equal(merged.item.quantity, 600, name);
     assert.equal(merged.pantry[0].purchaseDate, TODAY, 'the lot keeps its bought date');
-    assert.deepEqual(merged.lot, { boughtDate: TODAY, storage: 'fridge' });
+    assert.deepEqual(merged.lot, { boughtDate: TODAY, storage: 'fridge', storageSource: 'recorded' });
   }
 });
 
@@ -179,7 +179,7 @@ test('a safety lot exactly at its limit merges on its last day ("Use today") and
   // 2-day poultry limit from 2026-11-25: 2026-11-27 is the last day.
   const lastDay = call([row], args, {}, '2026-11-27');
   assert.equal(lastDay.item.quantity, 600);
-  assert.deepEqual(lastDay.lot, { boughtDate: '2026-11-25', storage: 'fridge' });
+  assert.deepEqual(lastDay.lot, { boughtDate: '2026-11-25', storage: 'fridge', storageSource: 'recorded' });
   const pantry = [row];
   const before = structuredClone(pantry);
   assert.throws(() => call(pantry, args, {}, '2026-11-28'), (error) => SEPARATE.test(error.message) && /Past safe fridge time/.test(error.message));
@@ -208,27 +208,47 @@ test('staples and non-safety lots keep the merge behaviour when usable, and stat
   // A frozen lot has no fridge safety class: no boughtDate is needed, and a given one changes nothing.
   const frozen = call([freshRow()], { ingredientId: 'chicken', quantity: 100, expectedUnit: 'g' });
   assert.equal(frozen.item.quantity, 600);
-  assert.deepEqual(frozen.lot, { boughtDate: '2026-11-01', storage: 'freezer' });
+  assert.deepEqual(frozen.lot, { boughtDate: '2026-11-01', storage: 'freezer', storageSource: 'recorded' });
   const withDate = call([freshRow()], { ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', boughtDate: TODAY });
   assert.equal(withDate.pantry[0].purchaseDate, '2026-11-01');
-  assert.deepEqual(withDate.lot, { boughtDate: '2026-11-01', storage: 'freezer' });
+  assert.deepEqual(withDate.lot, { boughtDate: '2026-11-01', storage: 'freezer', storageSource: 'recorded' });
   // Eggs in the fridge are excluded from the fridge safety limits.
   const eggs = call([freshRow({ name: 'Eggs', storage: 'fridge', unit: 'pcs', quantity: 6, purchaseDate: '2026-11-20', shelfLifeDays: 21 })], { ingredientId: 'chicken', quantity: 6, expectedUnit: 'pcs' });
   assert.equal(eggs.item.quantity, 12);
-  assert.deepEqual(eggs.lot, { boughtDate: '2026-11-20', storage: 'fridge' });
+  assert.deepEqual(eggs.lot, { boughtDate: '2026-11-20', storage: 'fridge', storageSource: 'recorded' });
   // A lot with no date and a storage location is ok/no-date and merges as before.
   const undated = call([freshRow({ purchaseDate: null, shelfLifeDays: undefined })], { ingredientId: 'chicken', quantity: 1, expectedUnit: 'g' });
-  assert.deepEqual(undated.lot, { boughtDate: null, storage: 'freezer' });
+  assert.deepEqual(undated.lot, { boughtDate: null, storage: 'freezer', storageSource: 'recorded' });
   // A use-soon (non-safety) lot is still usable and merges.
   const soon = call([freshRow({ name: 'Milk', category: 'dairy', storage: 'fridge', unit: 'ml', purchaseDate: '2026-11-21', shelfLifeDays: 7 })], { ingredientId: 'chicken', quantity: 500, expectedUnit: 'ml' });
   assert.equal(soon.item.quantity, 1000);
   // An empty staple whose dates are fine is refilled (out of stock is not a date problem).
-  const staple = call([{ id: 'rice', name: 'Rice', quantity: 0, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'pantry' }], { ingredientId: 'rice', quantity: 1, expectedUnit: 'kg' });
+  const staple = call([{ id: 'rice', name: 'Rice', quantity: 0, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'counter' }], { ingredientId: 'rice', quantity: 1, expectedUnit: 'kg' });
   assert.equal(staple.item.stockLevel, 'full');
-  assert.deepEqual(staple.lot, { boughtDate: null, storage: 'pantry' });
+  assert.deepEqual(staple.lot, { boughtDate: null, storage: 'counter', storageSource: 'recorded' });
 });
 
 test('the bridge-only category shelf-life defaults and the UTC skew window are gone', async () => {
   const source = await readFile(new URL('../src/operations/inventory.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /CATEGORY_SHELF_LIFE_DAYS|DEFAULT_CATEGORY_SHELF_LIFE_DAYS|UTC_LOCAL_DATE_SKEW_DAYS|validateMergeFreshness|dateStringToUtcDay|Date\.now\(/);
+});
+
+test('review fixes: unreadable or non-exact storage is refused; older boughtDate refused; bad dates and inferred storage stated honestly', () => {
+  const chicken = (storage) => ({ id: 'a', name: 'Chicken Breast', category: 'Protein', storage, purchaseDate: '2026-11-26', quantity: 500, unit: 'g', staple: false });
+  for (const storage of [{}, 1, 'Fridge', ' fridge', 'pantry']) {
+    assert.throws(() => call([chicken(storage)], { ingredientId: 'a', quantity: 1, expectedUnit: 'g', boughtDate: '2026-11-26' }),
+      (e) => e instanceof ValidationError && /record the new purchase separately in the app/.test(e.message), JSON.stringify(storage));
+  }
+  // Non-safety lot: older stock must not take a newer lot's date; newer stock may join.
+  const spinach = () => [{ id: 's', name: 'Spinach', category: 'Vegetable', storage: 'counter', purchaseDate: '2026-11-26', shelfLifeDays: 30, quantity: 1, unit: 'pcs', staple: false }];
+  assert.throws(() => call(spinach(), { ingredientId: 's', quantity: 1, expectedUnit: 'pcs', boughtDate: '2026-11-15' }),
+    (e) => e instanceof ValidationError && /before this lot \(2026-11-26\)/.test(e.message));
+  assert.equal(call(spinach(), { ingredientId: 's', quantity: 1, expectedUnit: 'pcs', boughtDate: '2026-11-26' }).item.quantity, 2);
+  // A stored date that is not a real calendar day is never stated back.
+  const odd = call([{ id: 'o', name: 'Onion', category: 'Vegetable', storage: 'counter', purchaseDate: 'yesterday', quantity: 1, unit: 'kg', staple: false }], { ingredientId: 'o', quantity: 1, expectedUnit: 'kg' });
+  assert.deepEqual(odd.lot, { boughtDate: null, storage: 'counter', storageSource: 'recorded' });
+  // No storage recorded: the guess is labelled inferred.
+  const inferred = call([{ id: 'r', name: 'Tuna (Canned)', category: 'Protein', purchaseDate: '2026-11-20', shelfLifeDays: 365, quantity: 1, unit: 'can', staple: false }], { ingredientId: 'r', quantity: 1, expectedUnit: 'can' });
+  assert.equal(inferred.lot.storageSource, 'inferred');
+  assert.equal(inferred.lot.storage, 'counter');
 });

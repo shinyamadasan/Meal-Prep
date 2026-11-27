@@ -174,7 +174,7 @@ test('add_stock adds server-side, preserves lot metadata, increments revision on
   assert.equal(b.fake.store.fields.pantry[0].id, 'chicken');
   assert.equal(b.fake.store.fields.pantry[0].purchaseDate, null);
   assert.equal(b.fake.store.fields.pantry[0].storage, 'freezer');
-  assert.deepEqual(message.result.structuredContent.lot, { boughtDate: null, storage: 'freezer' });
+  assert.deepEqual(message.result.structuredContent.lot, { boughtDate: null, storage: 'freezer', storageSource: 'recorded' });
   assert.equal(b.fake.store.fields.pantry[0].marker, 'keep');
   assert.deepEqual(b.fake.store.fields.pantry[1], unrelated);
   assert.deepEqual({ cookedMeals: b.fake.store.fields.cookedMeals, mealConsumptions: b.fake.store.fields.mealConsumptions, shopping: b.fake.store.fields.shopping, recipes: b.fake.store.fields.recipes, deletions: b.fake.store.fields.deletions }, untouched);
@@ -186,7 +186,7 @@ test('supported metric delta, staple restock, stale revision, and absent/tombsto
   const converted = await responseMessage(await metric.call('add_stock', { ...VALID, quantity: 500, expectedUnit: 'g' }));
   assert.equal(converted.result.structuredContent.item.quantity, 1.5);
 
-  const staple = bridge({ id: 'rice', name: 'Rice', quantity: 2, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'pantry', suggestDismissed: true });
+  const staple = bridge({ id: 'rice', name: 'Rice', quantity: 2, unit: 'kg', staple: true, stockLevel: 'empty', storage: 'counter', suggestDismissed: true });
   const restocked = await responseMessage(await staple.call('add_stock', { ingredientId: 'rice', quantity: 500, expectedUnit: 'g', expectedRevision: 4 }));
   assert.equal(restocked.result.structuredContent.item.quantity, 2.5);
   assert.equal(restocked.result.structuredContent.item.stockLevel, 'full');
@@ -284,7 +284,7 @@ test('fridge safety lot: missing boughtDate is needs_bought_date, a different da
   const merged = await responseMessage(await same.call('add_stock', { ...VALID, boughtDate: '2026-11-27' }));
   assert.equal(merged.result.isError, undefined);
   assert.equal(merged.result.structuredContent.item.quantity, 750);
-  assert.deepEqual(merged.result.structuredContent.lot, { boughtDate: '2026-11-27', storage: 'fridge' });
+  assert.deepEqual(merged.result.structuredContent.lot, { boughtDate: '2026-11-27', storage: 'fridge', storageSource: 'recorded' });
   assert.equal(same.fake.store.fields.pantry[0].purchaseDate, '2026-11-27');
   assert.equal(same.fake.store.fields.version, 5);
 });
@@ -351,7 +351,7 @@ test('boughtDate is a hashed business argument: same id + same date replays, sam
   assert.equal(first.result.isError, undefined);
   const replay = await responseMessage(await b.call('add_stock', args));
   assert.equal(replay.result.structuredContent.replayed, true);
-  assert.deepEqual(replay.result.structuredContent.lot, { boughtDate: '2026-11-27', storage: 'fridge' });
+  assert.deepEqual(replay.result.structuredContent.lot, { boughtDate: '2026-11-27', storage: 'fridge', storageSource: 'recorded' });
   const storeAfterFirst = JSON.stringify(b.fake.store);
   for (const changed of [{ ...args, boughtDate: '2026-11-26' }, { ...args, boughtDate: undefined }]) {
     const reused = await responseMessage(await b.call('add_stock', changed));

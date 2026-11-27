@@ -490,7 +490,9 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'bought); it merges only when it equals the bought date of the lot, otherwise it must be recorded ' +
         'separately in the app. On needs_bought_date, ask the user when they bought it; use today only ' +
         'if they said "today" or "just bought", never guess. A future boughtDate is rejected. Other lots ' +
-        'keep their stored dates. Tell the user the bought date and storage of the lot from the result. ' +
+        'keep their stored dates; stock bought BEFORE a lot's bought date is refused. Tell the user the ' +
+        'bought date and storage of the lot from the result; when lot.storageSource is "inferred", say ' +
+        'the storage was not recorded and was guessed from the ingredient. ' +
         'Stock-level-only staples and removed/tombstoned items must be handled in the app; use ' +
         'mark_in_stock for a stock-level-only staple. This delta is NOT safe to replay with a fresh ' +
         'revision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
@@ -503,7 +505,10 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         // TASK-094: stated back to the user ("bought 2026-11-27, stored in fridge").
         lot: z.strictObject({
           boughtDate: z.string().nullable(),
-          storage: z.string().nullable()
+          storage: z.string().nullable(),
+          // 'recorded' = stored on the lot; 'inferred' = no storage recorded, guessed from the
+          // ingredient (say so to the user); null = unknown.
+          storageSource: z.enum(['recorded', 'inferred']).nullable()
         })
       }),
       _meta: { securitySchemes: WRITE_SECURITY_SCHEMES },

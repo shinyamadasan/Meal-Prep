@@ -507,7 +507,16 @@ export function validateBoughtDate(boughtDate, today) {
 // invented. A lot whose only problem is that it is out of stock (reason `out-of-stock`: an empty
 // staple, a zero count) is still a merge target: refilling it is what add_stock is for, and its
 // dates passed the same verdict. Returns the stated-back lot facts for the success result.
+const STORED_STORAGE = ['fridge', 'freezer', 'counter'];
+
 function requireMergeableLot(record, boughtDate, today) {
+  // The same record gate as get_inventory (readableLot), plus the app's exact storage values: a lot
+  // chat's own read calls invalid-record, or whose storage is not exactly fridge / freezer /
+  // counter (e.g. {} or 'Fridge', which the shared rules would read as "not fridge" and skip the
+  // poultry/meat limits), is refused, never merged (TASK-094 review must-fix 1, should-fix 1).
+  if (!readableLot(record) || (record.storage != null && record.storage !== '' && !STORED_STORAGE.includes(record.storage))) {
+    throw new ValidationError('This lot\'s stored details (such as its storage location) cannot be checked; ' + SEPARATE_PURCHASE, { field: 'storage' });
+  }
   if (record.dateMode === 'expiry') {
     throw new ValidationError('This lot has a printed date, so new stock cannot share it; ' + SEPARATE_PURCHASE, { field: 'dateMode' });
   }
@@ -520,7 +529,8 @@ function requireMergeableLot(record, boughtDate, today) {
     throw new ValidationError('This lot cannot take new stock safely (' + verdict.label + '); ' + SEPARATE_PURCHASE, { field: 'ingredientId', safety: verdict.status });
   }
   const fridge = FoodSafety.pantryFridgeSafety(record, today);
-  const lotBought = textOrNull(record.purchaseDate);
+  // Only a real calendar day is stated back or compared (review should-fix 3).
+  const lotBought = isCalendarDay(record.purchaseDate) ? record.purchaseDate : null;
   if (fridge) {
     // Raw meat, poultry, seafood, ground, variety, sausage or cooked food in the fridge: its clock
     // is the bought day, so the new purchase must be from that same day.
@@ -534,12 +544,18 @@ function requireMergeableLot(record, boughtDate, today) {
     if (boughtDate !== lotBought) {
       throw new ValidationError('This lot was bought on ' + lotBought + ' and the new stock on ' + boughtDate + '; they must not share one safety clock. ' + SEPARATE_PURCHASE, { field: 'boughtDate' });
     }
+  } else if (boughtDate !== undefined && lotBought && boughtDate < lotBought) {
+    // Older stock must not run on a newer lot's clock (review should-fix 2). Newer stock joining an
+    // older lot keeps the older date, which only brings warnings sooner.
+    throw new ValidationError('The new stock was bought on ' + boughtDate + ', before this lot (' + lotBought + '); it must not take the newer date. ' + SEPARATE_PURCHASE, { field: 'boughtDate' });
   }
-  let storage = textOrNull(record.storage);
+  let storage = STORED_STORAGE.includes(record.storage) ? record.storage : null;
+  let storageSource = storage ? 'recorded' : null;
   if (!storage) {
     try { storage = textOrNull(FoodSafety.defaultInferStorage(record.name)); } catch { storage = null; }
+    if (storage) storageSource = 'inferred';
   }
-  return { boughtDate: lotBought, storage };
+  return { boughtDate: lotBought, storage, storageSource };
 }
 
 // Apply a conversational purchase delta to an existing row only. Preserve the old lot's
