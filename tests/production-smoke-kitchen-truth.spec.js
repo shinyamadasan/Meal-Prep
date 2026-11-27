@@ -238,6 +238,9 @@ test('live: Home shows Needs Attention with Keep / Remove and bulk cleanup', asy
   await expect(expiredRows.locator('.dash-remove-btn').first()).toHaveText('Remove');
   await expect(checkRows.locator('.dash-keep-btn')).toHaveText('Still good');
   await expect(checkRows.locator('.dash-remove-btn')).toHaveText('Toss');
+  // Use-soon rows carry no Keep/Remove: card-wide counts are exactly Expired (2) + Check (1).
+  await expect(card.locator('.dash-keep-btn')).toHaveCount(3);
+  await expect(card.locator('.dash-remove-btn')).toHaveCount(3);
   // Only the printed use-by is in the bulk set; the safety lot is per-row only.
   await expect(card.locator('.dash-remove-all-btn')).toHaveCount(1);
   await expect(card.locator('.dash-remove-all-btn')).toContainText('Remove expired (1)');
@@ -254,7 +257,8 @@ test('live: one-tap removal tombstones the record', async ({ page }) => {
     const day = eval(dayFnSrc);
     AppState.deletions = {};
     AppState.pantry = [
-      { id: 'prod_gone', name: 'Old Broccoli', category: 'Vegetable', purchaseDate: day(9), shelfLifeDays: 5, storage: 'fridge' }
+      { id: 'prod_gone', name: 'Old Yogurt', category: 'Dairy', purchaseDate: day(10), shelfLifeDays: 14, storage: 'fridge',
+        dateMode: 'expiry', expiryDate: day(2) }   // printed use-by passed: Expired (D-088)
     ];
     AppState.cookedMeals = [];
     showTab('dashboard');
@@ -262,7 +266,10 @@ test('live: one-tap removal tombstones the record', async ({ page }) => {
     openAttentionView(); // compact by default now — force it open to reach Remove
   }, DAY_FN);
 
-  await page.locator('.dash-card--warn .dash-remove-btn').first().click();
+  const removeBtn = page.locator('.dash-card--warn .dash-attn-row--expired .dash-remove-btn');
+  await expect(removeBtn).toHaveCount(1);
+  await expect(removeBtn).toHaveText('Remove');
+  await removeBtn.click();
   await page.waitForTimeout(600);
 
   const after = await page.evaluate(() => ({
