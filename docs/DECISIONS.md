@@ -3708,3 +3708,26 @@ depends on `shared/foodSafety.js` at load time; the file is in the service-worke
 
 **Why.** One rule set cannot drift. Unknown safety must never read as safe (PROP-041 principle).
 The app's behaviour is frozen (D-090), so the stricter chat rule lives only in the Worker.
+
+## D-092 — PROP-041 on the free Spark plan: logical 30-day expiry, no TTL deletion; Phase 2 D1-D3
+
+**Date:** 2026-11-27 · **Tasks:** TASK-093, TASK-095 (no code change), TASK-098..101 · **Decided by:**
+owner (Spark plan, no paid services) + Claude (implementation, owner-delegated)
+
+**Decision 1 — no TTL.** Firestore TTL requires billing; the owner keeps the Spark plan. The
+`mcpRequests` records are kept, not deleted. The 30-day rule is enforced logically by the code that
+already exists: `undo_request` refuses at or after `expireAt` (`undo_expired`); a retried
+`requestId` older than 30 days still replays its stored answer (never re-applies), which is stricter
+than TTL. Nothing deletes records automatically (owner rule). Size: about 1-3 KB per chat write, so
+years of household use stay far inside the free 1 GiB. If cleanup is ever wanted it is a manual,
+owner-approved step after a backup, never a scheduled job. `expireAt` stays on every record so a TTL
+policy can be switched on later without a migration.
+
+**Decision 2 — Phase 2 D1-D3** (owner-delegated, reversible):
+D1 an item recorded without an amount becomes a staple with a level, or a counted item, only on the
+user's explicit words, one item per request, undoable; D2 preparing or cooking deducts raw
+ingredients only when the user names them; D3 storage is inferred like the app and stated back,
+except raw meat, poultry and fish, where chat asks.
+
+**Why.** No paid service, no deletion job, no loss of the 30-day guarantees. D1-D3 keep every change
+explicit, visible and undoable.

@@ -69,7 +69,9 @@ one at step 4.2 before deploying.
   `users/{TARGET_UID}` and `users/{TARGET_UID}/mcpRequests/{requestId}` (fixed paths, ids validated to
   8-128 `[A-Za-z0-9_-]`).
 
-### 2.4 30-day TTL policy — blocked by billing (owner decision)
+### 2.4 30-day TTL policy — RESOLVED 2026-11-27: no TTL (owner keeps Spark; D-092)
+Logical expiry in code (undo refused after `expireAt`; old ids keep replaying, never re-apply);
+records are kept, never auto-deleted. The original finding follows for the record.
 - Attempted 2026-11-27 with the owner's Firebase CLI login: Firestore refused, "Project meal-prep-f8907
   has billing disabled". TTL policies need a billing-enabled (Blaze) project. Nothing was changed.
 - Without TTL, Phase 1 still behaves as specified: undo is refused after 30 days by code
@@ -91,7 +93,7 @@ safety core and `undo_request`. Secrets are not shown by a dry run; they are car
 
 ## 3. Owner decisions needed before step 4
 1. Approve this checklist (merge + both deploys).
-2. TTL: Blaze now (a) or later (b) — 2.4.
+2. ~~TTL~~ — resolved: no TTL on Spark (D-092).
 3. REST: retire `BRIDGE_API_TOKEN` (recommended) or keep — 2.1.
 4. Cloudflare access for steps 4.2/4.5/4.6: run them yourself, or run `npx wrangler login` on this
    machine so Claude can (no token is ever shared in chat).
