@@ -4,6 +4,22 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-096 (refresh four outdated production smoke specs) — APPROVED → done — Claude, 2026-11-27
+
+Builder: Claude (standing in for Codex, usage limit). Independent QA + review: separate Claude
+session, verdict FAIL with one must-fix, fixed by Claude in `3d0cd78`:
+- Must-fix (fixed): the Home Needs Attention test no longer proved use-soon rows carry no
+  Keep/Remove. Added card-wide counts (3 Keep, 3 Remove = 2 Expired + 1 Check).
+- Minor (fixed): `live: one-tap removal tombstones the record` used estimated "Old Broccoli",
+  which is now a Check row ("Toss"); it now uses a printed-expiry Expired fixture and asserts the
+  button is "Remove".
+Verified: every original guarantee is still asserted, most with exact id sets; fixtures follow
+D-088/D-089; signed-out contexts only; test files only. Evidence: reviewer `test:prod` 155 passed,
+4 skipped, 0 failed; Claude re-ran both specs on `3d0cd78` against the live site, 17/17.
+**Gate: `done`** — test-only, reversible, no app or data surface (D-032).
+
+---
+
 ## Review TASK-090 (FFS-V1 release blockers B1/B2/B3) — APPROVED (held) — Claude, 2026-11-26
 Branch `task-090-ffs-release-blockers` (Codex `e9ccdb1`, `9ca5ede`; review fix `9601807`), merged
 into `ffs-v1-refine` (`5bd770b`). Independent verification on a separate checkout:
