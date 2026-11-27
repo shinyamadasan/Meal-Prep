@@ -19,6 +19,10 @@
 // AmbiguousError / the reserved `ambiguous` contract code in errors.js.
 import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
 import { convertQuantity } from './quantity.js';
+// Shared food-safety rules (TASK-091, D-090): defines globalThis.MealPrepFoodSafety, the same rules
+// the app uses. Loaded only; nothing here reads it yet, so the classification note above still
+// describes this module's behaviour.
+import '../../../../shared/foodSafety.js';
 
 const MAX_UNIT_LENGTH = 40;
 const MAX_STOCK_QUANTITY = Number.MAX_SAFE_INTEGER;

@@ -1,0 +1,790 @@
+{
+  "description": "TASK-091 food-safety parity fixture. expected = verdicts of the app BEFORE the rules moved to shared/foodSafety.js (generated from the unmodified app.js with the browser clock fixed to each today). expectedDefault = the shared default storage path (no inferStorage hook, as in the Worker) where it legitimately differs: no storage location => unknown, never usable. Dates: @N = today + N days. See tests/fixtures/food-safety-parity-eval.js.",
+  "todays": ["2026-11-26","2026-12-31","2028-02-29"],
+  "cases": [
+    {
+      "id": "leftover-adobo-in-window",
+      "kind": "pantry",
+      "record": {"name":"Leftover Adobo","category":"Protein","storage":"fridge","purchaseDate":"@-3","quantity":1,"unit":"container"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"use-soon","daysLeft":0,"printed":false,"bestBefore":false,"limitDays":4,"safetyClass":"cooked-leftover"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"use-soon","daysLeft":0,"printed":false,"bestBefore":false,"limitDays":4,"safetyClass":"cooked-leftover"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"use-soon","daysLeft":0,"printed":false,"bestBefore":false,"limitDays":4,"safetyClass":"cooked-leftover"},"available":true}
+      }
+    },
+    {
+      "id": "chicken-curry-past-cooked-limit",
+      "kind": "pantry",
+      "record": {"name":"Chicken Curry","category":"Protein","storage":"fridge","purchaseDate":"@-5","quantity":1,"unit":"container"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":4,"safetyClass":"cooked-leftover"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":4,"safetyClass":"cooked-leftover"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-1,"limitDays":4,"safetyClass":"cooked-leftover"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":4,"safetyClass":"cooked-leftover"},"available":false}
+      }
+    },
+    {
+      "id": "bacon-cured-7-day",
+      "kind": "pantry",
+      "record": {"name":"Bacon","category":"Protein","storage":"fridge","purchaseDate":"@-6","quantity":200,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-3,"fridge":{"daysLeft":1,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-3,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-3,"fridge":{"daysLeft":1,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-3,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-3,"fridge":{"daysLeft":1,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-3,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true}
+      }
+    },
+    {
+      "id": "ham-cured-3-day-past",
+      "kind": "pantry",
+      "record": {"name":"Ham","category":"Protein","storage":"fridge","purchaseDate":"@-4","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false}
+      }
+    },
+    {
+      "id": "longganisa-raw-sausage",
+      "kind": "pantry",
+      "record": {"name":"Longganisa","category":"Protein","storage":"fridge","purchaseDate":"@-1","quantity":1,"unit":"pack"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"raw-sausage"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"raw-sausage"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"raw-sausage"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"raw-sausage"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"raw-sausage"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"raw-sausage"},"available":true}
+      }
+    },
+    {
+      "id": "smoked-sausage-excluded-from-raw-sausage",
+      "kind": "pantry",
+      "record": {"name":"Smoked Sausage","category":"Protein","storage":"fridge","purchaseDate":"@-5","quantity":1,"unit":"pack"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "hotdog-alias-sausage-uses-own-wording",
+      "kind": "pantry",
+      "record": {"name":"Hotdog","category":"Protein","storage":"fridge","purchaseDate":"@-5","quantity":1,"unit":"pack"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":2,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":2,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":2,"limitDays":7,"safetyClass":"cured-processed"},"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false,"limitDays":7,"safetyClass":"cured-processed"},"available":true}
+      }
+    },
+    {
+      "id": "ground-pork-last-day",
+      "kind": "pantry",
+      "record": {"name":"Ground Pork","category":"Protein","storage":"fridge","purchaseDate":"@-2","quantity":500,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"ground"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"ground"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"ground"},"available":true}
+      }
+    },
+    {
+      "id": "pork-liver-variety-past",
+      "kind": "pantry",
+      "record": {"name":"Pork Liver","category":"Protein","storage":"fridge","purchaseDate":"@-3","quantity":300,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-2,"limitDays":1,"safetyClass":"variety"},"signal":{"kind":"expired","daysLeft":-2,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":1,"safetyClass":"variety"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-2,"limitDays":1,"safetyClass":"variety"},"signal":{"kind":"expired","daysLeft":-2,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":1,"safetyClass":"variety"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-2,"limitDays":1,"safetyClass":"variety"},"signal":{"kind":"expired","daysLeft":-2,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":1,"safetyClass":"variety"},"available":false}
+      }
+    },
+    {
+      "id": "chicken-breast-poultry-in-window",
+      "kind": "pantry",
+      "record": {"name":"Chicken Breast","category":"Protein","storage":"fridge","purchaseDate":"@-1","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true}
+      }
+    },
+    {
+      "id": "chicken-thigh-poultry-past",
+      "kind": "pantry",
+      "record": {"name":"Chicken Thigh","category":"Protein","storage":"fridge","purchaseDate":"@-3","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false}
+      }
+    },
+    {
+      "id": "tilapia-seafood-last-day",
+      "kind": "pantry",
+      "record": {"name":"Tilapia","category":"Protein","storage":"fridge","purchaseDate":"@-2","quantity":2,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"seafood"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"seafood"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"seafood"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"seafood"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":0,"limitDays":2,"safetyClass":"seafood"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"seafood"},"available":true}
+      }
+    },
+    {
+      "id": "pork-chop-whole-cut",
+      "kind": "pantry",
+      "record": {"name":"Pork Chop","category":"Protein","storage":"fridge","purchaseDate":"@-2","quantity":500,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":{"daysLeft":1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true}
+      }
+    },
+    {
+      "id": "beef-sirloin-whole-cut-past",
+      "kind": "pantry",
+      "record": {"name":"Beef Sirloin","category":"Protein","storage":"fridge","purchaseDate":"@-4","quantity":400,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"whole-cut"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"whole-cut"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":-1,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":3,"safetyClass":"whole-cut"},"available":false}
+      }
+    },
+    {
+      "id": "eggs-excluded-estimate-check",
+      "kind": "pantry",
+      "record": {"name":"Eggs","category":"Protein","storage":"fridge","purchaseDate":"@-30","quantity":6,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":"check","daysLeft":-27,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":"check","daysLeft":-27,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":"check","daysLeft":-27,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "tofu-excluded",
+      "kind": "pantry",
+      "record": {"name":"Tofu (Tokwa)","category":"Protein","storage":"fridge","purchaseDate":"@-10","quantity":2,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-7,"fridge":null,"signal":{"kind":"check","daysLeft":-7,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-7,"fridge":null,"signal":{"kind":"check","daysLeft":-7,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-7,"fridge":null,"signal":{"kind":"check","daysLeft":-7,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "canned-tuna-on-counter",
+      "kind": "pantry",
+      "record": {"name":"Tuna (Canned)","category":"Protein","storage":"counter","purchaseDate":"@-400","quantity":3,"unit":"cans"},
+      "expected": {
+        "2026-11-26": {"foodClass":"pantry-staple","staple":true,"daysLeft":-397,"fridge":null,"signal":{"kind":null,"daysLeft":-397,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"pantry-staple","staple":true,"daysLeft":-397,"fridge":null,"signal":{"kind":null,"daysLeft":-397,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"pantry-staple","staple":true,"daysLeft":-397,"fridge":null,"signal":{"kind":null,"daysLeft":-397,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "canned-tuna-in-fridge-excluded",
+      "kind": "pantry",
+      "record": {"name":"Canned Tuna","category":"Protein","storage":"fridge","purchaseDate":"@-20","quantity":1,"unit":"can"},
+      "expected": {
+        "2026-11-26": {"foodClass":"pantry-staple","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":null,"daysLeft":-17,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"pantry-staple","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":null,"daysLeft":-17,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"pantry-staple","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":null,"daysLeft":-17,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "dried-fish-excluded",
+      "kind": "pantry",
+      "record": {"name":"Dried Fish (Tuyo)","category":"Protein","storage":"fridge","purchaseDate":"@-20","quantity":1,"unit":"pack"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":"check","daysLeft":-17,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":"check","daysLeft":-17,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-17,"fridge":null,"signal":{"kind":"check","daysLeft":-17,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "frozen-chicken-estimate-past",
+      "kind": "pantry",
+      "record": {"name":"Chicken Breast","category":"Protein","storage":"freezer","purchaseDate":"@-100","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"frozen","staple":false,"daysLeft":-97,"fridge":null,"signal":{"kind":null,"daysLeft":-97,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"frozen","staple":false,"daysLeft":-97,"fridge":null,"signal":{"kind":null,"daysLeft":-97,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"frozen","staple":false,"daysLeft":-97,"fridge":null,"signal":{"kind":null,"daysLeft":-97,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "frozen-dumplings-printed-past",
+      "kind": "pantry",
+      "record": {"name":"Frozen Dumplings","category":"Protein","storage":"freezer","dateMode":"expiry","expiryDate":"@-2","quantity":1,"unit":"pack"},
+      "expected": {
+        "2026-11-26": {"foodClass":"frozen","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":false},"available":false},
+        "2026-12-31": {"foodClass":"frozen","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":false},"available":false},
+        "2028-02-29": {"foodClass":"frozen","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":false},"available":false}
+      }
+    },
+    {
+      "id": "onion-counter-estimate-past",
+      "kind": "pantry",
+      "record": {"name":"Onion (Sibuyas)","category":"Vegetable","storage":"counter","purchaseDate":"@-20","quantity":3,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":true,"daysLeft":-13,"fridge":null,"signal":{"kind":null,"daysLeft":-13,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":true,"daysLeft":-13,"fridge":null,"signal":{"kind":null,"daysLeft":-13,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":true,"daysLeft":-13,"fridge":null,"signal":{"kind":null,"daysLeft":-13,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "luncheon-meat-on-counter",
+      "kind": "pantry",
+      "record": {"name":"Luncheon Meat","category":"Protein","storage":"counter","purchaseDate":"@-30","quantity":1,"unit":"can"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":null,"daysLeft":-27,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":null,"daysLeft":-27,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-27,"fridge":null,"signal":{"kind":null,"daysLeft":-27,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "banana-storage-from-ingredient-db",
+      "kind": "pantry",
+      "record": {"name":"Banana (Saging)","category":"Fruit","purchaseDate":"@-4","quantity":6,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "milk-printed-use-by-past",
+      "kind": "pantry",
+      "record": {"name":"Milk (Gatas)","category":"Dairy","storage":"fridge","dateMode":"expiry","expiryDate":"@-1","quantity":1,"unit":"L"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false},"available":false}
+      }
+    },
+    {
+      "id": "milk-printed-best-before-past",
+      "kind": "pantry",
+      "record": {"name":"Milk (Gatas)","category":"Dairy","storage":"fridge","dateMode":"expiry","expiryDate":"@-1","printedDateKind":"best-before","quantity":1,"unit":"L"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"check","daysLeft":-1,"printed":true,"bestBefore":true},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"check","daysLeft":-1,"printed":true,"bestBefore":true},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":null,"signal":{"kind":"check","daysLeft":-1,"printed":true,"bestBefore":true},"available":true}
+      }
+    },
+    {
+      "id": "yogurt-printed-use-soon",
+      "kind": "pantry",
+      "record": {"name":"Yogurt","category":"Dairy","storage":"fridge","dateMode":"expiry","expiryDate":"@+1","quantity":2,"unit":"cups"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":true,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":true,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":true,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "corned-beef-printed-far",
+      "kind": "pantry",
+      "record": {"name":"Corned Beef (Canned)","category":"Protein","storage":"counter","dateMode":"expiry","expiryDate":"@+200","quantity":2,"unit":"cans"},
+      "expected": {
+        "2026-11-26": {"foodClass":"pantry-staple","staple":true,"daysLeft":200,"fridge":null,"signal":{"kind":null,"daysLeft":200,"printed":true,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"pantry-staple","staple":true,"daysLeft":200,"fridge":null,"signal":{"kind":null,"daysLeft":200,"printed":true,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"pantry-staple","staple":true,"daysLeft":200,"fridge":null,"signal":{"kind":null,"daysLeft":200,"printed":true,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "chicken-printed-use-by-before-limit",
+      "kind": "pantry",
+      "record": {"name":"Chicken Breast","category":"Protein","storage":"fridge","purchaseDate":"@-1","dateMode":"expiry","expiryDate":"@-1","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-1,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":true,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":false}
+      }
+    },
+    {
+      "id": "ham-best-before-past-and-limit-past",
+      "kind": "pantry",
+      "record": {"name":"Ham","category":"Protein","storage":"fridge","purchaseDate":"@-5","dateMode":"expiry","expiryDate":"@-2","printedDateKind":"best-before","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-2,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":true,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-2,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":true,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":{"daysLeft":-2,"limitDays":3,"safetyClass":"cured-processed"},"signal":{"kind":"expired","daysLeft":-2,"printed":true,"bestBefore":true,"safety":"past-limit","limitDays":3,"safetyClass":"cured-processed"},"available":false}
+      }
+    },
+    {
+      "id": "malformed-printed-date-impossible-day",
+      "kind": "pantry",
+      "record": {"name":"Yogurt","category":"Dairy","storage":"fridge","dateMode":"expiry","expiryDate":"2026-02-30","quantity":1,"unit":"cup"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-269,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-304,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-729,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "malformed-printed-date-text",
+      "kind": "pantry",
+      "record": {"name":"Yogurt","category":"Dairy","storage":"fridge","dateMode":"expiry","expiryDate":"not-a-date","quantity":1,"unit":"cup"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":true,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "malformed-bought-date-month-13",
+      "kind": "pantry",
+      "record": {"name":"Chicken Breast","category":"Protein","storage":"fridge","purchaseDate":"2026-13-01","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false}
+      }
+    },
+    {
+      "id": "malformed-bought-date-slashes",
+      "kind": "pantry",
+      "record": {"name":"Ground Beef","category":"Protein","storage":"fridge","purchaseDate":"26/11/2026","quantity":500,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"ground"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"ground"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"ground"},"available":false}
+      }
+    },
+    {
+      "id": "chicken-missing-bought-date",
+      "kind": "pantry",
+      "record": {"name":"Chicken Leg","category":"Protein","storage":"fridge","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":{"daysLeft":null,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":null,"printed":false,"bestBefore":false,"safety":"unknown-date","limitDays":2,"safetyClass":"poultry"},"available":false}
+      }
+    },
+    {
+      "id": "cabbage-missing-bought-date",
+      "kind": "pantry",
+      "record": {"name":"Cabbage (Repolyo)","category":"Vegetable","storage":"fridge","quantity":1,"unit":"head"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "carrot-estimate-in-window",
+      "kind": "pantry",
+      "record": {"name":"Carrot (Karot)","category":"Vegetable","storage":"fridge","purchaseDate":"@-2","shelfLifeDays":14,"quantity":4,"unit":"pieces"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":12,"fridge":null,"signal":{"kind":null,"daysLeft":12,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":12,"fridge":null,"signal":{"kind":null,"daysLeft":12,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":12,"fridge":null,"signal":{"kind":null,"daysLeft":12,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "lettuce-estimate-use-soon",
+      "kind": "pantry",
+      "record": {"name":"Lettuce","category":"Vegetable","storage":"fridge","purchaseDate":"@-6","shelfLifeDays":7,"quantity":1,"unit":"head"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":1,"fridge":null,"signal":{"kind":"use-soon","daysLeft":1,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "lettuce-estimate-past-check",
+      "kind": "pantry",
+      "record": {"name":"Lettuce","category":"Vegetable","storage":"fridge","purchaseDate":"@-9","shelfLifeDays":7,"quantity":1,"unit":"head"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "cheese-category-default-past",
+      "kind": "pantry",
+      "record": {"name":"Cheese","category":"Dairy","storage":"fridge","purchaseDate":"@-40","quantity":200,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-33,"fridge":null,"signal":{"kind":"check","daysLeft":-33,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-33,"fridge":null,"signal":{"kind":"check","daysLeft":-33,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-33,"fridge":null,"signal":{"kind":"check","daysLeft":-33,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "staple-low-zero-quantity",
+      "kind": "pantry",
+      "record": {"name":"Soy Sauce (Toyo)","category":"Pantry","storage":"counter","staple":true,"stockLevel":"low","quantity":0,"unit":"ml"},
+      "expected": {
+        "2026-11-26": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "staple-empty",
+      "kind": "pantry",
+      "record": {"name":"Salt","category":"Pantry","storage":"counter","staple":true,"stockLevel":"empty","quantity":500,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false},
+        "2026-12-31": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false},
+        "2028-02-29": {"foodClass":"condiment","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false}
+      }
+    },
+    {
+      "id": "staple-from-ingredient-db-zero-quantity",
+      "kind": "pantry",
+      "record": {"name":"Garlic (Bawang)","category":"Vegetable","storage":"counter","quantity":0,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":true,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "staple-printed-past",
+      "kind": "pantry",
+      "record": {"name":"Cooking Oil","category":"Pantry","storage":"counter","staple":true,"dateMode":"expiry","expiryDate":"@-10","quantity":1,"unit":"L"},
+      "expected": {
+        "2026-11-26": {"foodClass":"condiment","staple":true,"daysLeft":-10,"fridge":null,"signal":{"kind":"expired","daysLeft":-10,"printed":true,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"condiment","staple":true,"daysLeft":-10,"fridge":null,"signal":{"kind":"expired","daysLeft":-10,"printed":true,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"condiment","staple":true,"daysLeft":-10,"fridge":null,"signal":{"kind":"expired","daysLeft":-10,"printed":true,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "non-staple-zero-quantity",
+      "kind": "pantry",
+      "record": {"name":"Pork Chop","category":"Protein","storage":"fridge","purchaseDate":"@-1","quantity":0,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":false}
+      }
+    },
+    {
+      "id": "explicit-non-staple-pantry-zero",
+      "kind": "pantry",
+      "record": {"name":"Coconut Milk","category":"Pantry","storage":"counter","staple":false,"quantity":0,"unit":"ml"},
+      "expected": {
+        "2026-11-26": {"foodClass":"pantry-staple","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false},
+        "2026-12-31": {"foodClass":"pantry-staple","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false},
+        "2028-02-29": {"foodClass":"pantry-staple","staple":false,"daysLeft":null,"fridge":null,"signal":{"kind":null,"daysLeft":null,"printed":false,"bestBefore":false},"available":false}
+      }
+    },
+    {
+      "id": "kept-today-check-lot",
+      "kind": "pantry",
+      "record": {"name":"Lettuce","category":"Vegetable","storage":"fridge","purchaseDate":"@-9","shelfLifeDays":7,"keptOn":"@0","quantity":1,"unit":"head"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-2,"fridge":null,"signal":{"kind":"check","daysLeft":-2,"printed":false,"bestBefore":false},"available":true}
+      }
+    },
+    {
+      "id": "kept-today-does-not-restore-safety",
+      "kind": "pantry",
+      "record": {"name":"Chicken Thigh","category":"Protein","storage":"fridge","purchaseDate":"@-3","keptOn":"@0","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":0,"fridge":{"daysLeft":-1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"expired","daysLeft":-1,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"poultry"},"available":false}
+      }
+    },
+    {
+      "id": "month-boundary-bought-date",
+      "kind": "pantry",
+      "record": {"name":"Ground Chicken","category":"Protein","storage":"fridge","purchaseDate":"@-31","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":-28,"fridge":{"daysLeft":-29,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":-29,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"ground"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":-28,"fridge":{"daysLeft":-29,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":-29,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"ground"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":-28,"fridge":{"daysLeft":-29,"limitDays":2,"safetyClass":"ground"},"signal":{"kind":"expired","daysLeft":-29,"printed":false,"bestBefore":false,"safety":"past-limit","limitDays":2,"safetyClass":"ground"},"available":false}
+      }
+    },
+    {
+      "id": "default-path-alias-name-no-storage",
+      "kind": "pantry",
+      "defaultStorageUnknown": true,
+      "record": {"name":"chicken","category":"Protein","purchaseDate":"@-1","quantity":1,"unit":"kg"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":1,"limitDays":2,"safetyClass":"poultry"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":2,"safetyClass":"poultry"},"available":true}
+      },
+      "expectedDefault": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false}
+      }
+    },
+    {
+      "id": "default-path-unknown-item-no-storage",
+      "kind": "pantry",
+      "defaultStorageUnknown": true,
+      "record": {"name":"Mystery Sauce","purchaseDate":"@-2","quantity":1,"unit":"jar"},
+      "expected": {
+        "2026-11-26": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":null,"daysLeft":5,"printed":false,"bestBefore":false},"available":true},
+        "2026-12-31": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":null,"daysLeft":5,"printed":false,"bestBefore":false},"available":true},
+        "2028-02-29": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":null,"daysLeft":5,"printed":false,"bestBefore":false},"available":true}
+      },
+      "expectedDefault": {
+        "2026-11-26": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":"unknown","daysLeft":5,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2026-12-31": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":"unknown","daysLeft":5,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2028-02-29": {"foodClass":"condiment","staple":false,"daysLeft":5,"fridge":null,"signal":{"kind":"unknown","daysLeft":5,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false}
+      }
+    },
+    {
+      "id": "default-path-beef-tapa-no-storage",
+      "kind": "pantry",
+      "defaultStorageUnknown": true,
+      "record": {"name":"Beef Tapa","category":"Protein","purchaseDate":"@-1","quantity":500,"unit":"g"},
+      "expected": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":{"daysLeft":2,"limitDays":3,"safetyClass":"whole-cut"},"signal":{"kind":"use-soon","daysLeft":2,"printed":false,"bestBefore":false,"limitDays":3,"safetyClass":"whole-cut"},"available":true}
+      },
+      "expectedDefault": {
+        "2026-11-26": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2026-12-31": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false},
+        "2028-02-29": {"foodClass":"perishable","staple":false,"daysLeft":2,"fridge":null,"signal":{"kind":"unknown","daysLeft":2,"printed":false,"bestBefore":false,"safety":"unknown-storage"},"available":false}
+      }
+    },
+    {
+      "id": "cooked-fridge-life-capped",
+      "kind": "cooked",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-5","fridgeLife":7,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-1}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-1}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-1}}
+      }
+    },
+    {
+      "id": "cooked-fridge-life-missing",
+      "kind": "cooked",
+      "record": {"name":"Sinigang","storage":"fridge","cookedDate":"@-3","portionsRemaining":3},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"use-soon","daysLeft":1}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"use-soon","daysLeft":1}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"use-soon","daysLeft":1}}
+      }
+    },
+    {
+      "id": "cooked-fridge-life-short",
+      "kind": "cooked",
+      "record": {"name":"Pancit","storage":"fridge","cookedDate":"@-1","fridgeLife":2},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":2,"signal":{"kind":"use-soon","daysLeft":1}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":2,"signal":{"kind":"use-soon","daysLeft":1}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":2,"signal":{"kind":"use-soon","daysLeft":1}}
+      }
+    },
+    {
+      "id": "cooked-freezer-quality-past",
+      "kind": "cooked",
+      "record": {"name":"Beef Stew","storage":"freezer","cookedDate":"@-100","freezerLife":90},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":90,"signal":{"kind":"check","daysLeft":-10}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":90,"signal":{"kind":"check","daysLeft":-10}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":90,"signal":{"kind":"check","daysLeft":-10}}
+      }
+    },
+    {
+      "id": "cooked-freezer-life-missing",
+      "kind": "cooked",
+      "record": {"name":"Chicken Soup","storage":"freezer","cookedDate":"@-10"},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":null,"signal":{"kind":null,"daysLeft":null}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":null,"signal":{"kind":null,"daysLeft":null}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":null,"signal":{"kind":null,"daysLeft":null}}
+      }
+    },
+    {
+      "id": "cooked-date-missing",
+      "kind": "cooked",
+      "record": {"name":"Takeout Pizza","storage":"fridge","fridgeLife":3},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":null}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":null}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":null}}
+      }
+    },
+    {
+      "id": "cooked-kept-today-still-expired",
+      "kind": "cooked",
+      "record": {"name":"Fried Rice","storage":"fridge","cookedDate":"@-6","fridgeLife":4,"keptOn":"@0"},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-2}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-2}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":4,"signal":{"kind":"expired","daysLeft":-2}}
+      }
+    },
+    {
+      "id": "cooked-today",
+      "kind": "cooked",
+      "record": {"name":"Tinola","cookedDate":"@0","fridgeLife":3},
+      "expected": {
+        "2026-11-26": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":3}},
+        "2026-12-31": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":3}},
+        "2028-02-29": {"foodClass":"cooked-meal","shelfLife":3,"signal":{"kind":null,"daysLeft":3}}
+      }
+    },
+    {
+      "id": "calendar-leap-day",
+      "kind": "calendar",
+      "value": "2028-02-29",
+      "expected": {
+        "2026-11-26": {"day":21243},
+        "2026-12-31": {"day":21243},
+        "2028-02-29": {"day":21243}
+      }
+    },
+    {
+      "id": "calendar-non-leap-feb-29",
+      "kind": "calendar",
+      "value": "2027-02-29",
+      "expected": {
+        "2026-11-26": {"day":null},
+        "2026-12-31": {"day":null},
+        "2028-02-29": {"day":null}
+      }
+    },
+    {
+      "id": "calendar-year-end",
+      "kind": "calendar",
+      "value": "2026-12-31",
+      "expected": {
+        "2026-11-26": {"day":20818},
+        "2026-12-31": {"day":20818},
+        "2028-02-29": {"day":20818}
+      }
+    },
+    {
+      "id": "calendar-empty",
+      "kind": "calendar",
+      "value": "",
+      "expected": {
+        "2026-11-26": {"day":null},
+        "2026-12-31": {"day":null},
+        "2028-02-29": {"day":null}
+      }
+    },
+    {
+      "id": "calendar-garbage",
+      "kind": "calendar",
+      "value": "garbage",
+      "expected": {
+        "2026-11-26": {"day":null},
+        "2026-12-31": {"day":null},
+        "2028-02-29": {"day":null}
+      }
+    },
+    {
+      "id": "calendar-relative-today",
+      "kind": "calendar",
+      "value": "@0",
+      "expected": {
+        "2026-11-26": {"day":20783},
+        "2026-12-31": {"day":20818},
+        "2028-02-29": {"day":21243}
+      }
+    },
+    {
+      "id": "category-protein",
+      "kind": "categoryShelfLife",
+      "category": "Protein",
+      "expected": {
+        "2026-11-26": {"days":3},
+        "2026-12-31": {"days":3},
+        "2028-02-29": {"days":3}
+      }
+    },
+    {
+      "id": "category-grain-lowercase",
+      "kind": "categoryShelfLife",
+      "category": "grain",
+      "expected": {
+        "2026-11-26": {"days":180},
+        "2026-12-31": {"days":180},
+        "2028-02-29": {"days":180}
+      }
+    },
+    {
+      "id": "category-pantry-uppercase",
+      "kind": "categoryShelfLife",
+      "category": "PANTRY",
+      "expected": {
+        "2026-11-26": {"days":365},
+        "2026-12-31": {"days":365},
+        "2028-02-29": {"days":365}
+      }
+    },
+    {
+      "id": "category-missing",
+      "kind": "categoryShelfLife",
+      "category": null,
+      "expected": {
+        "2026-11-26": {"days":7},
+        "2026-12-31": {"days":7},
+        "2028-02-29": {"days":7}
+      }
+    },
+    {
+      "id": "days-left-one-day-ago",
+      "kind": "daysLeftFrom",
+      "start": "@-1",
+      "shelfLifeDays": 3,
+      "expected": {
+        "2026-11-26": {"daysLeft":2},
+        "2026-12-31": {"daysLeft":2},
+        "2028-02-29": {"daysLeft":2}
+      }
+    },
+    {
+      "id": "days-left-today-zero",
+      "kind": "daysLeftFrom",
+      "start": "@0",
+      "shelfLifeDays": 0,
+      "expected": {
+        "2026-11-26": {"daysLeft":0},
+        "2026-12-31": {"daysLeft":0},
+        "2028-02-29": {"daysLeft":0}
+      }
+    },
+    {
+      "id": "days-left-across-month-end",
+      "kind": "daysLeftFrom",
+      "start": "@-29",
+      "shelfLifeDays": 30,
+      "expected": {
+        "2026-11-26": {"daysLeft":1},
+        "2026-12-31": {"daysLeft":1},
+        "2028-02-29": {"daysLeft":1}
+      }
+    },
+    {
+      "id": "days-left-impossible-start",
+      "kind": "daysLeftFrom",
+      "start": "2026-02-30",
+      "shelfLifeDays": 3,
+      "expected": {
+        "2026-11-26": {"daysLeft":-266},
+        "2026-12-31": {"daysLeft":-301},
+        "2028-02-29": {"daysLeft":-726}
+      }
+    },
+    {
+      "id": "days-left-non-numeric-shelf",
+      "kind": "daysLeftFrom",
+      "start": "@-10",
+      "shelfLifeDays": "abc",
+      "expected": {
+        "2026-11-26": {"daysLeft":null},
+        "2026-12-31": {"daysLeft":null},
+        "2028-02-29": {"daysLeft":null}
+      }
+    },
+    {
+      "id": "days-left-string-shelf",
+      "kind": "daysLeftFrom",
+      "start": "@-2",
+      "shelfLifeDays": "5",
+      "expected": {
+        "2026-11-26": {"daysLeft":3},
+        "2026-12-31": {"daysLeft":3},
+        "2028-02-29": {"daysLeft":3}
+      }
+    }
+  ]
+}

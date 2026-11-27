@@ -451,11 +451,11 @@ otherwise it becomes `null` (unknown) rather than an invented number.
 | `mealPrepFoodAlerts` | `{ enabled, announced }` — food-expiry notification opt-in plus the per-record dedup ledger (`"<kind>:<id>" -> "expired" | "use-soon"`). **Device-local by design and never synced** — see D-058 |
 | `mealPrepWeekTemplate` | saved weekly-plan template (device-local) |
 
-## Hardcoded databases (in app.js)
+## Hardcoded databases (in app.js; `INGREDIENT_DB` in shared/foodSafety.js)
 | Object | ~Size | Entry shape / purpose |
 |---|---|---|
 | `sampleRecipes` | ~26 | Built-in Filipino recipes with `nutritionPerServing` (ids 1–26); seeded on first load |
-| `INGREDIENT_DB` | ~175 | `{ name, unit, category, price, store, aliases, fridgeDays, freezerDays, trackExpiry, priceValue, minStockQty }` — autocomplete, pricing, storage inference |
+| `INGREDIENT_DB` | ~175 | `{ name, unit, category, price, store, aliases, fridgeDays, freezerDays, trackExpiry, priceValue, minStockQty }` — autocomplete, pricing, storage inference. Defined in `shared/foodSafety.js` (`MealPrepFoodSafety.INGREDIENT_DB`, shared with the Worker); `app.js` binds the same array (TASK-091) |
 | `LOCAL_NUTRITION_DB` | ~120 | `{ name, calories, protein, carbs, fat, fiber, sodium }` per 100g — offline nutrition |
 | `PANTRY_KNOWLEDGE` | 22 | Storage guidance prose (location, lasts, store, spoilage, freshness) |
 | `defaultCookingHacks` | 14 | Seeded hacks (ids 1-14) |

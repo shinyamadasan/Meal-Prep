@@ -1243,3 +1243,32 @@ qa: Verified local and Firestore payloads carry `plannedNeed`, the 390px Shop co
   are visible, and only one pantry tombstone is written for per-row safety removal. Restored
   the generated TASK-079 PNGs. Code Health and applicable AI checks passed.
 untested: A second full local run, production, real mobile devices, and coverage instrumentation.
+
+## TASK-091 · 2026-11-26
+baseline: before editing app.js, `expected` verdicts for all 76 fixture cases × 3 todays were
+  generated from the unmodified app (`origin/prop041-p1` 48c8ec2) in Playwright with
+  `page.clock.setFixedTime`.
+full local: `npm test` (Playwright local) passed 909 and failed 0, with no flaky tests: the 905
+  existing tests plus 4 new in `tests/food-safety-parity.spec.js`. No existing expectation was
+  edited.
+ledger: `npm run test:ledger-contract` passed 13/13.
+bridge: `npm run test:bridge` passed 262/262 (254 existing + 8 new in
+  `test/food-safety-parity.node.js`).
+parity: browser (app wrappers, shared module + app storage, shared module + default storage) and
+  Node (shared module via the Worker's own import, default storage) all equal the fixture for
+  2026-11-26, 2026-12-31 and 2028-02-29.
+mutation: setting FRESHNESS_WARN_DAYS to 3, the cooked-leftover limit to 5, or staple:true to
+  non-staple each failed 2/4 browser and 3–4/8 Node parity tests. Changing the poultry limit
+  from 2 to 3 correctly changed nothing, because INGREDIENT_DB `fridgeDays: 2` caps it
+  (`Math.min`). The file was restored byte-for-byte afterwards.
+static: `node --check` passed on app.js, shared/foodSafety.js, sw.js, both new tests, the
+  evaluator and inventory.js. `git diff --check` was clean. The moved INGREDIENT_DB block,
+  FRIDGE_SAFETY_LIMITS, STOCK_CLASS_RULES and six function bodies are byte-identical to HEAD
+  (scripted comparison).
+self-review/qa: Code Health and the applicable AI checks in `QA.md` passed. There are no
+  handler, CSS, persisted-field, saveData/cloudReady, tombstone, auth or Firestore changes, and
+  no secrets or debug leftovers.
+untested: `npx wrangler deploy --dry-run` (wrangler is not installed locally; the import
+  pattern matches the bundled `readyFoodContract.js`), the offline service-worker install in a
+  real browser, the private release-fixture round trip (Claude runs it), production, real
+  devices and coverage instrumentation.
