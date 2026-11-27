@@ -297,7 +297,8 @@ One more model-visible tool brings the surface to exactly seven: `get_inventory`
 surface at TASK-076 had exactly eight tools. That reviewed candidate was integrated and deployed;
 TASK-077 later added one more tool.
 
-- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The id must
+- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision` (TASK-093
+  adds `requestId`, TASK-094 the optional `boughtDate`). The id must
   come from `get_inventory`; duplicate-name matches require asking which row. The amount is the
   delta used, never an absolute resulting quantity. Extra uid/path/collection fields fail before
   Firestore access.
@@ -326,7 +327,8 @@ exactly nine tools. Reviewed candidate `9561f665` is deployed as Worker version
 Shopping preservation is supported by code/review evidence only (the write mask is `pantry` plus
 `version`); it was not verified live because no shopping read tool exists.
 
-- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision`. The stable id
+- Input is exactly `ingredientId`, `quantity`, `expectedUnit`, and `expectedRevision` (TASK-093
+  adds `requestId`, TASK-094 the optional `boughtDate`). The stable id
   must come from `get_inventory`; duplicate-name matches require asking which row. Quantity is the
   amount bought, never an absolute total. The Worker adds it to the live stored quantity. Extra
   uid/path/collection, date, storage, or other metadata keys fail before Firestore access.
@@ -336,11 +338,9 @@ Shopping preservation is supported by code/review evidence only (the write mask 
 - The existing row id and purchase, expiry, storage, category, and other metadata are preserved;
   only quantity/update time change for a non-staple. Numeric staples add the delta and become
   `stockLevel: 'full'`. Stock-level-only staples are refused with a direction to `mark_in_stock`.
-- Printed-expiry rows cannot merge, matching app purchase-merge behavior. The app compares inferred
-  freshness against a browser-local calendar date, but the Worker has no caller timezone and the
-  document stores none. It therefore refuses stale rows and the UTC/local boundary window where
-  expiration is uncertain; it never resets purchase dates to make old stock look fresh. Rows with
-  malformed freshness metadata fail closed.
+- Printed-expiry rows cannot merge, matching app purchase-merge behavior. It never resets purchase
+  dates to make old stock look fresh. (Superseded by TASK-094: mergeability now comes only from the
+  shared safety verdict for the household day, and fridge safety lots need `boughtDate`.)
 - Absent and tombstoned ids are refused; `add_stock` never creates or resurrects a row. A removed
   non-staple must be re-added through the app.
 - One `mealprep:write` authorization, one observed revision, one update-time-guarded pantry patch,
@@ -359,7 +359,7 @@ secret or Firestore change. Deploy is held for the owner (BQ-032).
   day in `HOUSEHOLD_TIME_ZONE` (`wrangler.jsonc` `vars`, `"Asia/Manila"`) with
   `Intl.DateTimeFormat`. One setting for the household, not per person. A missing or invalid zone
   throws `InfrastructureError` and the read fails before any Firestore access; the Worker never
-  guesses a day. (The UTC ±1-day guard inside `add_stock` is unchanged here; TASK-094 replaces it.)
+  guesses a day. (TASK-094 replaced the UTC ±1-day guard inside `add_stock` with this day.)
 - **`get_inventory`** items add `category`, `purchaseDate`, `expiryDate`, `dateMode`,
   `printedDateKind` (string or null) next to the existing fields, plus
   `safety: { status, reason, label, daysLeft, usable }` from `pantrySafety()` in
@@ -451,6 +451,46 @@ and the read tools are unchanged. Deploy is held for the owner (BQ-032).
    collection group `mcpRequests`, field `expireAt`. Firestore then deletes each record some time
    after its `expireAt` (typically within a day or so; deletion is not instant). No code or
    pruning job depends on it; until it exists, records simply stay.
+
+## TASK-094 safe purchase handling in `add_stock` (PROP-041 P1-4, local only — NOT deployed)
+
+Closes audit C2: new food never inherits an older or unsafe lot's clock, and no bought date is
+invented (owner decision 4). No new tool and no lot creation (Phase 2). Read tools and the other
+write tools are unchanged; `requestId` / `expectedRevision` guards are unchanged.
+
+- **One gate: the shared verdict.** `requireMergeableLot()` in `operations/inventory.js` decides
+  with `pantrySafety()` (TASK-092, built on `shared/foodSafety.js`) for the household day
+  (`HOUSEHOLD_TIME_ZONE`, same `householdDayFromEnv()` and injectable clock as the reads). The
+  bridge-only `CATEGORY_SHELF_LIFE_DAYS` defaults and the UTC ±1-day skew window are removed.
+- **Refused, zero writes, no request record** (validation error; the message says to "record the
+  new purchase separately in the app"): a lot `get_inventory` would call `invalid-record`
+  (`readableLot`), a lot whose stored `storage` is not exactly `fridge`, `freezer` or `counter`
+  (`''`/null fall back to the shared inference; `'Fridge'` or `{}` would skip the fridge limits), a
+  lot with a printed date (use-by or best-before, staple or not), or a lot whose verdict is
+  `expired`, `unknown` or `check`. A lot whose only problem is
+  being out of stock (`reason: out-of-stock`, e.g. an empty staple with in-date or no dates) can
+  still be refilled: that is not a date problem.
+- **Fridge safety lots** (shared `pantryFridgeSafety()` non-null: raw meat, poultry, seafood, ground
+  and variety meat, sausage, cooked food) need the new optional input `boughtDate` (`YYYY-MM-DD`,
+  the day the NEW stock was bought). Missing ⇒ `needs_bought_date: …` (chat asks the user; it may
+  use today only if they said "today" or "just bought"). A different day than the lot's
+  `purchaseDate` ⇒ refused as a separate lot. The same day ⇒ merge.
+- `boughtDate` must be a real calendar day not after the household day; a malformed or future date
+  (and an invalid `HOUSEHOLD_TIME_ZONE`) fails before any Firestore access. Other lots keep their
+  stored dates; a supplied `boughtDate` EARLIER than the lot's bought date is refused (older stock
+  must not take a newer clock), a later or equal one merges.
+- `boughtDate` is a business argument, so it is in the request's `argsHash`: the same `requestId`
+  with a different (or missing) `boughtDate` is `request_id_reused`.
+- **Stated back.** The success result adds `lot: { boughtDate, storage, storageSource }`: the
+  lot's stored `purchaseDate` when it is a real calendar day (else null), its storage, and
+  `storageSource` = `recorded` (stored on the lot) or `inferred` (no storage recorded; guessed from
+  the ingredient, and chat says so) or null.
+- Tests: `test/operations-add-stock.node.js` (every refusal branch, each fridge safety class,
+  the lot at its limit: "Use today" merges, the next day is refused; boughtDate validation;
+  staple/non-safety merges and the stated-back lot) and `test/mcp-add-stock.node.js` (zero writes
+  and no request record on refusal, the Manila/UTC household-day boundary both ways, schema
+  and time-zone failures before Firestore, replay and `request_id_reused` on a changed
+  `boughtDate`).
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 

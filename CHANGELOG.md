@@ -1792,3 +1792,63 @@ findings (recorded, not fixed):
     write). Out of this task's pantry/cookedMeals scope.
   - F3 `npx wrangler deploy --dry-run` not run: wrangler is not installed locally.
 → status set to `review` in TASKS.md
+
+## TASK-094 — implementation complete (branch: task-094-safe-add-stock)
+Builder: Claude standing in for Codex (Codex at its usage limit).
+changed:
+  - `workers/conversational-bridge/src/operations/inventory.js`: removed `CATEGORY_SHELF_LIFE_DAYS`,
+    `DEFAULT_CATEGORY_SHELF_LIFE_DAYS`, `UTC_LOCAL_DATE_SKEW_DAYS`, `MILLISECONDS_PER_DAY`,
+    `dateStringToUtcDay()` and `validateMergeFreshness()`. New `validateBoughtDate(boughtDate, today)`
+    (optional; a real `YYYY-MM-DD` day via `isCalendarDay()`, not after the household day) and
+    `requireMergeableLot(record, boughtDate, today)`: refuses a printed-date lot (`dateMode:
+    'expiry'`, staple or not) and any lot whose `pantrySafety()` verdict is not `ok`/`use-soon`
+    (expired, unknown, check) with a ValidationError ending "record the new purchase separately in
+    the app."; for a lot with a shared `pantryFridgeSafety()` class it requires `boughtDate`
+    (missing ⇒ `needs_bought_date: …`, detail `{ field: 'boughtDate', code: 'needs_bought_date' }`)
+    and refuses a different day than the lot's `purchaseDate`. `addStock()` takes the household day
+    as a 4th argument, runs these gates for staples and non-staples alike, and returns
+    `lot: { boughtDate, storage }` (stored `purchaseDate` or null; stored storage, else the shared
+    `defaultInferStorage()`).
+  - `src/mcp.js`: `add_stock` input gains optional `boughtDate` (string, `^\d{4}-\d{2}-\d{2}$`);
+    output gains strict `lot: { boughtDate: string|null, storage: string|null }`; description says
+    which lots are refused, when to send `boughtDate`, never to guess it (today only on "today" /
+    "just bought"), and to state the lot back. `addStockTool()` computes the household day once in
+    a `precheck` (`householdDayFromEnv(env, deps.now)`, before any Firestore access; an invalid
+    zone fails closed) and validates `boughtDate` there. `boughtDate` is not in
+    `UNHASHED_ARG_KEYS`, so it is part of `argsHash`. Other tools unchanged.
+  - `workers/conversational-bridge/README.md`: TASK-094 section; the TASK-077 and TASK-092 notes
+    about the old UTC guard now point to it.
+tests:
+  - `test/operations-add-stock.node.js`: fixtures use a fixed household day and a frozen lot for
+    the arithmetic cases; old UTC-window/category cases replaced by: the refusal branches
+    (printed use-by / best-before / printed staple, poultry past its limit, no or malformed bought
+    date, unknown storage, check perishable, check staple, unreadable shelf life); each of the 7
+    fridge safety classes (missing ⇒ needs_bought_date, different ⇒ refused, equal ⇒ merged and
+    stated back); a poultry lot at its limit (merges on its last day, refused the next);
+    boughtDate validation; non-safety/staple merges (frozen, eggs, undated, use-soon milk, empty
+    staple refill) with `lot`; a source check that the removed constants/helpers are gone.
+  - `test/mcp-add-stock.node.js`: the default row is frozen (no safety class), the schema lists
+    `boughtDate`, the success result carries `lot`; refusals leave the store unchanged and commit
+    no request record; needs_bought_date / different / same day; the Manila household-day boundary
+    both ways (00:30 Manila = previous UTC day: "today" accepted; tomorrow rejected before
+    Firestore; a poultry lot is "Use today" in get_inventory and merges at 23:30 Manila, and is
+    refused at 01:00 Manila the next day while UTC is still the last day); malformed boughtDate
+    and an invalid `HOUSEHOLD_TIME_ZONE` fail before Firestore; replay with the same boughtDate,
+    `request_id_reused` with a different or missing one.
+blockers: none for review. Deploy is held (BQ-032).
+deviations / interpretations:
+  - An out-of-stock lot whose dates pass the verdict (`reason: out-of-stock`, status ok/use-soon,
+    e.g. an empty staple) is still a merge target. Refilling it is add_stock's purpose and the
+    acceptance list names only not-usable-for-date reasons (unknown, check, expired, printed);
+    the gate is an allow-list on status, so any other status fails closed.
+  - `boughtDate` is ignored (validated and hashed only) for lots without a fridge safety class;
+    their stored dates never change and the result states them back. The task requires it only for
+    fridge safety lots and says other lots keep today's merge behaviour.
+  - Staples are now date-gated too (a staple with a printed date or past its estimate is refused);
+    before, staples skipped the freshness check. This follows the acceptance wording.
+  - `needs_bought_date` is a ValidationError with a `needs_bought_date: ` message prefix (same
+    pattern as `unit_mismatch:`), not a new error class; errors.js is not in the task's files.
+findings (recorded, not fixed):
+  - F1 A lot without `storage` whose name INGREDIENT_DB can place is merged with the inferred
+    storage stated back; a lot it cannot place is unknown and refused (TASK-092 rule, unchanged).
+→ status set to `review` in TASKS.md

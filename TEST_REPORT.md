@@ -1324,3 +1324,21 @@ self-review/qa: Code Health and the applicable AI checks in `QA.md` passed: app.
 untested: `npx wrangler deploy --dry-run` (wrangler not installed); real Firestore
   `documents:commit` and its IAM permission (`datastore.entities.create` not yet granted —
   owner step); TTL policy; production; live ChatGPT; coverage instrumentation.
+
+## TASK-094 · 2026-11-27
+Builder: Claude standing in for Codex.
+bridge: `npm run test:bridge` 328 passed, 0 failed (315 before; add_stock suites 13 + 16 cases,
+  old UTC-window cases replaced).
+mutation check: disabling the different-day refusal fails 2 tests; the future-date check 2; the
+  needs_bought_date branch 2; the printed-date refusal 3; the status allow-list 5.
+full local: `npm test` (Playwright local) 912 passed, 0 failed (2.3m). Rewritten
+  `feature-evidence/task-079` screenshots restored.
+ledger: `npm run test:ledger-contract` 13 passed.
+dry run: `npx wrangler deploy --dry-run --outdir <scratch>` built (1675.40 KiB, bindings
+  OAUTH_KV and HOUSEHOLD_TIME_ZONE "Asia/Manila"); nothing deployed.
+static: `node --check` on changed JS; `git diff --check` clean.
+self-review/qa: Code Health and the applicable AI checks in `QA.md` passed: app.js, index.html,
+  style.css, shared/ untouched; no saveData/cloudReady, tombstone, OAuth, route or secret change;
+  requestId, expectedRevision and updateTime guards unchanged; every refusal throws before the
+  commit (zero writes, no request record); no debug leftovers; removed helpers have no callers.
+untested: production Firestore, live ChatGPT, coverage instrumentation.
