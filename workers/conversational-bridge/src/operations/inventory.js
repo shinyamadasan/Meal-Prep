@@ -168,7 +168,10 @@ export function pantrySafety(p, today) {
     label = daysLeft == null ? 'No date recorded' : daysLeft + 'd left';
   }
   const usable = available === true && status !== 'expired' && status !== 'unknown';
-  if (!usable && status !== 'expired' && status !== 'unknown') {
+  if (!usable && status === 'check') {
+    // Past its estimate AND out of stock: keep the app's warning wording, add the stock state.
+    label = label + ' (out of stock)';
+  } else if (!usable && status !== 'expired' && status !== 'unknown') {
     // The date allows it; the app's availability rule does not (empty staple, no quantity left).
     reason = 'out-of-stock';
     label = 'Out of stock';
@@ -178,16 +181,50 @@ export function pantrySafety(p, today) {
 
 // get_inventory's item (TASK-092): the existing read item plus the stored date/category fields
 // (null when absent or not a string) and the safety verdict. Write results keep toInventoryItem().
+//
+// One stored lot the read schema cannot carry (non-text name/unit/storage/updatedAt, a quantity
+// that is not a finite number, a stockLevel outside full/ok/low/empty) must not fail the whole
+// read (re-review must-fix 2): that lot alone is unknown / invalid-record and not usable, with
+// schema-safe fields. A null or non-object entry is not a record and is skipped. Write results
+// keep toInventoryItem() unchanged.
+const READ_STOCK_LEVELS = ['full', 'ok', 'low', 'empty'];
+
+function textOrNullField(value) {
+  return value == null || typeof value === 'string';
+}
+
+function readableLot(p) {
+  return textOrNullField(p.name) && textOrNullField(p.unit) && textOrNullField(p.storage) &&
+    textOrNullField(p.updatedAt) &&
+    (p.quantity == null || (typeof p.quantity === 'number' && Number.isFinite(p.quantity))) &&
+    (p.stockLevel == null || READ_STOCK_LEVELS.includes(p.stockLevel));
+}
+
 export function listInventoryWithSafety(pantry, today) {
   requireHouseholdDay(today);
-  return (pantry || []).map((p) => Object.assign(toInventoryItem(p), {
-    category: textOrNull(p.category),
-    purchaseDate: textOrNull(p.purchaseDate),
-    expiryDate: textOrNull(p.expiryDate),
-    dateMode: textOrNull(p.dateMode),
-    printedDateKind: textOrNull(p.printedDateKind),
-    safety: pantrySafety(p, today)
-  }));
+  return (pantry || []).filter((p) => p != null && typeof p === 'object').map((p) => {
+    const dates = {
+      category: textOrNull(p.category),
+      purchaseDate: textOrNull(p.purchaseDate),
+      expiryDate: textOrNull(p.expiryDate),
+      dateMode: textOrNull(p.dateMode),
+      printedDateKind: textOrNull(p.printedDateKind)
+    };
+    if (readableLot(p)) return Object.assign(toInventoryItem(p), dates, { safety: pantrySafety(p, today) });
+    return Object.assign({
+      ingredientId: String(p.id),
+      name: textOrNull(p.name),
+      quantity: typeof p.quantity === 'number' && Number.isFinite(p.quantity) ? p.quantity : null,
+      unit: textOrNull(p.unit),
+      inStock: false,
+      staple: isStapleRecord(p),
+      stockLevel: READ_STOCK_LEVELS.includes(p.stockLevel) ? p.stockLevel : null,
+      storage: textOrNull(p.storage),
+      updatedAt: textOrNull(p.updatedAt)
+    }, dates, {
+      safety: { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false }
+    });
+  });
 }
 
 function validateQuantity(quantity) {

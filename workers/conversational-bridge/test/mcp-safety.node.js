@@ -302,11 +302,63 @@ test('review fix: counter and freezer lots past their estimate are check, never 
     { id: 'thigh', name: 'Chicken Thigh', category: 'Protein', storage: 'freezer', purchaseDate: '2026-01-01', dateMode: 'purchase', shelfLifeDays: 90, quantity: 1, unit: 'kg' }
   ];
   const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
-  for (const item of message.result.structuredContent.items) {
-    const signal = FoodSafety.pantryDateSignal(pantry.find((p) => p.id === item.ingredientId), today);
-    assert.ok(signal.daysLeft < 0, item.ingredientId);
-    assert.deepEqual(item.safety, { status: 'check', reason: 'estimate-passed', label: 'Estimated window passed — check it', daysLeft: signal.daysLeft, usable: true }, item.ingredientId);
+  const byId = Object.fromEntries(message.result.structuredContent.items.map((item) => [item.ingredientId, item]));
+  // 2026-09-01 + 30 days vs 2026-11-26 (86 days on): 56 days past. 2026-01-01 + 90 vs 329 days on: 239 past.
+  assert.deepEqual(byId.onion.safety, { status: 'check', reason: 'estimate-passed', label: 'Estimated window passed — check it', daysLeft: -56, usable: true });
+  assert.deepEqual(byId.thigh.safety, { status: 'check', reason: 'estimate-passed', label: 'Estimated window passed — check it', daysLeft: -239, usable: true });
+});
+
+test('re-review: past its estimate and out of stock keeps the warning wording', async () => {
+  const today = '2026-11-26';
+  const pantry = [
+    { id: 'onion0', name: 'Onion', category: 'Vegetable', storage: 'counter', purchaseDate: '2026-09-01', dateMode: 'purchase', shelfLifeDays: 30, quantity: 0, unit: 'kg' }
+  ];
+  const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  assert.deepEqual(message.result.structuredContent.items[0].safety,
+    { status: 'check', reason: 'estimate-passed', label: 'Estimated window passed — check it (out of stock)', daysLeft: -56, usable: false });
+});
+
+test('re-review: one unreadable lot or null entry never fails get_inventory', async () => {
+  const today = '2026-11-26';
+  const base = { name: 'Rice', category: 'Grain', storage: 'counter', purchaseDate: today, dateMode: 'purchase', shelfLifeDays: 365, quantity: 1, unit: 'kg' };
+  const bad = [
+    { id: 'numname', name: 7 },
+    { id: 'textqty', quantity: '2' },
+    { id: 'nanqty', quantity: NaN },
+    { id: 'infqty', quantity: Infinity },
+    { id: 'numunit', unit: 5 },
+    { id: 'medium', staple: true, stockLevel: 'medium' },
+    { id: 'capLow', staple: true, stockLevel: 'Low' },
+    { id: 'numstorage', storage: 3 },
+    { id: 'objupdated', updatedAt: { seconds: 1 } }
+  ].map((o) => Object.assign({}, base, o));
+  const pantry = [null, Object.assign({ id: 'good' }, base)].concat(bad, ['text-entry']);
+  const { message } = await callRead('get_inventory', { revision: 3, pantry, cookedMeals: [] }, manilaNoon(today));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
+  const items = message.result.structuredContent.items;
+  assert.equal(items.length, 1 + bad.length);
+  const byId = Object.fromEntries(items.map((item) => [item.ingredientId, item]));
+  assert.equal(byId.good.safety.usable, true);
+  for (const b of bad) {
+    assert.deepEqual(byId[b.id].safety, { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false }, b.id);
+    assert.equal(byId[b.id].inStock, false, b.id);
   }
+});
+
+test('re-review: a huge freezerLife or a null entry never fails get_ready_food', async () => {
+  const today = '2026-11-26';
+  const cookedMeals = [
+    null,
+    { id: 'huge', name: 'Adobo', storage: 'freezer', cookedDate: today, freezerLife: 1e20, portionsRemaining: 2 },
+    { id: 'good', name: 'Sinigang', storage: 'fridge', cookedDate: today, fridgeLife: 4, portionsRemaining: 2 }
+  ];
+  const { message } = await callRead('get_ready_food', { revision: 4, pantry: [], cookedMeals }, manilaNoon(today));
+  assert.equal(message.result.isError, undefined, JSON.stringify(message.result.content));
+  const items = message.result.structuredContent.items;
+  assert.equal(items.length, 2);
+  const byId = Object.fromEntries(items.map((item) => [item.cookedMealId, item]));
+  assert.deepEqual(byId.huge.safety, { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false });
+  assert.equal(byId.good.safety.usable, true);
 });
 
 test('review fix G1: one unreadable ready-food batch is unknown and the rest still load', async () => {

@@ -74,6 +74,11 @@ export function readyFoodSafety(meal, today) {
     return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
   }
   const daysLeft = Number.isFinite(signal.daysLeft) ? signal.daysLeft : null;
+  // An absurd stored shelf life (e.g. freezerLife 1e20) gives a day count the schema cannot carry;
+  // that batch alone is unknown instead of failing the whole read (re-review must-fix 1).
+  if (daysLeft != null && !Number.isSafeInteger(daysLeft)) {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
+  }
   const frozen = meal.storage === 'freezer';
   let status;
   let reason;
@@ -144,7 +149,8 @@ function readableBatch(meal) {
 
 export function listReadyFoodWithSafety(cookedMeals, today) {
   requireHouseholdDay(today);
-  return (cookedMeals || []).map((meal) => {
+  // A null or non-object entry is not a record; it is skipped, never a failed read.
+  return (cookedMeals || []).filter((meal) => meal != null && typeof meal === 'object').map((meal) => {
     if (readableBatch(meal)) {
       return Object.assign(toReadyFoodItem(meal), { safety: readyFoodSafety(meal, today) });
     }
