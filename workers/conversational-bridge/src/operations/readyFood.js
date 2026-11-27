@@ -18,9 +18,15 @@
 // client-side.
 import { NotFoundError, ValidationError, InsufficientServingsError } from '../errors.js';
 import '../../../../shared/readyFoodContract.js';
+// Shared food-safety rules (TASK-091/092): the get_ready_food safety verdict only.
+import '../../../../shared/foodSafety.js';
+import { isCalendarDay, isStoredRecord, readableId, requireHouseholdDay, useSoonLabel } from './inventory.js';
 
 const READY_FOOD_CONTRACT = globalThis.MealPrepReadyFoodContract;
+const FoodSafety = globalThis.MealPrepFoodSafety;
 export const READY_FOOD_SOURCES = READY_FOOD_CONTRACT.sources;
+export const READY_FOOD_DEFAULT_FRIDGE_LIFE = READY_FOOD_CONTRACT.defaultFridgeLife;
+export const READY_FOOD_DEFAULT_FREEZER_LIFE = READY_FOOD_CONTRACT.defaultFreezerLife;
 
 const PORTION_COUNT_MAX = 99;
 const VALID_STORAGE = ['fridge', 'freezer'];
@@ -46,6 +52,123 @@ function toReadyFoodItem(meal) {
 
 export function listReadyFood(cookedMeals) {
   return (cookedMeals || []).map(toReadyFoodItem);
+}
+
+// Chat's safety verdict for one ready-food batch (TASK-092, D-091), from the shared cooked-meal
+// rules on the household day. `usable` is the app's own getReadyFoodSuggestions() availability
+// (shared cookedMealAvailable(): named, portions left, not past its shelf life), except that an
+// `expired` or `unknown` batch is never usable. Stricter than the app in one way: a missing or
+// invalid cookedDate (or an unreadable fridge shelf life) is `unknown`, where the app has no
+// date to judge and keeps the batch. A frozen batch with a valid cookedDate but no freezer
+// quality window stays `ok` (freezing is a quality limit, not a safety limit; D-089).
+export function readyFoodSafety(meal, today) {
+  requireHouseholdDay(today);
+  let signal;
+  let available;
+  let shelfLife;
+  try {
+    signal = FoodSafety.cookedDateSignal(meal, today);
+    available = FoodSafety.cookedMealAvailable(meal, today);
+    shelfLife = FoodSafety.cookedShelfLife(meal);
+  } catch {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
+  }
+  // An absurd stored shelf life (freezerLife 1e20, +/-Infinity, NaN) gives a day count the schema
+  // cannot carry or that would read as "no quality date"; that batch alone is unknown.
+  if (signal.daysLeft != null && !Number.isSafeInteger(signal.daysLeft)) {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before eating', daysLeft: null, usable: false };
+  }
+  const daysLeft = signal.daysLeft == null ? null : signal.daysLeft;
+  const frozen = meal.storage === 'freezer';
+  let status;
+  let reason;
+  let label;
+  if (!isCalendarDay(meal.cookedDate)) {
+    status = 'unknown';
+    reason = 'unknown-cooked-date';
+    label = 'No valid cooked date - check it in the app before eating';
+  } else if (daysLeft == null && !frozen) {
+    status = 'unknown';
+    reason = 'unknown-shelf-life';
+    label = 'Fridge shelf life unreadable - check it in the app before eating';
+  } else if (signal.kind === 'expired') {
+    status = 'expired';
+    reason = 'past-safety-limit';
+    label = 'Past safe fridge time - do not eat (' + shelfLife + '-day limit)';
+  } else if (signal.kind === 'check') {
+    status = 'check';
+    reason = 'freezer-window-passed';
+    label = 'Freezer quality window passed \u2014 check it';
+  } else if (signal.kind === 'use-soon') {
+    status = 'use-soon';
+    reason = 'use-soon';
+    label = useSoonLabel(daysLeft);
+  } else if (daysLeft == null) {
+    status = 'ok';
+    reason = 'no-quality-window';
+    label = 'Frozen - no quality date recorded';
+  } else {
+    status = 'ok';
+    reason = 'in-date';
+    label = daysLeft + 'd left';
+  }
+  const usable = available === true && status !== 'expired' && status !== 'unknown';
+  if (!usable && (status === 'ok' || status === 'use-soon')) {
+    // The date allows it; the app's availability rule does not.
+    if (!meal.name) {
+      reason = 'unnamed';
+      label = 'Record has no name - check it in the app';
+    } else {
+      reason = 'no-portions-left';
+      label = 'No portions left';
+    }
+  }
+  return { status, reason, label, daysLeft, usable };
+}
+
+// get_ready_food's item (TASK-092): the existing read item plus the safety verdict. Write results
+// keep toReadyFoodItem().
+//
+// G1 (review): one stored batch the read schema cannot carry (a portion count that is not a whole
+// number 0..99, a storage or source outside the enums, a non-text name or date) must not fail the
+// whole read. That batch alone is shown as unknown and not usable, with schema-safe fields. This
+// is stricter than the app (D-091). Write results keep toReadyFoodItem() unchanged.
+function textOrNullValue(value) {
+  return typeof value === 'string' ? value : null;
+}
+
+function readableBatch(meal) {
+  const pr = meal.portionsRemaining;
+  return readableId(meal.id) && (meal.recipeId == null || readableId(meal.recipeId)) &&
+    (pr == null || (Number.isInteger(pr) && pr >= 0 && pr <= PORTION_COUNT_MAX)) &&
+    (!meal.storage || VALID_STORAGE.includes(meal.storage)) &&
+    (meal.source == null || READY_FOOD_SOURCES.includes(meal.source)) &&
+    (meal.name == null || typeof meal.name === 'string') &&
+    (meal.cookedDate == null || typeof meal.cookedDate === 'string') &&
+    (meal.updatedAt == null || typeof meal.updatedAt === 'string');
+}
+
+export function listReadyFoodWithSafety(cookedMeals, today) {
+  requireHouseholdDay(today);
+  // A null or non-object entry is not a record; it is skipped, never a failed read.
+  return (cookedMeals || []).filter(isStoredRecord).map((meal, index) => {
+    if (readableBatch(meal)) {
+      return Object.assign(toReadyFoodItem(meal), { safety: readyFoodSafety(meal, today) });
+    }
+    return {
+      // An unreadable id gets a placeholder no write tool will match.
+      cookedMealId: readableId(meal.id) ? String(meal.id) : 'unreadable-id-' + index,
+      recipeId: readableId(meal.recipeId) ? String(meal.recipeId) : null,
+      source: READY_FOOD_SOURCES.includes(meal.source) ? meal.source : null,
+      name: textOrNullValue(meal.name),
+      servingsRemaining: null,
+      trackedPortions: false,
+      storage: VALID_STORAGE.includes(meal.storage) ? meal.storage : 'fridge',
+      cookedDate: textOrNullValue(meal.cookedDate),
+      updatedAt: textOrNullValue(meal.updatedAt),
+      safety: { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before eating', daysLeft: null, usable: false }
+    };
+  });
 }
 
 function findMealIndex(cookedMeals, cookedMealId) {

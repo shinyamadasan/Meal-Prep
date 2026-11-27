@@ -9,6 +9,11 @@
   "observability": {
     "enabled": true
   },
+  // TASK-092 (PROP-041 owner decision 1): the household calendar day for food-safety verdicts.
+  // One non-secret setting for the whole household, an IANA time zone. Invalid => reads fail.
+  "vars": {
+    "HOUSEHOLD_TIME_ZONE": "Asia/Manila"
+  },
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",

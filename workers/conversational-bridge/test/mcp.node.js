@@ -64,6 +64,8 @@ function readDeps(doc) {
     calls,
     deps: {
       nowSeconds: NOW,
+      // TASK-092: fixed household clock (2027-01-15 16:00 in Asia/Manila).
+      now: () => new Date(NOW * 1000),
       getFirestoreAccessToken: async () => { calls.token += 1; return 'fake-firestore-token'; },
       getUserDocument: async () => { calls.read += 1; return doc; },
       patchUserDocument: async () => { calls.write += 1; throw new Error('write path reached'); },
@@ -166,7 +168,13 @@ test('get_inventory preserves the canonical revision and stable ingredient ids w
       staple: true,
       stockLevel: 'ok',
       storage: 'pantry',
-      updatedAt: null
+      updatedAt: null,
+      category: null,
+      purchaseDate: null,
+      expiryDate: null,
+      dateMode: null,
+      printedDateKind: null,
+      safety: { status: 'ok', reason: 'no-date', label: 'No date recorded', daysLeft: null, usable: true }
     }]
   });
   assert.deepEqual(read.calls, { token: 1, read: 1, write: 0, fetch: 0 });
@@ -192,7 +200,14 @@ test('get_ready_food preserves the canonical revision and stable cooked-meal ids
       trackedPortions: true,
       storage: 'fridge',
       cookedDate: '2026-09-30',
-      updatedAt: null
+      updatedAt: null,
+      safety: {
+        status: 'expired',
+        reason: 'past-safety-limit',
+        label: 'Past safe fridge time - do not eat (4-day limit)',
+        daysLeft: -103,
+        usable: false
+      }
     }]
   });
   assert.deepEqual(read.calls, { token: 1, read: 1, write: 0, fetch: 0 });

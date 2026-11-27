@@ -20,9 +20,11 @@
 import { InsufficientStockError, NotFoundError, ValidationError, AmbiguousError } from '../errors.js';
 import { convertQuantity } from './quantity.js';
 // Shared food-safety rules (TASK-091, D-090): defines globalThis.MealPrepFoodSafety, the same rules
-// the app uses. Loaded only; nothing here reads it yet, so the classification note above still
-// describes this module's behaviour.
+// the app uses. Only the get_inventory safety verdict reads it (TASK-092); the write operations
+// below still use the bridge's own classification described above.
 import '../../../../shared/foodSafety.js';
+
+const FoodSafety = globalThis.MealPrepFoodSafety;
 
 const MAX_UNIT_LENGTH = 40;
 const MAX_STOCK_QUANTITY = Number.MAX_SAFE_INTEGER;
@@ -43,7 +45,11 @@ function classifyStaple(p) {
   if (!p) return 'non-staple';
   if (p.staple === true) return 'staple';
   if (p.staple === false) return 'non-staple';
-  const category = (p.category == null ? '' : String(p.category)).trim().toLowerCase();
+  // Same text as before for every value String() can convert (write tools unchanged); a stored
+  // map whose toString cannot convert reads as no category instead of throwing.
+  let text = '';
+  try { text = p.category == null ? '' : String(p.category); } catch { text = ''; }
+  const category = text.trim().toLowerCase();
   if (category === 'pantry') return 'staple';
   return 'ambiguous';
 }
@@ -72,6 +78,168 @@ function toInventoryItem(p) {
 
 export function listInventory(pantry) {
   return (pantry || []).map(toInventoryItem);
+}
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+// A real YYYY-MM-DD calendar day by the shared calendar rule (no rollover: 2026-02-30 is not one).
+export function isCalendarDay(value) {
+  return typeof value === 'string' && DATE_ONLY.test(value) && FoodSafety.stockCalendarDay(value) != null;
+}
+
+export function requireHouseholdDay(today) {
+  if (!isCalendarDay(today)) {
+    throw new TypeError('A YYYY-MM-DD household day is required for safety verdicts.');
+  }
+  return today;
+}
+
+function textOrNull(value) {
+  return typeof value === 'string' ? value : null;
+}
+
+export function useSoonLabel(daysLeft) {
+  return daysLeft === 0 ? 'Use today' : 'Use soon - ' + daysLeft + 'd left';
+}
+
+// Chat's safety verdict for one pantry lot (TASK-092, D-091), computed ONLY from the shared rules
+// on the household day, with the shared default storage path (no PANTRY_KNOWLEDGE): a lot with no
+// storage that INGREDIENT_DB cannot place is `unknown`. `usable` is the app's pantryLotAvailable()
+// verdict, except that an `expired` or `unknown` lot is never usable (stricter than the app for a
+// staple past its printed use-by, TASK-091 finding F2). Labels reuse the app's own wording.
+export function pantrySafety(p, today) {
+  requireHouseholdDay(today);
+  let signal;
+  let available;
+  let fridge;
+  try {
+    signal = FoodSafety.pantryDateSignal(p, today);
+    available = FoodSafety.pantryLotAvailable(p, today);
+    fridge = FoodSafety.pantryFridgeSafety(p, today);
+  } catch {
+    // A record the shared rules cannot read is unknown, never usable; it must not hide the rest.
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
+  }
+  // An absurd stored shelf life (1e20, +/-Infinity, NaN) gives a day count the schema cannot carry
+  // or that would read as "no date"; that lot alone is unknown, never ok and never a failed read.
+  if (signal.daysLeft != null && !Number.isSafeInteger(signal.daysLeft)) {
+    return { status: 'unknown', reason: 'unreadable-record', label: 'Record could not be checked - check it in the app before use', daysLeft: null, usable: false };
+  }
+  let daysLeft = signal.daysLeft == null ? null : signal.daysLeft;
+  let kind = signal.kind;
+  // Within a fridge safety limit the app shows the shelf-life estimate, which can outlast the
+  // limit (raw chicken: 3-day protein estimate, 2-day poultry limit). Chat gets the sooner day, so
+  // "days left" never runs past the safety limit; this can only make the answer stricter.
+  if (kind !== 'expired' && kind !== 'unknown' && fridge && Number.isFinite(fridge.daysLeft) &&
+      (daysLeft == null || fridge.daysLeft < daysLeft)) {
+    daysLeft = fridge.daysLeft;
+    if (kind == null && daysLeft <= FoodSafety.FRESHNESS_WARN_DAYS) kind = 'use-soon';
+  }
+  // The app's Fridge list shows any lot past its shelf-life estimate (no printed date) as
+  // "Estimated window passed" in check styling, wherever it is stored (counter, freezer,
+  // non-perishables). Chat must not call it in-date. Availability is unchanged (quality only).
+  if (kind == null && daysLeft != null && daysLeft < 0 && !signal.printed) kind = 'check';
+  let status;
+  let reason;
+  let label;
+  if (kind === 'unknown') {
+    status = 'unknown';
+    reason = 'unknown-storage';
+    label = 'Storage location not recorded - set it in the app before use';
+  } else if (kind === 'expired') {
+    status = 'expired';
+    if (signal.safety === 'unknown-date') {
+      reason = 'no-bought-date';
+      label = 'No bought date - add it before use';
+    } else if (signal.safety === 'past-limit') {
+      reason = 'past-safety-limit';
+      label = 'Past safe fridge time - do not use (' + signal.safetyClass + ', ' + signal.limitDays + '-day limit)';
+    } else {
+      reason = 'printed-date-passed';
+      label = 'Use-by date passed' + (daysLeft != null ? ' ' + Math.abs(daysLeft) + 'd ago' : '') + ' - do not use';
+    }
+  } else if (kind === 'check') {
+    status = 'check';
+    reason = signal.bestBefore ? 'best-before-passed' : 'estimate-passed';
+    label = signal.bestBefore ? 'Best before passed — check it' : 'Estimated window passed — check it';
+  } else if (kind === 'use-soon') {
+    status = 'use-soon';
+    reason = 'use-soon';
+    label = useSoonLabel(daysLeft);
+  } else {
+    status = 'ok';
+    reason = daysLeft == null ? 'no-date' : 'in-date';
+    label = daysLeft == null ? 'No date recorded' : daysLeft + 'd left';
+  }
+  const usable = available === true && status !== 'expired' && status !== 'unknown';
+  if (!usable && status === 'check') {
+    // Past its estimate AND out of stock: keep the app's warning wording, add the stock state.
+    label = label + ' (out of stock)';
+  } else if (!usable && status !== 'expired' && status !== 'unknown') {
+    // The date allows it; the app's availability rule does not (empty staple, no quantity left).
+    reason = 'out-of-stock';
+    label = 'Out of stock';
+  }
+  return { status, reason, label, daysLeft, usable };
+}
+
+// get_inventory's item (TASK-092): the existing read item plus the stored date/category fields
+// (null when absent or not a string) and the safety verdict. Write results keep toInventoryItem().
+//
+// One stored lot the read schema cannot carry (non-text name/unit/storage/updatedAt, a quantity
+// that is not a finite number, a stockLevel outside full/ok/low/empty) must not fail the whole
+// read (re-review must-fix 2): that lot alone is unknown / invalid-record and not usable, with
+// schema-safe fields. A null or non-object entry is not a record and is skipped. Write results
+// keep toInventoryItem() unchanged.
+const READ_STOCK_LEVELS = ['full', 'ok', 'low', 'empty'];
+
+function textOrNullField(value) {
+  return value == null || typeof value === 'string';
+}
+
+// An id is read only when it is text or a finite number (String() on a stored map can throw).
+export function readableId(value) {
+  return typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
+}
+
+// The app keeps only object records with an id (unionById); chat sees the same set.
+export function isStoredRecord(entry) {
+  return entry != null && typeof entry === 'object' && !Array.isArray(entry) && entry.id != null;
+}
+
+function readableLot(p) {
+  return readableId(p.id) && textOrNullField(p.name) && textOrNullField(p.unit) && textOrNullField(p.storage) &&
+    textOrNullField(p.updatedAt) &&
+    (p.quantity == null || (typeof p.quantity === 'number' && Number.isFinite(p.quantity))) &&
+    (p.stockLevel == null || READ_STOCK_LEVELS.includes(p.stockLevel));
+}
+
+export function listInventoryWithSafety(pantry, today) {
+  requireHouseholdDay(today);
+  return (pantry || []).filter(isStoredRecord).map((p, index) => {
+    const dates = {
+      category: textOrNull(p.category),
+      purchaseDate: textOrNull(p.purchaseDate),
+      expiryDate: textOrNull(p.expiryDate),
+      dateMode: textOrNull(p.dateMode),
+      printedDateKind: textOrNull(p.printedDateKind)
+    };
+    if (readableLot(p)) return Object.assign(toInventoryItem(p), dates, { safety: pantrySafety(p, today) });
+    return Object.assign({
+      // An unreadable id gets a placeholder no write tool will match.
+      ingredientId: readableId(p.id) ? String(p.id) : 'unreadable-id-' + index,
+      name: textOrNull(p.name),
+      quantity: typeof p.quantity === 'number' && Number.isFinite(p.quantity) ? p.quantity : null,
+      unit: textOrNull(p.unit),
+      inStock: false,
+      staple: isStapleRecord(p),
+      stockLevel: READ_STOCK_LEVELS.includes(p.stockLevel) ? p.stockLevel : null,
+      storage: textOrNull(p.storage),
+      updatedAt: textOrNull(p.updatedAt)
+    }, dates, {
+      safety: { status: 'unknown', reason: 'invalid-record', label: 'Record could not be read - check it in the app before use', daysLeft: null, usable: false }
+    });
+  });
 }
 
 function validateQuantity(quantity) {

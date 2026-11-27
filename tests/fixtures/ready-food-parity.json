@@ -1,0 +1,296 @@
+{
+  "description": "TASK-092 ready-food parity fixture. expected = the app's verdicts BEFORE cookedMealTracksPortions/portionCountOrNull and the getReadyFoodSuggestions() availability filter moved to shared/foodSafety.js (generated from the unmodified app.js with the browser clock fixed to each today; available = the meal is returned by getReadyFoodSuggestions()). Dates: @N = today + N days. See tests/fixtures/food-safety-parity-eval.js.",
+  "todays": ["2026-11-26","2026-12-31","2028-02-29"],
+  "cases": [
+    {
+      "id": "tracked-three-portions-fresh",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":3},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":3,"portionCountMin1":3,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":3,"portionCountMin1":3,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":3,"portionCountMin1":3,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "tracked-zero-portions",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":0},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false}
+      }
+    },
+    {
+      "id": "negative-portions-untracked",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":-1},
+      "expected": {
+        "2026-11-26": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "null-portions-untracked",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":null,"fridgeLife":3,"freezerLife":90,"portionsRemaining":null},
+      "expected": {
+        "2026-11-26": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "absent-portions-untracked",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","fridgeLife":3,"freezerLife":90},
+      "expected": {
+        "2026-11-26": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "string-portions-two",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":"2"},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "string-portions-zero",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":"0"},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":false}
+      }
+    },
+    {
+      "id": "fractional-portions-two-point-seven",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2.7},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "fractional-portions-half",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":0.5},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "portions-over-max",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":150},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":99,"portionCountMin1":99,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":99,"portionCountMin1":99,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":99,"portionCountMin1":99,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "empty-string-portions",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":""},
+      "expected": {
+        "2026-11-26": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2026-12-31": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true},
+        "2028-02-29": {"tracksPortions":false,"portionCount":null,"portionCountMin1":null,"signal":{"kind":"use-soon","daysLeft":2},"available":true}
+      }
+    },
+    {
+      "id": "fridge-null-life-at-limit",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-4","initialPortions":4,"fridgeLife":null,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":0},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":0},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":0},"available":true}
+      }
+    },
+    {
+      "id": "fridge-null-life-past-limit",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-5","initialPortions":4,"fridgeLife":null,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false}
+      }
+    },
+    {
+      "id": "fridge-life-three-past",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-4","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false}
+      }
+    },
+    {
+      "id": "fridge-life-seven-capped-at-four",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-5","initialPortions":4,"fridgeLife":7,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-1},"available":false}
+      }
+    },
+    {
+      "id": "fridge-cooked-today",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@0","initialPortions":4,"fridgeLife":null,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":4},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":4},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":4},"available":true}
+      }
+    },
+    {
+      "id": "fridge-cooked-in-future",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@+3","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":6},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":6},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":6},"available":true}
+      }
+    },
+    {
+      "id": "freezer-in-window",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"freezer","cookedDate":"@-89","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true}
+      }
+    },
+    {
+      "id": "freezer-past-window",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"freezer","cookedDate":"@-91","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"check","daysLeft":-1},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"check","daysLeft":-1},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"check","daysLeft":-1},"available":false}
+      }
+    },
+    {
+      "id": "freezer-no-window",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"freezer","cookedDate":"@-400","initialPortions":4,"fridgeLife":3,"freezerLife":null,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true}
+      }
+    },
+    {
+      "id": "freezer-zero-portions",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"freezer","cookedDate":"@-3","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":0},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":null,"daysLeft":87},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":null,"daysLeft":87},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":0,"portionCountMin1":null,"signal":{"kind":null,"daysLeft":87},"available":false}
+      }
+    },
+    {
+      "id": "fridge-no-cooked-date",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true}
+      }
+    },
+    {
+      "id": "fridge-malformed-cooked-date",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"2026-13-01","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true}
+      }
+    },
+    {
+      "id": "fridge-rollover-cooked-date",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"2027-02-30","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":99},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":64},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"expired","daysLeft":-361},"available":false}
+      }
+    },
+    {
+      "id": "fridge-timestamp-cooked-date",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"2026-11-20T10:00:00.000Z","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true}
+      }
+    },
+    {
+      "id": "fridge-garbage-fridge-life",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","storage":"fridge","cookedDate":"@-2","initialPortions":4,"fridgeLife":"abc","freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":null,"daysLeft":null},"available":true}
+      }
+    },
+    {
+      "id": "missing-storage-uses-fridge-rules",
+      "kind": "readyFood",
+      "record": {"name":"Chicken Adobo","cookedDate":"@-2","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":1},"available":true}
+      }
+    },
+    {
+      "id": "missing-name",
+      "kind": "readyFood",
+      "record": {"storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false}
+      }
+    },
+    {
+      "id": "empty-name",
+      "kind": "readyFood",
+      "record": {"name":"","storage":"fridge","cookedDate":"@-1","initialPortions":4,"fridgeLife":3,"freezerLife":90,"portionsRemaining":2},
+      "expected": {
+        "2026-11-26": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2026-12-31": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false},
+        "2028-02-29": {"tracksPortions":true,"portionCount":2,"portionCountMin1":2,"signal":{"kind":"use-soon","daysLeft":2},"available":false}
+      }
+    }
+  ]
+}

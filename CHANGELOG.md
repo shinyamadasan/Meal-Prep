@@ -1611,3 +1611,115 @@ findings (recorded, NOT changed — behaviour identical):
     unknown on the default path. Callers must use `pantryDateSignal()`/`pantryLotAvailable()`,
     which return unknown/unusable for that lot, and not `pantryFridgeSafety()` alone.
 → status set to `review` in TASKS.md
+
+## TASK-092 — implementation complete (branch: task-092-mcp-truthful-reads)
+changed:
+  - `workers/conversational-bridge/src/householdDay.js` (new, pure): `householdDay(timeZone, now)`
+    returns the `YYYY-MM-DD` day in an IANA zone with `Intl.DateTimeFormat` (gregory, latn,
+    `formatToParts`). `householdDayFromEnv(env, now)` reads `HOUSEHOLD_TIME_ZONE`. The clock is
+    injected (`deps.now` in MCP). A missing, blank or invalid zone, or a non-finite clock,
+    throws `InfrastructureError`. It never guesses a day.
+  - `workers/conversational-bridge/wrangler.jsonc`: `vars.HOUSEHOLD_TIME_ZONE = "Asia/Manila"`.
+  - `src/mcp.js`:
+    - `readTool()` computes the household day after the auth check and BEFORE any token or
+      Firestore call, then passes it to the selector. With an invalid zone the read fails
+      closed with zero Firestore access.
+    - `get_inventory` / `get_ready_food` return `listInventoryWithSafety()` /
+      `listReadyFoodWithSafety()`. Their output schemas are the new strict
+      `inventoryReadItemSchema()` / `readyFoodReadItemSchema()`, which extend the existing item
+      schemas with `safetySchema()` (status enum
+      `ok|use-soon|check|expired|unknown`, `reason`, `label`, integer-or-null `daysLeft`,
+      `usable`).
+    - Write tools keep `inventoryItemSchema()` / `readyFoodItemSchema()` and toInventoryItem /
+      toReadyFoodItem unchanged.
+    - Both read descriptions add `SAFETY_RULES_TEXT`: never suggest `usable:false`; `unknown` is
+      NOT usable; `check` means look first; `expired` is never usable.
+    - `record_ready_food`'s description is fixed for audit C3. With a source it stores 3/90 days
+      (from the contract). Without a source the app still applies its 4-day fridge limit
+      (`COOKED_FRIDGE_LIMIT` from the shared rules), and a freezer record has no quality date.
+  - `src/operations/inventory.js`:
+    - `pantrySafety(p, today)` uses only `pantryDateSignal` / `pantryLotAvailable` /
+      `pantryFridgeSafety`, on the shared default storage path.
+    - `usable` = `pantryLotAvailable` && status not `expired`/`unknown` (D-091, finding F2).
+    - Labels reuse the app's wording (`pantrySafetyLabel`, check labels).
+    - A record the shared rules throw on becomes `unknown`/`unreadable-record` instead of
+      failing the read.
+    - `listInventoryWithSafety()` adds `category`, `purchaseDate`, `expiryDate`, `dateMode` and
+      `printedDateKind` (string or null).
+    - Also new: `isCalendarDay()` and `requireHouseholdDay()`.
+    - Header comment updated. `listInventory()` (REST and write paths) is unchanged.
+  - `src/operations/readyFood.js`:
+    - `readyFoodSafety(meal, today)` uses `cookedDateSignal` + `cookedMealAvailable` +
+      `cookedShelfLife`.
+    - A missing or invalid `cookedDate` (shared calendar rule, so the `2026-02-30` rollover
+      counts as invalid) or an unreadable fridge shelf life is `unknown`.
+    - A frozen batch with a valid date and no freezer window is `ok`/`no-quality-window`.
+    - Not usable while the date still allows it ⇒ reason `no-portions-left` or `unnamed`.
+    - `listReadyFoodWithSafety()`. Exports the contract's default lives for the description.
+  - `shared/foodSafety.js`: moved from app.js unchanged:
+    - `PORTION_COUNT_MAX`, `portionCountOrNull`, `cookedMealTracksPortions`;
+    - the `getReadyFoodSuggestions()` filter, as `cookedMealAvailable(m, today)` (same body,
+      plus `requireToday`).
+  - `app.js`: `PORTION_COUNT_MAX` is bound to the shared value. `portionCountOrNull` /
+    `cookedMealTracksPortions` are one-line wrappers. `getReadyFoodSuggestions()` filters with
+    `MealPrepFoodSafety.cookedMealAvailable(m, todayISO())`. No other app change.
+  - `workers/conversational-bridge/README.md`: TASK-092 section and the `HOUSEHOLD_TIME_ZONE`
+    var.
+tests:
+  - `tests/fixtures/ready-food-parity.json` (new): 29 cases × 3 todays. It covers tracked,
+    zero, negative, null, absent, string, fractional, over-max and empty-string portions; the
+    fridge limit (at, past, life 3, life 7 capped, today, future); freezer (in window, past, no
+    window, zero portions); missing, malformed, rollover and timestamp cookedDate; a garbage
+    fridgeLife; missing storage; missing or empty name. `expected` was GENERATED FROM THE
+    UNMODIFIED app.js before any app change. `available` = the batch is returned by
+    `getReadyFoodSuggestions()`.
+  - `tests/fixtures/food-safety-parity-eval.js`: adds case kind `readyFood`.
+  - `tests/ready-food-parity.spec.js` (3 cases): the app gives the pre-move verdicts, the shared
+    module matches in the browser, and the wrappers and binding are in place.
+  - `test/ready-food-parity.node.js` (5): Node side of the same fixture.
+  - `test/household-day.node.js` (5): the Manila 16:00 UTC boundary, month end, year end, leap
+    day, Date or ms clock, fail closed, and the wrangler var.
+  - `test/mcp-safety.node.js` (11):
+    - for every pantry case in the TASK-091 parity fixture and every cooked/readyFood case,
+      at all 3 todays (clock = Manila noon), the MCP response verdict equals the shared verdict,
+      and the live shared verdict equals the frozen fixture;
+    - the Manila midnight boundary end to end (chicken and adobo flip to expired at 16:00 UTC
+      while the UTC date is unchanged);
+    - an invalid or missing zone fails closed with 0 token, read or write;
+    - D-091 cases (staple past use-by, unknown storage, no bought date, best-before check,
+      empty staple, unreadable record);
+    - ready-food unknown/frozen/no-portions;
+    - descriptions; strict schemas; write-tool item schemas unchanged.
+  - `test/mcp.node.js`: the two read-shape `deepEqual`s now include the new fields, with a
+    fixed `deps.now`. `test/support/fixtures.js`: `testEnv()` sets `HOUSEHOLD_TIME_ZONE`.
+blockers: none.
+deviations:
+  - `staple` keeps its existing meaning (the bridge's `classifyStaple`, always boolean), instead
+    of a raw stored flag that is null when absent. Changing it would alter an existing read
+    field. `storage` and `stockLevel` already were null when absent.
+  - `daysLeft` is the sooner of the app's signal days and the shared `pantryFridgeSafety()`
+    days. Example: raw chicken bought 2 days ago shows the 3-day protein estimate "1d left" in
+    the app, but its 2-day poultry limit ends today, so chat gets 0 (same issue as TASK-091
+    F3). This can only turn `ok` into `use-soon`; `usable` is unchanged.
+  - Ready food is stricter than the app beyond D-091's expired/unknown rule. A missing or
+    invalid `cookedDate`, or an unreadable fridge shelf life, is `unknown` (not usable), where
+    the app keeps the batch because it has no date to judge.
+  - Files beyond the task's list (needed by the binding planning notes): `app.js`,
+    `shared/foodSafety.js`, the ready-food parity fixture, spec and evaluator kind.
+  - Not done here (Claude-owned docs): `docs/ARCHITECTURE.md` "Shared food-safety rules" could
+    list the moved portion helpers and `cookedMealAvailable`. `docs/DATA_MODEL.md` still names
+    `cookedMealTracksPortions(meal)`, which remains correct as the app wrapper.
+findings (recorded, NOT changed):
+  - G1 (pre-existing): `get_ready_food` fails the WHOLE read when any batch has a string or
+    fractional `portionsRemaining` (`servingsRemaining` is typed int; the Worker's
+    `tracksPortions` passes the raw value through). It fails closed, but one odd record hides
+    all ready food from chat. Covered in `mcp-safety.node.js` by checking those cases through
+    `listReadyFoodWithSafety()`.
+  - G2 (pre-existing, kept identical): the app treats `portionsRemaining: 0.5` as tracked and
+    available (it is floored to 0 for the count but `0.5 <= 0` is false). The Worker's
+    `trackedPortions` also differs from the app for negative counts (Worker: tracked; app: not).
+  - G3: REST `/v1/inventory` and `/v1/ready-food` still return items without safety (out of
+    scope: MCP reads only).
+  - G4: `npx wrangler deploy --dry-run` not run. wrangler is not installed (not a dependency,
+    not global), and fetching it was not authorised.
+→ status set to `review` in TASKS.md

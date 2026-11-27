@@ -12,6 +12,8 @@ import { getUserDocument, patchUserDocument, RevisionConflictError } from './fir
 import { AmbiguousError, InsufficientServingsError, InsufficientStockError, NotFoundError, ValidationError } from './errors.js';
 import * as inventory from './operations/inventory.js';
 import * as readyFood from './operations/readyFood.js';
+import { householdDayFromEnv } from './householdDay.js';
+import '../../../shared/foodSafety.js';
 import {
   MCP_SCOPE,
   MCP_WRITE_SCOPE,
@@ -22,6 +24,8 @@ import {
 } from './mcpAuth.js';
 
 const MAX_MCP_BODY_BYTES = 8 * 1024;
+// The app's cooked-leftover fridge limit, from the shared rules (loaded by the operations imports).
+const COOKED_FRIDGE_LIMIT = globalThis.MealPrepFoodSafety.COOKED_FRIDGE_LIMIT;
 const PRODUCTION_HOSTNAME = 'meal-prep-conversational-bridge.shinyamadasan.workers.dev';
 const ALLOWED_HOSTNAMES = localhostAllowedHostnames().concat(PRODUCTION_HOSTNAME);
 const ALLOWED_ORIGIN_HOSTNAMES = localhostAllowedOrigins().concat(PRODUCTION_HOSTNAME);
@@ -201,6 +205,47 @@ function readyFoodItemSchema() {
   });
 }
 
+// TASK-092 (D-091): the safety verdict on every get_inventory / get_ready_food item.
+function safetySchema() {
+  return z.strictObject({
+    status: z.enum(['ok', 'use-soon', 'check', 'expired', 'unknown']),
+    reason: z.string(),
+    label: z.string(),
+    daysLeft: z.number().int().nullable(),
+    usable: z.boolean()
+  });
+}
+
+// get_inventory's item: the write-result item plus stored dates/category and the safety verdict.
+// Write tools keep inventoryItemSchema() / readyFoodItemSchema() unchanged.
+function inventoryReadItemSchema() {
+  return inventoryItemSchema().extend({
+    category: z.string().nullable(),
+    purchaseDate: z.string().nullable(),
+    expiryDate: z.string().nullable(),
+    dateMode: z.string().nullable(),
+    printedDateKind: z.string().nullable(),
+    safety: safetySchema()
+  });
+}
+
+function readyFoodReadItemSchema() {
+  return readyFoodItemSchema().extend({ safety: safetySchema() });
+}
+
+// Shared by both read tools so chat gets one rule.
+const SAFETY_RULES_TEXT = 'Every item carries safety {status, reason, label, daysLeft, usable}, ' +
+  'computed with the app\'s own food-safety rules for the household\'s calendar day. NEVER suggest, ' +
+  'plan with, or describe as available any item with usable:false. status "unknown" means safety ' +
+  'information is missing or unreadable (for example no storage location, a ready-food batch with ' +
+  'no valid cooked date, or a record the app must fix): it is NOT usable; ' +
+  'tell the user to check it in the app. status "check" means the user must look at it before ' +
+  'using it; say so whenever you mention it. status "expired" is never usable. Give the label as ' +
+  'the reason; daysLeft is whole days left on the household calendar. A pantry item labelled "No ' +
+  'date recorded" has no freshness information; say so when you suggest it. safety.usable is the ' +
+  'only availability signal: inStock, staple and servingsRemaining are bookkeeping fields and never ' +
+  'override it.';
+
 export function createReadServer(env = {}, deps = {}, ctx = {}) {
   const server = new McpServer({
     name: 'meal-prep-private-reads',
@@ -211,20 +256,20 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     'get_inventory',
     {
       title: 'Get inventory',
-      description: 'Read the owner\'s current canonical pantry inventory.',
+      description: 'Read the owner\'s current canonical pantry inventory. ' + SAFETY_RULES_TEXT,
       inputSchema: z.strictObject({}),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
-        items: z.array(inventoryItemSchema())
+        items: z.array(inventoryReadItemSchema())
       }),
       _meta: { securitySchemes: READ_SECURITY_SCHEMES },
       annotations: READ_ANNOTATIONS
     },
-    async () => readTool(env, deps, ctx, (doc) => ({
+    async () => readTool(env, deps, ctx, (doc, today) => ({
       ok: true,
       revision: doc.revision,
-      items: inventory.listInventory(doc.pantry)
+      items: inventory.listInventoryWithSafety(doc.pantry, today)
     }))
   );
 
@@ -232,20 +277,20 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     'get_ready_food',
     {
       title: 'Get ready food',
-      description: 'Read the owner\'s current canonical ready-to-eat food.',
+      description: 'Read the owner\'s current canonical ready-to-eat food. ' + SAFETY_RULES_TEXT,
       inputSchema: z.strictObject({}),
       outputSchema: z.strictObject({
         ok: z.literal(true),
         revision: z.number().int().nonnegative(),
-        items: z.array(readyFoodItemSchema())
+        items: z.array(readyFoodReadItemSchema())
       }),
       _meta: { securitySchemes: READ_SECURITY_SCHEMES },
       annotations: READ_ANNOTATIONS
     },
-    async () => readTool(env, deps, ctx, (doc) => ({
+    async () => readTool(env, deps, ctx, (doc, today) => ({
       ok: true,
       revision: doc.revision,
-      items: readyFood.listReadyFood(doc.cookedMeals)
+      items: readyFood.listReadyFoodWithSafety(doc.cookedMeals, today)
     }))
   );
 
@@ -253,10 +298,17 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
     'record_ready_food',
     {
       title: 'Record ready food',
+      // Audit C3 (TASK-092): without a source the app still caps a fridge batch at its cooked
+      // fridge limit (null fridgeLife included), so "freshness unknown" was no longer true.
       description: 'Create exactly one new ready-to-eat (cooked) food record. Append-only: ' +
         'never edits, removes, or finishes any existing record. Optional source is leftovers or ' +
-        'takeout; either source uses the shared ready-food freshness defaults. Omit source to keep ' +
-        'freshness unknown.',
+        'takeout; with a source the record stores the shared ready-food shelf lives (' +
+        readyFood.READY_FOOD_DEFAULT_FRIDGE_LIFE + ' fridge days, ' + readyFood.READY_FOOD_DEFAULT_FREEZER_LIFE +
+        ' freezer days). Without a source no shelf life is stored, but freshness is NOT unknown: the ' +
+        'app still applies its ' + COOKED_FRIDGE_LIMIT + '-day fridge safety limit from cookedDate, so a ' +
+        'fridge record shows Expired after ' + COOKED_FRIDGE_LIMIT + ' days and the app can offer it for ' +
+        'removal; a freezer record without a source has no quality date. cookedDate is the day it was ' +
+        'cooked on the household calendar.',
       inputSchema: recordReadyFoodInputSchema(),
       outputSchema: z.strictObject({
         ok: z.literal(true),
@@ -728,13 +780,16 @@ function requireValidExpectedRevision(value) {
 async function readTool(env, deps, ctx, selectResult) {
   try {
     requireMcpReadContext(env, ctx, deps.nowSeconds);
+    // Household calendar day (TASK-092): computed before any Firestore access; a missing or
+    // invalid HOUSEHOLD_TIME_ZONE fails the read closed instead of guessing a day.
+    const today = householdDayFromEnv(env, deps.now);
     const fetchImpl = deps.fetchImpl || fetch;
     const cryptoImpl = deps.cryptoImpl || globalThis.crypto;
     const getToken = deps.getFirestoreAccessToken || getFirestoreAccessToken;
     const readDoc = deps.getUserDocument || getUserDocument;
     const accessToken = await getToken(env, { fetchImpl, cryptoImpl });
     const doc = await readDoc(env, accessToken, fetchImpl);
-    return toolResult(selectResult(doc));
+    return toolResult(selectResult(doc, today));
   } catch (error) {
     if (error instanceof McpAuthError) return mcpAuthChallenge(error);
     return {

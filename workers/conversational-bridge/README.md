@@ -349,6 +349,48 @@ Shopping preservation is supported by code/review evidence only (the write mask 
 - Shopping, ready food, meal-consumption history, recipes, and unrelated inventory remain untouched.
   The app may perform its existing grocery reconciliation on a later open; this Worker does not.
 
+## TASK-092 truthful reads: a safety verdict on every item (PROP-041 P1-2, local only — NOT deployed)
+
+Closes audit C1 (chat could call unsafe or unknown food available) and C3 (`record_ready_food`
+description drift). Read tools and descriptions only: no write behaviour, tool, OAuth, route,
+secret or Firestore change. Deploy is held for the owner (BQ-032).
+
+- **Household calendar day.** `src/householdDay.js` turns the injected clock into a `YYYY-MM-DD`
+  day in `HOUSEHOLD_TIME_ZONE` (`wrangler.jsonc` `vars`, `"Asia/Manila"`) with
+  `Intl.DateTimeFormat`. One setting for the household, not per person. A missing or invalid zone
+  throws `InfrastructureError` and the read fails before any Firestore access; the Worker never
+  guesses a day. (The UTC ±1-day guard inside `add_stock` is unchanged here; TASK-094 replaces it.)
+- **`get_inventory`** items add `category`, `purchaseDate`, `expiryDate`, `dateMode`,
+  `printedDateKind` (string or null) next to the existing fields, plus
+  `safety: { status, reason, label, daysLeft, usable }` from `pantrySafety()` in
+  `operations/inventory.js`. It uses only the shared rules (`shared/foodSafety.js`, D-091) on the
+  default storage path (no `PANTRY_KNOWLEDGE`): a lot with no `storage` whose exact name has no
+  INGREDIENT_DB storage is `unknown`.
+  - `status` is `ok | use-soon | check | expired | unknown` from `pantryDateSignal()`.
+  - `usable` is `pantryLotAvailable()`, except that `expired` or `unknown` is never usable (D-091:
+    stricter than the app for a staple past its printed use-by).
+  - `daysLeft` is the sooner of the app's date estimate and the fridge safety limit
+    (`pantryFridgeSafety()`), so chat is never told "1d left" for raw chicken whose 2-day limit
+    ends today. This can only turn `ok` into `use-soon`; it never changes `usable`.
+  - A record the shared rules cannot read (for example a non-string `category`) is
+    `unknown`/`unreadable-record` instead of failing the whole read.
+- **`get_ready_food`** items add the same `safety` object from `readyFoodSafety()` in
+  `operations/readyFood.js`: `cookedDateSignal()` plus `cookedMealAvailable()`, the app's own
+  `getReadyFoodSuggestions()` rule (moved to `shared/foodSafety.js` with `portionCountOrNull()` and
+  `cookedMealTracksPortions()`; app wrappers keep the old names). A missing or invalid
+  `cookedDate`, or an unreadable fridge shelf life, is `unknown` (not usable). A frozen batch with
+  a valid `cookedDate` and no freezer quality window is `ok` (freezing is a quality limit).
+- **Descriptions.** Both read tools say: never suggest `usable:false`; `unknown` is not usable;
+  `check` means look at it first; `expired` is never usable. `record_ready_food` now says that
+  without a `source` the app still applies its 4-day fridge limit from `cookedDate`.
+- **Schemas.** Read items use strict `inventoryReadItemSchema()` / `readyFoodReadItemSchema()`.
+  Write results keep `inventoryItemSchema()` / `readyFoodItemSchema()` unchanged. REST `/v1/*`
+  reads are unchanged.
+- Tests: `test/household-day.node.js` (Manila midnight, month end, leap day, fail closed),
+  `test/mcp-safety.node.js` (response verdict = shared verdict for every case in both parity
+  fixtures and three `today`s, the boundary end to end, D-091, descriptions, schemas) and
+  `test/ready-food-parity.node.js` (Node side of `tests/fixtures/ready-food-parity.json`).
+
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 
 Exactly one write tool exists, on top of the two TASK-068 read tools (three total; no other
@@ -419,6 +461,10 @@ Set with `wrangler secret put <NAME>` before any real deploy — never committed
 | `ACCESS_TEAM_DOMAIN` | Exact HTTPS Access issuer origin, such as `https://<team>.cloudflareaccess.com`. |
 | `ACCESS_POLICY_AUD` | Audience tag of the path-specific `/authorize` Access application. |
 | `MCP_AUTHORIZED_OWNER_SUBJECT` | Exact stable Access `sub` for the one authorized owner. |
+
+One non-secret setting lives in `wrangler.jsonc` `vars`: `HOUSEHOLD_TIME_ZONE` (`"Asia/Manila"`),
+the IANA zone of the household calendar day used for food-safety verdicts (TASK-092). Missing or
+invalid fails reads closed.
 
 The OAuth provider also requires a KV namespace binding named `OAUTH_KV`. A KV binding is not a
 secret; its namespace id is committed in `wrangler.jsonc` (TASK-068's independently reviewed,

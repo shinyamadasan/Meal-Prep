@@ -52,6 +52,17 @@
           signal: api.cookedDateSignal(meal, today)
         });
       }
+      // TASK-092 (tests/fixtures/ready-food-parity.json): portions and ready-food availability.
+      case 'readyFood': {
+        var batch = resolveRecord(testCase.record, today);
+        return plain({
+          tracksPortions: api.cookedMealTracksPortions(batch),
+          portionCount: api.portionCountOrNull(batch.portionsRemaining, 0),
+          portionCountMin1: api.portionCountOrNull(batch.portionsRemaining, 1),
+          signal: api.cookedDateSignal(batch, today),
+          available: api.cookedMealAvailable(batch, today)
+        });
+      }
       case 'calendar':
         return plain({ day: api.stockCalendarDay(resolve(testCase.value, today)) });
       case 'categoryShelfLife':

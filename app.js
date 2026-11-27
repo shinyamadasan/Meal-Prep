@@ -13925,19 +13925,13 @@ function saveManualCookedMeal() {
 // BOTH null = an untracked batch, which behaves exactly as it did before this
 // existed. Portions are whole meals, never grams, never per-person. See D-056.
 
-var PORTION_COUNT_MAX = 99;
+// The portion rules live in shared/foodSafety.js (TASK-092) so the conversational Worker
+// gives the same ready-food answers; these names are thin wrappers.
+var PORTION_COUNT_MAX = MealPrepFoodSafety.PORTION_COUNT_MAX;
 
-// A portion count, or null for "not tracked". Fractions are floored — half a
-// meal portion is not a concept this app has, and pretending otherwise would
-// invite exactly the weighing behaviour this wave is meant to avoid.
+// A portion count, or null for "not tracked". Fractions are floored.
 function portionCountOrNull(value, min) {
-  if (value == null || value === '') return null;
-  var n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  n = Math.floor(n);
-  if (n < min) return null;
-  if (n > PORTION_COUNT_MAX) return PORTION_COUNT_MAX;
-  return n;
+  return MealPrepFoodSafety.portionCountOrNull(value, min);
 }
 
 // ── Ready-food protein identity ──────────────────────────────────────────────
@@ -14331,7 +14325,7 @@ function findCookedMeal(id) {
 
 // Does this batch track portions at all?
 function cookedMealTracksPortions(meal) {
-  return !!meal && portionCountOrNull(meal.portionsRemaining, 0) != null;
+  return MealPrepFoodSafety.cookedMealTracksPortions(meal);
 }
 
 function formatPortions(n) {
@@ -14458,12 +14452,9 @@ function readyFoodBucket(meal) {
 // attention card already flag those for disposal, and recommending someone eat
 // food that is past its date would be actively harmful.
 function getReadyFoodSuggestions(limit) {
+  // The availability rule is shared with the conversational Worker (TASK-092).
   var meals = (AppState.cookedMeals || []).filter(function(m) {
-    if (!m || !m.name) return false;
-    if (cookedMealTracksPortions(m) && m.portionsRemaining <= 0) return false;
-    var daysLeft = daysLeftFrom(m.cookedDate, cookedShelfLife(m));
-    if (daysLeft != null && daysLeft < 0) return false; // expired — not a meal suggestion
-    return true;
+    return MealPrepFoodSafety.cookedMealAvailable(m, todayISO());
   });
 
   meals.sort(function(a, b) {

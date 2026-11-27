@@ -6837,7 +6837,7 @@ verification: `npm test`; `npm run test:ledger-contract`; `npm run test:bridge` 
   SELF_REVIEW.md + QA.md; CHANGELOG/TEST_REPORT entries.
 
 ### TASK-092 · PROP-041 P1-2 Truthful MCP reads: safety verdict on every inventory and ready-food item
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (Worker; what chat is allowed to recommend)
 source: BQ-032 / PROP-041 P1-2; audit C1 and C3 (planning/PROPOSALS.md PROP-041)
