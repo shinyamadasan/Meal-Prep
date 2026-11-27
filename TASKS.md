@@ -7050,6 +7050,158 @@ constraints: Bridge only — no app, shared-core or stored-data change. No new t
 verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`; `git diff --check`;
   `node --check` on changed files. Claude adds a private real-export count (read-only) at review.
 
+### TASK-098 · PROP-041 P2-3 + P2-0b Staple stock levels and items with no amount
+status: codex
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (stock-level writes; converts how an item is tracked)
+source: BQ-034 / PROP-041 Phase 2 priority 2-3; owner decision D1 (adopted 2026-11-27)
+depends-on: TASK-097 (merged into `prop041-p2`)
+branch: `task-098-stock-levels` from `prop041-p2`
+files: `src/operations/inventory.js`; `src/mcp.js`; Worker tests; README.md; CHANGELOG.md;
+  TEST_REPORT.md; TASKS.md status.
+objective: Chat can set any staple's level and, on the user's explicit words, turn an item recorded
+  without an amount into a staple with a level or a counted item — one item per request, undoable.
+acceptance:
+  - [ ] New write tool `set_stock_level({ requestId, expectedRevision, ingredientId, level })`,
+        `level` in full/ok/low/empty, for `tracking: 'level'` items. Same level → no-op (record-only
+        commit, TASK-093). `empty` keeps the record (staples are never removed). Result states back
+        the item, its previous level and new level.
+  - [ ] Optional `makeStaple: true` on `set_stock_level` converts a `tracking: 'presence'` item to a
+        staple (`staple: true`, `stockLevel: level`); refused on `quantity` items (they keep counts)
+        and when absent on a presence item (`presence_only`). Description: only when the user says
+        so ("salt is a staple"); never on chat's own initiative.
+  - [ ] `set_inventory_quantity` accepts a `presence` item when the call also gives `unit` (a
+        supported inventory unit) and no `expectedUnit` mismatch applies: it records the quantity and
+        unit (D1 "we have 200 g of paprika"). Quantity items keep the existing `expectedUnit` rule.
+  - [ ] `mark_in_stock` / `mark_out_of_stock` keep working unchanged (compatible aliases).
+  - [ ] `undo_request` restores each of these exactly (tests). Refusals: `invalid_record`,
+        presence without `makeStaple`, quantity item with `makeStaple`, staple given `unit`.
+  - [ ] Tool descriptions + README.
+constraints: Bridge only (`workers/conversational-bridge`): no `app.js`, `shared/`, `index.html` or
+  stored-shape change beyond the fields named here (every new pantry field is one the app already
+  reads — DATA_MODEL "Pantry item"). Every write goes through `requestWriteTool()` (required
+  `requestId`, `expectedRevision`, one atomic commit + request record with `before`/`after`/`added`
+  so `undo_request` works). Ids only from reads; never fuzzy-match. Raw meat, poultry and fish never
+  get an invented storage or date (D3). No deploy. Push only the task branch. Stop at `status: review`.
+verification: `node --check` on changed files and `npm run test:bridge` before every commit; then
+  `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
+
+### TASK-099 · PROP-041 P2-1 + P2-2 Register items (purchases, prepared ingredients) and edit storage/dates
+status: codex
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (creates pantry records; changes dates that drive food safety)
+source: BQ-034 / PROP-041 P2-1, P2-2; owner decisions D2-D3 (adopted 2026-11-27)
+depends-on: TASK-097 (merged into `prop041-p2`). Independent of TASK-098 (Claude merges both).
+branch: `task-099-register-edit` from `prop041-p2`
+files: `src/operations/inventory.js` (or a new `src/operations/pantryItems.js`); `src/mcp.js`; Worker
+  tests; README.md; CHANGELOG.md; TEST_REPORT.md; TASKS.md status.
+objective: Chat can register a new ingredient lot (a grocery purchase or a prepared ingredient such
+  as a frozen paste or chopped vegetables) and correct an item's storage and dates, producing the
+  same record shape the app's own Add path produces.
+acceptance:
+  - [ ] New write tool `add_pantry_item({ requestId, expectedRevision, name, quantity?, unit?,
+        storage?, boughtDate?, printedDate?, printedDateKind?, staple?, level?, prepared? })`.
+        Creates exactly one record shaped like the app's manual Add (`app.js` pantry add path): id
+        `buy_<ms>_<rand5>`, `name`, `category` (exact-name `INGREDIENT_DB` category, else ''),
+        `purchaseDate` (= `boughtDate`, default household today), `shelfLifeDays` (exact-name DB value,
+        else `MealPrepFoodSafety.categoryShelfLife(category)`), `storage`, `quantity` (> 0 or null),
+        `unit` (else the DB unit, else ''), `staple` (explicit, else DB `isStaple`, else unset),
+        `stockLevel` (staples: `level` or 'full'), printed date → `expiryDate`, `dateMode: 'expiry'`,
+        `printedDateKind` only when 'best-before'; `updatedAt` now.
+  - [ ] Storage (D3): explicit value wins; otherwise `defaultInferStorage(name)` and the result says
+        `storageSource: 'inferred'`. When the item's food class is raw meat, poultry or fish
+        (`stockFoodClass` / fridge-safety rules) and no storage was given, refuse with
+        `needs_storage:` (ask the user). A future `boughtDate` is refused; a raw meat/poultry/fish lot
+        whose `boughtDate` is already past the fridge limit is refused for fridge storage.
+  - [ ] Prepared ingredients (`prepared: true`): `storage` required (fridge or freezer); with no
+        printed date, `shelfLifeDays` = the ready-food default life for that storage (the same
+        `READY_FOOD_CONTRACT` defaults `record_ready_food` uses) — never longer than the raw item's
+        life; the name is used as given. Raw lots are NOT deducted here (that is TASK-100; D2).
+  - [ ] Duplicate guard: if an active same-name (case-insensitive, trimmed) lot with the same
+        `purchaseDate` and storage exists, return `ambiguous` listing both choices (`add_stock` to
+        that lot, or `add_pantry_item` with `confirmNewLot: true`). Different date or storage = a new
+        lot without asking (food safety: never merge clocks).
+  - [ ] New write tool `update_pantry_item({ requestId, expectedRevision, ingredientId, storage?,
+        boughtDate?, printedDate? (null clears), printedDateKind?, thawedToday? })`. Moving raw
+        meat/poultry/fish freezer → fridge requires `thawedToday: true` (sets `purchaseDate` to
+        household today) or an explicit `boughtDate`, else refuses with the thaw reminder. Every
+        result recomputes and returns `safety` (same as `get_inventory`). `invalid_record` lots refused.
+  - [ ] Both tools: result states back every stored field that matters (name, quantity, unit,
+        storage + source, bought date, printed date/kind, staple/level, safety). `undo_request` removes
+        an added lot (tombstone) and restores an edited one (tests).
+constraints: Bridge only (`workers/conversational-bridge`): no `app.js`, `shared/`, `index.html` or
+  stored-shape change beyond the fields named here (every new pantry field is one the app already
+  reads — DATA_MODEL "Pantry item"). Every write goes through `requestWriteTool()` (required
+  `requestId`, `expectedRevision`, one atomic commit + request record with `before`/`after`/`added`
+  so `undo_request` works). Ids only from reads; never fuzzy-match. Raw meat, poultry and fish never
+  get an invented storage or date (D3). No deploy. Push only the task branch. Stop at `status: review`.
+verification: `node --check` on changed files and `npm run test:bridge` before every commit; then
+  `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
+
+### TASK-100 · PROP-041 P2-4 Convert raw to prepared, and cook with deduction, without double counting
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (multi-record atomic write: consume + create)
+source: BQ-034 / PROP-041 P2-4; owner decision D2 (adopted 2026-11-27)
+depends-on: TASK-099 merged into `prop041-p2` (reuses its record builder)
+branch: `task-100-convert` from `prop041-p2`
+files: `src/operations/*.js`; `src/mcp.js`; Worker tests; README.md; CHANGELOG.md; TEST_REPORT.md;
+  TASKS.md status.
+objective: Turning raw ingredients into a prepared ingredient (or a cooked dish) changes inventory in
+  ONE write, so nothing is counted twice or lost if a call fails.
+acceptance:
+  - [ ] New write tool `convert_stock({ requestId, expectedRevision, consume: [{ ingredientId,
+        quantity, expectedUnit }] (1..10, explicit, ids from reads; D2), produce: { ...the
+        add_pantry_item fields, prepared: true } })`. Each consumed line follows `consume_stock`
+        rules exactly (units, staples, presence, insufficient stock, removal + tombstone at zero);
+        the produced lot follows TASK-099 rules. All-or-nothing: any refusal → zero writes.
+  - [ ] `record_ready_food` gains optional `consume` (same shape) applied in the same write; without
+        it, behaviour is unchanged. Ledger contract unchanged (`npm run test:ledger-contract`).
+  - [ ] `undo_request` reverses the whole conversion (restores consumed lots, removes the produced
+        lot) or refuses as a whole (`changed_since`) — never partially.
+  - [ ] Result states back each consumed line (before → after) and the produced item with safety.
+constraints: Bridge only (`workers/conversational-bridge`): no `app.js`, `shared/`, `index.html` or
+  stored-shape change beyond the fields named here (every new pantry field is one the app already
+  reads — DATA_MODEL "Pantry item"). Every write goes through `requestWriteTool()` (required
+  `requestId`, `expectedRevision`, one atomic commit + request record with `before`/`after`/`added`
+  so `undo_request` works). Ids only from reads; never fuzzy-match. Raw meat, poultry and fish never
+  get an invented storage or date (D3). No deploy. Push only the task branch. Stop at `status: review`.
+verification: `node --check` on changed files and `npm run test:bridge` before every commit; then
+  `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
+
+### TASK-101 · PROP-041 P2-6 Several routine updates in one request (`apply_changes`)
+status: todo
+owner: Codex (build) · independent QA/review · Claude (verdict)
+risk: High (batch writes; bulk removal confirmation)
+source: BQ-034 / PROP-041 P2-6; owner decision 6 (2026-11-26)
+depends-on: TASK-098, TASK-099, TASK-100 merged into `prop041-p2`
+branch: `task-101-apply-changes` from `prop041-p2`
+files: `src/operations/*.js`; `src/mcp.js`; Worker tests; README.md; CHANGELOG.md; TEST_REPORT.md;
+  TASKS.md status.
+objective: A whole grocery haul or a round of kitchen updates goes through as one atomic, undoable
+  request, and removing several items needs an explicit confirmation.
+acceptance:
+  - [ ] New write tool `apply_changes({ requestId, expectedRevision, operations: [1..10], dryRun?,
+        confirmToken? })`; each operation is `{ tool, args }` for one of: add_pantry_item, add_stock,
+        consume_stock, set_inventory_quantity, set_stock_level, mark_in_stock, mark_out_of_stock,
+        update_pantry_item, convert_stock (no nested requestId/expectedRevision). Applied in order to
+        one in-memory document with each tool's own rules; any refusal → zero writes and the result
+        names the failing operation.
+  - [ ] Removing 2+ distinct records (out-of-stock non-staples, consumption to zero) requires
+        `dryRun: true` first, which writes nothing and returns the full preview plus a
+        `confirmToken` = hash of (operations, expectedRevision); the real call must carry that token
+        or is refused `confirmation_required`. One removal needs no confirmation (owner decision 6).
+  - [ ] One request record for the batch; `undo_request` reverses the whole batch or refuses.
+  - [ ] Result: per-operation readback in order, plus the final revision.
+constraints: Bridge only (`workers/conversational-bridge`): no `app.js`, `shared/`, `index.html` or
+  stored-shape change beyond the fields named here (every new pantry field is one the app already
+  reads — DATA_MODEL "Pantry item"). Every write goes through `requestWriteTool()` (required
+  `requestId`, `expectedRevision`, one atomic commit + request record with `before`/`after`/`added`
+  so `undo_request` works). Ids only from reads; never fuzzy-match. Raw meat, poultry and fish never
+  get an invented storage or date (D3). No deploy. Push only the task branch. Stop at `status: review`.
+verification: `node --check` on changed files and `npm run test:bridge` before every commit; then
+  `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`
