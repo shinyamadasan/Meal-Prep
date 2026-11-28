@@ -87,9 +87,15 @@ bindings `OAUTH_KV` (KV) and `HOUSEHOLD_TIME_ZONE` ("Asia/Manila"); the bundle c
 safety core and `undo_request`. Secrets are not shown by a dry run; they are carried over by
 `versions upload`.
 
-### 2.6 Final gates on the release candidate `4b09ecd`
-`test:bridge` 362/362; `test:ledger-contract` 13/13; full local suite — see STATUS entry;
-`git diff --check` clean.
+### 2.6 Final gates on the release candidate `03bb2c6`
+`03bb2c6` = `4b09ecd` + one test file (`test/mcp-logical-expiry.node.js`, D-092) + docs; the Worker
+bundle is unchanged from the 2.5 dry run. `test:bridge` 363/363 (re-run 2026-11-27 on `03bb2c6`);
+`test:ledger-contract` 13/13; `git diff --check` clean. Full local suite 911/912: the one failure,
+`tombstone-namespace.spec.js` "Firestore payload and load round-trip", is calendar-dependent and
+fails identically on `main` (a fixed 2026-06-01 fixture tombstone passed the app's 180-day purge
+window on 2026-11-28 UTC). It is not caused by Phase 1. Test-only fix: TASK-102 on branch
+`task-102-tombstone-fixture-date` (from `main`, separately reviewable); merge it before or with this
+release so step 4's gate reads 912/912.
 
 ## 3. Owner decisions needed before step 4
 1. Approve this checklist (merge + both deploys).
@@ -97,6 +103,16 @@ safety core and `undo_request`. Secrets are not shown by a dry run; they are car
 3. REST: retire `BRIDGE_API_TOKEN` (recommended) or keep — 2.1.
 4. Cloudflare access for steps 4.2/4.5/4.6: run them yourself, or run `npx wrangler login` on this
    machine so Claude can (no token is ever shared in chat).
+5. TASK-102 (test-only, 2.6): approve its merge to `main` so the release gate is green.
+
+### Owner-only actions (the complete list — everything else is done or Claude-runnable)
+| # | Action | Why only the owner | Est. |
+| --- | --- | --- | --- |
+| O1 | Approve this checklist (and TASK-102). | Merge/deploy approval. | 2 min |
+| O2 | Before retiring `BRIDGE_API_TOKEN`: Cloudflare dashboard → Workers → `meal-prep-conversational-bridge` → Logs (or `npx wrangler tail` for a day) — confirm no requests to `/v1/` paths. If any appear, keep the token and tell Claude. | No Cloudflare login in this session (2.1). | 5 min |
+| O3 | IAM: add `datastore.entities.create` to custom role `mealPrepBridgeFirestore` (Google Cloud console → IAM → Roles) — nothing else. | Permission expansion needs the owner (2.3). | 3 min |
+| O4 | Cloudflare: `npx wrangler login` on this machine, or run 4.2 / 4.5 / 4.6 yourself. | Account access. | 2 min |
+| O5 | ChatGPT smoke 6.3 + 6.4 in your own ChatGPT session. | Owner's OAuth grant. | 10 min |
 
 ## 4. Deployment steps (only after approval)
 1. **Backup.** Fresh export of `users/{uid}` (app Settings export, or a read-only Firestore read with
@@ -105,7 +121,7 @@ safety core and `undo_request`. Secrets are not shown by a dry run; they are car
 2. **Record the rollback target.** `npx wrangler deployments list` → note the version at 100%
    (`ROLLBACK_VERSION`, expected `4e0200cc-...`). Stop if it differs and re-check the delta.
 3. **Permissions.** Add `datastore.entities.create` to `mealPrepBridgeFirestore` (nothing else);
-   re-read the role. If chosen: retire `BRIDGE_API_TOKEN` (2.1); enable TTL (2.4a).
+   re-read the role. If chosen: retire `BRIDGE_API_TOKEN` (2.1). No TTL (D-092).
 4. **App.** Open a PR `prop041-p1` → `main`, merge with a merge commit; wait for the Pages build;
    confirm live `app.js`, `index.html`, `sw.js`, `shared/foodSafety.js` are byte-identical to `main`;
    run `npm run test:prod` (signed out, no account writes).
