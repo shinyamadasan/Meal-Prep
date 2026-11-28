@@ -44,13 +44,19 @@ const NAME_ONLY_GROUND = { safetyClass: 'ground', days: 2, match: /\b(?:giniling
 // Meat and fish words the shared regex does not list (review SF3). They only make a name the
 // ingredient list does not know need a stated storage and bought date, keep it off the counter and
 // give it category Protein; with no shared fridge limit such a name is still refused in the fridge.
+// Sardines and anchovies are left out on purpose: they are commonly canned and kept on the counter.
 const NAME_ONLY_EXTRA = [
   { safetyClass: 'raw-sausage', days: 2, match: /\b(?:bratwursts?|kielbasas?)\b/i },
   { safetyClass: 'cured-processed', days: 3, match: /\bhams?\b/i },
+  // Raw cured Filipino breakfast meats (review 3 SF-2): kept in the fridge or freezer, never shelf-stable.
+  { safetyClass: 'cured-processed', days: 2, match: /\b(?:tocino|tapa)\b/i },
+  { safetyClass: 'variety', days: 2, match: /\bgizzards?\b/i },
+  { safetyClass: 'poultry', days: 2, match: /\bquails?\b/i },
+  { safetyClass: 'whole-cut', days: 3, match: /\b(?:pata|oxtails?|rabbits?)\b/i },
   { safetyClass: 'seafood', days: 2, match: new RegExp('\\b(?:' + [
     'cod', 'mackerel', 'trout', 'halibut', 'haddock', 'pollock', 'snapper', 'sea[ -]?bass', 'catfish', 'hito', 'tanigue',
     'lapu[ -]?lapu', 'maya[ -]?maya', 'milkfish', 'dalagang[ -]+bukid', 'hasa[ -]?hasa', 'tulingan', 'swordfish', 'mahi[ -]?mahi',
-    'lobsters?', 'octopus', 'cuttlefish'
+    'lobsters?', 'octopus', 'cuttlefish', 'eels?', 'herrings?'
   ].join('|') + ')\\b', 'i') }
 ];
 
@@ -156,6 +162,26 @@ function fridgeLifeFor(record) {
 }
 
 const CHECK_IN_APP = 'Ask the user to check the item in the app.';
+
+// Shared by update_pantry_item and undo_request (review 3 MF-A). A lot that is not usable now never
+// becomes usable by a chat change, and a lot with a warning now (expired, unknown, past its estimate
+// or best-before) never loses it. Returns the current verdict when `next` would read safer than
+// `current`, else null.
+const WARNING_STATUSES = ['expired', 'unknown', 'check'];
+
+function readsSaferThan(current, next, today) {
+  const now = readBackItem(current, today).safety;
+  const after = readBackItem(next, today).safety;
+  if ((now.usable !== true && after.usable === true) ||
+      (WARNING_STATUSES.includes(now.status) && !WARNING_STATUSES.includes(after.status))) {
+    return now;
+  }
+  return null;
+}
+
+function daysFromToday(day, today) {
+  return isCalendarDay(day) ? FoodSafety.stockCalendarDay(day) - FoodSafety.stockCalendarDay(today) : null;
+}
 
 function unsafeCounterError(name) {
   return new ValidationError('unsafe_storage: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
@@ -285,8 +311,8 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   if (storage === 'counter' && safetyLot) throw unsafeCounterError(name);
 
   if (args.boughtDate === undefined && safetyLot) {
-    throw new ValidationError('needs_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
-      'classify, so its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use ' +
+    throw new ValidationError('needs_bought_date: "' + name + '" has a fridge safety limit (raw meat, poultry, fish or a cooked ' +
+      'leftover), so its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use ' +
       'today only if they said "today" or "just bought".', { field: 'boughtDate', code: 'needs_bought_date' });
   }
 
@@ -307,10 +333,13 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   const nameOnly = unrecognizedSafetyRule(name);
   if (nameOnly) shelfLifeDays = Math.min(shelfLifeDays, nameOnly.days);
   if (args.prepared === true) {
-    // Frozen prepared food with no printed date keeps the ready-food freezer life (freezing is what
-    // makes it last; the raw item's fridge life does not apply). In the fridge, and whenever a printed
-    // date is given, the ready-food life is never longer than the raw item's own life.
-    if (storage === 'freezer' && args.printedDate === undefined) shelfLifeDays = readyFoodLife('freezer');
+    // Frozen prepared food keeps the ready-food freezer life (freezing is what makes it last; the
+    // raw item's fridge life does not apply), with or without a printed date (review 3 MF-B): the
+    // printed date governs the read while it is set, and the 90-day value stays the prepared
+    // signature, so a later printed-date clear plus a move to the fridge still needs the thaw day
+    // and is capped at the fridge life (fridgeLifeFor). In the fridge the ready-food life is never
+    // longer than the raw item's own life.
+    if (storage === 'freezer') shelfLifeDays = readyFoodLife('freezer');
     else shelfLifeDays = Math.min(readyFoodLife(storage), shelfLifeDays);
   }
 
@@ -479,6 +508,13 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
       const clock = fridgeClock(lot, today);
       if (clock && (clock.daysLeft == null || clock.daysLeft < 0)) throw pastLimitError(name, clock, 'moving it to the freezer');
     }
+    // Not usable for any other reason (a passed use-by, an unknown storage): freezing it would hide
+    // that, because the freezer read has no fridge limit (review 3 MF-A).
+    const nowSafety = readBackItem(record, today).safety;
+    if (nowSafety.usable !== true) {
+      throw new ValidationError('not_usable: "' + name + '" is not safe to use as it is now (' + nowSafety.label + '), so moving it ' +
+        'to the freezer is refused: freezing does not make it safe again. ' + CHECK_IN_APP, { field: 'storage', code: 'not_usable' });
+    }
   }
 
   // A fridge-safety lot's bought date only moves earlier (a later date would hide used-up fridge
@@ -541,6 +577,38 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
     else delete next.printedDateKind;
   }
 
+  // A fridge-safety lot's printed date is never loosened (cleared, moved later, or turned from a
+  // use-by into a best-before) once it has passed, nor past the lot's fridge limit counted from its
+  // bought date (review 3 MF-A). Moving it earlier, or a correction within the fridge limit on an
+  // in-date lot, is still made.
+  const oldPrinted = printedDateOf(record);
+  const newPrinted = printedDateOf(next);
+  const loosens = oldPrinted != null && (newPrinted == null || newPrinted > oldPrinted ||
+    (next.printedDateKind === 'best-before' && record.printedDateKind !== 'best-before'));
+  if (safetyLot && loosens) {
+    const clock = fridgeClock(next, today);
+    const oldLeft = daysFromToday(oldPrinted, today);
+    let newLeft = newPrinted != null ? daysFromToday(newPrinted, today) : FoodSafety.pantryDaysLeft(next, today);
+    if (newPrinted == null && toStorage === 'fridge' && clock && clock.daysLeft != null && Number.isFinite(newLeft)) newLeft = Math.min(newLeft, clock.daysLeft);
+    if (oldLeft == null || oldLeft < 0 || !clock || clock.daysLeft == null || !Number.isFinite(newLeft) || newLeft > clock.daysLeft) {
+      const what = newPrinted == null ? 'clearing it' : (newPrinted > oldPrinted ? 'moving it later' : 'making it a best-before date');
+      throw new ValidationError('unsafe_printed_date: "' + name + '" has a fridge safety limit (raw meat, poultry, fish or a cooked ' +
+        'leftover) and its printed date (' + oldPrinted + ') ' + (oldLeft != null && oldLeft < 0 ? 'has passed' : 'ends its safe time') +
+        ', so ' + what + ' is refused: it would make the item read safer than it is. ' + CHECK_IN_APP,
+      { field: 'printedDate', code: 'unsafe_printed_date' });
+    }
+  }
+
+  // Any route: an edit never makes a lot read safer than it is now (the rule undo_request uses).
+  // The one exception is the thaw restart: a frozen lot past only its quality estimate (frozen food
+  // stays safe; USDA) starts a fresh fridge clock on the thaw day.
+  const nowWarning = readsSaferThan(record, next, today);
+  const thawRestart = thawing && thawDateGiven && nowWarning && nowWarning.status === 'check' && nowWarning.reason === 'estimate-passed';
+  if (nowWarning && !thawRestart) {
+    throw new ValidationError('unsafe_edit: "' + name + '" is not safe to use as it is now (' + nowWarning.label + '), and this ' +
+      'change would make it read as usable. ' + CHECK_IN_APP, { field: 'ingredientId', code: 'unsafe_edit' });
+  }
+
   let storageSource = null;
   if (args.storage !== undefined) storageSource = 'given';
   else if (PANTRY_STORAGE.includes(record.storage)) storageSource = 'recorded';
@@ -562,8 +630,6 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
 // safe, else the reason it would make the lot read safer than it is. `today` is the household day,
 // fixed once per call. The restore is never refused only for leaving the freezer: the restored
 // fridge lot keeps its original bought date, which is never later than a thaw day.
-const WARNING_STATUSES = ['expired', 'unknown', 'check'];
-
 export function unsafeRestoreReason(current, restored, today) {
   requireHouseholdDay(today);
   const name = String((restored && restored.name) || (current && current.name) || 'this item');
@@ -583,6 +649,10 @@ export function unsafeRestoreReason(current, restored, today) {
       return '"' + name + '" is past its ' + clock.limitDays + '-day fridge safety limit (' + clock.safetyClass + '), and the undo ' +
         'would move it back into the freezer, where it would read as safe.';
     }
+    const nowSafety = readBackItem(current, today).safety;
+    if (nowSafety.usable !== true) {
+      return '"' + name + '" is not safe to use as it is now (' + nowSafety.label + '), and the undo would move it into the freezer.';
+    }
   }
   // A fridge-safety lot's bought date never moves later (that would hide used-up fridge time).
   if (safetyLot && restored.purchaseDate !== current.purchaseDate) {
@@ -599,9 +669,8 @@ export function unsafeRestoreReason(current, restored, today) {
   // Any other route: a lot that is not usable now never becomes usable by an undo, and a lot with a
   // warning now (expired, unknown, past its estimate) never loses it (a frozen prepared lot thawed a
   // week ago would otherwise get its 90-day freezer life back).
-  const now = readBackItem(current, today).safety;
-  const after = readBackItem(restored, today).safety;
-  if ((now.usable !== true && after.usable === true) || (WARNING_STATUSES.includes(now.status) && !WARNING_STATUSES.includes(after.status))) {
+  const now = readsSaferThan(current, restored, today);
+  if (now) {
     return '"' + name + '" is not safe to use as it is now (' + now.label + '), and the undo would make it read as usable.';
   }
   return null;
