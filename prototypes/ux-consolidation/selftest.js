@@ -162,7 +162,11 @@ function measure() {
       await expectText(page.locator('#prep-count'), /^1 of \d+ steps done$/);
       await snap('prep-day'); await shot('proto-05-prep-day');
       await btn(/^Done: \d+ portions to Kitchen/, false).first().click();
-      await expectText(page.locator('#toast-msg'), /portions in Kitchen/);
+      await expectText(sheet, /Its ingredients are deducted from what you have on hand/);
+      await expectText(sheet, /Mung beans: use 250 g · 250 g left/);
+      await snap('batch-done-sheet'); await shot('proto-23-batch-done');
+      await btn('Prepped — add to Kitchen').click();
+      await expectText(page.locator('#toast-msg'), /portions in Kitchen · \d+ reduced/);
       await closeSheet();
     });
 
@@ -370,7 +374,7 @@ function measure() {
       await btn(/expired ·/, false).click();
       await expectText(page.locator('main'), /Pechay[\s\S]*past its printed use-by/);
       await btn('Keep Pechay').click();
-      await expectText(page.locator('#toast-msg'), /Pechay kept for today · date unchanged/);
+      await expectText(page.locator('#toast-msg'), /Pechay kept for today · still not counted as stock/);
       if (await page.locator('main .row', { hasText: 'Pechay' }).count()) throw new Error('kept item still in review');
       await btn('Show all').click();
       await btn(/^Ingredients/, false).click();
@@ -397,6 +401,87 @@ function measure() {
       await page.getByRole('button', { name: 'Settings, sync and backups' }).click();
       await expectText(sheet, /Clear all data/);
       await closeSheet();
+    });
+
+    // ── Repros for the semantic re-check (must-fix 1–3) and should-fixes ──
+    await job('20 Keep never makes expired food available (Mung Bean Stew still needs Pechay)', 3, async () => {
+      await nav('Kitchen').click();
+      await btn(/expired ·/, false).click();
+      await btn('Keep Pechay').click();
+      await nav('Cook').click(); await btn('All recipes').click();
+      await expectText(page.locator('#recipe-browser .row', { hasText: 'Mung Bean Stew' }), /Need \d: [^…]*Pechay/); // Garlic may also be out after job 16
+      await page.locator('#recipe-browser').getByRole('button', { name: /^Mung Bean Stew/ }).click();
+      await expectText(sheet, /You need: [^.]*Pechay/);
+      await closeSheet();
+      await nav('Shop').click();
+      await expectText(page.locator('main'), /Pechay/);
+      await nav('Kitchen').click(); await btn('Show all').click();
+    });
+
+    await job('21 Attention tiers: Use soon has no Still good; Check has Still good', 2, async () => {
+      await nav('Kitchen').click();
+      if (await btn('Show all').count()) await btn('Show all').click();
+      await btn(/to check/, false).click();
+      const chicken = page.locator('main .row', { hasText: 'Chicken thigh' });
+      await expectText(chicken, /1d left/);
+      if (await chicken.getByRole('button', { name: /still good|^Keep/i }).count()) throw new Error('use-soon row offers Keep/Still good');
+      const radish = page.locator('main .row', { hasText: 'Radish' });
+      await expectText(radish, /estimated window passed — check it/);
+      if (await radish.getByRole('button', { name: 'Keep Radish' }).count()) throw new Error('check row says Keep');
+      await snap('kitchen-review-tiers'); await shot('proto-24-attention-tiers');
+      await nav('Cook').click(); await btn('All recipes').click();
+      await expectText(page.locator('#recipe-browser .row', { hasText: 'Pork & Tamarind Sour Soup' }), /Check Radish first/);
+      await nav('Kitchen').click(); // the review filter is still on
+      await btn('Radish is still good').click();
+      await expectText(page.locator('#toast-msg'), /Radish marked still good for today · date unchanged/);
+      if (await page.locator('main .row', { hasText: 'Radish' }).count()) throw new Error('still-good item still in review');
+      if (!(await page.locator('main .row', { hasText: 'Chicken thigh' }).count())) throw new Error('use-soon row disappeared');
+      await nav('Cook').click(); await btn('All recipes').click();
+      const soup = await page.locator('#recipe-browser .row', { hasText: 'Pork & Tamarind Sour Soup' }).textContent();
+      if (/Check Radish first/.test(soup)) throw new Error('check note survived Still good');
+      await page.locator('#toast-undo').click();
+      await nav('Kitchen').click(); await btn('Show all').click();
+    });
+
+    await job('22 Meal prep Done deducts like I cooked this (and Undo restores)', 3, async () => {
+      await nav('Cook').click(); await btn('Meal prep').click();
+      await btn('Start prep day').click();
+      const idx = await page.evaluate(() => S.plan.findIndex(b => b.rid === 'r5'));
+      await sheet.locator('[data-act="batch-done"]').nth(idx).click();
+      await expectText(sheet, /Rice Cooker Chicken & Rice — \d+ servings goes into your Kitchen/);
+      await expectText(sheet, /Chicken thigh: use [\d.½¼¾⅓⅔]+ kg · [\d.½¼¾⅓⅔]+ kg left/);
+      await expectText(sheet, /Staples are never deducted: Rice/);
+      await btn('Prepped — add to Kitchen').click();
+      await expectText(page.locator('#toast-msg'), /Rice Cooker Chicken & Rice: \d+ portions in Kitchen · 1 reduced/);
+      await closeSheet();
+      await nav('Kitchen').click();
+      await page.getByLabel('Search kitchen').fill('chicken thigh');
+      const after = await page.locator('main .row', { hasText: 'Chicken thigh' }).textContent();
+      if (/\b1 kg/.test(after)) throw new Error('chicken not deducted: ' + after.replace(/\s+/g, ' '));
+      await page.locator('#toast-undo').click();
+      await expectText(page.locator('main'), /Chicken thigh\s*1 kg/);
+      await page.getByLabel('Search kitchen').fill('');
+    });
+
+    await job('23 Made it says what happens to the existing batch', 3, async () => {
+      await nav('Cook').click(); await btn('Sauces & prep').click();
+      await btn('Prep-aheads ↓ (cooked rice, garlic…)').click();
+      await btn('Made Cooked rice').click();
+      await expectText(page.locator('#replace-note'), /Replaces your [23] cups \(2d left\)/);
+      await snap('made-replace'); await shot('proto-25-made-replace');
+      await btn('Replace batch').click();
+      await expectText(page.locator('#toast-msg'), /Replaced Cooked rice — [23] cups/);
+      await page.locator('#toast-undo').click();
+      await btn('Made a batch of Soy-Calamansi').click();
+      await expectText(page.locator('#replace-note'), /Replaces your 4 portions \(5d left\)/);
+      await closeSheet();
+    });
+
+    await job('24 Matcher is the app\'s, verbatim (incl. its Soy-Calamansi false positive)', 0, async () => {
+      const got = await page.evaluate(() => [['Garlic cloves', 'Garlic'], ['Onion, chopped', 'Onion'], ['Bay leaves', 'Bay leaf'], ['Rice', 'Sticky rice'], ['Soy-Calamansi sauce', 'Soy sauce'], ['Eggs', 'Egg noodles'], ['Rice', 'Rice vinegar']]
+        .map(([a, b]) => a + '|' + b + '=' + nameMatch(a, b)).join(' ') + ' ' + amtText(2, 'bunch') + '/' + amtText(1, 'bunches'));
+      const want = 'Garlic cloves|Garlic=true Onion, chopped|Onion=true Bay leaves|Bay leaf=true Rice|Sticky rice=false Soy-Calamansi sauce|Soy sauce=true Eggs|Egg noodles=false Rice|Rice vinegar=false 2 bunches/1 bunch';
+      if (got !== want) throw new Error(got);
     });
 
     // Extra screens for measurement only.

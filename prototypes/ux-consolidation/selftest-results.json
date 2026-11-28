@@ -20,19 +20,24 @@
       "PASS 16 Shop \"Not anymore?\" (3 taps)",
       "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
       "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
-      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)",
+      "PASS 20 Keep never makes expired food available (Mung Bean Stew still needs Pechay) (3 taps)",
+      "PASS 21 Attention tiers: Use soon has no Still good; Check has Still good (2 taps)",
+      "PASS 22 Meal prep Done deducts like I cooked this (and Undo restores) (3 taps)",
+      "PASS 23 Made it says what happens to the existing batch (3 taps)",
+      "PASS 24 Matcher is the app's, verbatim (incl. its Soy-Calamansi false positive)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1966,
+    "textSamples": 2129,
     "textBelow45": [],
     "minTextContrast": {
       "el": "button.btn.sm.primary \"Eat 1\"",
       "ratio": 4.65,
       "at": "home+toast"
     },
-    "uiSamples": 1165,
+    "uiSamples": 1269,
     "uiBelow3": [],
     "minUiContrast": {
       "kind": "border",
@@ -42,7 +47,7 @@
     },
     "uiByKind": {
       "badge": {
-        "samples": 56,
+        "samples": 62,
         "min": {
           "kind": "badge",
           "el": "#kitchen-badge \"6\"",
@@ -51,7 +56,7 @@
         }
       },
       "focus": {
-        "samples": 1025,
+        "samples": 1116,
         "min": {
           "kind": "focus",
           "el": "button.btn.sm \"Open Shop\"",
@@ -69,7 +74,7 @@
         }
       },
       "border": {
-        "samples": 40,
+        "samples": 47,
         "min": {
           "kind": "border",
           "el": "#cook-q \"Search recipes and flavors\"",
@@ -87,7 +92,7 @@
         }
       }
     },
-    "tapSamples": 1025,
+    "tapSamples": 1116,
     "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
@@ -117,19 +122,24 @@
       "PASS 16 Shop \"Not anymore?\" (3 taps)",
       "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
       "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
-      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)",
+      "PASS 20 Keep never makes expired food available (Mung Bean Stew still needs Pechay) (3 taps)",
+      "PASS 21 Attention tiers: Use soon has no Still good; Check has Still good (2 taps)",
+      "PASS 22 Meal prep Done deducts like I cooked this (and Undo restores) (3 taps)",
+      "PASS 23 Made it says what happens to the existing batch (3 taps)",
+      "PASS 24 Matcher is the app's, verbatim (incl. its Soy-Calamansi false positive)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1966,
+    "textSamples": 2129,
     "textBelow45": [],
     "minTextContrast": {
       "el": "div.thumb \"T\"",
       "ratio": 4.8,
       "at": "home"
     },
-    "uiSamples": 1165,
+    "uiSamples": 1269,
     "uiBelow3": [],
     "minUiContrast": {
       "kind": "border",
@@ -139,7 +149,7 @@
     },
     "uiByKind": {
       "badge": {
-        "samples": 56,
+        "samples": 62,
         "min": {
           "kind": "badge",
           "el": "#kitchen-badge \"6\"",
@@ -148,7 +158,7 @@
         }
       },
       "focus": {
-        "samples": 1025,
+        "samples": 1116,
         "min": {
           "kind": "focus",
           "el": "button.btn.sm \"Open Shop\"",
@@ -166,7 +176,7 @@
         }
       },
       "border": {
-        "samples": 40,
+        "samples": 47,
         "min": {
           "kind": "border",
           "el": "#cook-q \"Search recipes and flavors\"",
@@ -184,7 +194,7 @@
         }
       }
     },
-    "tapSamples": 1025,
+    "tapSamples": 1116,
     "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
@@ -214,19 +224,24 @@
       "PASS 16 Shop \"Not anymore?\" (3 taps)",
       "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
       "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
-      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)",
+      "PASS 20 Keep never makes expired food available (Mung Bean Stew still needs Pechay) (3 taps)",
+      "PASS 21 Attention tiers: Use soon has no Still good; Check has Still good (2 taps)",
+      "PASS 22 Meal prep Done deducts like I cooked this (and Undo restores) (3 taps)",
+      "PASS 23 Made it says what happens to the existing batch (3 taps)",
+      "PASS 24 Matcher is the app's, verbatim (incl. its Soy-Calamansi false positive)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1940,
+    "textSamples": 2094,
     "textBelow45": [],
     "minTextContrast": {
       "el": "button.btn.sm.primary \"Eat 1\"",
       "ratio": 4.65,
       "at": "home+toast"
     },
-    "uiSamples": 1148,
+    "uiSamples": 1246,
     "uiBelow3": [],
     "minUiContrast": {
       "kind": "border",
@@ -236,7 +251,7 @@
     },
     "uiByKind": {
       "badge": {
-        "samples": 56,
+        "samples": 62,
         "min": {
           "kind": "badge",
           "el": "#kitchen-badge \"6\"",
@@ -245,7 +260,7 @@
         }
       },
       "focus": {
-        "samples": 1010,
+        "samples": 1095,
         "min": {
           "kind": "focus",
           "el": "button.btn.sm \"Open Shop\"",
@@ -263,7 +278,7 @@
         }
       },
       "border": {
-        "samples": 39,
+        "samples": 46,
         "min": {
           "kind": "border",
           "el": "#cook-q \"Search recipes and flavors\"",
@@ -281,7 +296,7 @@
         }
       }
     },
-    "tapSamples": 1010,
+    "tapSamples": 1095,
     "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
@@ -311,19 +326,24 @@
       "PASS 16 Shop \"Not anymore?\" (3 taps)",
       "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
       "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
-      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)",
+      "PASS 20 Keep never makes expired food available (Mung Bean Stew still needs Pechay) (3 taps)",
+      "PASS 21 Attention tiers: Use soon has no Still good; Check has Still good (2 taps)",
+      "PASS 22 Meal prep Done deducts like I cooked this (and Undo restores) (3 taps)",
+      "PASS 23 Made it says what happens to the existing batch (3 taps)",
+      "PASS 24 Matcher is the app's, verbatim (incl. its Soy-Calamansi false positive)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1940,
+    "textSamples": 2094,
     "textBelow45": [],
     "minTextContrast": {
       "el": "div.thumb \"T\"",
       "ratio": 4.8,
       "at": "home"
     },
-    "uiSamples": 1148,
+    "uiSamples": 1246,
     "uiBelow3": [],
     "minUiContrast": {
       "kind": "border",
@@ -333,7 +353,7 @@
     },
     "uiByKind": {
       "badge": {
-        "samples": 56,
+        "samples": 62,
         "min": {
           "kind": "badge",
           "el": "#kitchen-badge \"6\"",
@@ -342,7 +362,7 @@
         }
       },
       "focus": {
-        "samples": 1010,
+        "samples": 1095,
         "min": {
           "kind": "focus",
           "el": "button.btn.sm \"Open Shop\"",
@@ -360,7 +380,7 @@
         }
       },
       "border": {
-        "samples": 39,
+        "samples": 46,
         "min": {
           "kind": "border",
           "el": "#cook-q \"Search recipes and flavors\"",
@@ -378,7 +398,7 @@
         }
       }
     },
-    "tapSamples": 1010,
+    "tapSamples": 1095,
     "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",

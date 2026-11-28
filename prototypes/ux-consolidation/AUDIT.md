@@ -47,20 +47,21 @@ Other observations:
 ## 2. Everyday jobs: current app vs prototype
 
 Taps exclude typing. "Before" is measured or traced on `origin/main`. "After" is the prototype
-self-test (Playwright clicks by visible label, as a first-time user). All 19 scripted jobs (the 8 below,
+self-test (Playwright clicks by visible label, as a first-time user). All 24 scripted jobs (the 8 below,
 plus Flavor authoring, Favorites, method chips and filters, undo isolation, the serving scaler, Cook
-history, Remove expired, "Not anymore?", Keep, D-086 matching and the new homes) pass at 390×844 and
-360×780, in light and dark. Each run had 0 console errors, 0 network requests and no horizontal scroll.
-Full numbers are in §8; the data-semantics fixes from the second review are in §9.
+history, Remove expired, "Not anymore?", Keep, D-086 matching, the new homes, and five repros for the
+semantic re-check) pass at 390×844 and 360×780, in light and dark. Each run had 0 console errors,
+0 network requests and no horizontal scroll. Full numbers are in §8; the data-semantics fixes are in §9
+(second review) and §10 (semantic re-check).
 
 | Job | Current app (before) | Prototype (after) |
 |---|---|---|
 | What can I eat now | Home → **Use 1** (1 tap; first button 0.59 screens down, under the meal-prep flow card and banner) | Home → **Eat 1** (**1 tap**; first card, about 0.25 screens) |
 | Cook something quick | More → Recipes → scroll about 1 screen → Lowest effort → scroll 1.2-screen cards → no cook action. Logging it needs Plan → + Add meals → pick → close → Prep → Prepped → Fridge → confirm (**about 10 taps, 3+ screens**) | Cook (opens on Quick cook, can-make-now first) → recipe → **I cooked this** → Save (**4 taps, no scroll**). The sheet shows what it will take out of the kitchen, `markRecipeCooked()`-style: "Canned tuna: use 1 can · 1 can left". Staples are never deducted, and an untracked amount is never removed unless you tick it (§9) |
-| Plan a meal-prep batch | Plan → + Add meals → pick → close (4), then Prep tab → **Prepped → Fridge** per batch (+2 each, 3 tabs total) | Home's **Meal prep** card → + Add → pick → Done (**4**; 5 if you start from the Cook tab). The picker lists every recipe, with optional search, a **Low effort only** chip and **View** on each row (D-078). Then Start prep day → **Done: N portions to Kitchen** (+2). All on one screen, with a 1-2-3-4 progress strip, a live "N of M steps done" count and a "N to buy → Open Shop" link |
+| Plan a meal-prep batch | Plan → + Add meals → pick → close (4), then Prep tab → **Prepped → Fridge** per batch (+2 each, 3 tabs total) | Home's **Meal prep** card → + Add → pick → Done (**4**; 5 if you start from the Cook tab). The picker lists every recipe, with optional search, a **Low effort only** chip and **View** on each row (D-078). Then Start prep day → **Done: N portions to Kitchen** → **Prepped — add to Kitchen** (+3). Done asks once, like the app's `completePlannedBatch()` confirm, and shows the same take-out list as *I cooked this* ("Mung beans: use 250 g · 250 g left"); confirming deducts the ingredients and adds the portions to Ready food, with Undo. All on one screen, with a 1-2-3-4 progress strip, a live "N of M steps done" count and a "N to buy → Open Shop" link |
 | I just shopped | Shop → scroll past struck-through in-stock rows → tick each (1 + n). Unlisted purchases: Fridge → scroll 1.9 screens → Bulk add → type → Add (4) | Shop → tick each (**1 + n**; only items to buy are shown, with amounts and Price book costs). Unlisted: **Bought something else?**, which sits right under the add box at the top of Shop → type → Add to Kitchen (**3**). A tick can be undone from the toast, or later from the collapsed **Bought today** section, which reverses exactly what the tick did (D-057 receipt) |
 | We're out of X | Fridge → scroll → search → open → level/delete → Shop → Add Item → type → save (**about 7**, 2 tabs) | Kitchen (or Home) → **We're out of…** → type → tap item (**3**). Results rank whole-word matches first, then starts-with, then contains, so "egg" lists **Eggs** before Eggplant. It is marked out and added to Shop in one step (checkbox on by default), with Undo |
-| Make a sauce / prepped ingredient | More → Flavor Library → scroll → I made this → save (**4**). Prepped ingredients are **not possible** | Cook → Sauces & prep → **Made it** → Save to Kitchen (**4**). The same path works for prep-aheads (cooked rice, minced garlic, boiled eggs), which a **Prep-aheads ↓** link at the top of the screen jumps to. "Use by" is optional and typed by you; with no date, no "days left" chip is shown (D-074) |
+| Make a sauce / prepped ingredient | More → Flavor Library → scroll → I made this → save (**4**). Prepped ingredients are **not possible** | Cook → Sauces & prep → **Made it** → Save to Kitchen (**4**). The same path works for prep-aheads (cooked rice, minced garlic, boiled eggs), which a **Prep-aheads ↓** link at the top of the screen jumps to. "Use by" is optional and typed by you; with no date, no "days left" chip is shown (D-074). If you already have a batch, the sheet is titled "Replace … batch?", says **Replaces your 3 cups (2d left)** before you save, and the button reads **Replace batch** (D-074 replace-in-place, so old food never quietly looks fresh) |
 | Find a flavor | More → Flavor Library → search/filter (**3**) | Cook → type in the one search box, which searches recipes, sauces and ingredients (**1 + typing**), or tap a sauce chip on a ready-food row or recipe ("Goes well with") |
 | Shop without a plan | Shop → open "No plan? Fill the gaps" → tap a chip (**3**) | Shop → tap a chip (**2**; quick picks open automatically while the list is short, and no item appears in two roles). "Running low: Vinegar, Oats → Add" is a one-tap restock |
 | Add / edit / delete a flavor | More → Flavor Library → Add flavor → fill → Save (**4**) | Cook → Sauces & prep → **+ Add your own flavor** → fill → Save flavor (**4**). Edit and Delete sit in each flavor's sheet. Delete asks first, then gives Undo |
@@ -75,7 +76,7 @@ Full numbers are in §8; the data-semantics fixes from the second review are in 
 |---|---|
 | Home: greeting, Ready to eat | **Home** · Ready to eat (first card) |
 | Home: meal-prep flow card (Plan/Shop/Prep/Fridge) | **Home** · "Meal prep" mode card with a one-line status. The full flow lives in **Cook › Meal prep** |
-| Home: What needs attention? | **Home** · "Use soon" (2 items). Expired rows offer **Keep** or **Remove** (FEATURES, D-057); use-soon rows offer *Cook*. **Kitchen › Review** lists them all; use-soon rows there have **Still good**. Keep and Still good are the same-day `keptOn` acknowledgement (D-088): the item is hidden from alerts until tomorrow and its date is never rewritten. Kitchen keeps showing "Expired · Kept today" on the item itself |
+| Home: What needs attention? | **Home** · "Needs attention" (first 3) and **Kitchen › Review** (all), with the app's three tiers from `collectAttentionItems()` and the app's buttons (`check ? 'Still good' : 'Keep'`). **Expired** (printed use-by passed, or ready food past its fridge window): **Keep** / **Remove**. **Check** (a fridge perishable past its *estimate*, a passed best-before, or frozen food past its quality window): **Still good** / **Toss**. **Use soon**: no keep button at all, only *Cook* with a recipe that uses it; the app never hides a use-soon row, so neither does the prototype. Keep and Still good write the same-day `keptOn` (D-057, D-088): the row leaves the list until tomorrow and the date is never rewritten. **Keep never makes expired food usable**: `pantryLotAvailable()` ignores `keptOn`, so a kept expired lot still is not "have", is never suggested and is never offered in *I cooked this*; Kitchen shows "Expired · Kept today". Still good on a Check lot clears the recipe's "Check X first" note for today. Prepared stock is not in this list, as in the app |
 | Home: Record leftovers/takeout | **Home** quick action, plus **Kitchen** › Ready |
 | Home: My Favorites (`#home-favorites`) | Hearts on every recipe row, plus a **♥ Favorites** chip in **Cook** (Quick cook and All recipes). It shows only hearted recipes, with a count, and is ANDed with the method chip and Filters. Recipes' `#favorites-filter` checkbox maps to the same chip |
 | Home: Need ideas? (What should we eat / cook / can I do) | **Home** · "Or make something" (Instant / Quick / Meal prep, plus "You can make right now") |
@@ -144,7 +145,7 @@ Full numbers are in §8; the data-semantics fixes from the second review are in 
   4. **Prepared ingredients get a first-class home** next to sauces (Kitchen › Prepped). They are
      created from Cook › Sauces & prep › *Made it* and consumed by recipes ("✓ Cooked rice").
   5. **Home is a decision page, not a dashboard.** It has three blocks (Ready to eat → Or make
-     something → Use soon) and three quick actions (We're out of… · I just shopped · Leftovers). The
+     something → Needs attention) and three quick actions (We're out of… · I just shopped · Leftovers). The
      meal-prep flow card, Favorites, Need ideas and Cook History move off it (to Cook › Meal prep, the
      Cook ♥ Favorites chip, can-make-now sorting and Settings › Cook history).
 
@@ -164,7 +165,7 @@ never editing.
 - **Added:** Cook, Kitchen, the ⚙ header button and bottom navigation.
 - **Merged:** Plan + Prep + the Home flow card → Cook › Meal prep. "Based on your kitchen" strip +
   quick filters + Need ideas → can-make-now sorting in Cook and Home. Freshness banner + attention
-  card → Kitchen badge + Review bar + Home "Use soon". Prepared Flavors (two places) → Kitchen ›
+  card → Kitchen badge + Review bar + Home "Needs attention". Prepared Flavors (two places) → Kitchen ›
   Prepped.
 - **Demoted behind one tap:** By-day grid, week templates, AI Prep Brief, Stock health,
   Inventory-checked stamp, select mode, ingredient browser, print/copy/clear, prices, JSON
@@ -181,7 +182,7 @@ never editing.
 4. **Muscle memory and deep links.** `showTab('fridge'|'planner'|'prep'|'recipes')`, the notification click (`show-attention` → `openAttentionView()`), and tests that select `.tab-btn[data-tab=…]` all assume today's ids. Keep the `data-tab` ids as internal section ids and remap the nav only, so existing specs and the service-worker route keep working.
 5. **Dark mode.** The released app is deliberately **light-only** (`color-scheme: light`; ROADMAP "Do Not Work On" lists a manual toggle). The prototype honours `prefers-color-scheme` as asked. Shipping that is a separate product decision, and Hard Rule 7 (single `:root`) still applies.
 6. **Discoverability of demoted tools.** People who use Nutrition, the Price Book or the By-day grid daily lose one tap. Mitigation: Settings rows plus contextual links (recipe sheet → nutrition, Shop ⋯ → prices, Meal prep → By day).
-7. **Matching quality.** "✓ Have everything" is only as good as ingredient matching. The prototype now follows D-086 `ingredientNamesMatch()`: names match when they are equal, or when every word of the shorter name is in the longer one **and** both share the head noun (last word), with the identity-modifier guard, the rice-family rule and "A or B" alternatives. So *Eggs* does not satisfy *Egg noodles*, *Rice* does not satisfy *Rice vinegar*, and *Egg* never matches *Eggplant*. (The first prototype used a plain word-subset test, which let Eggs satisfy Egg noodles and under-counted "Need N".) Two read-path rules from D-086 also apply: an Out staple, an empty lot or a lot past its printed date is not stock, and an untracked amount still counts as "have some". Prepped stock matches only by exact name, so a cooked-rice tub is used for "Cooked rice" lines and never stands in for raw "Rice". Production must keep these read paths on `ingredientNamesMatch()` / `pantryLotAvailable()`. The write path (`findPantryMatch()` in `deductIngredientsForRecipe()`) is still substring-based and is the deferred red-zone task D-086 records; the prototype's "I cooked this" assumes that alignment has happened.
+7. **Matching quality.** "✓ Have everything" is only as good as ingredient matching. The prototype no longer approximates it: `ingredientNamesMatch()` and the helpers it needs (`normalizeIngredientName()`, `ingredientNameSegments()`, `ingredientAlternatives()`, `ingredientMatchWords()`, `hasIngredientIdentityModifier()`, `INGREDIENT_IDENTITY_MODIFIERS`, `WATER_INGREDIENT_LINE`, `QUANTITY_INGREDIENT_NOTE`) are **copied verbatim from `app.js` on `origin/main`**, and recipe lines are matched the way Cook Now does it (`ingredientAlternatives(line).some(n => ingredientNamesMatch(n, lot))`). The only difference is the alias table: the app builds `INGREDIENT_AVAILABILITY_ALIASES` from `INGREDIENT_DB`; the prototype has no ingredient database, so its table is **empty**, and an alias-only match the app makes would be missed here. Pairs re-run against the port (self-test job 24): "Garlic cloves"/"Garlic" **true**, "Onion, chopped"/"Onion" **true**, "Bay leaves"/"Bay leaf" **true**, "Rice"/"Sticky rice" **false** (identity modifier), "Eggs"/"Egg noodles" false, "Rice"/"Rice vinegar" false, and "Soy-Calamansi sauce"/"Soy sauce" **true**, which is an app finding (§10). Availability follows `pantryLotAvailable()`: an Out staple, a lot with amount ≤ 0, or an **expired** lot is not stock (Keep does not change that), an estimate that has passed (Check) still counts, and an untracked amount counts as "have some". The cooked-rice tub is checked first by exact name, but with the app's rice-family rule a "Cooked rice" line is also satisfied by raw Rice when there is no tub. Production must keep these read paths on the real functions. The write path (`findPantryMatch()` in `deductIngredientsForRecipe()`) is still substring-based and is the deferred red-zone task D-086 records; the prototype's "I cooked this" assumes that alignment has happened.
 8. **Size of `app.js`.** Navigation is woven through about 17k lines of imperative `render*()`. A big-bang change is high risk, hence the phased plan below.
 
 ## 6. Phased production plan (smallest first)
@@ -216,7 +217,9 @@ Each phase is independently shippable and reversible, and follows D-001 (no fram
 `proto-15-flavor-editor`, `proto-16-favorites` (with the "1 more favorite over 30 min" note),
 `proto-17-method-empty` (D-060 empty chip), `proto-18-filters`, `proto-19-cooked-deduct` (what
 "I cooked this" takes out), `proto-20-picker` (search + Low effort), `proto-21-bought-today`,
-`proto-22-made-use-by` (optional use-by).
+`proto-22-made-use-by` (optional use-by), `proto-23-batch-done` (what prep-day Done takes out),
+`proto-24-attention-tiers` (Expired / Check / Use soon in Kitchen › Review), `proto-25-made-replace`
+("Replaces your … cups (2d left)").
 
 Note: some prototype screenshots show the toast from the previous step, because the self-test
 captures them mid-flow.
@@ -228,14 +231,14 @@ Method: [`selftest.js`](selftest.js) runs Playwright 1.65 (Chromium) against the
 and accessible names (`getByRole('button', { name })`, `getByLabel`). It runs four configurations:
 390×844 light, 390×844 dark, 360×780 light and 360×780 dark (`colorScheme`). After each step it
 measures every visible element across about 30 screens, sheets and toasts. Raw output:
-[`selftest-results.json`](selftest-results.json). Re-run after the second review on 2026-11-27.
+[`selftest-results.json`](selftest-results.json). Re-run after the semantic re-check on 2026-11-28.
 
 | Config | Jobs | Console errors | Network requests | Horizontal scroll |
 |---|---|---|---|---|
-| 390×844 light | 19/19 pass | 0 | 0 | none |
-| 390×844 dark | 19/19 pass | 0 | 0 | none |
-| 360×780 light | 19/19 pass | 0 | 0 | none |
-| 360×780 dark | 19/19 pass | 0 | 0 | none |
+| 390×844 light | 24/24 pass | 0 | 0 | none |
+| 390×844 dark | 24/24 pass | 0 | 0 | none |
+| 360×780 light | 24/24 pass | 0 | 0 | none |
+| 360×780 dark | 24/24 pass | 0 | 0 | none |
 
 The jobs are the 8 everyday jobs in §2, plus: (9) Flavor authoring (empty-name error, add, edit,
 delete, Undo, Freezer-friendly filter, starter prompt that never re-offers a deleted starter and
@@ -247,6 +250,19 @@ history; (15) Kitchen ⋯ Remove expired (1) + Undo; (16) Shop "Not anymore?"; (
 item (hidden from Review today, still "Expired · Kept today" in Kitchen) + Undo; (18) D-086 matching
 (Stir-Fried Noodles shows "Need 3: Egg noodles, Cabbage…" although Eggs are at home); (19) the new homes
 (Home "Something different", the recipe-sheet balance line, Settings › Clear all data).
+
+Semantic re-check repros (§10): (20) **Keep Pechay** (expired, printed use-by), then Mung Bean Stew
+still says "Need …: Pechay", its sheet still lists Pechay under "You need", and Pechay is still on
+Shop; (21) **attention tiers**: Chicken thigh (1d left, Use soon) has no Keep or Still good button;
+Radish (fridge, estimate passed, no printed date) is Check with **Still good** / **Toss**, and Pork &
+Tamarind Sour Soup says "Check Radish first"; Still good hides Radish, keeps Chicken thigh listed and
+clears the note; (22) **meal prep Done deducts**: Rice Cooker Chicken & Rice → Done → the sheet lists
+"Chicken thigh: use … kg · … kg left" and "Staples are never deducted: Rice…" → confirm → the toast
+says "1 reduced", Kitchen shows less chicken, Undo restores 1 kg; (23) **Made it on an existing
+batch**: Cooked rice says "Replaces your N cups (2d left)" and saves as "Replaced Cooked rice — …";
+Soy-Calamansi says "Replaces your 4 portions (5d left)"; (24) the matcher pairs in §5 risk 7 and the
+Shop pluralisation (`2 bunches`, `1 bunch`). Job 3 also now confirms the batch-done sheet ("Mung
+beans: use 250 g · 250 g left", "Its ingredients are deducted…") before the portions reach Kitchen.
 
 Jobs 2, 3, 4, 6, 10 and 11 also gained checks for the second-review fixes: the cook sheet's deductions
 (tuna 2 → 1 can, cooked rice 3 → 2 cups, untracked Cucumber unticked and still in Kitchen afterwards,
@@ -261,10 +277,10 @@ held to 4.5:1, with no large-text allowance):
 
 | Config | Text samples | Lowest text ratio | Text < 4.5 |
 |---|---|---|---|
-| 390×844 light | 1,966 | 4.65 (primary button text) | 0 |
-| 390×844 dark | 1,966 | 4.80 (recipe initial tile) | 0 |
-| 360×780 light | 1,940 | 4.65 | 0 |
-| 360×780 dark | 1,940 | 4.80 | 0 |
+| 390×844 light | 2,129 | 4.65 (primary button text) | 0 |
+| 390×844 dark | 2,129 | 4.80 (recipe initial tile) | 0 |
+| 360×780 light | 2,094 | 4.65 | 0 |
+| 360×780 dark | 2,094 | 4.80 | 0 |
 
 **Non-text UI contrast** (WCAG 1.4.11, held to 3:1). The self-test now measures five kinds of element.
 The **focus ring** is the `--focus` outline that sits 2px outside every visible button, input, select,
@@ -276,13 +292,13 @@ and **badge** are as before.
 
 | Kind | Samples (390 light) | Lowest, light | Lowest, dark | Before this round (light / dark) |
 |---|---|---|---|---|
-| Focus ring | 1,025 | 6.88 | 5.07 | 1.48 / 2.01 (45% alpha green) |
+| Focus ring | 1,116 | 6.88 | 5.07 | 1.48 / 2.01 (45% alpha green) |
 | Selected chip fill | 33 | 6.89 | 6.31 | 2.56 / 6.31 |
-| Control border | 40 | 3.88 (search box) | 3.76 (search box) | 1.36 / 1.94 (20% / 22% alpha) |
+| Control border | 47 | 3.88 (search box) | 3.76 (search box) | 1.36 / 1.94 (20% / 22% alpha) |
 | Checkbox | 11 | 6.67 | 6.92 | unchanged |
-| Nav badge | 56 | 6.61 | 5.30 | unchanged |
+| Nav badge | 62 | 6.61 | 5.30 | unchanged |
 
-0 UI samples are below 3:1 in any of the four configs (1,165 / 1,165 / 1,148 / 1,148 samples). The
+0 UI samples are below 3:1 in any of the four configs (1,269 / 1,269 / 1,246 / 1,246 samples). The
 360px runs give the same lowest values.
 
 Token changes behind this (prototype only; production `style.css` is untouched):
@@ -310,10 +326,10 @@ checkbox label):
 
 | Config | Targets measured | Smallest | Below 44 px |
 |---|---|---|---|
-| 390×844 light | 1,025 | 44×44 (icon buttons) | 0 |
-| 390×844 dark | 1,025 | 44×44 | 0 |
-| 360×780 light | 1,010 | 44×44 | 0 |
-| 360×780 dark | 1,010 | 44×44 | 0 |
+| 390×844 light | 1,116 | 44×44 (icon buttons) | 0 |
+| 390×844 dark | 1,116 | 44×44 | 0 |
+| 360×780 light | 1,095 | 44×44 | 0 |
+| 360×780 dark | 1,095 | 44×44 | 0 |
 
 `.btn.sm`, mode, method and flavor-filter chips, the stock-level chip (`.lvl`, min 60×44), steppers,
 hearts and ✕ buttons, the Shop checkbox (a 44×44 `.check-btn` around the 26px box) and toast Undo
@@ -337,7 +353,7 @@ by the self-test (§8).
 |---|---|---|---|
 | 1 | "I cooked this" deleted whole records | The sheet lists what it will **take out**, scaled by the servings made: "Canned tuna: use 1 can · 1 can left", "Cooked rice: use 1 cup · 2 cups left". A lot is removed only when it reaches zero ("that uses it up, so it is removed"). Staples are listed as "never deducted". A matched lot with **no tracked amount**, or with a unit that does not convert, goes under "Amount not tracked", **unticked**, and stays in the kitchen unless you tick "Used it all up?". Undo restores every amount | `markRecipeCooked()` → `deductIngredientsForRecipe()`: skips staples, skips null-quantity lots, converts units, subtracts, and tombstones only lots that hit zero (D-057 addendum). The explicit "used it all up" tick is a prototype addition; in production it would route through the existing single-item removal, never a new delete path |
 | 2 | Matching too loose | D-086 head-noun matching (§5 risk 7). "Need N" counts changed accordingly, e.g. Stir-Fried Noodles is now "Need 3: Egg noodles, Cabbage…" although Eggs are at home | `ingredientNamesMatch()`, `pantryLotAvailable()` |
-| 3a | "Still good" rewrote the date | **Keep** / **Still good** set a same-day `kept` flag. The item leaves Home "Use soon", Kitchen Review, the Kitchen badge and **Remove expired** for today; its date is untouched and Kitchen still shows "Expired · Kept today" | D-057 / D-088 `keptOn`, `isKeptToday()` |
+| 3a | "Still good" rewrote the date | *Corrected in §10.* **Keep** (Expired rows) and **Still good** (Check rows only) set a same-day `kept` flag. The row leaves Home "Needs attention", Kitchen Review and **Remove expired** for today; its date is untouched and Kitchen still shows "Expired · Kept today". Use-soon rows have neither button and are never hidden. Keep does **not** make an expired lot count as stock. (This row first said Keep/Still good applied to use-soon rows and, through `haveLot()`, made kept food available; both were wrong) | D-057 / D-088 `keptOn`, `isKeptToday()`; `collectAttentionItems()` skips kept only when the signal is not use-soon; `pantryLotAvailable()` ignores `keptOn` |
 | 3b | Expired rows offered only Toss | Expired rows (Home and Kitchen Review) offer **Keep** or **Remove**, and say "past its printed use-by" | FEATURES Home attention: Keep / Remove per row, bulk Remove expired |
 | 3c | "Made it" inferred a sauce expiry | **Use by (optional)** date field. Blank means no date and no "Nd left" chip ("no use-by date" in Kitchen › Prepped). A new batch of the same flavor replaces the record in place (same id) | D-074: `preparedFlavors` has no inferred shelf life; one active batch per `flavorId` |
 | 4 | A tick could only be reversed while the toast showed | Ticked rows move to a collapsed **Bought today (N)** section with their receipt. **Untick** reverses exactly that receipt (new lot removed, staple level restored, merged amount restored) and puts the row back on the list | D-057 `stockPurchasedGroceryItem()` / `unstockPurchasedGroceryItem()` receipts: created / staple / merged |
@@ -350,6 +366,42 @@ by the self-test (§8).
 | 8b | Prep-aheads "Made it" below the fold | **Prep-aheads ↓** jump link at the top of Sauces & prep; it scrolls and moves focus | — |
 | 8c | Method chip carried across modes | Switching between Quick cook and All recipes resets the chip to **All** | — |
 
-Still out of scope for the prototype, and noted for the proposal: the D-088 **Check** tier (an
-estimated date that has passed) would reuse the same row with Still good / Toss, and is never
-bulk-removed. The prototype's only past-date sample, Pechay, has a printed use-by, so it is Expired.
+The D-088 **Check** tier is now modelled (§10): Radish, a fridge lot past its estimate with no printed
+date, is Check with Still good / Toss and is never bulk-removed. Pechay (printed use-by) stays Expired.
+
+## 10. Semantic re-check: model the app, do not approximate it (2026-11-28)
+
+An independent re-check failed the prototype on semantics: production will copy it, so it must do what
+`origin/main` does. Each fix below is copied from `app.js` and has a self-test repro (§8, jobs 20–24).
+
+| # | Finding | Fix in the prototype | App code it now copies |
+|---|---|---|---|
+| M1 | **Keep made expired food available.** `haveLot()` had `\|\| i.kept`, so after Keep Pechay, Mung Bean Stew stopped needing Pechay and *I cooked this* offered to deduct it | `haveLot()` → `lotAvailable()`, which never reads `kept`. A kept expired lot is never "have", never recommended, never in the take-out list, and stays on Shop. Its sheet says "it still does not count" (job 20) | `pantryLotAvailable()` ignores `keptOn`; `keepAttentionItem()` only writes `keptOn` |
+| M2 | **Attention lists did not match the app.** Use-soon rows offered Still good and hid when tapped; there was no Check tier | One `dateSignal()` (Expired / Check / Use soon) and one `attentionRow()`: Expired → Keep / Remove, Check → Still good / Toss, Use soon → no keep button and never hidden. A sample Check item, **Radish** (fridge, estimate passed, no printed date), shows "estimated window passed — check it", still counts as stock, and puts "Check Radish first" on Pork & Tamarind Sour Soup until Still good (job 21). The Kitchen bar reads "1 expired · 1 to check · 4 use soon" | `collectAttentionItems()` (`signal.kind !== 'use-soon' && isKeptToday(rec)`), `pantryDateSignal()`, `cookedDateSignal()`, `attentionActionRow()` (`check ? 'Still good' : 'Keep'`, `check ? 'Toss' : 'Remove'`), `lotNeedsCheck()` |
+| M3 | **Prep-day Done did not deduct ingredients** | Done opens **Move to Kitchen?** with the same take-out list as *I cooked this* (tracked amounts ticked, untracked unticked, staples never), and **Prepped — add to Kitchen** deducts, adds the servings as portions and logs history, all in one Undo (jobs 3, 22). Tap count is now +3 (§2) | `completePlannedBatch()` confirm → `completePlannedBatchNow()` → `_doMarkCooked()` → `deductIngredientsForRecipe()` |
+| S1 | **Made it on an existing batch was silent** | The sheet is titled "Replace … batch?", says **Replaces your 3 cups (2d left)** (or "no use-by date"), defaults to the existing amount and place, and the button is **Replace batch**; the toast says "Replaced …" (job 23). The batch is replaced, never merged, so the new date never makes old food look fresh | `openPrepareFlavorDialog()` ("You have N left (Fridge). Saving replaces it with a new batch.", "Replace"), `savePreparedFlavor()`, `findPreparedFlavorByFlavorId()` (D-074) |
+| S2 | **Matcher was a re-implementation** | The app's matcher is pasted verbatim with an empty alias table (§5 risk 7; job 24) | `ingredientNamesMatch()` and helpers |
+| S3 | **Deduction ran once per lot** (a `seen` set in `cookPlan()`) | `cookPlan()` walks the ingredient **lines**; two lines on the same lot both deduct, each from what the previous line left | `deductIngredientsForRecipe()` (`ingredients.forEach`, no per-lot dedupe) |
+| N1 | Shop said "2 bunch" | Count units agree with the amount: "1 bunch", "2 bunches", "1 can", "2 cans"; g, kg, ml, L, tbsp and tsp never change | — |
+
+**App finding (not fixed; the app is out of scope here).** `ingredientNamesMatch('Soy-Calamansi sauce',
+'Soy sauce')` is **true** on `origin/main`: the hyphen splits into the words soy · calamansi · sauce, the
+shorter name's words (soy, sauce) are all present, the head noun (sauce) is shared, and "calamansi" is
+not in `INGREDIENT_IDENTITY_MODIFIERS`. So a recipe that needs a made sauce counts plain soy sauce as
+"have" — a likely false positive. The prototype shows it honestly: with no Soy-Calamansi batch in the
+kitchen, Crispy Tofu, Soy-Calamansi still reads "✓ Have everything" through the Soy sauce staple. A fix
+belongs in its own reviewed app task (for example, treating a compound hyphenated modifier as identity).
+
+**Where the prototype still differs from the app, on purpose and labelled in the code:**
+
+- *Prep-aheads* (cooked rice, minced garlic…) have no record type in the app. The prototype gives them
+  the prepared-flavor shape (one batch per item, replaced in place, optional user-typed use-by). A
+  production build needs an owner decision on where they live.
+- *Prepared stock in "have"*: the app's Cook Now reads pantry lots only. The prototype also lets a
+  prepped batch satisfy a line by exact name ("Cooked rice", "Soy-Calamansi sauce"), and a batch past
+  the use-by you typed does not count. Prepared stock is **not** in the attention lists, matching
+  `collectAttentionItems()`, which scans pantry and cooked meals only.
+- *Untracked amounts in the take-out list* are shown unticked with "Used it all up?"; the app simply
+  skips them. Unticked is the app's behaviour; the tick is an addition (§9 #1).
+- *Sample data has no bought dates*, so the D-089 fridge safety limits (raw meat, poultry and seafood
+  2–3 days from purchase) are not modelled. Chicken thigh is shown at 1d left, inside its limit.

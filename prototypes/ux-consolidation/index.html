@@ -1006,7 +1006,7 @@ function renderKitchen() {
   let body = '';
   const match = x => !q || x.name.toLowerCase().includes(q);
   if (S.kfilter === 'soon') {
-    body = `<div class="card"><h3>Expired or use soon <button class="btn ghost sm more" data-act="kfilter" data-v="">Show all</button></h3>
+    body = `<div class="card"><h3>Needs attention <button class="btn ghost sm more" data-act="kfilter" data-v="">Show all</button></h3>
       <p class="row-meta" style="margin:0 0 4px">Keep (expired) and Still good (check it) hide an item until tomorrow. They never change its date, and expired food still never counts as stock.</p>
       ${att.map(attentionRow).join('') || '<div class="empty">Nothing needs attention today.</div>'}</div>`;
   } else if (q) {
