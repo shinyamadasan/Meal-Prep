@@ -285,18 +285,22 @@ test('a meat or fish name the ingredient list does not know is not given the 7-d
 
 // ── Prepared ingredients ────────────────────────────────────────────────────────────────────
 
-test('prepared ingredients take the ready-food life for their storage, never longer than the raw item, and deduct nothing', async () => {
+test('prepared ingredients: the freezer keeps the ready-food freezer life; the fridge never exceeds the raw item; nothing is deducted', async () => {
   const b = bridge();
   const pantryBefore = structuredClone(b.fake.store.fields.pantry);
   const paste = ok(await b.call('add_pantry_item', { name: 'Frozen Minced Garlic', storage: 'freezer', quantity: 200, unit: 'g', prepared: true }));
   assert.equal(paste.prepared, true);
   assert.equal(paste.item.name, 'Frozen Minced Garlic', 'name used as given');
-  assert.equal(stored(b, NEW_ID).shelfLifeDays, Math.min(READY.defaultFreezerLife, FoodSafety.categoryShelfLife('')));
+  assert.equal(stored(b, NEW_ID).shelfLifeDays, READY.defaultFreezerLife, 'frozen prepared food: ready-food freezer life, not the raw 7-day cap');
   assert.deepEqual(b.fake.store.fields.pantry.slice(0, pantryBefore.length), pantryBefore, 'raw lots untouched (D2)');
 
   const b2 = bridge();
   ok(await b2.call('add_pantry_item', { name: 'Garlic (Bawang)', storage: 'freezer', prepared: true }));
-  assert.equal(stored(b2, NEW_ID).shelfLifeDays, Math.min(READY.defaultFreezerLife, 180));
+  assert.equal(stored(b2, NEW_ID).shelfLifeDays, READY.defaultFreezerLife);
+  // A printed date keeps the min() cap (the printed date drives the verdict).
+  const b5 = bridge();
+  ok(await b5.call('add_pantry_item', { name: 'Frozen Minced Garlic', storage: 'freezer', prepared: true, printedDate: '2027-03-01' }));
+  assert.equal(stored(b5, NEW_ID).shelfLifeDays, Math.min(READY.defaultFreezerLife, FoodSafety.categoryShelfLife('')));
 
   const b3 = bridge();
   ok(await b3.call('add_pantry_item', { name: 'Chopped Onions', storage: 'fridge', prepared: true }));

@@ -633,13 +633,15 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'user said it; otherwise it is inferred from the ingredient list and the result says storageSource "inferred": tell ' +
         'the user ("stored in the fridge - say if not"). Raw meat, poultry, fish and other foods with a fridge safety limit ' +
         'are never guessed: on needs_storage or needs_bought_date ask the user (use today only if they said "today" or ' +
-        '"just bought"). A fridge lot already past its fridge safety limit is refused (past_safety_limit). On ' +
-        'unrecognized_food, ask for the ingredient\'s name as the app lists it. A prepared ingredient needs storage (fridge ' +
-        'or freezer) and gets the ready-food shelf life for that storage, never longer than the raw ingredient\'s; this tool ' +
+        '"just bought"). Those foods are never recorded on the counter (unsafe_storage), and a fridge lot already past ' +
+        'its fridge safety limit is refused (past_safety_limit). On unrecognized_food, ask for the ingredient\'s name as ' +
+        'the app lists it. A prepared ingredient needs storage (fridge or freezer); in the freezer it gets the ready-food ' +
+        'freezer life, in the fridge the ready-food fridge life never longer than the raw ingredient\'s; this tool ' +
         'does NOT deduct the raw ingredients used. printedDate is the date printed on the pack (printedDateKind "use-by", ' +
         'the default, or "best-before"). staple: true makes it a staple tracked by level (default "full"). If the same ' +
         'item with the same bought date and storage is already recorded, the result is ambiguous with its ingredientId: ' +
-        'ask the user, then use add_stock on that lot or call again with confirmNewLot: true and a new requestId. Never ' +
+        'ask the user, then use add_stock on that lot or call again with confirmNewLot: true and a new requestId (when ' +
+        'either lot has a printed date, only confirmNewLot is offered; a different printed date is a new lot). Never ' +
         'register items the user did not mention. State back the stored name, amount, storage, bought date, printed date ' +
         'and safety label from the result. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
         'whether to retry.' + REQUEST_ID_TEXT,
@@ -666,8 +668,14 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'get_inventory (never guess or fuzzy-match; ask which row if several match). storage is fridge, freezer or ' +
         'counter; boughtDate is the bought day (not in the future); printedDate is the date printed on the pack (null ' +
         'clears it; a new printed date counts as use-by unless printedDateKind "best-before" is sent). Moving raw meat, ' +
-        'poultry or fish from the freezer to the fridge needs the thaw day: on needs_thaw_date remind the user that fridge ' +
-        'time counts from thawing, then send thawedToday: true if it moved today, or boughtDate as the day it moved. Name, ' +
+        'poultry or fish (or a frozen lot with a freezer shelf life, such as a frozen prepared ingredient) from the ' +
+        'freezer to the fridge needs the thaw day: on needs_thaw_date remind the user that fridge time counts from ' +
+        'thawing, then send thawedToday: true if it moved today, or boughtDate as the day it moved. For raw meat, poultry ' +
+        'or fish an edit never makes the food read safer: it is never moved to the counter (unsafe_storage), never moved ' +
+        'out of the fridge once past its fridge limit or with no known bought date (past_safety_limit, ' +
+        'unknown_bought_date: freezing does not make it safe again), and its bought date only moves earlier except when ' +
+        'thawing (later_bought_date); a name the app\'s list does not know is never moved into the fridge ' +
+        '(unrecognized_food). On those refusals tell the user and ask them to check the item in the app. Name, ' +
         'amount, staple flag and level are not changed here. unchanged: true means nothing needed changing. On ' +
         'invalid_record, ask the user to check the item in the app. Tell the user the new safety label from the result. ' +
         'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,
