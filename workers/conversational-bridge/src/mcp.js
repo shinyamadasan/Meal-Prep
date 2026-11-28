@@ -497,7 +497,7 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'one item per call. Without makeStaple a presence item is refused as presence_only: ask the user whether it ' +
         'is a staple or how much they have (for an amount, use set_inventory_quantity with unit). An item with ' +
         'tracking "quantity" keeps its count and is refused as quantity_tracked, with or without makeStaple. A ' +
-        'conversion that would change or remove the item's food-safety check is refused as unsafe_conversion: keep ' +
+        'conversion that would change or remove its food-safety check is refused as unsafe_conversion: keep ' +
         'the item as it is and ask the user to check it in the app. Take ' +
         'ingredientId ONLY from get_inventory; never guess or fuzzy-match, and ask which row if several match. On ' +
         'invalid_record, ask the user to check the item in the app. undo_request can put back a change. Requires ' +
