@@ -4,6 +4,18 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-102 (test-only: pin the clock in tombstone-namespace.spec.js) — APPROVED (held) — Claude, 2026-11-27
+branch `task-102-tombstone-fixture-date` @ `1d29be2` (base `4ccc930`). Independent reviewer: PASS, no must-fix.
+- Cause confirmed: with the old spec the round-trip test fails today (1 failed / 21 passed); with the branch, 22/22.
+- `page.clock.setFixedTime` runs in the file-level `beforeEach` before `addInitScript` and every page load
+  (`loadLocalApp`, `loadSignedIn`, same-page `reload`), so `purgeOldTombstones()` reads 2026-08-15. Timers
+  still run; no wait depends on page `Date.now()`. No assertion changed; no app file changed.
+- Full `npm test` on the branch: 905/905 (the 912 figure elsewhere is from the PROP-041 branches, which add bridge-parity specs).
+- Watch list (not broken today): `prepared-flavors.spec.js` sign-in-union tombstone 2026-08-20 (≈2027-02-16);
+  `fridge-prepared-flavors.spec.js` "earlier expiry lists first" (`expiresAt` 2026-12-01, unverified after 2026-12-02).
+Gate: `approved` (held), not `done` — the change is reversible, but `done` auto-merges to `main` (D-027) and the
+owner's current instruction is no merge without approval.
+
 ## Review TASK-097 (PROP-041 P2-0a staple parity) — APPROVED (held) — Claude, 2026-11-27
 
 Builder: Claude (standing in for Codex, usage limit until 2026-11-29) — `9f0d77c`. Independent

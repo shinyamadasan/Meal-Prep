@@ -7202,6 +7202,25 @@ constraints: Bridge only (`workers/conversational-bridge`): no `app.js`, `shared
 verification: `node --check` on changed files and `npm run test:bridge` before every commit; then
   `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
 
+### TASK-102 · Test-only: pin the clock in `tombstone-namespace.spec.js`
+status: approved
+owner: Claude (trivial test-fixture fix, autonomous run 2026-11-27) · independent review
+risk: Low (test file only; no app, shared or Worker code)
+source: gate failure found while verifying TASK-098 (911/912 on every branch, including `main`)
+branch: `task-102-tombstone-fixture-date` from `main`
+files: `tests/tombstone-namespace.spec.js`; TASKS.md; CHANGELOG.md; TEST_REPORT.md.
+objective: `npm test` is green again without weakening any assertion. The spec's fixture tombstone
+  (`TOMB` 2026-06-01) is older than the app's 180-day `purgeOldTombstones()` window once the real
+  date passes 2026-11-28 UTC, so "Firestore payload and load round-trip namespaced tombstones"
+  started failing on the calendar, not on a code change.
+acceptance:
+  - [x] `beforeEach` pins the page clock (`page.clock.setFixedTime('2026-08-15T12:00:00Z')`) inside
+        the fixtures' window, before the init script; no assertion changed.
+  - [x] `tests/tombstone-namespace.spec.js` 22/22 on `--project=local`.
+constraints: Test file only. Do not change `purgeOldTombstones()` or its 180-day window.
+verification: `npx playwright test tests/tombstone-namespace.spec.js --project=local`; `npm test`;
+  `git diff --check`.
+
 <!-- Paste new tasks above this line. Oldest/done tasks sink to the bottom. -->
 
 ### TASK-076 · MCP conversational stock consumption — `consume_stock`
