@@ -5,6 +5,49 @@
 
 ---
 
+## TASK-099 — STRICT review fixes (branch: task-099-register-edit; on 42a2c19)
+Builder: Claude sub-agent standing in for Codex. Fixes every must-fix (M1, M2a-d) and should-fix
+(1-5) of the failed independent STRICT review. Bridge only: no `app.js`, `shared/`, ledger,
+`index.html` or stored-shape change. Every new refusal throws before the commit (zero writes, no
+request record, `requestId` unspent).
+- **M1 (unknown protein into the fridge by an edit).** `updatePantryItem()` runs the add path's
+  `unrecognized_food` check on every move INTO the fridge (freezer, counter or unknown place ->
+  fridge), even with `thawedToday` / a thaw `boughtDate`. Lots stored the old way (category `''`,
+  e.g. the reviewer's "Chicken Thighs") are refused; new adds of such names now get Protein (should-
+  fix 4) and carry the 2-day poultry limit after thawing.
+- **M2a.** `unsafe_storage`: a safety lot (`needsStatedStorage`: shared fridge-safety lot or unknown
+  meat/fish name) is refused on the counter in `add_pantry_item` (before the date checks, so
+  counter no longer skips `past_safety_limit`) and in `update_pantry_item` (moved to, or edited
+  while left on, the counter).
+- **M2b.** A safety lot leaving the fridge (or counter / unknown place) for the freezer is refused
+  while past its fridge limit (`past_safety_limit`) or with no known bought date
+  (`unknown_bought_date`), checked on both the stored and the corrected date. New `fridgeClock()`
+  uses the name-matched rule for names the shared limits cannot place.
+- **M2c.** `later_bought_date`: a safety lot's `boughtDate` may only move earlier (and is not set
+  when the stored date is unknown -> `unknown_bought_date`); the one exception is leaving the
+  freezer for the fridge with `thawedToday` or a thaw `boughtDate`.
+- **M2d.** Every new refusal message tells chat to ask the user to check the item in the app.
+- **SF1.** Prepared lots in the freezer with no printed date get `defaultFreezerLife` (no raw cap);
+  fridge prepared lots and printed-date lots keep the `min()` cap. On freezer -> fridge, any lot
+  whose `shelfLifeDays` exceeds its fridge life (`fridgeLifeFor()`: bridge-prepared signature ->
+  `min(defaultFridgeLife, raw)`, else exact-name DB / category life) needs the thaw day
+  (`needs_thaw_date`) and is capped; such a lot is not moved to the counter. `shelfLifeDays` added
+  to `EDITED_FIELDS` (undo restores it). Test that expected `min(90, 7)` updated.
+- **SF2.** Duplicate guard compares printed dates: different printed dates (incl. one missing) are
+  different lots; same-date printed twins are `ambiguous` offering only `confirmNewLot`.
+- **SF3.** `NAME_ONLY_FALSE_FRIENDS` (cheese, mushroom, sauce, lettuce, palm, mayo, balls,
+  artichoke, dressing, paste, broth, stock, buns, bread, milk...) on the unknown-name path only;
+  the eight reviewer examples pass in the fridge. `NAME_ONLY_GROUND` adds `giniling`, `hamburger`,
+  `stew meat` (not "minced"). Neutral wording in `needs_storage` / `needs_bought_date`.
+- **SF4.** `categoryFor()`: exact name -> exact alias (`stockIngredientEntry`) -> the app's loose
+  `inferCategory()` match only when it yields Protein for a name that reads as raw meat/poultry/fish
+  (stricter only) -> `''`.
+- **SF5.** README TASK-099 section rewritten (incl. Known gaps: fish species and cured meats missing
+  from the shared regex; "prepared" not stored); `add_pantry_item` / `update_pantry_item` tool
+  descriptions name every new refusal code.
+- Files: `src/operations/pantryItems.js`, `src/mcp.js`, `test/mcp-pantry-items.node.js`,
+  `README.md`.
+
 ## TASK-099 — implementation complete (branch: task-099-register-edit; base: prop041-p2 99a4bce)
 Builder: Claude sub-agent standing in for Codex. PROP-041 P2-1 + P2-2 (owner decisions D2-D3). Bridge only:
 no `app.js`, `shared/`, `index.html` or stored-shape change.

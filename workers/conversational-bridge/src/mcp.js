@@ -628,18 +628,23 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
       description: 'Register ONE new pantry lot the user explicitly asked to record: a grocery purchase, or (prepared: true) a ' +
         'prepared ingredient such as frozen minced garlic or chopped onions. It creates a new record the same way the app\'s ' +
         'own Add does and never changes an existing lot (to add to an existing lot use add_stock). name is used exactly as ' +
-        'given; the app\'s ingredient list (exact name) supplies category, shelf life, default unit and the staple flag. ' +
+        'given; the app\'s ingredient list (exact name) supplies shelf life, default unit and the staple flag, and the ' +
+        'category (exact name or alias). ' +
         'boughtDate defaults to today on the household calendar; a future boughtDate is refused. storage: send it when the ' +
         'user said it; otherwise it is inferred from the ingredient list and the result says storageSource "inferred": tell ' +
-        'the user ("stored in the fridge - say if not"). Raw meat, poultry, fish and other foods with a fridge safety limit ' +
-        'are never guessed: on needs_storage or needs_bought_date ask the user (use today only if they said "today" or ' +
-        '"just bought"). A fridge lot already past its fridge safety limit is refused (past_safety_limit). On ' +
-        'unrecognized_food, ask for the ingredient\'s name as the app lists it. A prepared ingredient needs storage (fridge ' +
-        'or freezer) and gets the ready-food shelf life for that storage, never longer than the raw ingredient\'s; this tool ' +
+        'the user ("stored in the fridge - say if not"). For raw meat, poultry, fish, other foods with a fridge safety limit ' +
+        'and foods the bridge cannot classify, storage and bought date are never guessed: on needs_storage or ' +
+        'needs_bought_date ask the user (use today only if they said "today" or "just bought"); they are never kept on the ' +
+        'counter (unsafe_storage). A fridge lot already past its fridge safety limit is refused (past_safety_limit). On ' +
+        'unrecognized_food or unsafe_storage, ask for the ingredient\'s name as the app lists it, or ask the user to check ' +
+        'the item in the app. A prepared ingredient needs storage (fridge or freezer); in the freezer with no printed date ' +
+        'it gets the ready-food freezer life, in the fridge the ready-food fridge life, never longer than the raw ' +
+        'ingredient\'s; this tool ' +
         'does NOT deduct the raw ingredients used. printedDate is the date printed on the pack (printedDateKind "use-by", ' +
         'the default, or "best-before"). staple: true makes it a staple tracked by level (default "full"). If the same ' +
-        'item with the same bought date and storage is already recorded, the result is ambiguous with its ingredientId: ' +
-        'ask the user, then use add_stock on that lot or call again with confirmNewLot: true and a new requestId. Never ' +
+        'item with the same bought date, storage and printed date is already recorded, the result is ambiguous with its ' +
+        'ingredientId: ask the user, then use add_stock on that lot (offered only when neither lot has a printed date) or ' +
+        'call again with confirmNewLot: true and a new requestId. A different printed date is a new lot. Never ' +
         'register items the user did not mention. State back the stored name, amount, storage, bought date, printed date ' +
         'and safety label from the result. Requires expectedRevision; on revision_conflict, re-read before deciding ' +
         'whether to retry.' + REQUEST_ID_TEXT,
@@ -666,8 +671,15 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'get_inventory (never guess or fuzzy-match; ask which row if several match). storage is fridge, freezer or ' +
         'counter; boughtDate is the bought day (not in the future); printedDate is the date printed on the pack (null ' +
         'clears it; a new printed date counts as use-by unless printedDateKind "best-before" is sent). Moving raw meat, ' +
-        'poultry or fish from the freezer to the fridge needs the thaw day: on needs_thaw_date remind the user that fridge ' +
-        'time counts from thawing, then send thawedToday: true if it moved today, or boughtDate as the day it moved. Name, ' +
+        'poultry or fish, or a frozen prepared ingredient (any lot whose freezer shelf life is longer than its fridge life), ' +
+        'from the freezer to the fridge needs the thaw day: on needs_thaw_date remind the user that fridge time counts from ' +
+        'thawing, then send thawedToday: true if it moved today, or boughtDate as the day it moved; a freezer shelf life is ' +
+        'capped at the fridge life. Food safety refusals (raw meat, poultry, fish or a food the bridge cannot classify): ' +
+        'unsafe_storage (never the counter), past_safety_limit or unknown_bought_date (a lot past its fridge limit, or with ' +
+        'no known bought date, is not moved to the freezer: freezing does not make it safe again), later_bought_date (its ' +
+        'bought date may only move earlier, except the thaw day when leaving the freezer for the fridge), ' +
+        'unrecognized_food (a name the app does not list never moves into the fridge). On any of these, tell the user and ' +
+        'ask them to check the item in the app; never retry with a different date to get past it. Name, ' +
         'amount, staple flag and level are not changed here. unchanged: true means nothing needed changing. On ' +
         'invalid_record, ask the user to check the item in the app. Tell the user the new safety label from the result. ' +
         'Requires expectedRevision; on revision_conflict, re-read before deciding whether to retry.' + REQUEST_ID_TEXT,

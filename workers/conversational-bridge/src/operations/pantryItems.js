@@ -2,17 +2,21 @@
 // (TASK-099, PROP-041 P2-1 + P2-2; owner decisions D2-D3, D-092).
 //
 // add_pantry_item builds exactly the record the app's own Add paths build (app.js addToPantry() and
-// the grocery `buy_` path in stockPurchasedGroceryItem()): id `buy_<ms>_<rand5>`, exact-name
-// INGREDIENT_DB category / shelf life / unit / staple flag, purchaseDate = household day, storage,
-// quantity, printed date. Only the shared rules (shared/foodSafety.js, MealPrepFoodSafety) and the
-// shared ready-food contract are used; no app-only table (PANTRY_KNOWLEDGE, the loose inferCategory
-// match) is copied, so a name the shared data cannot place is asked about, never guessed.
+// the grocery `buy_` path in stockPurchasedGroceryItem()): id `buy_<ms>_<rand5>`, INGREDIENT_DB
+// category (exact name, else exact alias, else the app's loose match only when it gives Protein to a
+// name that reads as raw meat, poultry or fish), exact-name shelf life / unit / staple flag,
+// purchaseDate = household day, storage, quantity, printed date. Only the shared rules
+// (shared/foodSafety.js, MealPrepFoodSafety) and the shared ready-food contract are used; no
+// app-only table (PANTRY_KNOWLEDGE) is copied, so a name the shared data cannot place is asked
+// about, never guessed.
 //
-// Raw meat, poultry and fish never get an invented storage or date (D3): a lot the shared fridge
-// safety rules cover must name its storage and its bought date, and a fridge lot already past its fridge limit on the
-// day it was bought is refused. A same-name lot with the same bought day and storage is `ambiguous`
-// (add_stock to it, or confirm a new lot); a different day or storage is always a new lot, so two
-// safety clocks are never merged.
+// Raw meat, poultry and fish (and a meat or fish name the ingredient list does not know) never get
+// an invented storage or date and never go on the counter (D3): such a lot must name its storage
+// (fridge or freezer) and its bought date, and a fridge lot already past its fridge limit on the day
+// it was bought is refused. A same-name lot with the same bought day, storage and printed date is
+// `ambiguous` (add_stock to it when neither has a printed date, or confirm a new lot); anything else
+// is a new lot, so two safety clocks are never merged. update_pantry_item never lets an edit make
+// such a lot read safer than it is (see updatePantryItem).
 //
 // Pure: no Firestore, no clock (callers pass the household day, the time and a random source).
 import { AmbiguousError, NotFoundError, ValidationError } from '../errors.js';
@@ -31,9 +35,22 @@ export const MAX_NAME_LENGTH = 200;
 export const MAX_UNIT_LENGTH = 40;
 
 // Fridge safety classes the name alone can show for a name INGREDIENT_DB does not know (see
-// unrecognizedSafetyFood). 'ground' is left out on purpose: it matches "minced", which would catch
-// minced garlic and other prepared vegetables; ground meat names carry a meat word as well.
+// unrecognizedSafetyFood). The shared 'ground' rule is left out on purpose: it matches "minced",
+// which would catch minced garlic and other prepared vegetables. Its meat-only words are matched
+// by NAME_ONLY_GROUND instead.
 const NAME_ONLY_CLASSES = ['raw-sausage', 'variety', 'poultry', 'seafood', 'whole-cut'];
+const NAME_ONLY_GROUND = { safetyClass: 'ground', days: 2, match: /\b(?:giniling|hamburgers?|stew[ -]+meats?)\b/i };
+
+// Words that make a meat or fish word part of a non-meat food ("Goat cheese", "Lamb's lettuce",
+// "Steak sauce", "Oyster mushrooms", "Tuna mayo", "Fish balls", "Artichoke hearts", "Hearts of
+// palm", "Hamburger buns"). Used ONLY for names INGREDIENT_DB does not know; the shared rules for
+// known names are untouched.
+const NAME_ONLY_FALSE_FRIENDS = new RegExp('\\b(?:' + [
+  'cheeses?', 'mushrooms?', 'sauces?', 'lettuces?', 'palms?', 'mayo', 'mayonnaise', 'balls?', 'artichokes?',
+  'dressings?', 'pastes?', 'broths?', 'stocks?', 'bouillon', 'cubes?', 'seasonings?', 'flavou?r(?:ed|ing)?s?',
+  'chips?', 'crackers?', 'crisps?', 'noodles?', 'ramen', 'oils?', 'ketchup', 'gravy', 'marinades?', 'rubs?',
+  'buns?', 'breads?', 'milk', 'yogh?urts?', 'creams?', 'butter'
+].join('|') + ')\\b', 'i');
 
 function dbEntryByExactName(name) {
   const n = name.toLowerCase().trim();
@@ -56,22 +73,92 @@ function fridgeRuleFor(record, today) {
   return FoodSafety.pantryFridgeSafety(Object.assign({}, record, { storage: 'fridge' }), today);
 }
 
-// A name INGREDIENT_DB does not know (by name or alias) gets category '', and the shared fridge
-// limits only apply to category Protein, so "venison steak" or "squid rings" would get the 7-day
-// default instead of their 2-3 day limit. When the name alone matches a raw meat, poultry or fish
-// rule, say so instead of storing a clock that is too long.
-function unrecognizedSafetyFood(name) {
-  const n = name.trim().toLowerCase();
-  if (FoodSafety.stockIngredientEntry(n)) return null;
-  if (FoodSafety.FRIDGE_SAFETY_EXCLUSIONS.test(n)) return null;
+// A name INGREDIENT_DB does not know (by name or alias) gets no Protein category, and the shared
+// fridge limits only apply to category Protein, so "venison steak" or "squid rings" would get the
+// 7-day default instead of their 2-3 day limit. Returns the raw meat, poultry or fish rule the name
+// alone matches, or null.
+function unrecognizedSafetyRule(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n || FoodSafety.stockIngredientEntry(n)) return null;
+  if (FoodSafety.FRIDGE_SAFETY_EXCLUSIONS.test(n) || NAME_ONLY_FALSE_FRIENDS.test(n)) return null;
   const rule = FoodSafety.FRIDGE_SAFETY_LIMITS.find((candidate) =>
     NAME_ONLY_CLASSES.includes(candidate.safetyClass) && candidate.match.test(n) && !(candidate.exclude && candidate.exclude.test(n)));
+  if (rule) return rule;
+  return NAME_ONLY_GROUND.match.test(n) ? NAME_ONLY_GROUND : null;
+}
+
+function unrecognizedSafetyFood(name) {
+  const rule = unrecognizedSafetyRule(name);
   return rule ? rule.safetyClass : null;
 }
 
-// Raw meat, poultry, fish (and the other shared fridge safety classes): storage must be stated.
+// Category for a new lot. Exact INGREDIENT_DB name first, then an exact alias (the shared
+// stockIngredientEntry), so "chicken fillet" is stored as Protein and the app's Kitchen card applies
+// the poultry limit. The app's own inferCategory() also takes a loose substring match ("chicken
+// thighs" -> Chicken Thigh, but also "egg" -> Eggplant); that loose match is used here only where it
+// is stricter: it yields Protein for a name that already reads as raw meat, poultry or fish.
+function appLooseCategory(name) {
+  const n = name.toLowerCase();
+  const loose = FoodSafety.INGREDIENT_DB.find((i) => {
+    const x = i.name.toLowerCase();
+    return x.includes(n) || n.includes(x);
+  });
+  return loose ? loose.category : '';
+}
+
+function categoryFor(name) {
+  const entry = FoodSafety.stockIngredientEntry(name.toLowerCase().trim());
+  if (entry) return entry.category || '';
+  if (unrecognizedSafetyRule(name) && String(appLooseCategory(name)).toLowerCase() === 'protein') return appLooseCategory(name);
+  return '';
+}
+
+// Raw meat, poultry, fish (and the other shared fridge safety classes, plus a meat or fish name the
+// ingredient list does not know): storage and bought date must be stated, and never the counter.
 function needsStatedStorage(record, today) {
   return fridgeRuleFor(record, today) != null || unrecognizedSafetyFood(record.name) != null;
+}
+
+// The fridge clock of a lot as if it sat in the fridge: the shared rule, else (a name the ingredient
+// list does not know) the rule its name matches. daysLeft null = the bought date is unknown.
+function fridgeClock(record, today) {
+  const shared = fridgeRuleFor(record, today);
+  if (shared) return shared;
+  const rule = unrecognizedSafetyRule(record.name);
+  if (!rule) return null;
+  const bought = isCalendarDay(record.purchaseDate) ? FoodSafety.stockCalendarDay(record.purchaseDate) : null;
+  return {
+    daysLeft: bought == null ? null : bought + rule.days - FoodSafety.stockCalendarDay(today),
+    limitDays: rule.days,
+    safetyClass: rule.safetyClass
+  };
+}
+
+// The fridge shelf life of a lot leaving the freezer. A bridge-prepared frozen lot carries the
+// ready-food freezer life; in the fridge it gets the ready-food fridge life (never longer than the
+// raw item's). Any other lot gets the app's ingredientShelfLife() (exact-name DB value, else the
+// category default).
+function fridgeLifeFor(record) {
+  const raw = rawShelfLife(dbEntryByExactName(String(record.name || '')), record.category);
+  if (record.shelfLifeDays === READY_FOOD_CONTRACT.defaultFreezerLife && raw < READY_FOOD_CONTRACT.defaultFreezerLife) {
+    return Math.min(READY_FOOD_CONTRACT.defaultFridgeLife, raw);
+  }
+  return raw;
+}
+
+const CHECK_IN_APP = 'Ask the user to check the item in the app.';
+
+function unsafeCounterError(name) {
+  return new ValidationError('unsafe_storage: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+    'classify, so it is not recorded on the counter (it needs the fridge or the freezer). ' + CHECK_IN_APP,
+  { field: 'storage', code: 'unsafe_storage' });
+}
+
+function unrecognizedFoodError(name, unknownFood) {
+  return new ValidationError('unrecognized_food: "' + name + '" looks like ' + unknownFood + ' food, but it is not in the app\'s ' +
+    'ingredient list under that name, so its fridge safety limit cannot be applied. Use the ingredient\'s name as the app ' +
+    'lists it (for example "Salmon", "Chicken Breast", "Pork Chop"), or ask the user to check the item in the app.',
+  { field: 'name', code: 'unrecognized_food' });
 }
 
 function sameText(a, b) {
@@ -167,17 +254,18 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   const name = validateAddPantryItemArgs(args, today);
   if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new Error('A finite clock is required.');
   const entry = dbEntryByExactName(name);
-  const category = entry ? entry.category : '';
+  const category = categoryFor(name);
   const purchaseDate = args.boughtDate !== undefined ? args.boughtDate : today;
   const probe = { name, category, purchaseDate };
+  const safetyLot = needsStatedStorage(probe, today);
 
   let storage = args.storage;
   let storageSource = 'given';
   if (storage === undefined) {
-    if (needsStatedStorage(probe, today)) {
-      throw new ValidationError('needs_storage: "' + name + '" is raw meat, poultry, fish or another food with a fridge safety limit, ' +
-        'so its storage is never guessed. Ask the user whether it is in the fridge or the freezer, and send storage.',
-        { field: 'storage', code: 'needs_storage' });
+    if (safetyLot) {
+      throw new ValidationError('needs_storage: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+        'classify, so its storage is never guessed. Ask the user whether it is in the fridge or the freezer, and send storage.',
+      { field: 'storage', code: 'needs_storage' });
     }
     storage = effectiveStorage({ name });
     storageSource = 'inferred';
@@ -186,20 +274,17 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
         'whether it is in the fridge, the freezer or on the counter, and send storage.', { field: 'storage', code: 'needs_storage' });
     }
   }
+  if (storage === 'counter' && safetyLot) throw unsafeCounterError(name);
 
-  if (args.boughtDate === undefined && needsStatedStorage(probe, today)) {
-    throw new ValidationError('needs_bought_date: "' + name + '" is raw meat, poultry, fish or another food with a fridge safety limit, ' +
-      'so its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use today only ' +
-      'if they said "today" or "just bought".', { field: 'boughtDate', code: 'needs_bought_date' });
+  if (args.boughtDate === undefined && safetyLot) {
+    throw new ValidationError('needs_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+      'classify, so its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use ' +
+      'today only if they said "today" or "just bought".', { field: 'boughtDate', code: 'needs_bought_date' });
   }
 
   if (storage === 'fridge') {
     const unknownFood = unrecognizedSafetyFood(name);
-    if (unknownFood && fridgeRuleFor(probe, today) == null) {
-      throw new ValidationError('unrecognized_food: "' + name + '" looks like ' + unknownFood + ' food, but it is not in the app\'s ' +
-        'ingredient list under that name, so its fridge safety limit cannot be applied. Use the ingredient\'s name as the app ' +
-        'lists it (for example "Salmon", "Chicken Breast", "Pork Chop"), or add it in the app.', { field: 'name', code: 'unrecognized_food' });
-    }
+    if (unknownFood && fridgeRuleFor(probe, today) == null) throw unrecognizedFoodError(name, unknownFood);
     const fridge = fridgeRuleFor(probe, today);
     if (fridge && fridge.daysLeft != null && fridge.daysLeft < 0) {
       throw new ValidationError('past_safety_limit: "' + name + '" bought on ' + purchaseDate + ' is past its ' + fridge.limitDays +
@@ -210,8 +295,11 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
 
   let shelfLifeDays = rawShelfLife(entry, category);
   if (args.prepared === true) {
-    // Ready-food default life for this storage, never longer than the raw item's own life.
-    shelfLifeDays = Math.min(readyFoodLife(storage), shelfLifeDays);
+    // Frozen prepared food with no printed date keeps the ready-food freezer life (freezing is what
+    // makes it last; the raw item's fridge life does not apply). In the fridge, and whenever a printed
+    // date is given, the ready-food life is never longer than the raw item's own life.
+    if (storage === 'freezer' && args.printedDate === undefined) shelfLifeDays = readyFoodLife('freezer');
+    else shelfLifeDays = Math.min(readyFoodLife(storage), shelfLifeDays);
   }
 
   let staple;
@@ -243,14 +331,22 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   record.updatedAt = new Date(nowMs).toISOString();
 
   if (args.confirmNewLot !== true) {
+    // Lots with different printed dates are different lots. A printed-date lot is never merged by
+    // add_stock (it has no printed-date input), so only a separate lot is offered then.
+    const newPrinted = args.printedDate !== undefined ? args.printedDate : null;
     const twins = (pantry || []).filter((p) => isStoredRecord(p) && readableId(p.id) && sameText(p.name, name) &&
-      p.purchaseDate === purchaseDate && effectiveStorage(p) === storage &&
+      p.purchaseDate === purchaseDate && effectiveStorage(p) === storage && printedDateOf(p) === newPrinted &&
       !(deletionsPantry && Object.hasOwn(deletionsPantry, String(p.id))));
     if (twins.length) {
       const ids = twins.map((p) => '"' + String(p.id) + '"').join(', ');
-      throw new AmbiguousError('"' + name + '" bought ' + purchaseDate + ' and stored in the ' + storage + ' is already recorded (ingredientId ' + ids +
-        '). Ask the user which they mean: 1) more of that same lot -> add_stock with that ingredientId; or 2) a separate lot -> call ' +
-        'add_pantry_item again with confirmNewLot: true (and a new requestId).', { field: 'name', code: 'ambiguous', existing: twins.map((p) => String(p.id)) });
+      const where = '"' + name + '" bought ' + purchaseDate + ' and stored in the ' + storage +
+        (newPrinted ? ' with printed date ' + newPrinted : '') + ' is already recorded (ingredientId ' + ids + '). ';
+      const message = newPrinted
+        ? where + 'Ask the user whether this is a separate lot; if so, call add_pantry_item again with confirmNewLot: true (and a ' +
+          'new requestId). add_stock cannot be used for a lot with a printed date.'
+        : where + 'Ask the user which they mean: 1) more of that same lot -> add_stock with that ingredientId; or 2) a separate lot ' +
+          '-> call add_pantry_item again with confirmNewLot: true (and a new requestId).';
+      throw new AmbiguousError(message, { field: 'name', code: 'ambiguous', existing: twins.map((p) => String(p.id)) });
     }
   }
 
@@ -260,6 +356,11 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
     item: readBackItem(record, today),
     storageSource
   };
+}
+
+// The printed date a lot is tracked by, or null.
+function printedDateOf(p) {
+  return p.dateMode === 'expiry' && typeof p.expiryDate === 'string' && p.expiryDate ? p.expiryDate : null;
 }
 
 // Everything update_pantry_item can check without the stored document.
@@ -290,10 +391,32 @@ export function validateUpdatePantryItemArgs(args, today) {
   }
 }
 
-const EDITED_FIELDS = ['storage', 'purchaseDate', 'expiryDate', 'dateMode', 'printedDateKind'];
+const EDITED_FIELDS = ['storage', 'purchaseDate', 'expiryDate', 'dateMode', 'printedDateKind', 'shelfLifeDays'];
+
+function pastLimitError(name, clock, when) {
+  if (clock.daysLeft == null) {
+    return new ValidationError('unknown_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+      'classify, and its bought date is not known, so ' + when + ' cannot be done from chat. ' + CHECK_IN_APP,
+    { field: 'boughtDate', code: 'unknown_bought_date' });
+  }
+  return new ValidationError('past_safety_limit: "' + name + '" is past its ' + clock.limitDays + '-day fridge safety limit (' +
+    clock.safetyClass + '), so ' + when + ' is refused: freezing or moving it does not make it safe again. Tell the user it should ' +
+    'not be eaten. ' + CHECK_IN_APP, { field: 'storage', code: 'past_safety_limit' });
+}
 
 // update_pantry_item: correct storage and dates of one existing lot. Never changes name, amount,
 // staple flag or level. Returns unchanged:true (no write) when the values already match.
+//
+// Food safety (D3): an edit never makes raw meat, poultry or fish (or a meat or fish name the
+// ingredient list does not know) read safer than it is:
+//   - it never goes on the counter (unsafe_storage);
+//   - it never leaves the fridge (or the counter) for the freezer while past its fridge limit or with
+//     no known bought date (past_safety_limit / unknown_bought_date);
+//   - its bought date only moves earlier, except when it leaves the freezer for the fridge with the
+//     thaw day (thawedToday or boughtDate), which restarts the fridge clock (later_bought_date);
+//   - a name the shared rules cannot place never moves into the fridge (unrecognized_food).
+// Any lot leaving the freezer for the fridge with a shelf life longer than its fridge life (a frozen
+// prepared ingredient) needs the thaw day too, and its shelf life is capped at the fridge life.
 export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }) {
   validateUpdatePantryItemArgs(args, today);
   if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new Error('A finite clock is required.');
@@ -309,24 +432,73 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
     throw new ValidationError('invalid_record: ingredientId "' + ingredientId + '" could not be read safely, so it cannot be changed ' +
       'from chat. Ask the user to check it in the app.', { field: 'ingredientId', code: 'invalid_record' });
   }
+  const name = record.name;
 
   const next = Object.assign({}, record);
   if (args.storage !== undefined) next.storage = args.storage;
-  const wasFrozen = effectiveStorage(record) === 'freezer';
-  const thawing = wasFrozen && next.storage === 'fridge' && needsStatedStorage(record, today);
-  if (thawing && args.thawedToday !== true && args.boughtDate === undefined) {
-    throw new ValidationError('needs_thaw_date: thaw reminder - "' + record.name + '" is raw meat, poultry, fish or another food with a ' +
-      'fridge safety limit; moved from the freezer to the fridge, its fridge time counts from the day it thawed, not the day it was ' +
-      'bought. Ask the user: if it moved to the fridge today, send thawedToday: true; otherwise send boughtDate as the day it moved.',
+  const fromStorage = effectiveStorage(record);
+  const toStorage = effectiveStorage(next);
+  const wasFrozen = fromStorage === 'freezer';
+  const safetyLot = needsStatedStorage(record, today);
+  const leavesFreezerForFridge = wasFrozen && toStorage === 'fridge';
+  const thawDateGiven = args.thawedToday === true || args.boughtDate !== undefined;
+
+  if (args.thawedToday === true && !wasFrozen) {
+    throw new ValidationError('thawedToday is only for an item that was in the freezer; "' + name + '" is not recorded in the freezer.', { field: 'thawedToday' });
+  }
+  if (args.thawedToday === true) next.purchaseDate = today;
+  if (args.boughtDate !== undefined) next.purchaseDate = args.boughtDate;
+
+  // Unknown raw meat, poultry or fish never enters the fridge without its limit (same as add).
+  const unknownFood = unrecognizedSafetyFood(name);
+  if (toStorage === 'fridge' && fromStorage !== 'fridge' && unknownFood && fridgeRuleFor(next, today) == null) {
+    throw unrecognizedFoodError(name, unknownFood);
+  }
+  if (safetyLot && toStorage === 'counter') throw unsafeCounterError(name);
+
+  // Leaving the fridge (or the counter, or an unknown place) for the freezer: freezing does not make
+  // past-limit food safe again, and an unknown bought date cannot show it is within its limit.
+  if (safetyLot && toStorage === 'freezer' && fromStorage !== 'freezer') {
+    for (const lot of [record, next]) {
+      const clock = fridgeClock(lot, today);
+      if (clock && (clock.daysLeft == null || clock.daysLeft < 0)) throw pastLimitError(name, clock, 'moving it to the freezer');
+    }
+  }
+
+  // A fridge-safety lot's bought date only moves earlier (a later date would hide used-up fridge
+  // time), except the thaw restart when it leaves the freezer for the fridge.
+  if (safetyLot && next.purchaseDate !== record.purchaseDate && !(leavesFreezerForFridge && thawDateGiven)) {
+    if (!isCalendarDay(record.purchaseDate)) {
+      throw pastLimitError(name, { daysLeft: null }, 'setting its bought date');
+    }
+    if (next.purchaseDate > record.purchaseDate) {
+      throw new ValidationError('later_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+        'classify; its bought date (' + record.purchaseDate + ') can only be corrected to an earlier day from chat, because a later ' +
+        'day would hide fridge time it already used. The only exception is thawing: moving it from the freezer to the fridge with ' +
+        'thawedToday or the day it moved. ' + CHECK_IN_APP, { field: 'boughtDate', code: 'later_bought_date' });
+    }
+  }
+
+  // Leaving the freezer: a shelf life longer than the fridge life (a frozen prepared ingredient)
+  // does not carry over.
+  const fridgeLife = fridgeLifeFor(record);
+  const longLife = wasFrozen && Number.isFinite(record.shelfLifeDays) && record.shelfLifeDays > fridgeLife;
+  if (longLife && toStorage === 'counter') {
+    throw new ValidationError('unsafe_storage: "' + name + '" has a freezer shelf life (' + record.shelfLifeDays + ' days) that does not ' +
+      'apply out of the freezer, so it is not moved to the counter from chat. ' + CHECK_IN_APP, { field: 'storage', code: 'unsafe_storage' });
+  }
+  const thawing = leavesFreezerForFridge && (safetyLot || longLife);
+  if (thawing && !thawDateGiven) {
+    const why = safetyLot
+      ? 'looks like raw meat, poultry or fish, or a food the bridge cannot classify; moved'
+      : 'has a freezer shelf life; moved';
+    throw new ValidationError('needs_thaw_date: thaw reminder - "' + name + '" ' + why + ' from the freezer to the fridge, its ' +
+      'fridge time counts from the day it thawed, not the day it was bought or made. Ask the user: if it moved to the fridge ' +
+      'today, send thawedToday: true; otherwise send boughtDate as the day it moved.',
     { field: 'thawedToday', code: 'needs_thaw_date' });
   }
-  if (args.thawedToday === true) {
-    if (!wasFrozen) {
-      throw new ValidationError('thawedToday is only for an item that was in the freezer; "' + record.name + '" is not recorded in the freezer.', { field: 'thawedToday' });
-    }
-    next.purchaseDate = today;
-  }
-  if (args.boughtDate !== undefined) next.purchaseDate = args.boughtDate;
+  if (leavesFreezerForFridge && longLife) next.shelfLifeDays = fridgeLife;
+
   if (args.printedDate === null) {
     delete next.expiryDate;
     delete next.dateMode;
