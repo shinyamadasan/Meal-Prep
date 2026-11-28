@@ -7203,7 +7203,7 @@ verification: `node --check` on changed files and `npm run test:bridge` before e
   `npm test`, `npm run test:ledger-contract`, `git diff --check`; CHANGELOG/TEST_REPORT.
 
 ### TASK-102 · Test-only: pin the clock in `tombstone-namespace.spec.js`
-status: review
+status: approved
 owner: Claude (trivial test-fixture fix, autonomous run 2026-11-27) · independent review
 risk: Low (test file only; no app, shared or Worker code)
 source: gate failure found while verifying TASK-098 (911/912 on every branch, including `main`)
