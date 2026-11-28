@@ -1065,10 +1065,12 @@ async function undoRequestTool(env, deps, ctx, args) {
       const found = await readOriginal(io);
       requests.checkUndoable(found ? found.record : null, args.requestId, io.nowMs);
       originalUpdateTime = found.updateTime;
-      return Object.assign({ nowMs: io.nowMs }, found);
+      // One household day for the whole call (the restore safety check below).
+      return Object.assign({ nowMs: io.nowMs, today: householdDayFromEnv(env, deps.now) }, found);
     },
     apply: (doc, original) => {
       const plan = requests.planUndo(original.record, doc, args.requestId, original.nowMs);
+      if (original.record.tool === 'update_pantry_item') refuseUnsafeRestore(original.record, plan, original.today, args.requestId);
       return {
         write: plan.write,
         undoes: args.requestId,
@@ -1087,6 +1089,24 @@ async function undoRequestTool(env, deps, ctx, args) {
     onCommitConflict: async (io) => {
       const found = await readOriginal(io);
       if (found && found.record && found.record.undoneBy != null) requests.checkUndoable(found.record, args.requestId, io.nowMs);
+    }
+  });
+}
+
+// undo_request of update_pantry_item (TASK-099 review MF1): putting the edited lot back is itself
+// a storage/date edit, so it must pass the same food-safety rules update_pantry_item applies. Each
+// restored pantry record is checked as the move from what the request left (its `after` copy, which
+// planUndo has just matched against the live record) to its `before` copy. A refusal throws before
+// any write, so undoRequestId stays unspent.
+function refuseUnsafeRestore(record, plan, today, requestId) {
+  plan.restored.filter((entry) => entry.collection === 'pantry').forEach((entry) => {
+    const current = record.after.pantry.find((r) => String(r.id) === entry.id);
+    const restored = record.before.pantry.find((r) => String(r.id) === entry.id);
+    if (!current || !restored) return;
+    const reason = pantryItems.unsafeRestoreReason(current, restored, today);
+    if (reason) {
+      throw new requests.UndoRefusedError('unsafe_restore', 'Request "' + requestId + '" cannot be undone from chat: ' + reason +
+        ' Nothing was changed. Ask the user to check the item in the app.');
     }
   });
 }
