@@ -5,6 +5,55 @@
 
 ---
 
+## TASK-099 — STRICT re-review round 2 fixes (branch: task-099-register-edit; on 9d0c28c)
+Builder: Claude sub-agent standing in for Codex. Fixes MF1, MF2 and SF1-SF3 of the latest STRICT
+re-review and documents SF4 and SF5. Bridge only: no `app.js`, `shared/`, ledger, `index.html` or
+stored-shape change. Every new refusal throws before the commit (zero writes, no request record,
+`requestId` / `undoRequestId` unspent).
+- **MF1 (unsafe undo of `update_pantry_item`).** New `pantryItems.unsafeRestoreReason(current,
+  restored, today)` treats the restore as an edit from the current lot (the request's after-state,
+  which `planUndo` has just matched to the live record) to the restored `before` copy. It refuses
+  when: a safety lot would go back onto the counter; a safety lot past its fridge limit, or with no
+  known bought date, would go back into the freezer (a week-old thaw); a safety lot's bought date
+  would move later; a meat or fish name with no shared limit would go back into the fridge; or a
+  lot that is not usable, or carries a warning (expired / unknown / check), would come back usable
+  or clean (general rule; catches a week-old thawed prepared lot regaining its 90-day freezer life).
+  `mcp.js` `undoRequestTool()` fixes the household day once in `load` and calls the new
+  `refuseUnsafeRestore()` after `planUndo()` for `update_pantry_item` records only, throwing
+  `UndoRefusedError('unsafe_restore', ...)` (text `unsafe_restore: ...`, code `undo_refused`)
+  whose message tells chat to ask the user to check the item in the app. A same-day undo of a
+  mistaken thaw still works; undo of `add_pantry_item` (a removal) and of other tools is unchanged.
+- **MF2 (frozen prepared detection).** `fridgeLifeFor()` reads `shelfLifeDays ===
+  READY_FOOD_CONTRACT.defaultFreezerLife` as the prepared signature whatever the raw life, so
+  prepared Rice, Peanut Butter and Pasta (raw life > 90) need the thaw day and are capped at
+  `min(defaultFridgeLife, raw)`. New `frozen_printed_date`: a `dateMode: 'expiry'` lot leaving the
+  freezer for the fridge first needs the thaw day (`needs_thaw_date`), then is refused; the printed
+  date is never invented or cleared.
+- **SF1 (duplicate guard).** Same name, day and storage is `ambiguous` unless both lots have
+  printed dates and they differ; a printed date missing on either side is unknown. When either side
+  has a printed date only `confirmNewLot` is offered.
+- **SF2 (over-refusal).** `categoryFor()` stores `Protein` for any unknown name the name-only rules
+  match (the loose `inferCategory()` path is removed), so the shared fridge limits place "Chicken
+  wings", "Steak", "Turkey", "Sausages", "Lamb chops", "Chicken liver", "Rib eye", "Spare ribs",
+  "Scallops", "Fish fillet", "Pork mince", "Chicken sausage". Names still unplaced (cod, bratwurst,
+  meatballs, venison...) stay `unrecognized_food` in the fridge; that message no longer suggests
+  renaming the food. A name-only match's `shelfLifeDays` is capped at its name-only limit, and
+  ground words are checked first, so "Pork mince" is 2-day ground, not 3-day whole cut.
+- **SF3 (more words).** `NAME_ONLY_GROUND` adds `mince`, `meatball(s)`, `patty` / `patties` /
+  `burger patties`; new `NAME_ONLY_EXTRA` adds `bratwurst`, `kielbasa`, `ham` / `sliced ham` and
+  fish and shellfish (cod, mackerel, trout, halibut, haddock, pollock, snapper, sea bass, catfish /
+  hito, tanigue, lapu-lapu, maya-maya, milkfish, dalagang bukid, hasa-hasa, tulingan, swordfish,
+  mahi-mahi, lobster, octopus, cuttlefish); salmon, tilapia, bangus, galunggong and tuna were already
+  shared words. False friends add veggie, vegan, vegetarian, plant-based, meatless.
+- **SF4 / SF5 (docs only).** README: `defaultInferStorage` returns empty for most groceries, so
+  chat asks for storage (safe, owner-facing spec note); Known gaps now cover the name-only list
+  limit (counter and the assumed bought date for names on no list), the 90-day prepared signature
+  and the same-day freeze -> thaw clock restart (no storage history).
+- Tool descriptions: `update_pantry_item` names `frozen_printed_date`; `undo_request` names
+  `unsafe_restore`. `pantryItems.js` header comment updated for the duplicate rule and undo.
+- Files: `src/operations/pantryItems.js`, `src/mcp.js`, `test/mcp-pantry-items.node.js`,
+  `README.md`.
+
 ## TASK-099 — STRICT review fixes (branch: task-099-register-edit; on 42a2c19)
 Builder: Claude sub-agent standing in for Codex. Fixes every must-fix (M1, M2a-d) and should-fix
 (1-5) of the failed independent STRICT review. Bridge only: no `app.js`, `shared/`, ledger,

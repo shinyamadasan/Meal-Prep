@@ -5,6 +5,43 @@
 
 ---
 
+## TASK-099 · 2026-11-27 · STRICT re-review round 2 (MF1, MF2, SF1-SF3; SF4-SF5 docs)
+Builder: Claude sub-agent standing in for Codex.
+bridge: `npm run test:bridge` 416 passed, 0 failed (406 before). `test/mcp-pantry-items.node.js` 36
+  tests (26 before). New: MF1 week-old thaw undo refused (Chicken Breast frozen 2026-10-01, thawed
+  2026-11-20 with `thawedToday`, undone 2026-11-27); MF1 later-bought-date undo refused (2026-11-26
+  corrected to 2026-11-20); MF1 general rule (prepared garlic thawed a week ago); MF1 counter and
+  unknown-meat-into-fridge restores refused; MF1 safe undos exact (storage edit, printed-date edit,
+  same-day thaw) and undo of `add_pantry_item` a week later still removes the lot; MF2 Rice / Peanut
+  Butter / Pasta prepared freezer -> fridge; MF2 Chopped onions printed 2027-02-27 freezer -> fridge
+  (`needs_thaw_date`, then `frozen_printed_date`); SF1 Milk `expiryDate 2026-12-05` + undated Milk
+  -> ambiguous, only confirmNewLot; SF2 the 12 named foods accepted in the fridge (shared limit
+  asserted for each, Protein, needs_storage / unsafe_storage / needs_bought_date), Pork mince 2
+  days, Bratwurst refused with no rename advice; SF3 15 names (storage stated, counter refused,
+  Protein) and 9 non-meat names pass. Updated: Venison Steak cases now accepted via Protein (cod
+  used for the unplaced-name case); the printed-date split test now expects `ambiguous` for one
+  missing printed date. Every refusal goes through `refused()` (no commit; user document and
+  request records byte-identical); undo refusals also assert `undoRequestId` absent and the
+  original record has no `undoneBy`, and one test reuses the refused undo id for a later safe undo.
+mutation check: each new guard disabled alone fails tests: MF1 hook 4; restore freezer past-limit
+  1; restore later date 1; restore general rule 1; restore counter 1; restore unknown food into
+  fridge 1; MF2 90-day signature 1; MF2 frozen printed date 1; SF1 unknown printed date 2; SF2
+  Protein category 4; SF3 extra words 4; SF3 ground words 2; ground-before-whole-cut 1; name-only
+  shelf-life cap 1; veggie false friend 1.
+full local: `npm test` (Playwright local, port 47813 free) 911 passed, 1 failed: the known
+  `tests/tombstone-namespace.spec.js` "Firestore payload and load round-trip namespaced tombstones"
+  date failure (fixed separately as TASK-102). Rewritten `feature-evidence/task-079` screenshots
+  restored.
+ledger: `npm run test:ledger-contract` 13 passed.
+static: `node --check` on `src/mcp.js`, `src/operations/pantryItems.js`,
+  `test/mcp-pantry-items.node.js`; `git diff --check` clean.
+self-review/qa: app.js, shared/, index.html, style.css and the ledger untouched; no stored-shape
+  change; every write still one `requestWriteTool()` commit; undo refusals throw inside `apply`,
+  before the commit. No deploy.
+untested: production Firestore, live ChatGPT, deploy (none done).
+result: bridge and ledger pass; the one known Playwright failure is TASK-102. TASK-099 stays
+  `review`.
+
 ## TASK-099 · 2026-11-27 · STRICT review fixes (M1, M2a-d, should-fix 1-5)
 Builder: Claude sub-agent standing in for Codex.
 bridge: `npm run test:bridge` 406 passed, 0 failed. `test/mcp-pantry-items.node.js` 26 tests (17
