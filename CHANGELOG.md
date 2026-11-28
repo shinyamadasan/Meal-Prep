@@ -5,6 +5,10 @@
 
 ---
 
+## TASK-102 — pin the clock in tombstone-namespace.spec.js (branch: task-102-tombstone-fixture-date; base: 4ccc930)
+changed: `tests/tombstone-namespace.spec.js` `beforeEach` calls `page.clock.setFixedTime(new Date('2026-08-15T12:00:00.000Z'))` before the fixture init script, with a comment. No assertion changed; no app code changed.
+why: fixed fixture dates (`TOMB` 2026-06-01) fell outside `purgeOldTombstones()`'s 180-day window after 2026-11-28 UTC, so the round-trip test failed on every branch including `main` (911/912).
+
 ## TASK-096 — refresh four outdated production smoke specs (branch: task-096-prod-smoke-refresh; base: 48c8ec2)
 changed: `tests/production-smoke-kitchen-truth.spec.js` (3 tests), `tests/production-smoke-low-effort.spec.js` (1 test); `planning/ROADMAP.md` Known Issues entry "Stale production smoke specs (post FFS-V1)" removed; TASKS.md status. No app, HTML, CSS or Worker change.
 - `live: Home shows Needs Attention…`: Expired fixtures are now a printed use-by (`dateMode: 'expiry'`, past `expiryDate`) and a past-limit fridge-safety lot (raw chicken bought 4 days ago, D-089); "Old Broccoli" (estimate) is asserted under Check with Still good / Toss; Keep / Remove asserted on both Expired rows; `Remove expired (1)` proves only the printed record is bulk-eligible; tap-target height kept.

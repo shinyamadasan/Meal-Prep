@@ -5,6 +5,10 @@
 
 ---
 
+## TASK-102 · 2026-11-27 · tombstone fixture clock
+suite: `npx playwright test tests/tombstone-namespace.spec.js --project=local` 22/22 PASS (was 21/22 on `main`).
+result: date-dependent failure removed; no assertion weakened. Full `npm test` pending on the reviewer.
+
 ## TASK-096 · 2026-11-26 · production smoke refresh
 suite: `npx playwright test tests/production-smoke-kitchen-truth.spec.js tests/production-smoke-low-effort.spec.js --project=prod` 17/17 PASS against https://shinyamadasan.github.io/Meal-Prep/ (signed-out fresh contexts; no sign-in, no account write); full `npm run test:prod` 155 passed, 4 skipped (pre-existing conditional skips), 0 failed; `npm test` (local) 905/905 PASS, `suite-classification` included; `git diff --check` clean.
 result: the four previously failing prod specs pass and assert shipped D-088/D-089/TASK-079 behaviour; no assertion weakened. TASK-096 set to `review`.
