@@ -6,8 +6,9 @@
 
 - **Prototype:** [`index.html`](index.html). One self-contained file with no network requests, generic
   in-memory sample data (reset on reload), light and dark mode.
-- **Evidence:** screenshots in [`audit/`](audit/) (390×844 PNG) and raw measurements in
-  [`audit-metrics.json`](audit-metrics.json).
+- **Evidence:** screenshots in [`audit/`](audit/) (390×844 PNG), raw current-app measurements in
+  [`audit-metrics.json`](audit-metrics.json), and the prototype self-test ([`selftest.js`](selftest.js))
+  with its results in [`selftest-results.json`](selftest-results.json) (see §8).
 - **Method:** `origin/main` @ `4ccc930`, served over local http and walked by a Playwright script
   (Chromium, 390×844, mobile and touch, service workers blocked, all off-origin requests aborted,
   so no sign-in). First run went through the app's own Kitchen Setup wizard ("Average household").
@@ -46,19 +47,24 @@ Other observations:
 ## 2. Everyday jobs: current app vs prototype
 
 Taps exclude typing. "Before" is measured or traced on `origin/main`. "After" is the prototype
-self-test (Playwright clicks by visible label, as a first-time user; all 8 jobs pass, with 0 console
-errors, 0 external requests and max document width 360px at a 360px viewport, in light and dark).
+self-test (Playwright clicks by visible label, as a first-time user). All 16 scripted jobs (the 8 below,
+plus Flavor authoring, Favorites, method chips and filters, undo isolation, the serving scaler, Cook
+history, Remove expired and "Not anymore?") pass at 390×844 and 360×780, in light and dark. Each run had
+0 console errors, 0 network requests and no horizontal scroll. Full numbers are in §8.
 
 | Job | Current app (before) | Prototype (after) |
 |---|---|---|
 | What can I eat now | Home → **Use 1** (1 tap; first button 0.59 screens down, under the meal-prep flow card and banner) | Home → **Eat 1** (**1 tap**; first card, about 0.25 screens) |
 | Cook something quick | More → Recipes → scroll about 1 screen → Lowest effort → scroll 1.2-screen cards → no cook action. Logging it needs Plan → + Add meals → pick → close → Prep → Prepped → Fridge → confirm (**about 10 taps, 3+ screens**) | Cook (opens on Quick cook, can-make-now first) → recipe → **I cooked this** → Save (**4 taps, no scroll**) |
-| Plan a meal-prep batch | Plan → + Add meals → pick → close (4), then Prep tab → **Prepped → Fridge** per batch (+2 each, 3 tabs total) | Cook → Meal prep → + Add → pick → Done (**5**), then Start prep day → **Done: N portions to Kitchen** (+2). All on one screen, with a 1-2-3-4 progress strip and a "N to buy → Open Shop" link |
-| I just shopped | Shop → scroll past struck-through in-stock rows → tick each (1 + n). Unlisted purchases: Fridge → scroll 1.9 screens → Bulk add → type → Add (4) | Shop → tick each (**1 + n**; only items to buy are shown). Unlisted: **Bought something else?** → type → Add to Kitchen (**3**). Every action has Undo |
-| We're out of X | Fridge → scroll → search → open → level/delete → Shop → Add Item → type → save (**about 7**, 2 tabs) | Kitchen (or Home) → **We're out of…** → tap item (**3**). It is marked out and added to Shop in one step (checkbox on by default), with Undo |
+| Plan a meal-prep batch | Plan → + Add meals → pick → close (4), then Prep tab → **Prepped → Fridge** per batch (+2 each, 3 tabs total) | Home's **Meal prep** card → + Add → pick → Done (**4**; 5 if you start from the Cook tab). Then Start prep day → **Done: N portions to Kitchen** (+2). All on one screen, with a 1-2-3-4 progress strip and a "N to buy → Open Shop" link |
+| I just shopped | Shop → scroll past struck-through in-stock rows → tick each (1 + n). Unlisted purchases: Fridge → scroll 1.9 screens → Bulk add → type → Add (4) | Shop → tick each (**1 + n**; only items to buy are shown). Unlisted: **Bought something else?**, which sits right under the add box at the top of Shop → type → Add to Kitchen (**3**). Each tick has its own Undo |
+| We're out of X | Fridge → scroll → search → open → level/delete → Shop → Add Item → type → save (**about 7**, 2 tabs) | Kitchen (or Home) → **We're out of…** → type → tap item (**3**). Results rank whole-word matches first, then starts-with, then contains, so "egg" lists **Eggs** before Eggplant. It is marked out and added to Shop in one step (checkbox on by default), with Undo |
 | Make a sauce / prepped ingredient | More → Flavor Library → scroll → I made this → save (**4**). Prepped ingredients are **not possible** | Cook → Sauces & prep → **Made it** → Save to Kitchen (**4**). The same path works for prep-aheads (cooked rice, minced garlic, boiled eggs) |
 | Find a flavor | More → Flavor Library → search/filter (**3**) | Cook → type in the one search box, which searches recipes, sauces and ingredients (**1 + typing**), or tap a sauce chip on a ready-food row or recipe ("Goes well with") |
-| Shop without a plan | Shop → open "No plan? Fill the gaps" → tap a chip (**3**) | Shop → tap a chip (**2**; quick picks open automatically while the list is short). "Running low: Vinegar, Oats → Add" is a one-tap restock |
+| Shop without a plan | Shop → open "No plan? Fill the gaps" → tap a chip (**3**) | Shop → tap a chip (**2**; quick picks open automatically while the list is short, and no item appears in two roles). "Running low: Vinegar, Oats → Add" is a one-tap restock |
+| Add / edit / delete a flavor | More → Flavor Library → Add flavor → fill → Save (**4**) | Cook → Sauces & prep → **+ Add your own flavor** → fill → Save flavor (**4**). Edit and Delete sit in each flavor's sheet. Delete asks first, then gives Undo |
+| Show my favorites | Home → scroll to ❤️ My Favorites (about 1 screen), or Recipes → ♥ Favorites checkbox | Cook → **♥ Favorites** (**2**). The chip shows a live count and combines with the method chips and Filters |
+| Find rice-cooker / oven / low-effort recipes | More → Recipes → scroll to the quick-filter row → tap (**3**) | Cook → Quick cook or All recipes → tap the method chip (**2**). The chips are always visible (D-060; see §3) |
 
 ## 3. Information architecture
 
@@ -70,9 +76,10 @@ errors, 0 external requests and max document width 360px at a 360px viewport, in
 | Home: meal-prep flow card (Plan/Shop/Prep/Fridge) | **Home** · "Meal prep" mode card with a one-line status. The full flow lives in **Cook › Meal prep** |
 | Home: What needs attention? | **Home** · "Use soon" (2 items, each with *Cook* or *Toss*), plus **Kitchen** › Review |
 | Home: Record leftovers/takeout | **Home** quick action, plus **Kitchen** › Ready |
-| Home: My Favorites | Hearts on every recipe row. A favorites filter goes in **Cook** (the prototype keeps hearts; a production chip is suggested) |
+| Home: My Favorites (`#home-favorites`) | Hearts on every recipe row, plus a **♥ Favorites** chip in **Cook** (Quick cook and All recipes). It shows only hearted recipes, with a count, and is ANDed with the method chip and Filters. Recipes' `#favorites-filter` checkbox maps to the same chip |
 | Home: Need ideas? (What should we eat / cook / can I do) | **Home** · "Or make something" (Instant / Quick / Meal prep, plus "You can make right now") |
-| Home: Cook History | **Settings** › history (rarely needed), or a recipe sheet's "last cooked" line |
+| Home: Cook History (`#dash-history`) | **Settings › Cook history**, a working list of the last 10 cooks (tap one to open the recipe). Each recipe sheet also shows "Last cooked N days ago". *I cooked this* and prep-day *Done* both add to it, and Undo removes the entry |
+| Home: Getting Started card (2-step onboarding) | **Home**, first run only, above Ready to eat. Unchanged: two steps (set up kitchen, then add a recipe or batch) and auto-dismiss. The prototype's sample kitchen is past first run, so the card is not drawn |
 | Plan: This week's batches, Batch Picker | **Cook › Meal prep** |
 | Plan: By day grid, Save/Load week, Clear week | **Cook › Meal prep › More planning tools** (collapsed, kept intact) |
 | Prep: Prepped → Fridge, Prep checklist | **Cook › Meal prep › Start prep day** (one checklist, done per batch) |
@@ -80,18 +87,31 @@ errors, 0 external requests and max document width 360px at a 360px viewport, in
 | Fridge: Cooked & Stored | **Kitchen › Ready** |
 | Fridge: Prepared Flavors | **Kitchen › Prepped** (sauces + prepped ingredients, single home) |
 | Fridge: Ingredients on hand, add row, Bulk add, Browse | **Kitchen › Ingredients** + "+ Add" sheet (one textarea, optional qty/date) |
-| Fridge: Inventory checked, Stock health, Select, Clear expired | **Kitchen ⋯** menu (and Settings › Stock health) |
+| Fridge: Inventory checked, Stock health, Select | **Kitchen ⋯** menu (and Settings › Stock health) |
+| Fridge: bulk **Remove expired (N)** | **Kitchen ⋯ › Remove expired (N)**, working. It lists what will go, removes all expired ingredients, ready food and prepped items in one step, and the toast's Undo restores exactly those items |
+| Fridge: Bulk add + voice (`startVoiceInput()`) | **Kitchen › + Add** and **Shop › Bought something else?** use the same one-item-per-line box, with a **Say it instead** button that fills it (stub for the existing Web Speech path, Chrome/Edge only) |
 | Fridge: freshness banner / badge | **Kitchen** tab badge + one "N to check · N use soon → Review" bar inside Kitchen. No global banner |
-| Recipes: list, search, filters, quick filters | **Cook** (Instant / Quick cook / All recipes + global search) |
+| Recipes: list, search | **Cook** (Instant / Quick cook / All recipes + global search) |
+| Recipes: cooking-method quick filters (`#recipe-quick-filters`, D-060) | **Cook › Quick cook** and **Cook › All recipes**: an always-visible, wrapping **Cooking method** chip row: All · Lowest effort · Rice cooker · Oven · Air Fryer · Instant Pot · No-cook · Pan, plus the Batch-friendly refinement. D-060 is kept as is. A primary method chip **never hides**: at zero it renders dashed with its count (for example "Rice cooker 0" in Quick cook), and tapping it shows "No rice cooker recipes under 30 min yet — open a recipe, tick Rice cooker under Cooking method, and it will show up here". Only refinements (Batch-friendly, Rice + steamer) hide when empty. One chip at a time; tapping the active chip clears it |
+| Recipes: category, prep-time and favorites filters (`#category-filter`, `#preptime-filter`, `#favorites-filter`) | **Cook › Filters** sheet (Category: Breakfast / Main dish / Snack / Dessert; Prep time: under 15 / 30 / 45 min, under 1 hour, 1 hour+, the same buckets as today), with live counts and a "Show N recipes" button. Active filters show as removable chips next to Filters. Favorites is the ♥ chip, not part of the sheet |
+| Nutrition: Find Recipes by Nutrition (`#nutrition-filter-type`) | The same **Cook › Filters** sheet, Nutrition group: High protein (>25 g), Low carb (<15 g), Low calorie (<300), High fiber (>5 g). It is ANDed with the other filters instead of being a separate list on another tab |
+| Recipes: serving scaler (`adjustDetailServings()` / `buildDetailIngList()`) | **Recipe sheet › Ingredients**: a Servings stepper that rescales amounts in place (1 kg → 1¼ kg; "to taste" left alone) with an "As written / Scaled from N" note. *I cooked this* pre-fills leftovers from the scaled servings |
+| Recipes: Sample badge (`isSampleRecipe()`) | A **Sample** chip on rows in **Cook › All recipes** and in the recipe sheet's facts. Quick cook stays uncluttered |
+| Recipes: opt-in starter pack (`#starter-pack-prompt`, D-063) | **Cook › All recipes**, a compact "Low-effort starter recipes → Add starter recipes" card below the list (stub). Same rules as today: adds only absent ids and never re-adds deleted ones |
 | Recipes: Add / Import recipe / CSV | **Cook › All recipes** footer |
 | Recipes: Import / Export (JSON backup) | **Settings › Backup & restore** |
 | Recipes: "Based on what's in your kitchen" strip | Folded into every recipe row ("✓ Have everything" / "Need 1: …"), sorted can-make-first |
 | Shop: list, Add item, check-off → inventory | **Shop** (to-buy only; ticking moves it to Kitchen, with Undo) |
 | Shop: in-stock rows | **Shop** · collapsed "Already in your kitchen (N)" |
+| Shop: **Not anymore?** (`openNotInKitchenDialog()` / `correctKitchenStock()`) | **Shop › Already in your kitchen**, a **Not anymore?** button on each row, working. The row shows which kitchen record matched. The confirm sheet names that one record, and *It's gone · add to list* corrects only it (staple → out, otherwise removed) and adds the item to the list, with Undo |
 | Shop: No plan? Fill the gaps | **Shop** · "No plan? Quick picks" (role-based, always reachable) |
 | Shop: Print / Copy / Clear / Price List | **Shop ⋯** menu |
 | More › Recipes | **Cook** (primary tab) |
 | More › Flavor Library | **Cook › Sauces & prep** (knowledge) + **Kitchen › Prepped** (stock) + "try with" chips on ready food |
+| Flavor Library: add your own flavor | **Cook › Sauces & prep › Flavor Library › + Add your own flavor** (card header), working. The form has name (required, with an inline error), how it's made, hands-on minutes, goes-with chips, ingredients and steps. Saved flavors get a "Yours" chip |
+| Flavor Library: edit / delete | **Flavor sheet › Edit / Delete**, working. Edit reuses the same form. Delete asks first, says any stock in Kitchen › Prepped stays, and the toast's Undo brings the flavor back |
+| Flavor Library: search, preparation-style filter, protein filter (`getFilteredFlavors()`) | The global **Cook search** covers flavors. In the Flavor Library card, **How it's made** (Any · Make fresh · Fridge batch · Freezer-friendly) and **Goes with** (Any · Chicken · Pork · Fish · Tofu · Egg) chip rows are ANDed, sorted by name, with a "Clear filters" empty state |
+| Flavor Library: opt-in starter flavors (`flavorStarterCandidates()` / `addStarterFlavors()`) | **Cook › Sauces & prep**, a "Starter flavors" card above the library, working: "N starter flavors you don't have yet: … → Add them / Not now". It follows D-063: a flavor already present is skipped, and a deleted starter is never offered again. The card retires itself when nothing is eligible |
 | More › Nutrition | **Settings › Nutrition**, plus per-recipe facts in the recipe sheet |
 | More › Price Book | **Settings › Price book** and **Shop ⋯ › Prices** |
 | More › Cooking Hacks | **Settings › Cooking tips** (later: contextual tips in Meal prep) |
@@ -121,7 +141,8 @@ errors, 0 external requests and max document width 360px at a 360px viewport, in
      created from Cook › Sauces & prep › *Made it* and consumed by recipes ("✓ Cooked rice").
   5. **Home is a decision page, not a dashboard.** It has three blocks (Ready to eat → Or make
      something → Use soon) and three quick actions (We're out of… · I just shopped · Leftovers). The
-     meal-prep flow card, Favorites, Need ideas and Cook History are removed from it.
+     meal-prep flow card, Favorites, Need ideas and Cook History move off it (to Cook › Meal prep, the
+     Cook ♥ Favorites chip, can-make-now sorting and Settings › Cook history).
 
 ### Recipe cards: key facts first
 
@@ -145,8 +166,8 @@ never editing.
   Inventory-checked stamp, select mode, ingredient browser, print/copy/clear, prices, JSON
   import/export, nutrition, price book, tips, cook history.
 - **New interactions (all reuse existing data):** "We're out of…" (out + add to Shop in one write),
-  "I cooked this" from any recipe, "Bought something else?", prep-ahead *Made it*, Undo on every
-  destructive or stock-moving action.
+  "I cooked this" from any recipe, "Bought something else?", prep-ahead *Made it*, and Undo on every
+  destructive or stock-moving action. Each toast's Undo reverses only that action's own writes; see §8.
 
 ## 5. Risks
 
@@ -183,10 +204,82 @@ Each phase is independently shippable and reversible, and follows D-001 (no fram
 `m-recipe-edit`, `m-add-recipe`, `m-batch-picker`, `m-prep-mode`, `m-manual-cooked`, `m-bulk-add`,
 `m-settings`, `m-help`, `m-ingredient-browser`.
 
-**Prototype** (`audit/`): `proto-01-home`, `proto-02-cook-quick`, `proto-03-recipe-sheet`,
-`proto-04-meal-prep`, `proto-05-prep-day`, `proto-06-shop`, `proto-07-kitchen`, `proto-08-out-of`,
-`proto-09-flavors`, `proto-10-search`, `proto-11-settings`, `proto-12-home-360-light`,
-`proto-12-home-360-dark`, `proto-13-kitchen-dark`.
+**Prototype** (`audit/`, regenerated by `selftest.js`): `proto-01-home`, `proto-02-cook-quick`
+(method chips + Favorites), `proto-03-recipe-sheet`, `proto-04-meal-prep`, `proto-05-prep-day`,
+`proto-06-shop`, `proto-07-kitchen` (Prepped), `proto-08-out-of` ("egg" → Eggs first),
+`proto-09-flavors` (starter prompt, + Add your own flavor, style filter), `proto-10-search`,
+`proto-11-settings`, `proto-12-home-360-light`, `proto-12-home-360-dark`, `proto-13-kitchen-dark`,
+`proto-15-flavor-editor`, `proto-16-favorites`, `proto-17-method-empty` (D-060 empty chip),
+`proto-18-filters`.
 
 Note: some prototype screenshots show the toast from the previous step, because the self-test
 captures them mid-flow.
+
+## 8. Self-test and accessibility (re-run after review)
+
+Method: [`selftest.js`](selftest.js) runs Playwright 1.65 (Chromium) against the file directly with
+`isMobile` + `hasTouch`. Every non-`file:` request is logged and aborted. It clicks only visible labels
+and accessible names (`getByRole('button', { name })`, `getByLabel`). It runs four configurations:
+390×844 light, 390×844 dark, 360×780 light and 360×780 dark (`colorScheme`). After each step it
+measures every visible element across about 25 screens, sheets and toasts. Raw output:
+[`selftest-results.json`](selftest-results.json).
+
+| Config | Jobs | Console errors | Network requests | Horizontal scroll |
+|---|---|---|---|---|
+| 390×844 light | 16/16 pass | 0 | 0 | none |
+| 390×844 dark | 16/16 pass | 0 | 0 | none |
+| 360×780 light | 16/16 pass | 0 | 0 | none |
+| 360×780 dark | 16/16 pass | 0 | 0 | none |
+
+The jobs are the 8 everyday jobs in §2, plus: (9) Flavor authoring (empty-name error, add, edit,
+delete, Undo, Freezer-friendly filter, starter prompt that never re-offers a deleted starter and
+retires after "Add them"); (10) Favorites (heart a recipe, then ♥ Favorites lists exactly the hearted
+ones); (11) all eight method chips visible in Quick cook, the empty "Rice cooker 0" D-060 message,
+"Rice cooker 1" in All recipes, and Filters (Breakfast + High fiber → "Show 1 recipe"); (12) undo
+isolation; (13) serving scaler (Chicken Adobo 4 → 5 servings: 1 kg → 1¼ kg); (14) Settings › Cook
+history; (15) Kitchen ⋯ Remove expired (1) + Undo; (16) Shop "Not anymore?".
+
+**Contrast** (WCAG relative luminance; alpha backgrounds composited up the DOM; every text node is
+held to 4.5:1, with no large-text allowance):
+
+| Config | Text samples | Lowest text ratio | Text < 4.5 | Badge / checkbox samples | Lowest UI ratio | UI < 3 |
+|---|---|---|---|---|---|---|
+| 390×844 light | 1,684 | 4.65 (primary button text on hover) | 0 | 54 | 6.61 (Kitchen badge) | 0 |
+| 390×844 dark | 1,684 | 4.80 (recipe initial tile) | 0 | 54 | 5.30 (Kitchen badge) | 0 |
+| 360×780 light | 1,661 | 4.65 | 0 | 54 | 6.61 | 0 |
+| 360×780 dark | 1,661 | 4.80 | 0 | 54 | 5.30 | 0 |
+
+Token changes behind this (prototype only; production `style.css` is untouched):
+
+- **Orange text:** a new `--warn-text` is used for chip text, the Review and Running-low bars, sauce
+  tiles and "need" bullets. It is rgb(150,70,14) in light (was the fill orange, about 3:1) and
+  rgb(250,190,140) in dark. The orange fill `--warn` is now only a non-text accent.
+- **Nav badges:** `--badge-bg`/`--badge-fg` (dark orange with white text in light, light orange with
+  near-black text in dark) and `--badge2-*` for Shop. Dark mode previously put white text on light
+  green.
+- **Grey text:** dark `--text-2` is raised to rgb(204,206,208), which fixes the dark grey chips and the
+  Settings subtext. Light `--text-2` is rgb(98,91,86). Light `--primary-strong` is darkened to
+  rgb(58,94,62) so "✓ Have everything" chips pass. Dark `--danger` is raised to rgb(255,160,164).
+- **Toast Undo:** its own `--toast-link` in each mode. Placeholder text uses `--text-2` at full opacity.
+
+**Tap targets** (bounding box of every visible button, input, select, textarea, summary and
+checkbox label):
+
+| Config | Targets measured | Smallest | Below 44 px |
+|---|---|---|---|
+| 390×844 light | 879 | 44×44 (icon buttons) | 0 |
+| 390×844 dark | 879 | 44×44 | 0 |
+| 360×780 light | 866 | 44×44 | 0 |
+| 360×780 dark | 866 | 44×44 | 0 |
+
+`.btn.sm`, mode, method and flavor-filter chips, the stock-level chip (`.lvl`, min 60×44), steppers,
+hearts and ✕ buttons, the Shop checkbox (a 44×44 `.check-btn` around the 26px box) and toast Undo
+(min 64×44) are all at least 44px. The Review and Running-low bars are at least 52px tall.
+
+**Undo, as built:** each action records the inverse of only its own writes (`push`/`del`/`set` into a
+per-action journal). The toast's Undo replays that journal newest-first against the live state, then
+recomputes the plan-derived Shop rows. Job 12 proves the isolation: remove the Mung Bean Stew batch,
+then raise the Rice Cooker batch from 4 to 5 servings, then tap Undo. The batch comes back and the
+servings stay at 5. Non-destructive view changes (servings steppers, picker ticks, hearts, filters)
+are not undoable, by design. Production must still implement each inverse through the existing write
+paths (§5 risk 2).
