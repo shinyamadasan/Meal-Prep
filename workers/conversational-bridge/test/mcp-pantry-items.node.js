@@ -785,3 +785,20 @@ test('SF3: more meat and fish words need storage, are never on the counter, and 
     assert.notEqual(stored(b, NEW_ID).category, 'Protein', name);
   }
 });
+
+test('MF1: undo never puts raw protein back on the counter, nor an unplaceable meat name back into the fridge', async () => {
+  const counter = { id: 'ctr-chicken-1', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', storage: 'counter', purchaseDate: TODAY, shelfLifeDays: 2 };
+  const b = bridge(seedWith(counter));
+  const r1 = 'ctr-to-fridge-0001';
+  ok(await b.raw('update_pantry_item', { requestId: r1, expectedRevision: 5, ingredientId: 'ctr-chicken-1', storage: 'fridge' }));
+  const why = await undoRefused(b, r1, 'undo-ctr-fridge-01', 6);
+  assert.match(why, /on the counter/);
+
+  // A legacy lot (category '') whose meat name has no shared fridge limit, frozen from chat.
+  const legacy = { id: 'venison-3', name: 'Venison Steak', quantity: 1, unit: 'kg', category: '', storage: 'fridge', purchaseDate: TODAY, shelfLifeDays: 7 };
+  const b2 = bridge(seedWith(legacy));
+  const r2 = 'venison-freeze-001';
+  ok(await b2.raw('update_pantry_item', { requestId: r2, expectedRevision: 5, ingredientId: 'venison-3', storage: 'freezer' }));
+  const why2 = await undoRefused(b2, r2, 'undo-venison-0001', 6);
+  assert.match(why2, /no shared fridge safety limit/);
+});

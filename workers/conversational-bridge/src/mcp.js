@@ -678,7 +678,9 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'unsafe_storage (never the counter), past_safety_limit or unknown_bought_date (a lot past its fridge limit, or with ' +
         'no known bought date, is not moved to the freezer: freezing does not make it safe again), later_bought_date (its ' +
         'bought date may only move earlier, except the thaw day when leaving the freezer for the fridge), ' +
-        'unrecognized_food (a name the app does not list never moves into the fridge). On any of these, tell the user and ' +
+        'unrecognized_food (a meat or fish name with no shared fridge limit never moves into the fridge), ' +
+        'frozen_printed_date (a lot with a printed date is not moved from the freezer to the fridge from chat, even with ' +
+        'the thaw day: its printed date no longer applies). On any of these, tell the user and ' +
         'ask them to check the item in the app; never retry with a different date to get past it. Name, ' +
         'amount, staple flag and level are not changed here. unchanged: true means nothing needed changing. On ' +
         'invalid_record, ask the user to check the item in the app. Tell the user the new safety label from the result. ' +
@@ -715,7 +717,9 @@ export function createReadServer(env = {}, deps = {}, ctx = {}) {
         'item changed since (changed_since; so to undo two changes to the same item, only the latest can ' +
         'be undone - the earlier one is then refused) or a removed item\'s id is in use again (id_in_use); it was ' +
         'itself an undo (undo_of_undo); it changed nothing (nothing_to_undo); it recorded food that was ' +
-        'eaten (undo_not_supported: eaten-meal history is permanent); or its record is incomplete ' +
+        'eaten (undo_not_supported: eaten-meal history is permanent); putting back an update_pantry_item ' +
+        'edit would make the item read safer than it is (unsafe_restore: for example a thawed item now past its ' +
+        'fridge limit going back into the freezer, or a later bought date); or its record is incomplete ' +
         '(undo_record_incomplete). Tell the user the reason and suggest fixing it in the app. Requires ' +
         'expectedRevision from a fresh read; on revision_conflict, re-read before deciding whether to retry. ' +
         'Undo one change per call.',

@@ -13,10 +13,11 @@
 // Raw meat, poultry and fish (and a meat or fish name the ingredient list does not know) never get
 // an invented storage or date and never go on the counter (D3): such a lot must name its storage
 // (fridge or freezer) and its bought date, and a fridge lot already past its fridge limit on the day
-// it was bought is refused. A same-name lot with the same bought day, storage and printed date is
-// `ambiguous` (add_stock to it when neither has a printed date, or confirm a new lot); anything else
-// is a new lot, so two safety clocks are never merged. update_pantry_item never lets an edit make
-// such a lot read safer than it is (see updatePantryItem).
+// it was bought is refused. A same-name lot with the same bought day and storage is `ambiguous`
+// unless both lots have different printed dates (add_stock to it when neither has a printed date,
+// or confirm a new lot); anything else is a new lot, so two safety clocks are never merged.
+// update_pantry_item never lets an edit make such a lot read safer than it is (see
+// updatePantryItem), and neither does an undo of one (unsafeRestoreReason).
 //
 // Pure: no Firestore, no clock (callers pass the household day, the time and a random source).
 import { AmbiguousError, NotFoundError, ValidationError } from '../errors.js';
