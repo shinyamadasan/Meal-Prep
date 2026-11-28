@@ -5,6 +5,37 @@
 
 ---
 
+## TASK-098 · 2026-11-27 · re-review fixes (MF-1b, should-fix 1-2)
+suite: `npm run test:bridge` 419/419 PASS (416 + 3). Mutation: removing the `dropsFridgeLimit` refusal → 1 failure. `node --check` + `git diff --check` clean. App suite unaffected (bridge-only change); last full run 911/912 with the known TASK-102 date failure.
+
+## TASK-098 review fixes · 2026-11-27 · commit abf7373
+suite: `npm run test:bridge` 416/416 PASS; `npm run test:ledger-contract` 13/13 PASS; `npm test` (local)
+911/912 — the 1 failure is `tests/tombstone-namespace.spec.js` "Firestore payload and load round-trip
+namespaced tombstones", a date-dependent fixture (tombstone dated 2026-06-01 is purged by the app's
+180-day rule after 2026-11-28 UTC). It fails identically on `main`; the branch changes no app file.
+Fixed separately as TASK-102 (test-only). `node --check` and `git diff --check` clean.
+
+## TASK-098 · 2026-11-27 · staple stock levels + items with no amount (PROP-041 P2-3 + P2-0b)
+Builder: Claude sub-agent standing in for Codex.
+suite: `npm run test:bridge` 406/406 PASS (baseline on prop041-p2 99a4bce: 380; +26 in
+`test/mcp-stock-level.node.js`; 9 existing test files updated for the new tool / optional `unit`, see
+CHANGELOG); `npm test` (local) 912/912 PASS; `npm run test:ledger-contract` 13/13 PASS; `node --check` on
+every changed Worker src/test file; `git diff --check` clean. No deploy, no production call.
+mutation check (each restored after): dropping the presence-without-makeStaple refusal fails 1 test; the
+stored-unit relabel check 1; `unit` on a counted item 2; the same-level no-op 1; `quantity_tracked` 1.
+covered: set_stock_level schema (level enum, makeStaple const true, strict keys, write scope, annotations,
+description) and schema refusals with zero Firestore calls; every level on a flagged staple, `empty` kept
+with no tombstone and read as not usable; same level = unchanged, record-only commit, replay, undo
+`nothing_to_undo`; INGREDIENT_DB staple by name and a staple with no level (`previousLevel: null`);
+mark_in_stock / mark_out_of_stock unchanged; makeStaple conversions keep every other field and add no
+storage or date (raw chicken with stored `staple:false`); presence without makeStaple, counted item with /
+without makeStaple, invalid_record (3 shapes), not_found, stale revision — each byte-identical store, 0
+commits, requestId unspent; set_inventory_quantity `unit` on presence items (none, stray quantity, stored
+unit kept, other unit / expectedUnit mismatch refused) and then the ordinary rule; `unit_not_allowed`,
+staple + unit, presence without unit; undo restores each change exactly (level, conversion incl. stored
+`staple:false`, quantity + unit removed), `changed_since` after a later chat or app write, `already_undone`.
+result: all pass. TASK-098 set to `review`.
+
 ## TASK-097 · 2026-11-27 · staple parity + tracking (PROP-041 P2-0a)
 Builder: Claude sub-agent standing in for Codex.
 suite: `npm run test:bridge` 378/378 PASS (baseline on prop041-p2 bb7e8dd: 362/362; +14 in

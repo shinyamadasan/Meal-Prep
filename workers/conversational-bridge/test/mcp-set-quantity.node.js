@@ -110,7 +110,7 @@ function text(message) {
   return message.result.content[0].text;
 }
 
-test('tools/list exposes exactly ten tools; set_inventory_quantity has a strict schema with an expectedUnit precondition and no unit', async () => {
+test('tools/list exposes exactly eleven tools; set_inventory_quantity has a strict schema with an expectedUnit precondition and an optional presence-only unit', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(1, 'tools/list')), testEnv(), { nowSeconds: NOW }, contextWithScope([MCP_SCOPE, MCP_WRITE_SCOPE])
   );
@@ -118,7 +118,7 @@ test('tools/list exposes exactly ten tools; set_inventory_quantity has a strict 
   const names = tools.map((tool) => tool.name);
   assert.deepEqual(names, [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', NAME, 'consume_stock', 'add_stock', 'undo_request'
+    'mark_out_of_stock', 'mark_in_stock', 'set_stock_level', NAME, 'consume_stock', 'add_stock', 'undo_request'
   ]);
   assert.doesNotMatch(names.join(' '), /create_inventory|mutate_inventory|shopping|convert|leftover/i);
 
@@ -126,7 +126,8 @@ test('tools/list exposes exactly ten tools; set_inventory_quantity has a strict 
   assert.deepEqual(tool.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.deepEqual(tool._meta.securitySchemes, [{ type: 'oauth2', scopes: ['mealprep:write'] }]);
   assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
+  // TASK-098: optional unit (presence-only items), never required.
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId', 'unit']);
   assert.deepEqual([...tool.inputSchema.required].sort(), ['expectedRevision', 'expectedUnit', 'ingredientId', 'quantity', 'requestId']);
   assert.equal(tool.inputSchema.properties.quantity.exclusiveMinimum, 0);
   assert.equal(tool.inputSchema.properties.expectedRevision.minimum, 0);
@@ -308,14 +309,16 @@ test('I/J: unit mismatch with a current revision mutates nothing; correct unit w
   assert.equal(JSON.stringify(b.fake.store), before);
 });
 
-test('G: missing, empty and non-string expectedUnit fail the schema before Firestore; unit key is still rejected', async () => {
+test('G: missing, empty and non-string expectedUnit fail the schema before Firestore; an unsupported unit is rejected', async () => {
   for (const extra of [{}, { expectedUnit: '' }, { expectedUnit: 5 }, { expectedUnit: null }, { expectedUnit: ['g'] }]) {
     const args = Object.assign({ ingredientId: 'eggs', quantity: 7, expectedRevision: 0 }, extra);
     const result = await rejected(NAME, args, contextWithScope([MCP_WRITE_SCOPE]));
     assert.match(text(result.message), /input validation error/i, JSON.stringify(extra));
     assert.deepEqual(result.calls, NO_ACCESS);
   }
-  const withUnit = await rejected(NAME, Object.assign({}, VALID, { unit: 'kg' }), contextWithScope([MCP_WRITE_SCOPE]));
+  // TASK-098: unit is accepted only from the inventory unit list (and only for presence items, checked
+  // by the operation); anything else still fails the schema before Firestore.
+  const withUnit = await rejected(NAME, Object.assign({}, VALID, { unit: 'kilos' }), contextWithScope([MCP_WRITE_SCOPE]));
   assert.match(text(withUnit.message), /input validation error/i);
   assert.deepEqual(withUnit.calls, NO_ACCESS);
 });

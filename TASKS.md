@@ -7051,7 +7051,7 @@ verification: `npm run test:bridge`; `npm test`; `npm run test:ledger-contract`;
   `node --check` on changed files. Claude adds a private real-export count (read-only) at review.
 
 ### TASK-098 · PROP-041 P2-3 + P2-0b Staple stock levels and items with no amount
-status: codex
+status: review
 owner: Codex (build) · independent QA/review · Claude (verdict)
 risk: High (stock-level writes; converts how an item is tracked)
 source: BQ-034 / PROP-041 Phase 2 priority 2-3; owner decision D1 (adopted 2026-11-27)

@@ -11,7 +11,7 @@
 // record the shared rule cannot read (not an object, or a name/category that is not text) is
 // `invalid`: reads flag it as invalid-record and every write refuses it, never guessing.
 import { InsufficientStockError, NotFoundError, ValidationError } from '../errors.js';
-import { convertQuantity } from './quantity.js';
+import { convertQuantity, INVENTORY_UNITS } from './quantity.js';
 // Shared food-safety rules (TASK-091, D-090): defines globalThis.MealPrepFoodSafety, the same rules
 // the app uses. The get_inventory safety verdict (TASK-092), add_stock's merge gate (TASK-094) and
 // the staple classification (TASK-097) all read it.
@@ -364,17 +364,36 @@ export function setQuantity(pantry, { ingredientId, quantity, unit }) {
 // delegates to the unchanged setQuantity() — no `unit` is passed, so the stored unit can never be
 // relabelled (500 g -> 500 kg). Zero is refused here, not translated: "none left" is
 // markOutOfStock(). Staples are modelled by stockLevel, not by a count, so they are refused; an
-// unreadable row and a presence-only row (no amount recorded) are refused (TASK-097).
-export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUnit }) {
+// unreadable row is refused (TASK-097).
+// TASK-098 (PROP-041 P2-0b, D1): a presence-only row (no amount recorded) becomes a counted row
+// ONLY when the call also gives `unit` ("we have 200 g of paprika"): a supported inventory unit,
+// equal to expectedUnit, and equal to the row's stored unit if it has one (never a relabel). Without
+// `unit` a presence row is refused as presence_only, as before. `unit` on a counted or staple row is
+// refused: counted rows keep the expectedUnit rule, staples are tracked by level.
+export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUnit, unit }, today) {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
     throw new ValidationError('quantity must be a finite number > 0. For none left, use mark_out_of_stock.', { field: 'quantity' });
+  }
+  if (unit !== undefined && (typeof unit !== 'string' || !INVENTORY_UNITS.includes(unit))) {
+    throw new ValidationError('unsupported_unit: unit must be one of ' + INVENTORY_UNITS.join(', ') + '.', { field: 'unit', code: 'unsupported_unit' });
   }
   const index = findPantryIndex(pantry, ingredientId);
   if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
 
   const classification = requireClassified(pantry[index], ingredientId);
   if (classification === 'staple') {
-    throw new ValidationError('ingredientId "' + ingredientId + '" is a staple tracked by stock level, not by count; use mark_in_stock or mark_out_of_stock.', { field: 'ingredientId' });
+    throw new ValidationError('ingredientId "' + ingredientId + '" is a staple tracked by stock level, not by count' +
+      (unit !== undefined ? ', so no unit can be recorded for it' : '') +
+      '; use set_stock_level, mark_in_stock or mark_out_of_stock.', { field: unit !== undefined ? 'unit' : 'ingredientId' });
+  }
+  if (unit !== undefined) return recordPresenceQuantity(pantry, index, { ingredientId, quantity, expectedUnit, unit }, classification, today);
+  if (trackingOf(pantry[index], classification) === 'presence') {
+    throw new ValidationError(
+      'presence_only: ingredientId "' + ingredientId + '" is recorded without an amount (no usable quantity and ' +
+      'unit). Do not guess an amount: ask the user how much they have. Only when the user states an amount and ' +
+      'unit, call again with that quantity and with both unit and expectedUnit set to the unit they said.',
+      { field: 'ingredientId', code: 'presence_only', tracking: 'presence' }
+    );
   }
   requireQuantityTracked(pantry[index], ingredientId, classification);
   // expectedUnit is an immutable PRECONDITION: exact equality with the stored unit, no trimming,
@@ -388,6 +407,153 @@ export function setCountedQuantity(pantry, { ingredientId, quantity, expectedUni
     throw new ValidationError('unit_mismatch: the stored unit for ingredientId "' + ingredientId + '" is "' + storedUnit + '", not the asserted unit. Re-read get_inventory and state the quantity in the stored unit, or clarify with the user.', { field: 'expectedUnit', storedUnit });
   }
   return setQuantity(pantry, { ingredientId, quantity });
+}
+
+// TASK-098: the presence-only half of setCountedQuantity() (`unit` given). Records quantity + unit
+// through the unchanged setQuantity(); every other stored field is kept.
+function recordPresenceQuantity(pantry, index, { ingredientId, quantity, expectedUnit, unit }, classification, today) {
+  requireHouseholdDay(today);
+  const record = pantry[index];
+  if (trackingOf(record, classification) !== 'presence') {
+    throw new ValidationError(
+      'unit_not_allowed: ingredientId "' + ingredientId + '" already has a recorded quantity and unit ("' + record.unit +
+      '"), so its unit cannot be set. Leave unit out and pass the stored unit as expectedUnit.',
+      { field: 'unit', code: 'unit_not_allowed', storedUnit: record.unit }
+    );
+  }
+  if (expectedUnit !== unit) {
+    throw new ValidationError('unit_mismatch: unit and expectedUnit must both be the unit the user said ("' + unit + '").', { field: 'expectedUnit' });
+  }
+  const storedUnit = typeof record.unit === 'string' && record.unit.trim() !== '' ? record.unit : null;
+  if (storedUnit !== null && storedUnit !== unit) {
+    throw new ValidationError(
+      'unit_mismatch: ingredientId "' + ingredientId + '" is recorded in "' + storedUnit + '", not "' + unit + '". ' +
+      'State the amount in "' + storedUnit + '" or clarify with the user; the unit is never relabelled.',
+      { field: 'unit', storedUnit }
+    );
+  }
+  const r = setQuantity(pantry, { ingredientId, quantity, unit });
+  // Review should-fix 2: a non-staple left with stockLevel 'empty' (e.g. once a staple) reads
+  // "Out of stock" in get_inventory and the app (pantryLotAvailable) even with a quantity. Recording
+  // the user's amount drops that stray level, but only when the shared rule then reads the lot as
+  // available; otherwise refuse rather than leave a counted item that still reads out of stock.
+  // Other stray levels change no read and are kept. Undo restores the record exactly.
+  if (record.stockLevel === 'empty') {
+    const updated = Object.assign({}, r.pantry[index]);
+    delete updated.stockLevel;
+    let available = false;
+    try { available = FoodSafety.pantryLotAvailable(updated, today) === true; } catch { available = false; }
+    if (!available) {
+      throw new ValidationError(
+        'stale_stock_level: ingredientId "' + ingredientId + '" is marked out of stock, and the app would still ' +
+        'not count it as available with this amount (check its dates and storage). Nothing was changed. Ask the ' +
+        'user to check the item in the app.',
+        { field: 'ingredientId', code: 'stale_stock_level' }
+      );
+    }
+    r.pantry[index] = updated;
+    r.item = toInventoryItem(updated);
+  }
+  return r;
+}
+
+// set_stock_level (TASK-098, PROP-041 P2-3 + P2-0b, D1): set one staple's stockLevel to
+// full / ok / low / empty. `empty` keeps the record (staples are never removed). The same level is
+// a no-op (`unchanged`, record-only commit, TASK-093). `makeStaple: true` turns a presence-only item
+// into a staple (`staple: true`, `stockLevel: level`) — only on the user's explicit words; it is
+// refused on a counted item (it keeps its count), and a presence item without it is presence_only.
+// mark_in_stock / mark_out_of_stock stay as they are (compatible aliases for full / empty).
+export const STOCK_LEVELS = Object.freeze(['full', 'ok', 'low', 'empty']);
+
+export function setStockLevel(pantry, { ingredientId, level, makeStaple }, today) {
+  if (!STOCK_LEVELS.includes(level)) {
+    throw new ValidationError('level must be one of ' + STOCK_LEVELS.join(', ') + '.', { field: 'level' });
+  }
+  if (makeStaple !== undefined && makeStaple !== true) {
+    throw new ValidationError('makeStaple may only be true (leave it out otherwise).', { field: 'makeStaple' });
+  }
+  requireHouseholdDay(today);
+  const index = findPantryIndex(pantry, ingredientId);
+  if (index === -1) throw new NotFoundError('No pantry record with ingredientId "' + ingredientId + '".');
+
+  const record = pantry[index];
+  const classification = requireClassified(record, ingredientId);
+  const tracking = trackingOf(record, classification);
+  if (tracking === 'quantity') {
+    throw new ValidationError(
+      'quantity_tracked: ingredientId "' + ingredientId + '" is counted (' + record.quantity + ' ' + record.unit + '), ' +
+      (makeStaple ? 'so it cannot be made a staple from chat: it keeps its count. ' : 'not a staple, so it has no stock level. ') +
+      'Use set_inventory_quantity, consume_stock or add_stock, or mark_out_of_stock when none is left.',
+      { field: makeStaple ? 'makeStaple' : 'ingredientId', code: 'quantity_tracked', tracking }
+    );
+  }
+  if (tracking === 'presence' && makeStaple !== true) {
+    throw new ValidationError(
+      'presence_only: ingredientId "' + ingredientId + '" is recorded without an amount and is not a staple, so it ' +
+      'has no stock level. Only if the user says it is a staple, call again with makeStaple: true. If the user ' +
+      'states an amount instead, use set_inventory_quantity with unit. Never decide this yourself.',
+      { field: 'makeStaple', code: 'presence_only', tracking }
+    );
+  }
+  const converted = tracking === 'presence';
+  // A converted item was not a staple, so it had no level (a stale stored stockLevel is not one).
+  const previousLevel = !converted && record.stockLevel != null ? record.stockLevel : null;
+  if (!converted && record.stockLevel === level) {
+    return { pantry, item: toInventoryItem(record), previousLevel, level, converted: false, unchanged: true };
+  }
+  const updated = Object.assign({}, record, { stockLevel: level, updatedAt: new Date().toISOString() });
+  if (converted) {
+    updated.staple = true;
+    // Review should-fix 3: a stray non-positive count on a presence item would read as "full with
+    // zero quantity" in the app's stock health; the user has just said they have it. Undo restores it.
+    if (typeof updated.quantity === 'number' && updated.quantity <= 0) delete updated.quantity;
+  }
+  // The app must read the result as a staple (stored flag first); anything else fails closed.
+  if (classifyStaple(updated) !== 'staple') {
+    throw new ValidationError('invalid_record: ingredientId "' + ingredientId + '" could not be made a staple safely. Ask the user to check it in the app.', { field: 'ingredientId', code: 'invalid_record' });
+  }
+  if (converted) requireSafeConversion(record, updated, ingredientId, today);
+  // Review MF-2 (app parity: syncStapleToGrocery / cycleStapleLevel / setBrowserItemLevel / the
+  // restock path): a staple back at full or ok is suggested again the next time it drops.
+  if (level === 'full' || level === 'ok') delete updated.suggestDismissed;
+  const next = pantry.slice();
+  next[index] = updated;
+  return { pantry: next, item: toInventoryItem(updated), previousLevel, level, converted, unchanged: false };
+}
+
+// Review MF-1 (food safety): the shared stockFoodClass() reads a staple as `pantry-staple`, so a
+// conversion could switch off pantryFridgeSafety() and turn an unsafe fridge lot (a leftover with
+// no bought date, or past its fridge limit) into a usable one. A conversion is allowed only when
+// the item is usable before it AND the converted record gets the same verdict (status, reason,
+// usable, daysLeft) from the same pantrySafety() reads use, for the household day. "Before" is read
+// without the fields the conversion replaces (stockLevel, a stray count <= 0): those only say "out
+// of stock", which the user has just corrected; they never change a date or safety rule.
+function requireSafeConversion(record, updated, ingredientId, today) {
+  const base = Object.assign({}, record);
+  delete base.stockLevel;
+  if (typeof base.quantity === 'number' && base.quantity <= 0) delete base.quantity;
+  const before = pantrySafety(base, today);
+  const after = pantrySafety(updated, today);
+  const same = before.status === after.status && before.reason === after.reason &&
+    before.usable === after.usable && before.daysLeft === after.daysLeft;
+  // Re-review MF-1b: an identical verdict TODAY is not enough. When the item's own shelf life or
+  // best-before is at or under its fridge limit, both reads show the sooner date today, but the
+  // converted record has lost the fridge limit for every later day. Refuse whenever a fridge safety
+  // limit applies before and not after (not on a food-class change alone: kimchi in the fridge has
+  // no limit either way and converts).
+  const dropsFridgeLimit = FoodSafety.pantryFridgeSafety(base, today) != null &&
+    FoodSafety.pantryFridgeSafety(updated, today) == null;
+  if (!before.usable || !same || dropsFridgeLimit) {
+    throw new ValidationError(
+      'unsafe_conversion: ingredientId "' + ingredientId + '" cannot be made a staple from chat: ' +
+      (!before.usable ? 'its safety check says it is not usable now (' + before.label + ')' :
+        dropsFridgeLimit && same ? 'making it a staple would remove its fridge safety limit (' + before.label + ' today, but ' +
+          'the limit would no longer apply on later days)' :
+        'making it a staple would change its safety check (' + before.label + ' -> ' + after.label + ')') +
+      '. Keep the item as it is and ask the user to check it in the app.',
+      { field: 'makeStaple', code: 'unsafe_conversion', safety: before }
+    );
+  }
 }
 
 // Mirrors correctKitchenStock(): staple -> stockLevel 'empty'; non-staple -> removed with an
@@ -437,6 +603,9 @@ export function markInStock(pantry, { ingredientId }) {
   }
   const next = pantry.slice();
   const updated = Object.assign({}, record, { stockLevel: 'full', updatedAt: new Date().toISOString() });
+  // Same as set_stock_level full (and the app's syncStapleToGrocery): a restocked staple must be
+  // able to reach Shop again when it next runs low (TASK-098 re-review should-fix 1).
+  delete updated.suggestDismissed;
   next[index] = updated;
   return { pantry: next, item: toInventoryItem(updated), unchanged: false };
 }
@@ -599,7 +768,7 @@ export function addStock(pantry, deletionsPantry, { ingredientId, quantity, expe
   const classification = requireClassified(record, ingredientId);
   requireQuantityTracked(record, ingredientId, classification);
   if (classification === 'staple' && (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity))) {
-    throw new ValidationError('This staple has no counted quantity; use mark_in_stock instead.', { field: 'quantity' });
+    throw new ValidationError('This staple has no counted quantity; use set_stock_level or mark_in_stock instead.', { field: 'quantity' });
   }
   if (typeof record.quantity !== 'number' || !Number.isFinite(record.quantity) || record.quantity < 0) {
     throw new ValidationError('The stored quantity is missing or invalid; clarify the amount in the app before adding stock.', { field: 'quantity' });

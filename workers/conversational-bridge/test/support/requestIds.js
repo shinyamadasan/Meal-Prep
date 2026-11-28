@@ -7,6 +7,7 @@ export const WRITE_TOOL_NAMES = Object.freeze([
   'consume_ready_food',
   'mark_out_of_stock',
   'mark_in_stock',
+  'set_stock_level',
   'set_inventory_quantity',
   'consume_stock',
   'add_stock'

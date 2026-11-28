@@ -36,6 +36,7 @@ const VALID_CALLS = {
   consume_ready_food: { cookedMealId: 'meal-1', servings: 1, expectedRevision: 3 },
   mark_out_of_stock: { ingredientId: 'salt', expectedRevision: 3 },
   mark_in_stock: { ingredientId: 'rice', expectedRevision: 3 },
+  set_stock_level: { ingredientId: 'rice', level: 'low', expectedRevision: 3 },
   set_inventory_quantity: { ingredientId: 'eggs', quantity: 12, expectedUnit: 'pcs', expectedRevision: 3 },
   consume_stock: { ingredientId: 'chicken', quantity: 100, expectedUnit: 'g', expectedRevision: 3 },
   add_stock: { ingredientId: 'eggs', quantity: 6, expectedUnit: 'pcs', expectedRevision: 3 }
@@ -175,6 +176,7 @@ test('each write tool makes exactly ONE documents:commit with the guarded user u
     consume_ready_food: ['cookedMeals', 'mealConsumptions', 'version'],
     mark_out_of_stock: ['pantry', 'version'],
     mark_in_stock: ['pantry', 'version'],
+    set_stock_level: ['pantry', 'version'],
     set_inventory_quantity: ['pantry', 'version'],
     consume_stock: ['pantry', 'version'],
     add_stock: ['pantry', 'version']

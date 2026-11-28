@@ -83,7 +83,7 @@ test('delta can restore a numeric staple to full without changing its stable id'
 
 test('stock-level-only staples, presence-only and unreadable rows, absent rows, and tombstones fail without mutation', () => {
   const cases = [
-    [{ id: 'rice', staple: true, stockLevel: 'empty' }, {}, /use mark_in_stock/],
+    [{ id: 'rice', staple: true, stockLevel: 'empty' }, {}, /use set_stock_level or mark_in_stock/],
     // TASK-097: was AmbiguousError; an unflagged Dairy row with an amount is now the app's
     // non-staple (accepted, see mcp-staple-parity). Presence-only and unreadable rows are refused.
     [{ id: 'custom', category: 'Dairy' }, {}, /presence_only:/],

@@ -87,7 +87,7 @@ test('MCP initialize handshake succeeds for an authenticated owner context', asy
   assert.equal(message.result.serverInfo.name, 'meal-prep-private-reads');
 });
 
-test('tools/list exposes exactly ten tools total — two read, eight write — with correct annotations', async () => {
+test('tools/list exposes exactly eleven tools total — two read, nine write — with correct annotations', async () => {
   const response = await routeRequest(
     mcpRequest(rpcRequest(2, 'tools/list')),
     testEnv(),
@@ -97,7 +97,7 @@ test('tools/list exposes exactly ten tools total — two read, eight write — w
   const message = await responseMessage(response);
   assert.deepEqual(message.result.tools.map((tool) => tool.name), [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
+    'mark_out_of_stock', 'mark_in_stock', 'set_stock_level', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
   ]);
 
   const [getInventory, getReadyFood, recordReadyFood, consumeReadyFood] = message.result.tools;

@@ -5,6 +5,88 @@
 
 ---
 
+## TASK-098 — re-review fixes (Claude, 2026-11-27; branch task-098-stock-levels)
+changed: `operations/inventory.js` `requireSafeConversion()` also refuses when `pantryFridgeSafety()` applies before the conversion and not after (MF-1b: a leftover whose own shelf life/best-before is under its fridge limit read the same today but stayed usable after the limit). `markInStock()` clears `suggestDismissed` when it raises a staple to full (same as `set_stock_level` full / app `syncStapleToGrocery`); the already-full no-op is unchanged. `set_stock_level` description names `unsafe_conversion`. README safety-gate paragraph updated.
+correction to the earlier TASK-098 entry: the conversion gate compares status, reason, usable **and daysLeft**; the app paths that clear `suggestDismissed` are `syncStapleToGrocery` (called from `cycleStapleLevel`, `setBrowserItemLevel`, `applyPurchaseToStock`).
+tests: 3 new in `test/mcp-stock-level.node.js` (5 MF-1b records refused; kimchi/baking soda/freezer leftover still convert; mark_in_stock dismissal + no-op). Disabling the new check fails 1 test.
+
+## TASK-098 — review fixes (branch: task-098-stock-levels; commit abf7373)
+Builder: Claude sub-agent standing in for Codex (run cut off by a usage limit after committing; this
+evidence entry was added by Claude when resuming, 2026-11-27). Fixes for the independent STRICT review FAIL:
+  - MF-1 food safety: `set_stock_level` `makeStaple` refuses (`unsafe_conversion:`, zero writes,
+    requestId unspent) when the item is not usable today or the conversion would change its safety
+    verdict (status, reason or usable); verdicts from the reads' `pantrySafety` for the household day.
+  - MF-2 app parity: a new level of `full` / `ok` deletes `suggestDismissed` (the app's rule in
+    `syncStapleToGrocery` / `cycleStapleLevel`); undo restores it.
+  - Should-fix: README Shop timing (`checkAndReplenishLowStock`); stray non-staple `stockLevel:'empty'`
+    removed on `set_inventory_quantity {unit}` when `pantryLotAvailable` then reads it available, else
+    `stale_stock_level`; `makeStaple` drops a stray quantity <= 0; TRACKING_TEXT availability comes from
+    `inStock` / `safety.usable`; `add_stock` staple refusal names `set_stock_level`.
+  - Correction to the implementation entry below: 7 existing test files were updated plus
+    `test/support/requestIds.js` (not 9 test files).
+
+## TASK-098 — implementation complete (branch: task-098-stock-levels; base: prop041-p2 99a4bce)
+Builder: Claude sub-agent standing in for Codex. PROP-041 Phase 2 priorities 2-3 (P2-3 + P2-0b), owner
+decision D1. Bridge only; `app.js`, `shared/`, `index.html`, the ledger and every Phase 1 guard untouched.
+changed:
+  - `workers/conversational-bridge/src/operations/inventory.js`: new exported `STOCK_LEVELS` and
+    `setStockLevel()` (staple level; `makeStaple: true` converts a presence item to `staple: true` +
+    `stockLevel`; same level = `unchanged`; refusals `presence_only:`, `quantity_tracked:`, plus the
+    existing `invalid_record:` / not_found; a converted record must classify as `staple` or it fails
+    closed). `setCountedQuantity()` takes optional `unit`: on a presence item it goes to the new local
+    `recordPresenceQuantity()` (unit in `INVENTORY_UNITS`, equal to `expectedUnit`, equal to any stored
+    unit; then the unchanged `setQuantity()` records quantity + unit); `unit` on a counted item is
+    `unit_not_allowed:`, on a staple the staple refusal. A presence item without `unit` keeps a
+    `presence_only:` refusal whose text now tells chat how to send `unit`. The staple refusal text adds
+    `set_stock_level`. `requireClassified` / `trackingOf` / `requireQuantityTracked` unchanged.
+  - `src/operations/quantity.js`: one additive export, `INVENTORY_UNITS` (the keys of the existing unit
+    table). No behaviour change.
+  - `src/mcp.js`: new `set_stock_level` tool (strict input: `ingredientId`, `level` enum, `makeStaple`
+    literal true optional, `requestId`, `expectedRevision`; output adds `previousLevel`, `level`,
+    `converted`, `unchanged`; destructive + idempotent annotations; write scope; registered after
+    `mark_in_stock`; `TOOL_SECURITY_SCHEMES` entry). It runs through `requestWriteTool()`; the same level
+    commits a record-only request. `set_inventory_quantity` input adds optional `unit` (`z.enum
+    (INVENTORY_UNITS)`) passed to the operation; its description explains the presence case. The
+    get_inventory `TRACKING_TEXT` names `set_stock_level` and the two explicit conversions.
+  - `README.md`: TASK-098 section; the TASK-097 tracking bullet and judgment call point to it.
+tests:
+  - New `test/mcp-stock-level.node.js` (26): schemas and descriptions; schema refusals with zero Firestore
+    access; each level, `empty` kept with no tombstone, same-level no-op (record-only, replay,
+    nothing_to_undo); INGREDIENT_DB staple and a staple with no level; makeStaple on a staple; aliases
+    unchanged; makeStaple conversions (plain, stray quantity, stray unit, stored `staple:false` raw
+    chicken: no storage or date added); every refusal with a byte-identical store and request set;
+    `unit` on presence items (none / stray quantity / stored unit kept / mismatch / raw protein) and the
+    refusals; operation guards; undo of each change restores the exact prior record (keys included),
+    changed_since after a later chat or app change, already_undone.
+  - Existing tests changed (reason: a new tool and a new optional key are now part of the public
+    contract): the exact tool-list assertions in `mcp.node.js`, `mcp-add-stock`, `mcp-consume-stock`,
+    `mcp-consume`, `mcp-set-quantity`, `mcp-stock-state` (add `set_stock_level`; titles "ten" →
+    "eleven", "eight write" → "nine write"); `support/requestIds.js` `WRITE_TOOL_NAMES` and
+    `mcp-request-ids.node.js` `VALID_CALLS` / commit-mask table gain `set_stock_level`, so the generic
+    requestId suites cover it; `mcp-set-quantity.node.js`: the schema key list gains `unit` (not
+    required), and test G, which asserted that any `unit` key is rejected, now asserts that an
+    unsupported unit (`'kilos'`) is rejected before Firestore — the acceptance criteria require a
+    supported `unit` to be accepted. The TASK-097 presence-only refusal test passes unchanged.
+blockers: none for review. Deploy held.
+design choices where the spec left room:
+  - `makeStaple` is `true` or absent (`false` fails the schema) so it cannot be sent by habit.
+  - `makeStaple: true` on an item that is already a staple is accepted (level only, `converted: false`)
+    rather than refused: harmless, and avoids a pointless round trip.
+  - A converted item's `previousLevel` is null even if a stale `stockLevel` was stored on the non-staple
+    (it had no level as a non-staple). A conversion is never a no-op (the staple flag changes).
+  - Conversion keeps every other stored field (a stray quantity or unit included), and overwrites a
+    stored `staple: false`; undo restores it.
+  - `set_stock_level` refuses a counted item with or without `makeStaple` (`quantity_tracked:`): it has
+    no stock level, and the spec keeps counts on counted items.
+  - `set_inventory_quantity` with `unit` keeps `expectedUnit` required and requires it to equal `unit`
+    (no schema loosening; one rule for chat). The stored unit of a presence item that has one but no
+    quantity is never relabelled.
+  - `unit` is limited to the existing bridge unit table (`INVENTORY_UNITS`), the "supported inventory
+    unit" vocabulary the quantity tools already use; it is advertised as a schema enum.
+  - `set_stock_level` does not touch `suggestDismissed` or the grocery list: the app's `syncStapleToGrocery`
+    does that on load, the same as for `mark_in_stock` / `mark_out_of_stock`.
+  - No change was needed in `operations/requests.js`: undo is generic over `before` / `after`.
+
 ## TASK-097 — implementation complete (branch: task-097-staple-parity; base: prop041-p2 bb7e8dd)
 Builder: Claude sub-agent standing in for Codex. PROP-041 Phase 2 priority 1 (P2-0a). Bridge only.
 changed:

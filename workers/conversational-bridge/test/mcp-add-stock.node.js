@@ -68,13 +68,13 @@ function countingDeps(doc) {
   };
 }
 
-test('tools/list exposes exactly ten tools and add_stock strict schema, scope, and delta annotations', async () => {
+test('tools/list exposes exactly eleven tools and add_stock strict schema, scope, and delta annotations', async () => {
   const b = bridge();
   const message = await responseMessage(await routeRequest(request(rpc(1, 'tools/list')), b.env, b.deps, AUTH_CONTEXT()));
   const tools = message.result.tools;
   assert.deepEqual(tools.map((tool) => tool.name), [
     'get_inventory', 'get_ready_food', 'record_ready_food', 'consume_ready_food',
-    'mark_out_of_stock', 'mark_in_stock', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
+    'mark_out_of_stock', 'mark_in_stock', 'set_stock_level', 'set_inventory_quantity', 'consume_stock', 'add_stock', 'undo_request'
   ]);
   const tool = tools.find((entry) => entry.name === 'add_stock');
   assert.equal(tool.inputSchema.additionalProperties, false);
