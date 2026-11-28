@@ -32,14 +32,37 @@ function measure() {
     const fg = parse(getComputedStyle(el).color); const bg = bgOf(el);
     text.push({ el: sel(el), ratio: +ratio(over(fg, bg), bg).toFixed(2) });
   });
-  // Non-text UI: badge fill vs nav, checkbox outline vs surface.
+  // Non-text UI (WCAG 1.4.11, 3:1): badge fill vs nav, checkbox outline, selected-chip fill vs what is
+  // around it, control borders vs both the outside and the control's own fill, and the focus ring
+  // (the --focus outline, drawn 2px outside every focusable element) vs the surface it lands on.
   const ui = [];
+  const add = (kind, el, r) => ui.push({ kind, el: sel(el), ratio: +r.toFixed(2) });
   document.querySelectorAll('.badge, .check').forEach(el => {
     if (!visible(el)) return;
     const cs = getComputedStyle(el);
-    const fill = el.classList.contains('check') ? parse(cs.borderTopColor) : parse(cs.backgroundColor);
+    const on = el.classList.contains('on');
+    const fill = el.classList.contains('check') ? parse(on ? cs.backgroundColor : cs.borderTopColor) : parse(cs.backgroundColor);
     const around = bgOf(el.parentElement);
-    ui.push({ el: sel(el), ratio: +ratio(over(fill, around), around).toFixed(2) });
+    add(el.classList.contains('check') ? 'checkbox' : 'badge', el, ratio(over(fill, around), around));
+  });
+  document.querySelectorAll('[aria-pressed="true"]').forEach(el => {
+    if (!visible(el)) return;
+    const fill = parse(getComputedStyle(el).backgroundColor); if (fill[3] === 0) return; // hearts: icon only
+    const around = bgOf(el.parentElement);
+    add('selected', el, ratio(over(fill, around), around));
+  });
+  document.querySelectorAll('input:not([type=checkbox]):not([type=hidden]), select, textarea, .stepper').forEach(el => {
+    if (!visible(el)) return;
+    const cs = getComputedStyle(el); const b = parse(cs.borderTopColor);
+    const around = bgOf(el.parentElement), own = bgOf(el);
+    add('border', el, Math.min(ratio(over(b, around), around), ratio(over(b, own), own)));
+  });
+  // --focus is read per element (custom properties inherit), so a surface that redefines it is honoured.
+  document.querySelectorAll('button, input:not([type=hidden]), select, textarea, summary').forEach(el => {
+    if (!visible(el)) return;
+    const focus = parse(getComputedStyle(el).getPropertyValue('--focus').trim());
+    const around = bgOf(el.parentElement);
+    add('focus', el, ratio(over(focus, around), around));
   });
   const taps = [];
   document.querySelectorAll('button, a[href], input:not([type=checkbox]):not([type=hidden]), select, textarea, summary, label').forEach(el => {
@@ -93,25 +116,50 @@ function measure() {
       await snap('home+toast');
     });
 
-    await job('2 Cook something quick', 4, async () => {
+    await job('2 Cook something quick (deducts amounts, never deletes untracked)', 4, async () => {
       await nav('Cook').click();
       await snap('cook-quick'); await shot('proto-02-cook-quick');
       await page.locator('#recipe-browser').getByRole('button', { name: /^Tuna Rice Bowl/ }).click();
       await snap('recipe-sheet'); await shot('proto-03-recipe-sheet');
       await btn('I cooked this').click();
+      await expectText(sheet, /Canned tuna: use 1 can · 1 can left/);
+      await expectText(sheet, /Cooked rice: use 1 cup · 2 cups left/);
+      await expectText(sheet, /Amount not tracked[\s\S]*Cucumber: the recipe uses ½\. Used it all up\?/);
+      await expectText(sheet, /Staples are never deducted: Soy sauce/);
+      if (await sheet.getByRole('checkbox', { name: /Cucumber/ }).isChecked()) throw new Error('untracked Cucumber ticked by default');
+      await snap('cooked-sheet'); await shot('proto-19-cooked-deduct');
       await btn('Save').click();
-      await expectText(page.locator('#toast-msg'), /Logged|portions saved/);
+      await expectText(page.locator('#toast-msg'), /2 reduced/);
+      await nav('Kitchen').click();
+      await page.getByLabel('Search kitchen').fill('tuna');
+      await expectText(page.locator('main'), /Canned tuna\s*1 can/);
+      await page.getByLabel('Search kitchen').fill('cucumber');
+      await expectText(page.locator('main'), /Cucumber\s*Amount not tracked/);
+      await page.getByLabel('Search kitchen').fill('');
     });
 
     await job('3 Plan a meal-prep batch (from Home)', 4, async () => {
       await nav('Home').click();
       await page.getByRole('button', { name: /^Meal prep/ }).click();
       await btn('+ Add').click();
-      await sheet.getByRole('button', { name: /Chicken Adobo/ }).click();
+      const all = await sheet.locator('#pick-list [data-act="pick"]').count();
+      await btn('Low effort only').click();
+      const low = await sheet.locator('#pick-list [data-act="pick"]').count();
+      if (!(low < all)) throw new Error('Low effort did not narrow: ' + low + '/' + all);
+      await page.getByLabel('Search recipes to add').fill('adobo');
+      if (await sheet.locator('#pick-list [data-act="pick"]').count() !== 1) throw new Error('search did not narrow to Adobo');
+      await snap('picker'); await shot('proto-20-picker');
+      await btn('View Chicken Adobo recipe').click();
+      await expectText(page.locator('#sheet-title'), /Chicken Adobo/);
+      await btn('‹ Back to the list').click();
+      await sheet.getByRole('button', { name: /^Chicken Adobo/ }).click();
       await btn('Done').click();
       await expectText(page.locator('main'), /Chicken Adobo/);
       await snap('meal-prep'); await shot('proto-04-meal-prep');
       await btn('Start prep day').click();
+      await expectText(page.locator('#prep-count'), /^0 of \d+ steps done$/);
+      await sheet.getByRole('checkbox').first().check();
+      await expectText(page.locator('#prep-count'), /^1 of \d+ steps done$/);
       await snap('prep-day'); await shot('proto-05-prep-day');
       await btn(/^Done: \d+ portions to Kitchen/, false).first().click();
       await expectText(page.locator('#toast-msg'), /portions in Kitchen/);
@@ -120,9 +168,23 @@ function measure() {
 
     await job('4 I just shopped', 2, async () => {
       await nav('Shop').click();
+      await expectText(page.locator('main'), /Pechay · 1 bunch[\s\S]*≈ ₱25/);
+      await expectText(page.locator('main'), /About ₱\d+ for the \d+ items? with a price/);
       await snap('shop'); await shot('proto-06-shop');
       await btn('Bought Milk').click();
       await expectText(page.locator('#toast-msg'), /→ Kitchen/);
+      await page.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: 8000 });
+      await page.waitForTimeout(300); // let the fade finish so the screenshot is clean
+      await page.getByText(/^Bought today \(1\)$/).click();
+      await snap('bought-today'); await shot('proto-21-bought-today');
+      await btn('Untick Milk').click();
+      await expectText(page.locator('#toast-msg'), /Milk is back on your list/);
+      await nav('Kitchen').click();
+      await page.getByLabel('Search kitchen').fill('milk');
+      await expectText(page.locator('main'), /No “milk” in your kitchen/);
+      await page.getByLabel('Search kitchen').fill('');
+      await nav('Shop').click();
+      await btn('Bought Milk').click();
       await btn('Bought something else?').click();
       await page.getByLabel('One item per line. Amount and date are optional.').fill('Yogurt 2');
       await btn('Add to Kitchen').click();
@@ -144,13 +206,20 @@ function measure() {
       await nav('Cook').click();
       await btn('Sauces & prep').click();
       await btn('Made a batch of Chili-Garlic Oil').click();
+      await expectText(sheet, /never guesses one for a sauce/);
       await btn('Save to Kitchen').click();
       await expectText(page.locator('#toast-msg'), /saved to Kitchen › Prepped/);
+      await btn('Prep-aheads ↓ (cooked rice, garlic…)').click();
       await btn('Made Boiled eggs').click();
+      const in4 = await page.evaluate(() => { const t = new Date(); t.setDate(t.getDate() + 4); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); });
+      await page.getByLabel('Use by (optional)').fill(in4);
+      await snap('made-sheet'); await shot('proto-22-made-use-by');
       await btn('Save to Kitchen').click();
       await nav('Kitchen').click();
       await btn(/^Prepped/, false).click();
-      await expectText(page.locator('main'), /Boiled eggs/);
+      const chili = await page.locator('main .row', { hasText: 'Chili-Garlic Oil' }).textContent();
+      if (!/no use-by date/.test(chili) || /d left|Today|Expired/.test(chili)) throw new Error('sauce got an inferred date: ' + chili.replace(/\s+/g, ' '));
+      await expectText(page.locator('main .row', { hasText: 'Boiled eggs' }), /4d left/);
       await snap('kitchen-prepped'); await shot('proto-07-kitchen');
     });
 
@@ -209,23 +278,29 @@ function measure() {
       await expectText(page.locator('#flavor-library'), /Sweet Chili Glaze/);
     });
 
-    await job('10 Favorites', 2, async () => {
+    await job('10 Favorites (none hidden by the mode)', 2, async () => {
       await btn('Quick cook').click();
       await btn('Favorite Garlic Fried Rice').click();
       await page.locator('#recipe-browser').getByRole('button', { name: /♥ Favorites/ }).click();
       const names = await page.locator('#recipe-browser .row-title').allTextContents();
       if (!names.includes('Garlic Fried Rice') || !names.includes('Tuna Rice Bowl') || names.includes('Eggplant Omelette')) throw new Error('favorites list: ' + names.join(', '));
+      await expectText(page.locator('#fav-note'), /1 more favorite over 30 min: Chicken Adobo/);
       await snap('favorites'); await shot('proto-16-favorites');
+      await btn('Show all 4 favorites').click();
+      const all = await page.locator('#recipe-browser .row-title').allTextContents();
+      if (all.length !== 4 || !all.includes('Chicken Adobo')) throw new Error('all favorites: ' + all.join(', '));
       await page.locator('#recipe-browser').getByRole('button', { name: /♥ Favorites/ }).click();
     });
 
     await job('11 Method chips (D-060) + filters', 2, async () => {
+      await btn('Quick cook').click();
       for (const l of ['Lowest effort', 'Rice cooker', 'Oven', 'Air Fryer', 'Instant Pot', 'No-cook', 'Pan', 'Batch-friendly'])
         if (!(await page.locator('#recipe-browser').getByRole('button', { name: new RegExp('^' + l + ' \\d') }).isVisible())) throw new Error(l + ' chip not visible in Quick cook');
       await page.locator('#recipe-browser').getByRole('button', { name: /^Rice cooker 0/ }).click();
       await expectText(page.locator('#recipe-browser'), /No rice cooker recipes under 30 min yet — open a recipe, tick Rice cooker under Cooking method/);
       await shot('proto-17-method-empty');
       await btn('All recipes').click();
+      if (await page.locator('#recipe-browser').getByRole('button', { name: /^All \d/ }).getAttribute('aria-pressed') !== 'true') throw new Error('method chip carried over between modes');
       await page.locator('#recipe-browser').getByRole('button', { name: /^Rice cooker 1/ }).click();
       await expectText(page.locator('#recipe-browser'), /Rice Cooker Chicken & Rice/);
       await page.locator('#recipe-browser').getByRole('button', { name: /^All \d/ }).click();
@@ -273,7 +348,7 @@ function measure() {
       await btn(/^Remove expired \(1\)/, false).click();
       await expectText(page.locator('#toast-msg'), /Removed 1 expired item/);
       await page.locator('#toast-undo').click();
-      await btn(/to check/, false).click();
+      await btn(/expired ·/, false).click();
       await expectText(page.locator('main'), /Pechay/);
       await snap('kitchen-review');
       await btn('Show all').click();
@@ -290,6 +365,40 @@ function measure() {
       await snap('shop-after');
     });
 
+    await job('17 Keep an expired item (today only, date unchanged)', 2, async () => {
+      await nav('Kitchen').click();
+      await btn(/expired ·/, false).click();
+      await expectText(page.locator('main'), /Pechay[\s\S]*past its printed use-by/);
+      await btn('Keep Pechay').click();
+      await expectText(page.locator('#toast-msg'), /Pechay kept for today · date unchanged/);
+      if (await page.locator('main .row', { hasText: 'Pechay' }).count()) throw new Error('kept item still in review');
+      await btn('Show all').click();
+      await btn(/^Ingredients/, false).click();
+      await expectText(page.locator('main .row', { hasText: 'Pechay' }), /Expired\s*Kept today/);
+      await page.locator('#toast-undo').click();
+    });
+
+    await job('18 Matching (D-086): Eggs is not Egg noodles', 2, async () => {
+      await nav('Cook').click();
+      await btn('All recipes').click();
+      await expectText(page.locator('#recipe-browser .row', { hasText: 'Stir-Fried Noodles' }), /Need 3: Egg noodles, Cabbage/);
+      await page.locator('#recipe-browser').getByRole('button', { name: /^Stir-Fried Noodles/ }).click();
+      await expectText(sheet, /You need: Egg noodles, Cabbage, Carrots/);
+      await closeSheet();
+    });
+
+    await job('19 Homes: Something different, balance line, Clear all data', 3, async () => {
+      await nav('Home').click();
+      await expectText(page.locator('main'), /Something different/);
+      await nav('Cook').click(); await btn('All recipes').click();
+      await page.locator('#recipe-browser').getByRole('button', { name: /^Rice Cooker Chicken & Rice/ }).click();
+      await expectText(page.locator('#balance-line'), /^Protein ✓ · Veg ✓ · Carb ✓$/);
+      await closeSheet();
+      await page.getByRole('button', { name: 'Settings, sync and backups' }).click();
+      await expectText(sheet, /Clear all data/);
+      await closeSheet();
+    });
+
     // Extra screens for measurement only.
     await nav('Home').click(); await snap('home-final');
     if (cfg.name === '360x780 light') await shot('proto-12-home-360-light');
@@ -303,6 +412,8 @@ function measure() {
 
     const minText = m.text.reduce((a, b) => (b.ratio < a.ratio ? b : a), { ratio: 99 });
     const minUi = m.ui.reduce((a, b) => (b.ratio < a.ratio ? b : a), { ratio: 99 });
+    const uiByKind = {};
+    m.ui.forEach(u => { const k = uiByKind[u.kind] = uiByKind[u.kind] || { samples: 0, min: { ratio: 99 } }; k.samples++; if (u.ratio < k.min.ratio) k.min = u; });
     const minTap = m.taps.reduce((a, b) => (Math.min(b.w, b.h) < Math.min(a.w, a.h) ? b : a), { w: 999, h: 999 });
     const uniq = arr => [...new Map(arr.map(x => [x.el, x])).values()];
     summary.push({
@@ -310,7 +421,7 @@ function measure() {
       jobs: jobs.map(j => (j.ok ? 'PASS ' : 'FAIL ') + j.name + (j.taps && j.ok ? ` (${j.taps} taps)` : '') + (j.err ? ' — ' + j.err : '')),
       consoleErrors: errors, networkRequests: requests, horizontalOverflow: overflow,
       textSamples: m.text.length, textBelow45: uniq(m.text.filter(t => t.ratio < 4.5)), minTextContrast: minText,
-      uiSamples: m.ui.length, uiBelow3: uniq(m.ui.filter(t => t.ratio < 3)), minUiContrast: minUi,
+      uiSamples: m.ui.length, uiBelow3: uniq(m.ui.filter(t => t.ratio < 3)), minUiContrast: minUi, uiByKind,
       tapSamples: m.taps.length, tapsBelow44: uniq(m.taps.filter(t => t.h < 44 || t.w < 44)), minTap
     });
     await ctx.close();

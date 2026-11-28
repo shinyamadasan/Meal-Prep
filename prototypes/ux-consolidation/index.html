@@ -211,6 +211,7 @@ details.fold[open] > summary::after { transform: rotate(-90deg); }
 .sticky-actions .btn { flex: 1; }
 .toast { position: fixed; left: 16px; right: 16px; bottom: 76px; z-index: 60; max-width: 568px; margin: 0 auto; background: var(--text); color: var(--bg); border-radius: var(--r-md); padding: 6px 6px 6px 14px; min-height: 56px; display: flex; align-items: center; gap: 8px; font-size: 14px; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(10px); transition: .18s; pointer-events: none; }
 .toast.show { opacity: 1; transform: none; }
+.toast { --focus: var(--toast-link); } /* inverted surface: the ring uses the toast's own link colour */
 .toast.show button { pointer-events: auto; }
 .toast span { flex: 1; }
 .toast button { border: 0; background: transparent; color: var(--toast-link); font-weight: 700; min-height: 44px; min-width: 64px; padding: 0 12px; border-radius: var(--r); }
@@ -480,7 +481,7 @@ function parseAmt(q) {
 }
 const canon = u => { const k = String(u || '').toLowerCase().trim(); return UNITS[k] || [k.replace(/(ch|sh)es$/, '$1').replace(/s$/, ''), 1]; };
 function convert(v, from, to) { const [cf, ff] = canon(from), [ct, ft] = canon(to); return cf === ct ? v * ff / ft : null; }
-const amtText = (v, unit) => v == null ? '' : fmtQty(v) + (unit ? ' ' + unit : '');
+const amtText = (v, unit) => v == null ? '' : fmtQty(v) + (unit ? ' ' + (v <= 1 && /[^s]s$/.test(unit) ? unit.slice(0, -1) : unit) : '');
 function lotQty(x) {
   if (x.staple) return 'Staple';
   const v = x.amt !== undefined ? x.amt : x.qty;
@@ -640,7 +641,7 @@ function renderHome() {
   const quick = sortByReady(quickRecipes()).filter(r => missing(r).length === 0).slice(0, 3);
   // "Something different" (D-055/D-059): only when there is a cook history to differ from.
   const recent = new Set(S.history.map(h => h.rid));
-  const diff = S.history.length ? sortByReady(RECIPES).find(r => !recent.has(r.id) && !quick.includes(r) && missing(r).length === 0) : null;
+  const diff = S.history.length ? sortByReady(RECIPES).find(r => !recent.has(r.id) && !quick.includes(r) && missing(r).length <= 1) : null;
   const h = new Date().getHours();
   const greet = h < 11 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const toBuy = S.shop.length;
@@ -664,7 +665,7 @@ function renderHome() {
       <button class="mode-card" data-act="go" data-tab="cook" data-mode="prep"><b>Meal prep</b><span>${esc(planTxt)}</span></button>
     </div>
     ${quick.length ? `<div class="group-h">You can make right now</div>${quick.map(r => recipeRow(r)).join('')}` : ''}
-    ${diff ? `<div class="group-h">Something different</div><p class="row-meta" style="margin:0">You haven't cooked this lately, and you have everything for it.</p>${recipeRow(diff)}` : ''}
+    ${diff ? `<div class="group-h">Something different</div><p class="row-meta" style="margin:0">Not in your recent cooking, and you have most of it.</p>${recipeRow(diff)}` : ''}
   </div>
 
   ${att.length ? `<div class="card">

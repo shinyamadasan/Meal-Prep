@@ -3,7 +3,7 @@
     "config": "390x844 light",
     "jobs": [
       "PASS 1 What can I eat now (1 taps)",
-      "PASS 2 Cook something quick (4 taps)",
+      "PASS 2 Cook something quick (deducts amounts, never deletes untracked) (4 taps)",
       "PASS 3 Plan a meal-prep batch (from Home) (4 taps)",
       "PASS 4 I just shopped (2 taps)",
       "PASS 5 We're out of X (egg ranks Eggs first) (3 taps)",
@@ -11,45 +11,96 @@
       "PASS 7 Find a flavor (1 taps)",
       "PASS 8 Shop without a plan (2 taps)",
       "PASS 9 Flavor authoring: add, edit, delete, undo, style filter, starters (4 taps)",
-      "PASS 10 Favorites (2 taps)",
+      "PASS 10 Favorites (none hidden by the mode) (2 taps)",
       "PASS 11 Method chips (D-060) + filters (2 taps)",
       "PASS 12 Undo restores only its own change (3 taps)",
       "PASS 13 Serving scaler in recipe sheet (2 taps)",
       "PASS 14 Cook history (Settings › History) (2 taps)",
       "PASS 15 Remove expired (Kitchen ⋯) (3 taps)",
-      "PASS 16 Shop \"Not anymore?\" (3 taps)"
+      "PASS 16 Shop \"Not anymore?\" (3 taps)",
+      "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
+      "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1684,
-    "minTextContrast": {
-      "el": "button.btn.primary.block \"Start prep day\"",
-      "ratio": 4.65,
-      "at": "prep-day"
-    },
+    "textSamples": 1966,
     "textBelow45": [],
-    "uiSamples": 54,
-    "minUiContrast": {
-      "el": "#kitchen-badge \"6\"",
-      "ratio": 6.61,
-      "at": "home"
+    "minTextContrast": {
+      "el": "button.btn.sm.primary \"Eat 1\"",
+      "ratio": 4.65,
+      "at": "home+toast"
     },
+    "uiSamples": 1165,
     "uiBelow3": [],
-    "tapSamples": 879,
+    "minUiContrast": {
+      "kind": "border",
+      "el": "#cook-q \"Search recipes and flavors\"",
+      "ratio": 3.88,
+      "at": "cook-quick"
+    },
+    "uiByKind": {
+      "badge": {
+        "samples": 56,
+        "min": {
+          "kind": "badge",
+          "el": "#kitchen-badge \"6\"",
+          "ratio": 6.61,
+          "at": "home"
+        }
+      },
+      "focus": {
+        "samples": 1025,
+        "min": {
+          "kind": "focus",
+          "el": "button.btn.sm \"Open Shop\"",
+          "ratio": 6.88,
+          "at": "picker"
+        }
+      },
+      "selected": {
+        "samples": 33,
+        "min": {
+          "kind": "selected",
+          "el": "button \"Quick cook\"",
+          "ratio": 6.89,
+          "at": "cook-quick"
+        }
+      },
+      "border": {
+        "samples": 40,
+        "min": {
+          "kind": "border",
+          "el": "#cook-q \"Search recipes and flavors\"",
+          "ratio": 3.88,
+          "at": "cook-quick"
+        }
+      },
+      "checkbox": {
+        "samples": 11,
+        "min": {
+          "kind": "checkbox",
+          "el": "span.check \"\"",
+          "ratio": 6.67,
+          "at": "picker"
+        }
+      }
+    },
+    "tapSamples": 1025,
+    "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
       "w": 44,
       "h": 44,
       "at": "home"
-    },
-    "tapsBelow44": []
+    }
   },
   {
     "config": "390x844 dark",
     "jobs": [
       "PASS 1 What can I eat now (1 taps)",
-      "PASS 2 Cook something quick (4 taps)",
+      "PASS 2 Cook something quick (deducts amounts, never deletes untracked) (4 taps)",
       "PASS 3 Plan a meal-prep batch (from Home) (4 taps)",
       "PASS 4 I just shopped (2 taps)",
       "PASS 5 We're out of X (egg ranks Eggs first) (3 taps)",
@@ -57,45 +108,96 @@
       "PASS 7 Find a flavor (1 taps)",
       "PASS 8 Shop without a plan (2 taps)",
       "PASS 9 Flavor authoring: add, edit, delete, undo, style filter, starters (4 taps)",
-      "PASS 10 Favorites (2 taps)",
+      "PASS 10 Favorites (none hidden by the mode) (2 taps)",
       "PASS 11 Method chips (D-060) + filters (2 taps)",
       "PASS 12 Undo restores only its own change (3 taps)",
       "PASS 13 Serving scaler in recipe sheet (2 taps)",
       "PASS 14 Cook history (Settings › History) (2 taps)",
       "PASS 15 Remove expired (Kitchen ⋯) (3 taps)",
-      "PASS 16 Shop \"Not anymore?\" (3 taps)"
+      "PASS 16 Shop \"Not anymore?\" (3 taps)",
+      "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
+      "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1684,
+    "textSamples": 1966,
+    "textBelow45": [],
     "minTextContrast": {
       "el": "div.thumb \"T\"",
       "ratio": 4.8,
       "at": "home"
     },
-    "textBelow45": [],
-    "uiSamples": 54,
-    "minUiContrast": {
-      "el": "#kitchen-badge \"6\"",
-      "ratio": 5.3,
-      "at": "home"
-    },
+    "uiSamples": 1165,
     "uiBelow3": [],
-    "tapSamples": 879,
+    "minUiContrast": {
+      "kind": "border",
+      "el": "#cook-q \"Search recipes and flavors\"",
+      "ratio": 3.76,
+      "at": "cook-quick"
+    },
+    "uiByKind": {
+      "badge": {
+        "samples": 56,
+        "min": {
+          "kind": "badge",
+          "el": "#kitchen-badge \"6\"",
+          "ratio": 5.3,
+          "at": "home"
+        }
+      },
+      "focus": {
+        "samples": 1025,
+        "min": {
+          "kind": "focus",
+          "el": "button.btn.sm \"Open Shop\"",
+          "ratio": 5.07,
+          "at": "picker"
+        }
+      },
+      "selected": {
+        "samples": 33,
+        "min": {
+          "kind": "selected",
+          "el": "button \"All 9\"",
+          "ratio": 6.31,
+          "at": "cook-quick"
+        }
+      },
+      "border": {
+        "samples": 40,
+        "min": {
+          "kind": "border",
+          "el": "#cook-q \"Search recipes and flavors\"",
+          "ratio": 3.76,
+          "at": "cook-quick"
+        }
+      },
+      "checkbox": {
+        "samples": 11,
+        "min": {
+          "kind": "checkbox",
+          "el": "span.check \"\"",
+          "ratio": 6.92,
+          "at": "picker"
+        }
+      }
+    },
+    "tapSamples": 1025,
+    "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
       "w": 44,
       "h": 44,
       "at": "home"
-    },
-    "tapsBelow44": []
+    }
   },
   {
     "config": "360x780 light",
     "jobs": [
       "PASS 1 What can I eat now (1 taps)",
-      "PASS 2 Cook something quick (4 taps)",
+      "PASS 2 Cook something quick (deducts amounts, never deletes untracked) (4 taps)",
       "PASS 3 Plan a meal-prep batch (from Home) (4 taps)",
       "PASS 4 I just shopped (2 taps)",
       "PASS 5 We're out of X (egg ranks Eggs first) (3 taps)",
@@ -103,45 +205,96 @@
       "PASS 7 Find a flavor (1 taps)",
       "PASS 8 Shop without a plan (2 taps)",
       "PASS 9 Flavor authoring: add, edit, delete, undo, style filter, starters (4 taps)",
-      "PASS 10 Favorites (2 taps)",
+      "PASS 10 Favorites (none hidden by the mode) (2 taps)",
       "PASS 11 Method chips (D-060) + filters (2 taps)",
       "PASS 12 Undo restores only its own change (3 taps)",
       "PASS 13 Serving scaler in recipe sheet (2 taps)",
       "PASS 14 Cook history (Settings › History) (2 taps)",
       "PASS 15 Remove expired (Kitchen ⋯) (3 taps)",
-      "PASS 16 Shop \"Not anymore?\" (3 taps)"
+      "PASS 16 Shop \"Not anymore?\" (3 taps)",
+      "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
+      "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1661,
-    "minTextContrast": {
-      "el": "button.btn.primary.block \"Start prep day\"",
-      "ratio": 4.65,
-      "at": "prep-day"
-    },
+    "textSamples": 1940,
     "textBelow45": [],
-    "uiSamples": 54,
-    "minUiContrast": {
-      "el": "#kitchen-badge \"6\"",
-      "ratio": 6.61,
-      "at": "home"
+    "minTextContrast": {
+      "el": "button.btn.sm.primary \"Eat 1\"",
+      "ratio": 4.65,
+      "at": "home+toast"
     },
+    "uiSamples": 1148,
     "uiBelow3": [],
-    "tapSamples": 866,
+    "minUiContrast": {
+      "kind": "border",
+      "el": "#cook-q \"Search recipes and flavors\"",
+      "ratio": 3.88,
+      "at": "cook-quick"
+    },
+    "uiByKind": {
+      "badge": {
+        "samples": 56,
+        "min": {
+          "kind": "badge",
+          "el": "#kitchen-badge \"6\"",
+          "ratio": 6.61,
+          "at": "home"
+        }
+      },
+      "focus": {
+        "samples": 1010,
+        "min": {
+          "kind": "focus",
+          "el": "button.btn.sm \"Open Shop\"",
+          "ratio": 6.88,
+          "at": "picker"
+        }
+      },
+      "selected": {
+        "samples": 32,
+        "min": {
+          "kind": "selected",
+          "el": "button \"Quick cook\"",
+          "ratio": 6.89,
+          "at": "cook-quick"
+        }
+      },
+      "border": {
+        "samples": 39,
+        "min": {
+          "kind": "border",
+          "el": "#cook-q \"Search recipes and flavors\"",
+          "ratio": 3.88,
+          "at": "cook-quick"
+        }
+      },
+      "checkbox": {
+        "samples": 11,
+        "min": {
+          "kind": "checkbox",
+          "el": "span.check \"\"",
+          "ratio": 6.67,
+          "at": "picker"
+        }
+      }
+    },
+    "tapSamples": 1010,
+    "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
       "w": 44,
       "h": 44,
       "at": "home"
-    },
-    "tapsBelow44": []
+    }
   },
   {
     "config": "360x780 dark",
     "jobs": [
       "PASS 1 What can I eat now (1 taps)",
-      "PASS 2 Cook something quick (4 taps)",
+      "PASS 2 Cook something quick (deducts amounts, never deletes untracked) (4 taps)",
       "PASS 3 Plan a meal-prep batch (from Home) (4 taps)",
       "PASS 4 I just shopped (2 taps)",
       "PASS 5 We're out of X (egg ranks Eggs first) (3 taps)",
@@ -149,38 +302,89 @@
       "PASS 7 Find a flavor (1 taps)",
       "PASS 8 Shop without a plan (2 taps)",
       "PASS 9 Flavor authoring: add, edit, delete, undo, style filter, starters (4 taps)",
-      "PASS 10 Favorites (2 taps)",
+      "PASS 10 Favorites (none hidden by the mode) (2 taps)",
       "PASS 11 Method chips (D-060) + filters (2 taps)",
       "PASS 12 Undo restores only its own change (3 taps)",
       "PASS 13 Serving scaler in recipe sheet (2 taps)",
       "PASS 14 Cook history (Settings › History) (2 taps)",
       "PASS 15 Remove expired (Kitchen ⋯) (3 taps)",
-      "PASS 16 Shop \"Not anymore?\" (3 taps)"
+      "PASS 16 Shop \"Not anymore?\" (3 taps)",
+      "PASS 17 Keep an expired item (today only, date unchanged) (2 taps)",
+      "PASS 18 Matching (D-086): Eggs is not Egg noodles (2 taps)",
+      "PASS 19 Homes: Something different, balance line, Clear all data (3 taps)"
     ],
     "consoleErrors": [],
     "networkRequests": [],
     "horizontalOverflow": [],
-    "textSamples": 1661,
+    "textSamples": 1940,
+    "textBelow45": [],
     "minTextContrast": {
       "el": "div.thumb \"T\"",
       "ratio": 4.8,
       "at": "home"
     },
-    "textBelow45": [],
-    "uiSamples": 54,
-    "minUiContrast": {
-      "el": "#kitchen-badge \"6\"",
-      "ratio": 5.3,
-      "at": "home"
-    },
+    "uiSamples": 1148,
     "uiBelow3": [],
-    "tapSamples": 866,
+    "minUiContrast": {
+      "kind": "border",
+      "el": "#cook-q \"Search recipes and flavors\"",
+      "ratio": 3.76,
+      "at": "cook-quick"
+    },
+    "uiByKind": {
+      "badge": {
+        "samples": 56,
+        "min": {
+          "kind": "badge",
+          "el": "#kitchen-badge \"6\"",
+          "ratio": 5.3,
+          "at": "home"
+        }
+      },
+      "focus": {
+        "samples": 1010,
+        "min": {
+          "kind": "focus",
+          "el": "button.btn.sm \"Open Shop\"",
+          "ratio": 5.07,
+          "at": "picker"
+        }
+      },
+      "selected": {
+        "samples": 32,
+        "min": {
+          "kind": "selected",
+          "el": "button \"All 9\"",
+          "ratio": 6.31,
+          "at": "cook-quick"
+        }
+      },
+      "border": {
+        "samples": 39,
+        "min": {
+          "kind": "border",
+          "el": "#cook-q \"Search recipes and flavors\"",
+          "ratio": 3.76,
+          "at": "cook-quick"
+        }
+      },
+      "checkbox": {
+        "samples": 11,
+        "min": {
+          "kind": "checkbox",
+          "el": "span.check \"\"",
+          "ratio": 6.92,
+          "at": "picker"
+        }
+      }
+    },
+    "tapSamples": 1010,
+    "tapsBelow44": [],
     "minTap": {
       "el": "button.icon-btn \"\"",
       "w": 44,
       "h": 44,
       "at": "home"
-    },
-    "tapsBelow44": []
+    }
   }
 ]
