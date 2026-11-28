@@ -602,7 +602,9 @@ converts one on its own.
   `pantry-staple`, which switches off `pantryFridgeSafety()`. So a conversion is allowed only when the
   item's `pantrySafety()` verdict for the household day (the same one `get_inventory` returns) is
   usable before the conversion AND the converted record gets the same `status`, `reason`, `usable`
-  and `daysLeft`. Otherwise it is refused as `unsafe_conversion:` (zero writes, `requestId` not
+  and `daysLeft` AND keeps any fridge safety limit that applied (`pantryFridgeSafety()` is not
+  switched off — otherwise a leftover whose own shelf life is under its limit would read the same
+  today but stay usable after the limit passes). Otherwise it is refused as `unsafe_conversion:` (zero writes, `requestId` not
   spent): chat keeps the item as it is and asks the user to check it in the app. Examples: a fridge
   leftover with no bought date or past its fridge limit, raw protein with no bought date, and an
   in-date leftover whose 4-day fridge limit would stop applying. The "before" verdict is read

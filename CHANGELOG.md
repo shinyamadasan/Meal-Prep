@@ -5,6 +5,11 @@
 
 ---
 
+## TASK-098 — re-review fixes (Claude, 2026-11-27; branch task-098-stock-levels)
+changed: `operations/inventory.js` `requireSafeConversion()` also refuses when `pantryFridgeSafety()` applies before the conversion and not after (MF-1b: a leftover whose own shelf life/best-before is under its fridge limit read the same today but stayed usable after the limit). `markInStock()` clears `suggestDismissed` when it raises a staple to full (same as `set_stock_level` full / app `syncStapleToGrocery`); the already-full no-op is unchanged. `set_stock_level` description names `unsafe_conversion`. README safety-gate paragraph updated.
+correction to the earlier TASK-098 entry: the conversion gate compares status, reason, usable **and daysLeft**; the app paths that clear `suggestDismissed` are `syncStapleToGrocery` (called from `cycleStapleLevel`, `setBrowserItemLevel`, `applyPurchaseToStock`).
+tests: 3 new in `test/mcp-stock-level.node.js` (5 MF-1b records refused; kimchi/baking soda/freezer leftover still convert; mark_in_stock dismissal + no-op). Disabling the new check fails 1 test.
+
 ## TASK-098 — review fixes (branch: task-098-stock-levels; commit abf7373)
 Builder: Claude sub-agent standing in for Codex (run cut off by a usage limit after committing; this
 evidence entry was added by Claude when resuming, 2026-11-27). Fixes for the independent STRICT review FAIL:

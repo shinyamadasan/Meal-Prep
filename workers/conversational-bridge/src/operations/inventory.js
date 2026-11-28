@@ -536,10 +536,19 @@ function requireSafeConversion(record, updated, ingredientId, today) {
   const after = pantrySafety(updated, today);
   const same = before.status === after.status && before.reason === after.reason &&
     before.usable === after.usable && before.daysLeft === after.daysLeft;
-  if (!before.usable || !same) {
+  // Re-review MF-1b: an identical verdict TODAY is not enough. When the item's own shelf life or
+  // best-before is at or under its fridge limit, both reads show the sooner date today, but the
+  // converted record has lost the fridge limit for every later day. Refuse whenever a fridge safety
+  // limit applies before and not after (not on a food-class change alone: kimchi in the fridge has
+  // no limit either way and converts).
+  const dropsFridgeLimit = FoodSafety.pantryFridgeSafety(base, today) != null &&
+    FoodSafety.pantryFridgeSafety(updated, today) == null;
+  if (!before.usable || !same || dropsFridgeLimit) {
     throw new ValidationError(
       'unsafe_conversion: ingredientId "' + ingredientId + '" cannot be made a staple from chat: ' +
       (!before.usable ? 'its safety check says it is not usable now (' + before.label + ')' :
+        dropsFridgeLimit && same ? 'making it a staple would remove its fridge safety limit (' + before.label + ' today, but ' +
+          'the limit would no longer apply on later days)' :
         'making it a staple would change its safety check (' + before.label + ' -> ' + after.label + ')') +
       '. Keep the item as it is and ask the user to check it in the app.',
       { field: 'makeStaple', code: 'unsafe_conversion', safety: before }
@@ -594,6 +603,9 @@ export function markInStock(pantry, { ingredientId }) {
   }
   const next = pantry.slice();
   const updated = Object.assign({}, record, { stockLevel: 'full', updatedAt: new Date().toISOString() });
+  // Same as set_stock_level full (and the app's syncStapleToGrocery): a restocked staple must be
+  // able to reach Shop again when it next runs low (TASK-098 re-review should-fix 1).
+  delete updated.suggestDismissed;
   next[index] = updated;
   return { pantry: next, item: toInventoryItem(updated), unchanged: false };
 }

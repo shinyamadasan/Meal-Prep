@@ -602,3 +602,45 @@ test('MF-1: a usable fridge leftover is refused when the staple verdict would di
     assert.deepEqual(await safetyOf(b, 'lo'), before);
   }
 });
+
+// ── TASK-098 re-review ─────────────────────────────────────────────────────────────────────────
+
+test('re-review MF-1b: a conversion that would switch off a fridge limit is refused even when today reads the same', () => {
+  const day = '2026-11-27';
+  const records = [
+    { id: 'a', name: 'Leftover adobo', category: 'Other', storage: 'fridge', purchaseDate: day, shelfLifeDays: 4 },
+    { id: 'a', name: 'Leftover adobo', category: 'Other', storage: 'fridge', purchaseDate: day, shelfLifeDays: 3 },
+    { id: 'a', name: 'Leftover curry', category: 'Other', storage: 'fridge', purchaseDate: day, dateMode: 'expiry', expiryDate: '2026-11-29', printedDateKind: 'best-before' },
+    { id: 'a', name: 'Chicken soup', storage: 'fridge', purchaseDate: day, shelfLifeDays: 1 },
+    { id: 'a', name: 'Leftover adobo', category: 'Other', storage: 'fridge', purchaseDate: day, shelfLifeDays: 4, stockLevel: 'empty' }
+  ];
+  for (const record of records) {
+    assert.throws(() => inventory.setStockLevel([record], { ingredientId: 'a', level: 'full', makeStaple: true }, day),
+      (error) => error.code === 'validation_failed' && /^unsafe_conversion: /.test(error.message) && /check it in the app/.test(error.message),
+      JSON.stringify(record));
+  }
+});
+
+test('re-review MF-1b: no over-refusal — fridge food without a fridge limit still converts', () => {
+  const day = '2026-11-27';
+  for (const record of [
+    { id: 'k', name: 'Kimchi', category: 'Other', storage: 'fridge' },
+    { id: 'k', name: 'Baking soda', category: 'Pantry', storage: 'counter', staple: false },
+    { id: 'k', name: 'Leftover adobo', category: 'Other', storage: 'freezer' }
+  ]) {
+    const r = inventory.setStockLevel([record], { ingredientId: 'k', level: 'full', makeStaple: true }, day);
+    assert.equal(r.converted, true, JSON.stringify(record));
+  }
+});
+
+test('re-review should-fix 1: mark_in_stock clears suggestDismissed like set_stock_level full; a full staple stays a no-op', () => {
+  const low = { id: 's', name: 'Salt', category: 'Pantry', stockLevel: 'low', suggestDismissed: true };
+  const r = inventory.markInStock([low], { ingredientId: 's' });
+  assert.equal(r.unchanged, false);
+  assert.equal(r.pantry[0].stockLevel, 'full');
+  assert.equal('suggestDismissed' in r.pantry[0], false);
+  const full = { id: 's', name: 'Salt', category: 'Pantry', stockLevel: 'full' };
+  const same = inventory.markInStock([full], { ingredientId: 's' });
+  assert.equal(same.unchanged, true);
+  assert.equal(same.pantry[0], full);
+});

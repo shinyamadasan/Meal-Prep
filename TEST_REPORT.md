@@ -5,6 +5,9 @@
 
 ---
 
+## TASK-098 · 2026-11-27 · re-review fixes (MF-1b, should-fix 1-2)
+suite: `npm run test:bridge` 419/419 PASS (416 + 3). Mutation: removing the `dropsFridgeLimit` refusal → 1 failure. `node --check` + `git diff --check` clean. App suite unaffected (bridge-only change); last full run 911/912 with the known TASK-102 date failure.
+
 ## TASK-098 review fixes · 2026-11-27 · commit abf7373
 suite: `npm run test:bridge` 416/416 PASS; `npm run test:ledger-contract` 13/13 PASS; `npm test` (local)
 911/912 — the 1 failure is `tests/tombstone-namespace.spec.js` "Firestore payload and load round-trip
