@@ -591,6 +591,10 @@ test('clear all data tombstones every collection in its own namespace', async ({
 });
 
 test.beforeEach(async ({ page }) => {
+  // The fixtures use fixed dates (TOMB, OLD, lastSaved). purgeOldTombstones() forgets tombstones
+  // older than 180 days, so without a pinned clock TOMB (2026-06-01) is purged once the real date
+  // passes 2026-11-28 and the round-trip test fails. Pin "now" inside the fixtures' window (TASK-102).
+  await page.clock.setFixedTime(new Date('2026-08-15T12:00:00.000Z'));
   await page.addInitScript(() => {
     window.TOMB = '2026-06-01T00:00:00.000Z';
     window.OLD = '2026-01-01T00:00:00.000Z';
