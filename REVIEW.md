@@ -4,6 +4,24 @@
 > After writing: set the task status in TASKS.md to `approved` or back to `codex`.
 
 ---
+## Review TASK-098 (PROP-041 P2-3 + P2-0b staple stock levels, presence conversions) — APPROVED (held) — Claude, 2026-11-27
+branch `task-098-stock-levels` @ `aa6863f` (base `99a4bce`), merged `--no-ff` into `prop041-p2` (`33cb4ff`).
+Three independent STRICT rounds:
+1. FAIL — MF-1: `makeStaple` switched off `pantryFridgeSafety()` (a fridge leftover with no/old bought date read
+   usable); MF-2: `suggestDismissed` kept on full/ok (app `syncStapleToGrocery` clears it); 6 should-fixes.
+   Fixed in `abf7373` (conversion gate on the household-day `pantrySafety` verdict; dismissal parity).
+2. FAIL — MF-1b: the gate compared today only; a leftover whose own shelf life / best-before was under its fridge
+   limit read the same today but stayed usable after the limit. Claude fixed in `78d15e6`/`aa6863f`: refuse when a
+   fridge limit applies before and not after; `mark_in_stock` also clears `suggestDismissed` when raising to full
+   (no-op on an already-full staple unchanged — P1 smoke 6.4).
+3. PASS — exhaustive probe 4,788,000 records (520 names × categories × storage × dates × date variants × strays):
+   every allowed conversion reads identical status/reason/daysLeft at +0/+1/+3/+5/+10/+30 days; no over-refusal
+   (kimchi, condiments, freezer/counter items, tofu); undo exact through `undo_request`, incl. `suggestDismissed`.
+Gates: `test:bridge` 419/419; `test:ledger-contract` 13/13; `npm test` 911/912 (the one = calendar failure fixed by
+TASK-102, fails on `main` too); `git diff --check` clean. No app, `shared/` or ledger change.
+Follow-up (app, frozen D-090): the app's own `togglePantryStaple` can switch off the fridge limit the same way.
+Gate: `approved` (held) — red zone (D-032): bridge write path on the household pantry. No deploy.
+
 ## Review TASK-102 (test-only: pin the clock in tombstone-namespace.spec.js) — APPROVED (held) — Claude, 2026-11-27
 branch `task-102-tombstone-fixture-date` @ `1d29be2` (base `4ccc930`). Independent reviewer: PASS, no must-fix.
 - Cause confirmed: with the old spec the round-trip test fails today (1 failed / 21 passed); with the branch, 22/22.
