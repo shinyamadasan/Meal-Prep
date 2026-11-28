@@ -579,14 +579,21 @@ The bridge now uses the app's own rule from the shared core.
 Two MCP write tools, both through `requestWriteTool()` (required `requestId` + `expectedRevision`,
 one atomic commit with the request record, undoable). Logic lives in `operations/pantryItems.js`
 and uses only the shared rules (`MealPrepFoodSafety`) and `MealPrepReadyFoodContract`; no app-only
-table (`PANTRY_KNOWLEDGE`) is copied. The app's loose `inferCategory()` substring match is used only
-where it is stricter: it may set category `Protein` for a name that already reads as raw meat,
-poultry or fish (`Chicken Thighs` -> `Chicken Thigh`), never any other category.
+table (`PANTRY_KNOWLEDGE`) is copied. Every refusal below happens before the commit: zero writes, and
+the `requestId` stays unspent (the same id can carry a corrected call).
+
+"Safety lot" below = a lot with a fridge safety limit (`pantryFridgeSafety` on the lot as if in the
+fridge: raw meat, poultry, seafood, ground, variety, sausage, cured or cooked food), or a meat or
+fish name `INGREDIENT_DB` does not know (see `unrecognized_food`). Messages call it "raw meat,
+poultry or fish, or a food the bridge cannot classify".
 
 - **`add_pantry_item`** creates ONE lot shaped like the app's manual Add / grocery `buy_` path:
-  `id` `buy_<ms>_<rand5>`; `name` (trimmed, used as given); `category` = exact-name `INGREDIENT_DB`
-  category, else the category of the entry it is an exact alias of (`chicken fillet` -> `Protein`),
-  else `Protein` by the loose rule above, else `''`; `purchaseDate` = `boughtDate`, default the household day
+  `id` `buy_<ms>_<rand5>`; `name` (trimmed, used as given); `category` = the `INGREDIENT_DB` entry
+  for the exact name, else for an exact alias (`stockIngredientEntry`, so "chicken fillet" is stored
+  as Protein and the app's Kitchen card applies the poultry limit), else the app's loose
+  `inferCategory()` substring match **only when it gives Protein to a name that already reads as raw
+  meat, poultry or fish** (stricter: "Chicken Thighs" -> Protein; the looser cases such as "egg" ->
+  Eggplant are not copied), else `''`; `purchaseDate` = `boughtDate`, default the household day
   (`HOUSEHOLD_TIME_ZONE`), never in the future; `shelfLifeDays` = exact-name `INGREDIENT_DB` value,
   else `categoryShelfLife(category)` (the app's `ingredientShelfLife()`); `storage`; `quantity`
   (> 0, else `null`); `unit` (given, else the DB unit, else `''`); `staple` (given, else
@@ -596,64 +603,77 @@ poultry or fish (`Chicken Thighs` -> `Chicken Thigh`), never any other category.
   `updatedAt` now. Keys the app would leave `undefined` are omitted.
 - **Storage (D3).** A given storage wins (`storageSource: 'given'`). Otherwise
   `defaultInferStorage(name)` (`storageSource: 'inferred'`, stated back). Refused with
-  `needs_storage` when the shared rules give no storage (the name is not in `INGREDIENT_DB`) or when
-  the lot has a fridge safety limit (`pantryFridgeSafety` on the lot as if in the fridge: raw meat,
-  poultry, seafood, ground, variety, sausage, cured or cooked food). The same lots also need an
-  explicit `boughtDate` (`needs_bought_date`; never assumed to be today) and are never recorded on
-  the counter (`unsafe_storage`). A fridge lot already past its fridge safety limit is refused
-  (`past_safety_limit`). A fridge lot whose name matches a raw poultry / seafood / whole-cut /
-  variety / sausage rule (or the meat-only ground words `giniling`, `hamburger`, `stew meat`; not
-  `minced`, which also names minced garlic) but which `INGREDIENT_DB` does not know by name or alias
-  (so the shared limits would not apply) is refused as `unrecognized_food` instead of getting the
-  7-day default. For such unknown names a short list of non-meat words clears the match (`Goat
-  cheese`, `Lamb's lettuce`, `Steak sauce`, `Oyster mushrooms`, `Tuna mayo`, `Fish balls`,
-  `Artichoke hearts`, `Hearts of palm`, `Hamburger buns`); refusal messages say the name *may be*
-  raw meat, poultry or fish.
+  `needs_storage` when the shared rules give no storage (the name is not in `INGREDIENT_DB`) or for
+  a safety lot. Safety lots also need an explicit `boughtDate` (`needs_bought_date`; never assumed
+  to be today) and are never stored on the counter (`unsafe_storage`). A fridge lot already past its
+  fridge safety limit is refused (`past_safety_limit`). A fridge lot whose name matches a raw
+  poultry / seafood / whole-cut / variety / sausage rule, or the raw ground-meat words `giniling`,
+  `hamburger` and `stew meat` (not "minced", which also names prepared vegetables), but which the
+  shared limits cannot place (category not Protein) is refused as `unrecognized_food` instead of
+  getting the 7-day default. Names where the meat or fish word is part of a non-meat food are not
+  matched: cheese, mushroom, sauce, lettuce, palm, mayo, balls, artichoke, dressing, paste, broth,
+  stock, seasoning, chips, noodles, oil, buns, bread, milk, cream and similar ("Goat cheese",
+  "Lamb's lettuce", "Steak sauce", "Oyster mushrooms", "Tuna mayo", "Fish balls", "Artichoke
+  hearts", "Hearts of palm" are accepted in the fridge).
 - **Prepared ingredients (`prepared: true`).** `storage` fridge or freezer is required. In the
-  freezer with no printed date, `shelfLifeDays` = `READY_FOOD_CONTRACT.defaultFreezerLife` (90; not
-  capped at the raw fridge life: freezing is what makes it last). In the fridge, or with a printed
-  date, `shelfLifeDays` = `min(ready-food life for that storage, the raw shelf life above)` (the
-  printed date governs the verdict). `prepared` is not stored on the record. Raw lots are NOT
-  deducted (D2, TASK-100).
+  freezer with no printed date, `shelfLifeDays` = `READY_FOOD_CONTRACT.defaultFreezerLife` (not
+  capped at the raw fridge life; freezing is what makes it last). In the fridge, and whenever a
+  printed date is given, `shelfLifeDays` = `min(READY_FOOD_CONTRACT default life for that storage,
+  the raw shelf life above)`. Not stored on the record. Raw lots are NOT deducted (D2, TASK-100).
 - **Duplicate guard.** An active (not tombstoned) lot with the same name (case-insensitive,
-  trimmed), the same `purchaseDate` and the same storage (stored, else `defaultInferStorage`) is
-  `ambiguous`, naming its `ingredientId`(s): `add_stock` to it, or call again with
-  `confirmNewLot: true` and a new `requestId`. When either lot has a printed date, only
-  `confirmNewLot` is offered (`add_stock` has no printed-date input). A different day, storage or
-  printed date (both lots dated, dates differ) is a new lot without asking.
+  trimmed), the same `purchaseDate`, the same storage (stored, else `defaultInferStorage`) and the
+  same printed date (or neither has one) is `ambiguous`, naming its `ingredientId`(s). With no
+  printed date the choices are `add_stock` to it or `confirmNewLot: true`; with a printed date only
+  `confirmNewLot: true` is offered (`add_stock` has no printed-date input). A different day, storage
+  or printed date is a new lot.
 - **`update_pantry_item`** changes only `storage`, `purchaseDate` (`boughtDate`, or `thawedToday`
-  = household day), `expiryDate` / `dateMode` (`printedDate`; `null` clears both and the kind) and
-  `printedDateKind` (a new printed date is use-by unless `best-before` is sent). Moving a lot with a
-  fridge safety limit from the freezer to the fridge needs `thawedToday: true` or a `boughtDate`,
-  else `needs_thaw_date` (the thaw reminder). `thawedToday` is only valid with `storage: 'fridge'`
-  on a lot recorded in the freezer. Food safety on edits (each refusal writes nothing, spends no
-  `requestId`, and asks chat to have the user check the item in the app):
-  - a lot with a fridge safety limit (or an unknown name that reads as meat or fish) never goes on
-    the counter (`unsafe_storage`);
-  - it never leaves the fridge (or the counter) for the freezer while past its fridge limit
-    (`past_safety_limit`) or with no known bought date (`unknown_bought_date`): freezing does not
-    make past-limit food safe again;
-  - its bought date only moves earlier (`later_bought_date`), except when it leaves the freezer for
-    the fridge with `thawedToday` or a thaw `boughtDate`, which restarts the fridge clock;
-  - any move into the fridge applies the add path's `unrecognized_food` check;
-  - any lot leaving the freezer for the fridge whose `shelfLifeDays` is longer than its fridge life
-    (a frozen prepared lot: the ready-food fridge life, never above the raw item's; otherwise the
-    exact-name DB value or the category shelf life) needs the thaw day too, and `shelfLifeDays` is
-    capped at that fridge life. Such a lot is not moved to the counter (`unsafe_storage`). Unknown / tombstoned ids are `not_found`; lots `get_inventory`
-  flags `invalid-record` are `invalid_record`. Values already as asked -> `unchanged: true`, no user
-  document write (the request record is still kept, like `mark_in_stock`).
+  = household day), `expiryDate` / `dateMode` (`printedDate`; `null` clears both and the kind),
+  `printedDateKind` (a new printed date is use-by unless `best-before` is sent) and, when a lot
+  leaves the freezer for the fridge, `shelfLifeDays` (capped, below). `thawedToday` is only valid
+  with `storage: 'fridge'` on a lot recorded in the freezer. Unknown / tombstoned ids are
+  `not_found`; lots `get_inventory` flags `invalid-record` are `invalid_record`. Values already as
+  asked -> `unchanged: true`, no user document write (the request record is still kept, like
+  `mark_in_stock`).
+- **Edits never make a safety lot read safer than it is** (STRICT review fixes). Freezing does not
+  make past-limit food safe again. Each refusal asks chat to have the user check the item in the app.
+  - `unrecognized_food`: a move INTO the fridge (from the freezer, the counter or an unknown place)
+    runs the same check as the add path, so an unknown protein name never enters the fridge without
+    its limit, even with a thaw date.
+  - `unsafe_storage`: a safety lot is never moved to, or edited while left on, the counter.
+  - `past_safety_limit` / `unknown_bought_date`: a safety lot is not moved out of the fridge (or the
+    counter) into the freezer while it is past its fridge limit, or when its bought date is unknown —
+    checked on both the current and the corrected date. For a name the shared limits cannot place,
+    the clock uses the rule its name matches.
+  - `later_bought_date` / `unknown_bought_date`: a safety lot's `boughtDate` may only move EARLIER,
+    and is not set at all when the stored date is unknown. The one exception is leaving the freezer
+    for the fridge with `thawedToday` or an explicit thaw `boughtDate`, which restarts the fridge
+    clock.
+  - `needs_thaw_date`: a safety lot leaving the freezer for the fridge, or ANY lot leaving the
+    freezer for the fridge whose `shelfLifeDays` is longer than its fridge life, needs `thawedToday`
+    or a `boughtDate` (the thaw reminder). Its `shelfLifeDays` is then capped at the fridge life:
+    for a bridge-prepared frozen lot (`shelfLifeDays` = the ready-food freezer life, longer than the
+    raw life) `min(READY_FOOD_CONTRACT.defaultFridgeLife, raw life)`; otherwise the raw life (exact-
+    name DB value, else the category default). Such a long-life frozen lot is not moved to the
+    counter (`unsafe_storage`).
 - **Results** state back `item` = the `get_inventory` item for the stored record (same `safety`
   computation) plus `shelfLifeDays`, and `storageSource`; `add_pantry_item` adds `prepared`,
   `update_pantry_item` adds `unchanged` and `thawed`.
 - **Undo.** `undo_request` removes an added lot with a fresh tombstone and restores an edited lot's
-  earlier values (TASK-095 planner, unchanged), refusing `changed_since` after a later edit.
-- **Known gaps (out of scope, shared data):** the shared `FRIDGE_SAFETY_LIMITS` regex in
-  `shared/foodSafety.js` does not list many fish species (cod, mackerel, sardine, dory, ...) or cured
-  meats (salami, pepperoni, prosciutto, tocino, tapa, ...), so an unknown name made only of those
-  words is not recognized as meat or fish by this bridge either. The bridge does not widen the
-  shared rules; that belongs to a `shared/` change. Ground meat named only `ground <x>` or
-  `minced <x>` with an unknown `<x>` is likewise not caught (the word also names ground spices and
-  minced garlic).
+  earlier values, `shelfLifeDays` included (TASK-095 planner, unchanged), refusing `changed_since`
+  after a later edit.
+
+### Known gaps (TASK-099)
+
+- **Fish species and cured meats are missing from the shared regex.** `FRIDGE_SAFETY_LIMITS` in
+  `shared/foodSafety.js` does not list many fish and shellfish names (cod, lobster, mackerel,
+  sardine, anchovy, halibut, trout, octopus...) or cured meats (salami, prosciutto, pepperoni,
+  tocino, tapa...). A name the ingredient list does not know that uses only those words is not
+  caught by `unrecognized_food` and gets the category default. Fixing it is a shared-rule change
+  (app + bridge parity), outside this bridge-only task.
+- **"Prepared" is not stored on the record** (no new pantry field). A frozen prepared lot is
+  recognised on the way out of the freezer by its ready-food freezer `shelfLifeDays`; a lot whose
+  shelf life the user set by hand to that same value is treated the same way (the cap is the
+  stricter outcome).
 
 ## TASK-069 authenticated MCP write pilot (Phase B2A, local only)
 

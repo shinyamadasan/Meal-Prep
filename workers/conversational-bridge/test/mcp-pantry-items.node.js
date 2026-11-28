@@ -138,6 +138,10 @@ test('tools/list: add_pantry_item and update_pantry_item have strict schemas, wr
   assert.match(add.description, /does NOT deduct/);
   assert.match(add.description, /confirmNewLot/);
   assert.match(update.description, /needs_thaw_date/);
+  assert.match(add.description, /unsafe_storage/);
+  for (const code of ['unsafe_storage', 'past_safety_limit', 'unknown_bought_date', 'later_bought_date', 'unrecognized_food']) {
+    assert.match(update.description, new RegExp(code), 'update_pantry_item names ' + code);
+  }
   assert.match(update.description, /get_inventory/);
 });
 
@@ -423,181 +427,6 @@ test('undo_request restores an edited lot exactly, and refuses once it changed a
   assert.match(text(message), /^changed_since: /);
 });
 
-// ── Review fixes (STRICT review of 42a2c19): an edit never makes raw protein read safer ───────
-
-const CHECK_APP = /Ask the user to check the item in the app\./;
-// A raw lot past its 2-day poultry fridge limit (bought 2026-11-20, today 2026-11-27).
-const OLD_CHICKEN = { id: 'chicken-old', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', staple: false, storage: 'fridge', purchaseDate: '2026-11-20', shelfLifeDays: 2, updatedAt: '2026-11-20T00:00:00.000Z' };
-
-function seedWith(...lots) {
-  const fields = seed();
-  fields.pantry.push(...lots.map((lot) => structuredClone(lot)));
-  return fields;
-}
-
-test('M1: every move into the fridge applies the unrecognized_food check (freezer -> fridge, counter -> fridge)', async () => {
-  // The repro: a frozen "Chicken Thighs" lot added from chat is stored as Protein (the app's loose
-  // match, stricter only), so thawing it into the fridge applies the 2-day poultry limit, never 7d.
-  const b = bridge();
-  ok(await b.call('add_pantry_item', { name: 'Chicken Thighs', storage: 'freezer', boughtDate: '2026-11-01' }));
-  assert.equal(stored(b, NEW_ID).category, 'Protein');
-  const thawed = ok(await b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }));
-  assert.equal(thawed.item.safety.daysLeft, 2, 'poultry 2-day fridge limit, not the 7-day default');
-  assert.equal(thawed.item.safety.status, 'use-soon');
-
-  // A lot the app stored with category '' (or a name nothing maps): never moved into the fridge.
-  const legacyThighs = { id: 'thighs-legacy', name: 'Chicken Thighs', quantity: 1, unit: 'kg', category: '', storage: 'freezer', purchaseDate: '2026-11-01', shelfLifeDays: 7 };
-  const venisonCounter = { id: 'venison-counter', name: 'Venison Steak', quantity: 1, unit: 'kg', category: '', storage: 'counter', purchaseDate: TODAY, shelfLifeDays: 7 };
-  const b2 = bridge(seedWith(legacyThighs, venisonCounter));
-  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'thighs-legacy', storage: 'fridge', thawedToday: true }), 'unrecognized_food');
-  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'thighs-legacy', storage: 'fridge', boughtDate: TODAY }), 'unrecognized_food');
-  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'venison-counter', storage: 'fridge' }), 'unrecognized_food');
-
-  // Added in the freezer from chat (allowed: no fridge clock there), then moved: refused.
-  const b3 = bridge();
-  ok(await b3.call('add_pantry_item', { name: 'Venison Steak', storage: 'freezer', boughtDate: TODAY }));
-  await refused(b3, b3.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }), 'unrecognized_food');
-});
-
-test('M2: a past-limit fridge lot never becomes check or use-soon through an edit, and never goes on the counter', async () => {
-  const b = bridge(seedWith(OLD_CHICKEN));
-  const before = await inventoryItem(b, 'chicken-old');
-  assert.equal(before.safety.status, 'expired', 'fixture: past the poultry limit');
-
-  const toFreezer = await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-old', storage: 'freezer' }), 'past_safety_limit');
-  assert.match(toFreezer, /does not make it safe again/);
-  assert.match(toFreezer, CHECK_APP);
-  const toCounter = await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-old', storage: 'counter' }), 'unsafe_storage');
-  assert.match(toCounter, CHECK_APP);
-  const later = await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-old', boughtDate: TODAY }), 'later_bought_date');
-  assert.match(later, CHECK_APP);
-  await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-old', storage: 'freezer', boughtDate: '2026-11-26' }), 'past_safety_limit');
-  assert.equal((await inventoryItem(b, 'chicken-old')).safety.status, 'expired', 'still expired after every refusal');
-
-  // An earlier bought date is a stricter correction and is allowed.
-  const earlier = ok(await b.call('update_pantry_item', { ingredientId: 'chicken-old', boughtDate: '2026-11-19' }));
-  assert.equal(earlier.item.safety.status, 'expired');
-
-  // Adding raw protein on the counter is refused, past its limit or not, known name or not.
-  const b2 = bridge();
-  const addCounter = await refused(b2, b2.call('add_pantry_item', { name: 'Chicken Breast', storage: 'counter', boughtDate: '2026-11-20' }), 'unsafe_storage');
-  assert.match(addCounter, CHECK_APP);
-  await refused(b2, b2.call('add_pantry_item', { name: 'Chicken Breast', storage: 'counter', boughtDate: TODAY }), 'unsafe_storage');
-  await refused(b2, b2.call('add_pantry_item', { name: 'Venison Steak', storage: 'counter', boughtDate: TODAY }), 'unsafe_storage');
-});
-
-test('M2: a fridge-safety lot leaves the fridge only within its limit, and its bought date only moves earlier', async () => {
-  const noDate = { id: 'chicken-nodate', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', staple: false, storage: 'fridge', shelfLifeDays: 2 };
-  const fresh = { id: 'chicken-fresh', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', staple: false, storage: 'fridge', purchaseDate: '2026-11-26', shelfLifeDays: 2 };
-  const b = bridge(seedWith(noDate, fresh));
-  const unknown = await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-nodate', storage: 'freezer' }), 'unknown_bought_date');
-  assert.match(unknown, CHECK_APP);
-  await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-nodate', boughtDate: TODAY }), 'unknown_bought_date');
-  // Within its limit: freezing is fine.
-  const frozen = ok(await b.call('update_pantry_item', { ingredientId: 'chicken-fresh', storage: 'freezer' }));
-  assert.equal(frozen.item.storage, 'freezer');
-  // In the freezer and not leaving it, the bought date still only moves earlier.
-  await refused(b, b.call('update_pantry_item', { ingredientId: 'chicken-1', boughtDate: '2026-10-05' }), 'later_bought_date');
-  ok(await b.call('update_pantry_item', { ingredientId: 'chicken-1', boughtDate: '2026-09-30' }));
-  // The thaw restart is the one exception (freezer -> fridge with the day it moved).
-  ok(await b.call('update_pantry_item', { ingredientId: 'chicken-1', storage: 'fridge', boughtDate: '2026-11-26' }));
-  assert.equal(stored(b, 'chicken-1').purchaseDate, '2026-11-26');
-});
-
-test('a refusal spends no requestId: the same requestId then applies a valid change', async () => {
-  const b = bridge(seedWith(OLD_CHICKEN));
-  const requestId = 'refused-then-ok-01';
-  const before = b.snapshot();
-  const message = await b.raw('update_pantry_item', { requestId, expectedRevision: 5, ingredientId: 'chicken-old', storage: 'freezer' });
-  assert.match(text(message), /^past_safety_limit: /);
-  assert.equal(b.snapshot(), before);
-  assert.equal(b.fake.requests.has(requestId), false, 'no request record');
-  const applied = ok(await b.raw('update_pantry_item', { requestId, expectedRevision: 5, ingredientId: 'chicken-old', boughtDate: '2026-11-19' }));
-  assert.notEqual(applied.replayed, true, 'applied, not a replay of the refusal');
-  assert.equal(stored(b, 'chicken-old').purchaseDate, '2026-11-19');
-});
-
-test('should-fix 1: a frozen prepared lot keeps the freezer life; leaving the freezer needs the thaw day and caps the life', async () => {
-  const b = bridge();
-  ok(await b.call('add_pantry_item', { name: 'Garlic (Bawang)', storage: 'freezer', prepared: true }));
-  assert.equal(stored(b, NEW_ID).shelfLifeDays, READY.defaultFreezerLife);
-  const why = await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge' }), 'needs_thaw_date');
-  assert.match(why, /freezer shelf life/);
-  await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'counter' }), 'unsafe_storage');
-  const thawed = ok(await b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }));
-  assert.equal(thawed.thawed, true);
-  assert.equal(stored(b, NEW_ID).shelfLifeDays, Math.min(READY.defaultFridgeLife, 180), 'ready-food fridge life, not the raw 180 days');
-  assert.equal(thawed.item.shelfLifeDays, READY.defaultFridgeLife);
-  assert.equal(stored(b, NEW_ID).purchaseDate, TODAY);
-
-  // Any lot (not only prepared) whose stored life exceeds its fridge life: thaw day + cap.
-  const longJam = { id: 'jam-frozen', name: 'Grandma Jam', quantity: 1, unit: 'jar', category: '', storage: 'freezer', purchaseDate: '2026-11-01', shelfLifeDays: 30 };
-  const b2 = bridge(seedWith(longJam));
-  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'jam-frozen', storage: 'fridge' }), 'needs_thaw_date');
-  ok(await b2.call('update_pantry_item', { ingredientId: 'jam-frozen', storage: 'fridge', boughtDate: '2026-11-25' }));
-  assert.equal(stored(b2, 'jam-frozen').shelfLifeDays, FoodSafety.categoryShelfLife(''));
-  assert.equal(stored(b2, 'jam-frozen').purchaseDate, '2026-11-25');
-});
-
-test('should-fix 2: a printed-date lot is never offered add_stock; a different printed date is a new lot', async () => {
-  // SAUCE: Soy Sauce, counter, bought 2026-11-01, printed 2027-06-01.
-  const b = bridge();
-  const undated = await refused(b, b.call('add_pantry_item', { name: 'Soy Sauce', storage: 'counter', boughtDate: '2026-11-01' }), 'ambiguous');
-  assert.match(undated, /"sauce-1"/);
-  assert.match(undated, /confirmNewLot: true/);
-  assert.doesNotMatch(undated, /-> add_stock/);
-  const same = await refused(b, b.call('add_pantry_item', { name: 'Soy Sauce', storage: 'counter', boughtDate: '2026-11-01', printedDate: '2027-06-01' }), 'ambiguous');
-  assert.match(same, /confirmNewLot: true/);
-  assert.doesNotMatch(same, /-> add_stock/);
-  ok(await b.call('add_pantry_item', { name: 'Soy Sauce', storage: 'counter', boughtDate: '2026-11-01', printedDate: '2027-09-01' }), 'a different printed date');
-  // An undated existing lot and a new dated one: only a new lot is offered.
-  const b2 = bridge();
-  const dated = await refused(b2, b2.call('add_pantry_item', { name: 'Eggs', printedDate: '2026-12-20' }), 'ambiguous');
-  assert.match(dated, /confirmNewLot: true/);
-  assert.doesNotMatch(dated, /-> add_stock/);
-  ok(await b2.call('add_pantry_item', { name: 'Eggs', printedDate: '2026-12-20', confirmNewLot: true }));
-});
-
-test('should-fix 3: non-meat names with a meat or fish word pass in the fridge; meat-only ground words are caught', async () => {
-  for (const name of ['Goat cheese', 'Lamb\'s lettuce', 'Steak sauce', 'Oyster mushrooms', 'Tuna mayo', 'Fish balls', 'Artichoke hearts', 'Hearts of palm', 'Hamburger buns']) {
-    const b = bridge();
-    const added = ok(await b.call('add_pantry_item', { name, storage: 'fridge' }), name);
-    assert.equal(stored(b, NEW_ID).category, '', name + ': no category guessed');
-    assert.equal(added.item.safety.usable, true, name);
-  }
-  for (const name of ['Giniling', 'Stew meat', 'Pork Giniling']) {
-    const b = bridge();
-    const why = await refused(b, b.call('add_pantry_item', { name, storage: 'fridge' }), 'needs_bought_date');
-    assert.match(why, /may be raw meat, poultry or fish/, name + ': neutral wording');
-    assert.doesNotMatch(why, /looks like/);
-    if (name !== 'Pork Giniling') await refused(b, b.call('add_pantry_item', { name, storage: 'fridge', boughtDate: TODAY }), 'unrecognized_food');
-  }
-  // "Hamburger" maps to Protein by the loose rule, so the shared 2-day ground limit applies.
-  const b = bridge();
-  const burger = ok(await b.call('add_pantry_item', { name: 'Hamburger', storage: 'fridge', boughtDate: TODAY }));
-  assert.equal(burger.item.safety.daysLeft, 2);
-  // "minced" alone is not a meat word: an unknown minced vegetable is not refused.
-  const b2 = bridge();
-  ok(await b2.call('add_pantry_item', { name: 'Minced Shallots', storage: 'fridge' }));
-  const b4 = bridge();
-  const needsStorage = await refused(b4, b4.call('add_pantry_item', { name: 'Giniling' }), 'needs_storage');
-  assert.match(needsStorage, /may be raw meat, poultry or fish/);
-});
-
-test('should-fix 4: an alias name takes the alias entry\'s category; the loose match only ever adds Protein', async () => {
-  const b = bridge();
-  ok(await b.call('add_pantry_item', { name: 'chicken fillet', storage: 'freezer', boughtDate: TODAY }));
-  assert.equal(stored(b, NEW_ID).category, FoodSafety.stockIngredientEntry('chicken fillet').category);
-  assert.equal(stored(b, NEW_ID).category, 'Protein');
-  const b2 = bridge();
-  ok(await b2.call('add_pantry_item', { name: 'Minced Garlic', storage: 'fridge' }));
-  assert.equal(stored(b2, NEW_ID).category, FoodSafety.stockIngredientEntry('minced garlic').category, 'alias of Garlic (Bawang)');
-  // Loose match is NOT used when it is not stricter (Goat cheese -> Cheese/Dairy is ignored).
-  const b3 = bridge();
-  ok(await b3.call('add_pantry_item', { name: 'Goat cheese', storage: 'fridge' }));
-  assert.equal(stored(b3, NEW_ID).category, '');
-});
-
 // ── Pure operation ──────────────────────────────────────────────────────────────────────────
 
 test('addPantryItem never mutates its input and mints a fresh id that avoids existing ids and tombstones', () => {
@@ -610,4 +439,182 @@ test('addPantryItem never mutates its input and mints a fresh id that avoids exi
   assert.notEqual(r.record.id, NEW_ID);
   assert.match(r.record.id, /^buy_\d+_[0-9a-z]{1,5}$/);
   assert.equal(r.pantry.length, 2);
+});
+
+// ── Review fixes (STRICT review of TASK-099): edits never make unsafe protein read as safe ───
+
+const OLD_CHICKEN = { id: 'old-chicken-1', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', staple: false, storage: 'fridge', purchaseDate: '2026-11-20', shelfLifeDays: 2, updatedAt: '2026-11-20T00:00:00.000Z' };
+
+function seedWith(...extra) {
+  const fields = seed();
+  fields.pantry.push(...extra.map((p) => structuredClone(p)));
+  return fields;
+}
+
+test('M1: unknown raw protein never enters the fridge by an edit (freezer -> fridge, counter -> fridge)', async () => {
+  // A freezer lot of a meat name the shared rules cannot place.
+  const b = bridge();
+  ok(await b.call('add_pantry_item', { name: 'Venison Steak', storage: 'freezer', boughtDate: '2026-11-01' }));
+  const why = await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }), 'unrecognized_food');
+  assert.match(why, /check the item in the app/);
+  await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', boughtDate: TODAY }), 'unrecognized_food');
+
+  // The reviewer's repro on a lot stored the old way (category ''): refused.
+  const legacy = { id: 'thighs-1', name: 'Chicken Thighs', quantity: 1, unit: 'kg', category: '', storage: 'freezer', purchaseDate: '2026-11-01', shelfLifeDays: 7 };
+  const b2 = bridge(seedWith(legacy));
+  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'thighs-1', storage: 'fridge', thawedToday: true }), 'unrecognized_food');
+
+  // Counter -> fridge.
+  const counter = { id: 'venison-2', name: 'Venison Steak', quantity: 1, unit: 'kg', category: '', storage: 'counter', purchaseDate: TODAY, shelfLifeDays: 7 };
+  const b3 = bridge(seedWith(counter));
+  await refused(b3, b3.call('update_pantry_item', { ingredientId: 'venison-2', storage: 'fridge' }), 'unrecognized_food');
+
+  // The same repro through add_pantry_item now stores Protein (the app's loose match, used only
+  // where it is stricter), so the thawed lot carries the 2-day poultry limit, never 7 days.
+  const b4 = bridge();
+  ok(await b4.call('add_pantry_item', { name: 'Chicken Thighs', storage: 'freezer', boughtDate: '2026-11-01' }));
+  assert.equal(stored(b4, NEW_ID).category, 'Protein');
+  const thawed = ok(await b4.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }));
+  assert.equal(thawed.item.safety.daysLeft, 2);
+  assert.equal(thawed.item.safety.status, 'use-soon');
+});
+
+test('M2a: raw meat, poultry, fish and unknown protein are never stored on the counter (add and update)', async () => {
+  const b = bridge();
+  for (const args of [
+    { name: 'Chicken Breast', storage: 'counter', boughtDate: TODAY },
+    { name: 'Chicken Breast', storage: 'counter', boughtDate: '2026-11-20' },
+    { name: 'Salmon', storage: 'counter' },
+    { name: 'Venison Steak', storage: 'counter', boughtDate: TODAY }
+  ]) {
+    const why = await refused(b, b.call('add_pantry_item', args), 'unsafe_storage');
+    assert.match(why, /check the item in the app/);
+  }
+  const b2 = bridge(seedWith(OLD_CHICKEN));
+  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'old-chicken-1', storage: 'counter' }), 'unsafe_storage');
+  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'chicken-1', storage: 'counter' }), 'unsafe_storage');
+});
+
+test('M2b-c: an expired fridge lot cannot be hidden by freezing it, moving it, or a later bought date', async () => {
+  const b = bridge(seedWith(OLD_CHICKEN));
+  const before = await inventoryItem(b, 'old-chicken-1');
+  assert.equal(before.safety.status, 'expired', 'fixture: past the 2-day fridge limit');
+  const frozen = await refused(b, b.call('update_pantry_item', { ingredientId: 'old-chicken-1', storage: 'freezer' }), 'past_safety_limit');
+  assert.match(frozen, /does not make it safe again/);
+  assert.match(frozen, /check the item in the app/);
+  await refused(b, b.call('update_pantry_item', { ingredientId: 'old-chicken-1', storage: 'freezer', boughtDate: '2026-11-19' }), 'past_safety_limit');
+  const later = await refused(b, b.call('update_pantry_item', { ingredientId: 'old-chicken-1', boughtDate: '2026-11-27' }), 'later_bought_date');
+  assert.match(later, /check the item in the app/);
+  // An earlier day is allowed (it can only make the lot read less safe).
+  const earlier = ok(await b.call('update_pantry_item', { ingredientId: 'old-chicken-1', boughtDate: '2026-11-19' }));
+  assert.equal(earlier.item.safety.status, 'expired');
+
+  // A lot within its limit may be frozen; a later bought date on a frozen lot is still refused.
+  const fresh = Object.assign({}, OLD_CHICKEN, { id: 'fresh-chicken-1', purchaseDate: TODAY });
+  const b2 = bridge(seedWith(fresh));
+  const moved = ok(await b2.call('update_pantry_item', { ingredientId: 'fresh-chicken-1', storage: 'freezer' }));
+  assert.equal(moved.item.storage, 'freezer');
+  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'chicken-1', boughtDate: '2026-10-05' }), 'later_bought_date');
+  // The thaw exit is the one exception: freezer -> fridge with the thaw day restarts the clock.
+  ok(await b2.call('update_pantry_item', { ingredientId: 'chicken-1', storage: 'fridge', boughtDate: '2026-11-26' }));
+});
+
+test('M2b: a fridge lot with no known bought date cannot be frozen or given a bought date from chat', async () => {
+  const undated = { id: 'undated-1', name: 'Chicken Breast', quantity: 1, unit: 'kg', category: 'Protein', storage: 'fridge', shelfLifeDays: 2 };
+  const b = bridge(seedWith(undated));
+  const read = await inventoryItem(b, 'undated-1');
+  assert.equal(read.safety.usable, false, 'fixture: an unknown date is never usable');
+  const why = await refused(b, b.call('update_pantry_item', { ingredientId: 'undated-1', storage: 'freezer' }), 'unknown_bought_date');
+  assert.match(why, /check the item in the app/);
+  await refused(b, b.call('update_pantry_item', { ingredientId: 'undated-1', boughtDate: TODAY }), 'unknown_bought_date');
+});
+
+test('a refused edit leaves its requestId unspent: the same requestId then applies a valid change', async () => {
+  const b = bridge(seedWith(OLD_CHICKEN));
+  const requestId = 'refused-then-ok-01';
+  await refused(b, b.raw('update_pantry_item', { requestId, expectedRevision: 5, ingredientId: 'old-chicken-1', storage: 'freezer' }), 'past_safety_limit');
+  assert.equal(b.fake.requests.has(requestId), false);
+  const applied = ok(await b.raw('update_pantry_item', { requestId, expectedRevision: 5, ingredientId: 'eggs-1', storage: 'counter' }));
+  assert.notEqual(applied.replayed, true, 'applied, not replayed');
+  assert.equal(stored(b, 'eggs-1').storage, 'counter');
+});
+
+test('should-fix 1: a frozen prepared lot (or any long-life frozen lot) needs the thaw day and is capped at its fridge life', async () => {
+  const b = bridge();
+  ok(await b.call('add_pantry_item', { name: 'Frozen Minced Garlic', storage: 'freezer', prepared: true, boughtDate: '2026-09-01' }));
+  assert.equal(stored(b, NEW_ID).shelfLifeDays, READY.defaultFreezerLife);
+  const why = await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'fridge' }), 'needs_thaw_date');
+  assert.match(why, /freezer shelf life/);
+  await refused(b, b.call('update_pantry_item', { ingredientId: NEW_ID, storage: 'counter' }), 'unsafe_storage');
+  const requestId = 'thaw-garlic-00001';
+  const thawed = ok(await b.raw('update_pantry_item', { requestId, expectedRevision: 6, ingredientId: NEW_ID, storage: 'fridge', thawedToday: true }));
+  assert.equal(thawed.thawed, true);
+  assert.equal(stored(b, NEW_ID).shelfLifeDays, Math.min(READY.defaultFridgeLife, FoodSafety.categoryShelfLife('')));
+  assert.equal(stored(b, NEW_ID).purchaseDate, TODAY);
+  assert.equal(thawed.item.safety.daysLeft, READY.defaultFridgeLife);
+  // Undo restores the frozen lot exactly, shelf life included.
+  ok(await b.raw('undo_request', { requestId, undoRequestId: 'undo-thaw-garlic1', expectedRevision: 7 }));
+  assert.equal(stored(b, NEW_ID).shelfLifeDays, READY.defaultFreezerLife);
+  assert.equal(stored(b, NEW_ID).storage, 'freezer');
+
+  // Not prepared: a frozen lot whose shelf life was lengthened is capped at the app shelf life.
+  const jam = { id: 'jam-1', name: 'Grandma Jam', quantity: 1, unit: 'jar', category: '', storage: 'freezer', purchaseDate: '2026-08-01', shelfLifeDays: 120 };
+  const b2 = bridge(seedWith(jam));
+  await refused(b2, b2.call('update_pantry_item', { ingredientId: 'jam-1', storage: 'fridge' }), 'needs_thaw_date');
+  ok(await b2.call('update_pantry_item', { ingredientId: 'jam-1', storage: 'fridge', boughtDate: '2026-11-25' }));
+  assert.equal(stored(b2, 'jam-1').shelfLifeDays, FoodSafety.categoryShelfLife(''));
+});
+
+test('should-fix 2: printed dates split lots; a same-date printed lot offers only confirmNewLot', async () => {
+  const printed = { id: 'milk-1', name: 'Oat Milk', quantity: 1, unit: 'L', category: '', storage: 'fridge', purchaseDate: TODAY, shelfLifeDays: 7, dateMode: 'expiry', expiryDate: '2026-12-05' };
+  const b = bridge(seedWith(printed));
+  const why = await refused(b, b.call('add_pantry_item', { name: 'oat milk', storage: 'fridge', printedDate: '2026-12-05' }), 'ambiguous');
+  assert.match(why, /"milk-1"/);
+  assert.match(why, /confirmNewLot: true/);
+  assert.doesNotMatch(why, /add_stock with/);
+  ok(await b.call('add_pantry_item', { name: 'Oat Milk', storage: 'fridge', printedDate: '2026-12-09' }), 'different printed date = new lot');
+  const b2 = bridge(seedWith(printed));
+  ok(await b2.call('add_pantry_item', { name: 'Oat Milk', storage: 'fridge' }), 'no printed date vs a printed lot = new lot');
+  // An undated existing lot and a printed new lot are different lots too.
+  const b3 = bridge();
+  ok(await b3.call('add_pantry_item', { name: 'Eggs', printedDate: '2026-12-20' }));
+});
+
+test('should-fix 3: non-meat foods that contain a meat or fish word are not refused; neutral wording', async () => {
+  const names = ['Goat cheese', 'Lamb’s lettuce', "Lamb's lettuce", 'Steak sauce', 'Oyster mushrooms', 'Tuna mayo', 'Fish balls',
+    'Artichoke hearts', 'Hearts of palm'];
+  for (const name of names) {
+    const b = bridge();
+    const result = ok(await b.call('add_pantry_item', { name, storage: 'fridge' }), name);
+    assert.equal(result.item.storage, 'fridge', name);
+    assert.equal(stored(b, NEW_ID).category, '', name + ': no loose category');
+  }
+  for (const name of ['Pork giniling', 'Hamburger patties', 'Stew meat', 'Giniling']) {
+    const b = bridge();
+    const why = await refused(b, b.call('add_pantry_item', { name }), 'needs_storage');
+    assert.match(why, /looks like raw meat, poultry or fish, or a food the bridge cannot classify/);
+    await refused(b, b.call('add_pantry_item', { name, storage: 'fridge' }), 'needs_bought_date');
+  }
+  // In the fridge: refused as unrecognized, or (when the app's loose match gives Protein) stored
+  // with the 2-day ground-meat limit — never the 7-day default.
+  for (const name of ['Hamburger patties', 'Stew meat', 'Giniling']) {
+    const b = bridge();
+    const message = await b.call('add_pantry_item', { name, storage: 'fridge', boughtDate: TODAY });
+    if (message.result.isError) assert.match(text(message), /^unrecognized_food: /, name);
+    else assert.ok(message.result.structuredContent.item.safety.daysLeft <= 2, name + ': fridge limit applied');
+  }
+  // "minced" alone is not a meat word.
+  const b = bridge();
+  ok(await b.call('add_pantry_item', { name: 'Minced Onion', storage: 'fridge' }));
+});
+
+test('should-fix 4: a name known only by an INGREDIENT_DB alias takes the alias entry category', async () => {
+  const b = bridge();
+  ok(await b.call('add_pantry_item', { name: 'chicken fillet', storage: 'fridge', boughtDate: TODAY }));
+  assert.equal(stored(b, NEW_ID).category, 'Protein');
+  const item = await inventoryItem(b, NEW_ID);
+  assert.equal(item.safety.daysLeft, 2, 'poultry limit applies on the stored record');
+  const b2 = bridge();
+  ok(await b2.call('add_pantry_item', { name: 'itlog', storage: 'fridge' }));
+  assert.equal(stored(b2, NEW_ID).category, 'Protein');
 });

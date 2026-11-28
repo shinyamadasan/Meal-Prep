@@ -5,6 +5,33 @@
 
 ---
 
+## TASK-099 · 2026-11-27 · STRICT review fixes (M1, M2a-d, should-fix 1-5)
+Builder: Claude sub-agent standing in for Codex.
+bridge: `npm run test:bridge` 406 passed, 0 failed. `test/mcp-pantry-items.node.js` 26 tests (17
+  before): new M1, M2a, M2b-c, M2b unknown-date, requestId-unspent, SF1, SF2, SF3, SF4 cases;
+  the prepared-life test updated (freezer = `defaultFreezerLife`, no longer `min(90, 7)`); the
+  tools/list test asserts every new refusal code is named in the descriptions. Every refusal case
+  goes through `refused()`: no commit, user document and request records byte-identical.
+mutation check: disabling each new guard fails tests: move-into-fridge `unrecognized_food` 1;
+  update counter refusal 1; add counter refusal 1; leave-fridge past-limit/unknown-date 3;
+  later-bought-date 1; freezer->fridge shelf-life cap 1; printed-date lot split 1; false-friend
+  exclusions 1; alias category 2.
+full local: `npm test` (Playwright local, port 47813 waited for until free, never killed) 911
+  passed, 1 failed: `tests/tombstone-namespace.spec.js` "Firestore payload and load round-trip
+  namespaced tombstones", 3/3 on re-run. Pre-existing date time bomb, not this change: the
+  fixture `TOMB = '2026-06-01T00:00:00.000Z'` is now older than `purgeOldTombstones()`'s 180-day
+  cutoff (today minus 180 days = 2026-06-01T04:19Z), so the app purges it on load. That spec loads
+  no bridge code, and this task may not touch app tests, so it is left for Claude to schedule
+  (fixture date relative to today). Rewritten `feature-evidence/` screenshots restored.
+ledger: `npm run test:ledger-contract` 13 passed.
+static: `node --check` on `src/operations/pantryItems.js`, `src/mcp.js`; `git diff --check` clean.
+self-review/qa: app.js, shared/, index.html, style.css and the ledger are untouched; no stored-shape
+  change (only `shelfLifeDays` is newly edited, and the app already reads it); every write is still
+  one `requestWriteTool()` commit with its request record; undo restores `shelfLifeDays`.
+untested: production Firestore, live ChatGPT, deploy (none done).
+result: bridge and ledger pass; one unrelated, pre-existing Playwright failure recorded above.
+  TASK-099 stays `review`.
+
 ## TASK-099 · 2026-11-27 · add_pantry_item + update_pantry_item (PROP-041 P2-1, P2-2)
 Builder: Claude sub-agent standing in for Codex.
 suite: `npm run test:bridge` 397/397 PASS (baseline on prop041-p2 99a4bce: 380; +17 in

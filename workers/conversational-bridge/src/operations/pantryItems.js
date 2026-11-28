@@ -2,19 +2,21 @@
 // (TASK-099, PROP-041 P2-1 + P2-2; owner decisions D2-D3, D-092).
 //
 // add_pantry_item builds exactly the record the app's own Add paths build (app.js addToPantry() and
-// the grocery `buy_` path in stockPurchasedGroceryItem()): id `buy_<ms>_<rand5>`, exact-name
-// INGREDIENT_DB category / shelf life / unit / staple flag, purchaseDate = household day, storage,
-// quantity, printed date. Only the shared rules (shared/foodSafety.js, MealPrepFoodSafety) and the
-// shared ready-food contract are used; no app-only table (PANTRY_KNOWLEDGE) is copied, and the app's
-// loose inferCategory match is used only where it is stricter (see categoryFor), so a name the
-// shared data cannot place is asked about, never guessed.
+// the grocery `buy_` path in stockPurchasedGroceryItem()): id `buy_<ms>_<rand5>`, INGREDIENT_DB
+// category (exact name, else exact alias, else the app's loose match only when it gives Protein to a
+// name that reads as raw meat, poultry or fish), exact-name shelf life / unit / staple flag,
+// purchaseDate = household day, storage, quantity, printed date. Only the shared rules
+// (shared/foodSafety.js, MealPrepFoodSafety) and the shared ready-food contract are used; no
+// app-only table (PANTRY_KNOWLEDGE) is copied, so a name the shared data cannot place is asked
+// about, never guessed.
 //
-// Raw meat, poultry and fish never get an invented storage or date (D3): a lot the shared fridge
-// safety rules cover (or whose unknown name reads as meat or fish) must name its storage and its
-// bought date, never goes on the counter, and a fridge lot already past its fridge limit is refused.
-// A same-name lot with the same bought day and storage is `ambiguous` (add_stock to it, or confirm a
-// new lot; only a new lot when either has a printed date); a different day, storage or printed date
-// is always a new lot, so two safety clocks are never merged.
+// Raw meat, poultry and fish (and a meat or fish name the ingredient list does not know) never get
+// an invented storage or date and never go on the counter (D3): such a lot must name its storage
+// (fridge or freezer) and its bought date, and a fridge lot already past its fridge limit on the day
+// it was bought is refused. A same-name lot with the same bought day, storage and printed date is
+// `ambiguous` (add_stock to it when neither has a printed date, or confirm a new lot); anything else
+// is a new lot, so two safety clocks are never merged. update_pantry_item never lets an edit make
+// such a lot read safer than it is (see updatePantryItem).
 //
 // Pure: no Firestore, no clock (callers pass the household day, the time and a random source).
 import { AmbiguousError, NotFoundError, ValidationError } from '../errors.js';
@@ -42,10 +44,13 @@ const NAME_ONLY_GROUND = { safetyClass: 'ground', days: 2, match: /\b(?:giniling
 // Words that make a meat or fish word part of a non-meat food ("Goat cheese", "Lamb's lettuce",
 // "Steak sauce", "Oyster mushrooms", "Tuna mayo", "Fish balls", "Artichoke hearts", "Hearts of
 // palm", "Hamburger buns"). Used ONLY for names INGREDIENT_DB does not know; the shared rules for
-// known names are untouched. Kept narrow on purpose: a word that can also name a raw cut or a cooked
-// dish ("cubes", "balls", "chips" as in fish and chips, "butter" as in butter chicken) is not
-// listed, so such a name is still asked about.
-const NAME_ONLY_FALSE_FRIENDS = /\b(?:cheeses?|mushrooms?|sauces?|lettuces?|palms?|mayo|mayonnaise|artichokes?|fish[ -]?balls?|dressings?|pastes?|broths?|stocks?|bouillon|seasonings?|flavou?r(?:ed|ings?)|crackers?|crisps|noodles?|ramen|oils?|ketchup|gravy|marinades?|rubs?|buns?|breads?)\b/i;
+// known names are untouched.
+const NAME_ONLY_FALSE_FRIENDS = new RegExp('\\b(?:' + [
+  'cheeses?', 'mushrooms?', 'sauces?', 'lettuces?', 'palms?', 'mayo', 'mayonnaise', 'balls?', 'artichokes?',
+  'dressings?', 'pastes?', 'broths?', 'stocks?', 'bouillon', 'cubes?', 'seasonings?', 'flavou?r(?:ed|ing)?s?',
+  'chips?', 'crackers?', 'crisps?', 'noodles?', 'ramen', 'oils?', 'ketchup', 'gravy', 'marinades?', 'rubs?',
+  'buns?', 'breads?', 'milk', 'yogh?urts?', 'creams?', 'butter'
+].join('|') + ')\\b', 'i');
 
 function dbEntryByExactName(name) {
   const n = name.toLowerCase().trim();
@@ -129,31 +134,28 @@ function fridgeClock(record, today) {
   };
 }
 
-// The fridge shelf life of a lot leaving the freezer. A prepared lot add_pantry_item put in the
-// freezer carries the ready-food freezer life and no stored marker, so a frozen lot whose shelf life
-// is exactly that, and is not the raw item's own life, is read as prepared: in the fridge it gets the
-// ready-food fridge life, never longer than the raw item's. Any other lot gets the app's
-// ingredientShelfLife() (exact-name DB value, else the category default).
+// The fridge shelf life of a lot leaving the freezer. A bridge-prepared frozen lot carries the
+// ready-food freezer life; in the fridge it gets the ready-food fridge life (never longer than the
+// raw item's). Any other lot gets the app's ingredientShelfLife() (exact-name DB value, else the
+// category default).
 function fridgeLifeFor(record) {
   const raw = rawShelfLife(dbEntryByExactName(String(record.name || '')), record.category);
-  if (record.shelfLifeDays === READY_FOOD_CONTRACT.defaultFreezerLife && raw !== READY_FOOD_CONTRACT.defaultFreezerLife) {
+  if (record.shelfLifeDays === READY_FOOD_CONTRACT.defaultFreezerLife && raw < READY_FOOD_CONTRACT.defaultFreezerLife) {
     return Math.min(READY_FOOD_CONTRACT.defaultFridgeLife, raw);
   }
   return raw;
 }
 
 const CHECK_IN_APP = 'Ask the user to check the item in the app.';
-// Neutral wording: the name matched a fridge safety rule; it is not a claim about what the food is.
-const MAY_BE_RAW = 'may be raw meat, poultry or fish (a food with a fridge safety limit)';
 
 function unsafeCounterError(name) {
-  return new ValidationError('unsafe_storage: "' + name + '" ' + MAY_BE_RAW + ', so it is not ' +
-    'recorded on the counter (it needs the fridge or the freezer). ' + CHECK_IN_APP,
+  return new ValidationError('unsafe_storage: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+    'classify, so it is not recorded on the counter (it needs the fridge or the freezer). ' + CHECK_IN_APP,
   { field: 'storage', code: 'unsafe_storage' });
 }
 
 function unrecognizedFoodError(name, unknownFood) {
-  return new ValidationError('unrecognized_food: "' + name + '" may be ' + unknownFood + ' food, but it is not in the app\'s ' +
+  return new ValidationError('unrecognized_food: "' + name + '" looks like ' + unknownFood + ' food, but it is not in the app\'s ' +
     'ingredient list under that name, so its fridge safety limit cannot be applied. Use the ingredient\'s name as the app ' +
     'lists it (for example "Salmon", "Chicken Breast", "Pork Chop"), or ask the user to check the item in the app.',
   { field: 'name', code: 'unrecognized_food' });
@@ -261,8 +263,8 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   let storageSource = 'given';
   if (storage === undefined) {
     if (safetyLot) {
-      throw new ValidationError('needs_storage: "' + name + '" ' + MAY_BE_RAW + ', so ' +
-        'its storage is never guessed. Ask the user whether it is in the fridge or the freezer, and send storage.',
+      throw new ValidationError('needs_storage: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+        'classify, so its storage is never guessed. Ask the user whether it is in the fridge or the freezer, and send storage.',
       { field: 'storage', code: 'needs_storage' });
     }
     storage = effectiveStorage({ name });
@@ -275,8 +277,8 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   if (storage === 'counter' && safetyLot) throw unsafeCounterError(name);
 
   if (args.boughtDate === undefined && safetyLot) {
-    throw new ValidationError('needs_bought_date: "' + name + '" ' + MAY_BE_RAW + ', so ' +
-      'its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use ' +
+    throw new ValidationError('needs_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+      'classify, so its bought date is never assumed. Ask the user what day it was bought and send boughtDate (YYYY-MM-DD); use ' +
       'today only if they said "today" or "just bought".', { field: 'boughtDate', code: 'needs_bought_date' });
   }
 
@@ -329,23 +331,17 @@ export function addPantryItem(pantry, deletionsPantry, args, { today, nowMs, ran
   record.updatedAt = new Date(nowMs).toISOString();
 
   if (args.confirmNewLot !== true) {
-    // Two different printed dates are two different lots (never asked about). When either lot has a
-    // printed date, add_stock is not offered: it has no printed-date input, so a merge could lose or
-    // mix up the date the lot is tracked by. Only a separate lot (confirmNewLot) is offered then.
+    // Lots with different printed dates are different lots. A printed-date lot is never merged by
+    // add_stock (it has no printed-date input), so only a separate lot is offered then.
     const newPrinted = args.printedDate !== undefined ? args.printedDate : null;
-    const twins = (pantry || []).filter((p) => {
-      if (!isStoredRecord(p) || !readableId(p.id) || !sameText(p.name, name)) return false;
-      if (p.purchaseDate !== purchaseDate || effectiveStorage(p) !== storage) return false;
-      if (deletionsPantry && Object.hasOwn(deletionsPantry, String(p.id))) return false;
-      const printed = printedDateOf(p);
-      return !(printed && newPrinted && printed !== newPrinted);
-    });
+    const twins = (pantry || []).filter((p) => isStoredRecord(p) && readableId(p.id) && sameText(p.name, name) &&
+      p.purchaseDate === purchaseDate && effectiveStorage(p) === storage && printedDateOf(p) === newPrinted &&
+      !(deletionsPantry && Object.hasOwn(deletionsPantry, String(p.id))));
     if (twins.length) {
       const ids = twins.map((p) => '"' + String(p.id) + '"').join(', ');
-      const anyPrinted = newPrinted != null || twins.some((p) => printedDateOf(p) != null);
       const where = '"' + name + '" bought ' + purchaseDate + ' and stored in the ' + storage +
-        ' is already recorded (ingredientId ' + ids + '). ';
-      const message = anyPrinted
+        (newPrinted ? ' with printed date ' + newPrinted : '') + ' is already recorded (ingredientId ' + ids + '). ';
+      const message = newPrinted
         ? where + 'Ask the user whether this is a separate lot; if so, call add_pantry_item again with confirmNewLot: true (and a ' +
           'new requestId). add_stock cannot be used for a lot with a printed date.'
         : where + 'Ask the user which they mean: 1) more of that same lot -> add_stock with that ingredientId; or 2) a separate lot ' +
@@ -399,8 +395,8 @@ const EDITED_FIELDS = ['storage', 'purchaseDate', 'expiryDate', 'dateMode', 'pri
 
 function pastLimitError(name, clock, when) {
   if (clock.daysLeft == null) {
-    return new ValidationError('unknown_bought_date: "' + name + '" ' + MAY_BE_RAW + ', and ' +
-      'its bought date is not known, so ' + when + ' cannot be done from chat. ' + CHECK_IN_APP,
+    return new ValidationError('unknown_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+      'classify, and its bought date is not known, so ' + when + ' cannot be done from chat. ' + CHECK_IN_APP,
     { field: 'boughtDate', code: 'unknown_bought_date' });
   }
   return new ValidationError('past_safety_limit: "' + name + '" is past its ' + clock.limitDays + '-day fridge safety limit (' +
@@ -476,8 +472,8 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
       throw pastLimitError(name, { daysLeft: null }, 'setting its bought date');
     }
     if (next.purchaseDate > record.purchaseDate) {
-      throw new ValidationError('later_bought_date: "' + name + '" ' + MAY_BE_RAW + '; ' +
-        'its bought date (' + record.purchaseDate + ') can only be corrected to an earlier day from chat, because a later ' +
+      throw new ValidationError('later_bought_date: "' + name + '" looks like raw meat, poultry or fish, or a food the bridge cannot ' +
+        'classify; its bought date (' + record.purchaseDate + ') can only be corrected to an earlier day from chat, because a later ' +
         'day would hide fridge time it already used. The only exception is thawing: moving it from the freezer to the fridge with ' +
         'thawedToday or the day it moved. ' + CHECK_IN_APP, { field: 'boughtDate', code: 'later_bought_date' });
     }
@@ -494,7 +490,7 @@ export function updatePantryItem(pantry, deletionsPantry, args, { today, nowMs }
   const thawing = leavesFreezerForFridge && (safetyLot || longLife);
   if (thawing && !thawDateGiven) {
     const why = safetyLot
-      ? MAY_BE_RAW + '; moved'
+      ? 'looks like raw meat, poultry or fish, or a food the bridge cannot classify; moved'
       : 'has a freezer shelf life; moved';
     throw new ValidationError('needs_thaw_date: thaw reminder - "' + name + '" ' + why + ' from the freezer to the fridge, its ' +
       'fridge time counts from the day it thawed, not the day it was bought or made. Ask the user: if it moved to the fridge ' +
