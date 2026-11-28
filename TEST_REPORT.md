@@ -5,6 +5,13 @@
 
 ---
 
+## TASK-098 review fixes · 2026-11-27 · commit abf7373
+suite: `npm run test:bridge` 416/416 PASS; `npm run test:ledger-contract` 13/13 PASS; `npm test` (local)
+911/912 — the 1 failure is `tests/tombstone-namespace.spec.js` "Firestore payload and load round-trip
+namespaced tombstones", a date-dependent fixture (tombstone dated 2026-06-01 is purged by the app's
+180-day rule after 2026-11-28 UTC). It fails identically on `main`; the branch changes no app file.
+Fixed separately as TASK-102 (test-only). `node --check` and `git diff --check` clean.
+
 ## TASK-098 · 2026-11-27 · staple stock levels + items with no amount (PROP-041 P2-3 + P2-0b)
 Builder: Claude sub-agent standing in for Codex.
 suite: `npm run test:bridge` 406/406 PASS (baseline on prop041-p2 99a4bce: 380; +26 in

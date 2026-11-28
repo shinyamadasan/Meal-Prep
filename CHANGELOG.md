@@ -5,6 +5,21 @@
 
 ---
 
+## TASK-098 — review fixes (branch: task-098-stock-levels; commit abf7373)
+Builder: Claude sub-agent standing in for Codex (run cut off by a usage limit after committing; this
+evidence entry was added by Claude when resuming, 2026-11-27). Fixes for the independent STRICT review FAIL:
+  - MF-1 food safety: `set_stock_level` `makeStaple` refuses (`unsafe_conversion:`, zero writes,
+    requestId unspent) when the item is not usable today or the conversion would change its safety
+    verdict (status, reason or usable); verdicts from the reads' `pantrySafety` for the household day.
+  - MF-2 app parity: a new level of `full` / `ok` deletes `suggestDismissed` (the app's rule in
+    `syncStapleToGrocery` / `cycleStapleLevel`); undo restores it.
+  - Should-fix: README Shop timing (`checkAndReplenishLowStock`); stray non-staple `stockLevel:'empty'`
+    removed on `set_inventory_quantity {unit}` when `pantryLotAvailable` then reads it available, else
+    `stale_stock_level`; `makeStaple` drops a stray quantity <= 0; TRACKING_TEXT availability comes from
+    `inStock` / `safety.usable`; `add_stock` staple refusal names `set_stock_level`.
+  - Correction to the implementation entry below: 7 existing test files were updated plus
+    `test/support/requestIds.js` (not 9 test files).
+
 ## TASK-098 — implementation complete (branch: task-098-stock-levels; base: prop041-p2 99a4bce)
 Builder: Claude sub-agent standing in for Codex. PROP-041 Phase 2 priorities 2-3 (P2-3 + P2-0b), owner
 decision D1. Bridge only; `app.js`, `shared/`, `index.html`, the ledger and every Phase 1 guard untouched.
